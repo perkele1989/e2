@@ -628,3 +628,4 @@ Engine2/assets/
 Engine2/*/bin/
 Engine2/*/lib/
 Engine2/*/reflection/
+!templates/project.vcxproj.user

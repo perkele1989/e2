@@ -1,0 +1,84 @@
+{
+    "targets" : [
+        {
+            "name": "core",
+            "type": "shared-library",
+            "reflection": "enabled",
+            "api": "E2_API",
+            "source-paths": [ "e2.core/src" ],
+            "public": {
+                "defines": {
+                    "GLM_FORCE_DEPTH_ZERO_TO_ONE": "1"
+                },
+                "defines-devel": {
+                    "GLM_FORCE_DEPTH_ZERO_TO_ONE": "1",
+                    "E2_DEVELOPMENT": "true"
+                },
+                "dependencies": [ "glm.core", "glfw.core" ],
+                "include-paths": [ "e2.core/include", "!%VULKAN_SDK%/Include" ]
+            },
+            "private": {
+                "defines": { 
+                    "E2_BUILD": "true",
+                    "VK_USE_PLATFORM_WIN32_KHR": "true"
+                },
+                "defines-devel": { 
+                    "E2_BUILD": "true",
+                    "VK_USE_PLATFORM_WIN32_KHR": "true"
+                },
+                "include-paths": [ "e2.core/private" ],
+                "dependencies": [ "libshaderc.core" ]
+            }
+        },
+        {
+            "name": "tests",
+            "type": "application",
+            "reflection": "enabled",
+            "source-paths": [ "e2.tests/src" ],
+            "private": {
+                "dependencies": [ "e2.core"],
+                "include-paths": [ "e2.tests/include" ]
+            }
+        },
+        {
+            "name": "editor",
+            "type": "application",
+            "reflection": "enabled",
+            "source-paths": [ "e2.editor/src" ],
+            "private": {
+                "dependencies": [ "e2.core", "assimp.core"],
+                "include-paths": [ "e2.editor/include" ]
+            }
+        },
+        {
+            "name": "demo",
+            "type": "application",
+            "reflection": "enabled",
+            "source-paths": [ "e2.demo/src" ],
+            "private": {
+                "dependencies": [ "e2.core"],
+                "include-paths": [ "e2.demo/include" ]
+            }
+        },
+        {
+            "name": "rhisandbox",
+            "type": "application",
+            "reflection": "enabled",
+            "source-paths": ["e2.rhisandbox/src"],
+            "private": {
+                "dependencies": [ "e2.core" ],
+                "include-paths": [ "e2.rhisandbox/include" ]
+            }
+        },
+        {
+            "name": "game",
+            "type": "application",
+            "reflection": "enabled",
+            "source-paths": ["e2.game/src"],
+            "private": {
+                "dependencies": ["e2.core"],
+                "include-paths": ["e2.game/include"]
+            }
+        }
+    ]
+}
