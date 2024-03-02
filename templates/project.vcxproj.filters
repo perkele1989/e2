@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+  {% for filter in project.filters: %}
+    <Filter Include="{{ filter.path }}">
+      <UniqueIdentifier>{{ filter.guid }}</UniqueIdentifier>
+    </Filter>
+  {% endfor %}
+  {% for inc in project.filter_includes: %}
+    <ClInclude Include="{{ inc.path }}">
+      <Filter>{{ inc.filter.path }}</Filter>
+    </ClInclude>
+  {% endfor  %}
+  {% for src in project.filter_sources: %}
+    <ClCompile Include="{{ src.path }}">
+      <Filter>{{ src.filter.path }}</Filter>
+    </ClCompile>
+  {% endfor  %}
+  </ItemGroup>
+</Project>
