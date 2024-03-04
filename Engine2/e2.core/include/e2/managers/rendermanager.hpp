@@ -119,6 +119,10 @@ namespace e2
 			return m_linePipelineLayout;
 		}
 
+		e2::IShader* fullscreenTriangleShader();
+
+		void invalidatePipelines();
+
 	protected:
 
 		e2::IRenderContext* m_renderContext{};
@@ -127,6 +131,8 @@ namespace e2
 		e2::ISampler* m_frontBufferSampler;
 		e2::ISampler* m_brdfSampler;
 		e2::Texture2DPtr m_integratedBrdf;
+
+		e2::IShader* m_fullscreenTriangleShader{};
 
 		e2::Texture2DPtr m_defaultTexture;
 		e2::FontPtr m_defaultFont[size_t(e2::FontFace::Count)];

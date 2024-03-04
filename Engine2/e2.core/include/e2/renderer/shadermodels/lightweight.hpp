@@ -94,6 +94,9 @@ namespace e2
 		virtual e2::IPipelineLayout* getOrCreatePipelineLayout(e2::MeshProxy* proxy, uint8_t submeshIndex) override;
 		virtual e2::IPipeline* getOrCreatePipeline(e2::MeshProxy* proxy, uint8_t submeshIndex, e2::RendererFlags rendererFlags) override;
 
+
+		virtual void invalidatePipelines() override;
+
 		e2::IdArena<uint32_t, e2::maxNumLightweightProxies> proxyIds;
 
 	protected:

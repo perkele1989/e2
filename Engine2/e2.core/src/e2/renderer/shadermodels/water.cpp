@@ -133,11 +133,37 @@ static char const* commonSource = R"SRC(
 		  return 130.0 * dot(m, g);
 	}
 
+
+	float sampleSimplex(vec2 position, float scale)
+	{
+		return simplex(position*scale) * 0.5 + 0.5;
+	}
+
+	float sampleBaseHeight(vec2 position)
+	{
+		float h1p = 0.42;
+		float scale1 = 0.058;
+		float h1 = pow(sampleSimplex(position, scale1), h1p);
+
+		float semiStart = 0.31;
+		float semiSize = 0.47;
+		float h2p = 0.013;
+		float h2 = smoothstep(semiStart, semiStart + semiSize, sampleSimplex(position, h2p));
+
+		float semiStart2 = 0.65; 
+		float semiSize2 = 0.1;
+		float h3p = (0.75 * 20) / 5000;
+		float h3 = 1.0 - smoothstep(semiStart2, semiStart2 + semiSize2, sampleSimplex(position, h3p));
+		return h1 * h2 * h3;
+	}
+
+
+
 	float sampleWaterDepth(vec2 position)
 	{
-		float simp = clamp(simplex(position*0.05f) * 0.5 + 0.5, 0.0, 1.0);
+		float baseHeight = sampleBaseHeight(position);
 
-		float depthCoeff = smoothstep(0.35, 0.75, simp);
+		float depthCoeff = smoothstep(0.03, 0.39, baseHeight);
 
 		return 1.0 - depthCoeff;
 	}
@@ -312,6 +338,7 @@ void main()
 
 	vec3 finalDark = mix(shoreDark, oceanDark, d);
 	vec3 finalLight = mix(pow(lightWater, vec3(0.4)), lightWater, d);
+
 	//vec3 finalLight = lightWater;
 
 	vec3 r = reflect(v, n);
@@ -338,7 +365,7 @@ void main()
 	//baseColor = mix(baseColor, frontBuffer, viewDepthCoeff);
 	
 	vec3 foamColor = vec3(0.867, 0.89, 0.9);
-	baseColor = mix(baseColor, foamColor, pow(viewDepthCoeffFoam, 0.25)*0.75);
+	baseColor = mix(baseColor, foamColor, (pow(viewDepthCoeffFoam, 0.25)*0.75));
 
 	outColor.rgb =vec3(0.0, 0.0, 0.0);
 
@@ -525,18 +552,20 @@ e2::IPipeline* e2::WaterModel::getOrCreatePipeline(e2::MeshProxy* proxy, uint8_t
 	if ((lwFlags & e2::WaterFlags::Albedo) == e2::WaterFlags::Albedo)
 		shaderInfo.defines.push({ "Material_Albedo", "1" });
 
-	std::stringstream vertexBuilder;
-	vertexBuilder << vertexHeader << commonSource << vertexSource;
-	std::string vs = vertexBuilder.str();
+	std::string vertexSource;
+	if (!e2::readFileWithIncludes("shaders/water/water.vertex.glsl", vertexSource))
+		LogError("broken distribution");
+
 	shaderInfo.stage = ShaderStage::Vertex;
-	shaderInfo.source = vs.c_str();
+	shaderInfo.source = vertexSource.c_str();
 	newEntry.vertexShader = renderContext()->createShader(shaderInfo);
 
-	std::stringstream fragmentBuilder;
-	fragmentBuilder << fragmentHeader << commonSource << fragmentSource;
-	std::string fs = fragmentBuilder.str();
+	std::string fragmentSource;
+	if (!e2::readFileWithIncludes("shaders/water/water.fragment.glsl", fragmentSource))
+		LogError("broken distribution");
+
 	shaderInfo.stage = ShaderStage::Fragment;
-	shaderInfo.source = fs.c_str();
+	shaderInfo.source = fragmentSource.c_str();
 	newEntry.fragmentShader = renderContext()->createShader(shaderInfo);
 
 	e2::PipelineCreateInfo pipelineInfo;
@@ -549,6 +578,26 @@ e2::IPipeline* e2::WaterModel::getOrCreatePipeline(e2::MeshProxy* proxy, uint8_t
 
 	m_pipelineCache[uint16_t(lwFlags)] = newEntry;
 	return newEntry.pipeline;
+}
+
+void e2::WaterModel::invalidatePipelines()
+{
+	for (uint16_t i = 0; i < uint16_t(e2::WaterFlags::Count); i++)
+	{
+		e2::WaterCacheEntry& entry = m_pipelineCache[i];
+
+		if (entry.vertexShader)
+			e2::discard(entry.vertexShader);
+		entry.vertexShader = nullptr;
+
+		if (entry.fragmentShader)
+			e2::discard(entry.fragmentShader);
+		entry.fragmentShader = nullptr;
+
+		if (entry.pipeline)
+			e2::discard(entry.pipeline);
+		entry.pipeline = nullptr;
+	}
 }
 
 e2::RenderLayer e2::WaterModel::renderLayer()

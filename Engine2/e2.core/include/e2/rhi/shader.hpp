@@ -31,6 +31,7 @@ namespace e2
 		IShader(IRenderContext* context, e2::ShaderCreateInfo const& createInfo);
 		virtual ~IShader();
 
+		virtual bool valid() = 0;
 	};
 }
 

@@ -18,9 +18,11 @@ namespace e2
 		IShader_Vk(IRenderContext* context, e2::ShaderCreateInfo const& createInfo);
 		virtual ~IShader_Vk();
 
+		virtual bool valid() override;
+
 		VkShaderStageFlagBits m_vkStage;
 		VkShaderModule m_vkHandle{};
-
+		bool m_valid{};
 	};
 
 }

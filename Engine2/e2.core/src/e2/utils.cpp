@@ -268,6 +268,7 @@ uint32_t e2::calculateMipLevels(glm::uvec2 const& resolution)
 	return uint32_t(1 + glm::floor(glm::log2(glm::max(resolution.x, resolution.y))));
 }
 
+
 e2::Object* e2::createDynamic(Name typeName)
 {
 	e2::Type* type = e2::Type::fromName(typeName);

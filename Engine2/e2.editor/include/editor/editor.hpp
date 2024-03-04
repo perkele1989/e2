@@ -8,7 +8,13 @@
 
 #include <editor/editorcontext.hpp>
 
+#include <filesystem>
 #include <set>
+
+//#define WIN32_LEAN_AND_MEAN
+//#include <Windows.h>
+
+typedef void* HANDLE;
 
 namespace e2
 {
@@ -57,15 +63,60 @@ namespace e2
 
 		virtual void tick(double seconds);
 
-		e2::MeshComponent* m3{};
-
-		e2::MeshPtr generatedMesh;
-
 	protected:
-		e2::ALJTicket m_ticket;
-		bool m_loaded;
+
 	};
 
+	struct ProcGenConstants
+	{
+		glm::uvec2 resolution;
+		float zoom{ 1.0f };
+
+		float param1{ 1.0f };
+		float param2{ 1.0f };
+		float param3{ 1.0f };
+		float param4{ 1.0f };
+		float param5{ 1.0f };
+		float param6{ 1.0f };
+		float param7{ 1.0f };
+		float param8{ 1.0f };
+		float param9{ 1.0f };
+		float param10{ 1.0f };
+		float param11{ 1.0f };
+		float param12{ 1.0f };
+		float param13{ 1.0f };
+		float param14{ 1.0f };
+		float param15{ 1.0f };
+		float param16{ 1.0f };
+	};
+
+	class ProcGenWorkspace : public e2::Workspace
+	{
+	public:
+		ProcGenWorkspace(e2::Editor* ed);
+		virtual ~ProcGenWorkspace();
+		virtual void update(double deltaSeconds) override;
+
+		void updateShaderWatchdog();
+
+	protected:
+
+		ProcGenConstants m_constants;
+
+		float m_leftSize{ 100.0f };
+		e2::IRenderTarget* m_outputTarget{};
+		e2::ITexture* m_outputTexture{};
+		glm::uvec2 m_outputSize{};
+
+		std::filesystem::file_time_type m_watchdogStamp;
+		HANDLE m_watchdogHandle;
+
+		e2::IShader* m_fragShader;
+		e2::IPipelineLayout* m_pipelineLayout;
+		e2::IPipeline* m_pipeline;
+		e2::Pair<e2::ICommandBuffer*> m_commandBuffers{ nullptr };
+
+	};
 
 	class WorldEditorWorkspace : public e2::Workspace
 	{
@@ -175,6 +226,9 @@ namespace e2
 
 		e2::WorldEditorWorkspace* spawnWorldEditor();
 		void destroyWorldEditor(e2::WorldEditorWorkspace* wrksp);
+
+		e2::ProcGenWorkspace* spawnProcGen();
+		void destroyProcGen(e2::ProcGenWorkspace* wrksp);
 
 	protected:
 		friend e2::EditorWindow;

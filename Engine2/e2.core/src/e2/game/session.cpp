@@ -12,6 +12,7 @@
 #include "e2/renderer/shadermodels/lightweight.hpp"
 #include "e2/managers/rendermanager.hpp"
 #include "e2/managers/assetmanager.hpp"
+#include "e2/managers/gamemanager.hpp"
 
 #include "e2/renderer/meshproxy.hpp"
 
@@ -42,11 +43,12 @@ e2::Session::Session(e2::Context* ctx)
 	m_modelSets[0]->writeDynamicBuffer(0, m_modelBuffers[0], dynamicSize, 0);
 	m_modelSets[1]->writeDynamicBuffer(0, m_modelBuffers[1], dynamicSize, 0);
 
-	
+	gameManager()->registerSession(this);
 }
 
 e2::Session::~Session()
 {
+	gameManager()->unregisterSession(this);
 	std::unordered_set<e2::World*> tmpWorlds = m_worlds;
 	for (e2::World* world : tmpWorlds)
 	{
@@ -187,6 +189,16 @@ e2::MaterialProxy* e2::Session::getOrCreateDefaultMaterialProxy(e2::MaterialPtr 
 	}
 
 	return finder->second;
+}
+
+void e2::Session::invalidateAllPipelines()
+{
+
+	std::unordered_set<e2::MeshProxy*> copy = m_meshProxies;
+	for (e2::MeshProxy* proxy : copy)
+	{
+		proxy->invalidatePipeline();
+	}
 }
 
 bool e2::MeshProxySubmesh::operator==(const MeshProxySubmesh& rhs) const

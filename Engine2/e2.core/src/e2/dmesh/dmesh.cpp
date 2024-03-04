@@ -440,9 +440,9 @@ void e2::DynamicMesh::calculateFaceNormals()
 			LogError("Vertex index out of bounds, refusing to calculate face normal");
 		}
 
-		Vertex& a = m_vertices[triangle.a];
+		Vertex& c = m_vertices[triangle.a];
 		Vertex& b = m_vertices[triangle.b];
-		Vertex& c = m_vertices[triangle.c];
+		Vertex& a = m_vertices[triangle.c];
 
 		glm::vec3 u = glm::normalize(b.position - a.position);
 		glm::vec3 v = glm::normalize(c.position - a.position);

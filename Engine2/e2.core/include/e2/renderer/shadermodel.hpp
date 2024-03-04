@@ -56,6 +56,8 @@ namespace e2
 
 		virtual e2::RenderLayer renderLayer();
 
+		virtual void invalidatePipelines()=0;
+
 	protected:
 		e2::Engine* m_engine{};
 

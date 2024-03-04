@@ -362,7 +362,7 @@ void e2::UIContext::label(e2::Name id, std::string const& text, uint8_t fontSize
 
 	// Y offset is always centered
 	//drawQuad(widgetState->position, widgetState->size, 0xFF00000F);
-	drawRasterTextShadow(FontFace::Serif, uint8_t(fontSize * style.scale), widgetState->position + glm::vec2(xOffset, widgetState->size.y / 2.0), text);
+	//drawRasterTextShadow(FontFace::Serif, uint8_t(fontSize * style.scale), widgetState->position + glm::vec2(xOffset, widgetState->size.y / 2.0), text);
 	drawRasterText(FontFace::Serif, uint8_t(fontSize * style.scale), style.windowFgColor, widgetState->position + glm::vec2(xOffset, widgetState->size.y / 2.0), text);
 	
 }
@@ -516,8 +516,32 @@ bool e2::UIContext::sliderInt(e2::Name id, int32_t& value, int32_t min, int32_t 
 
 bool e2::UIContext::sliderFloat(e2::Name id, float& value, float min, float max, char const* format /*= "%.3f"*/)
 {
-	constexpr glm::vec2 minSize(100.0f, 20.0f);
+	e2::UIStyle const& style = uiManager()->workingStyle();
+
+	constexpr glm::vec2 minSize(200.0f, 20.0f);
 	e2::UIWidgetState* widgetState = reserve(id, minSize);
+
+
+	bool mouseDown = widgetState->active&& widgetState->hovered&& m_mouseState.buttons[0].held;
+
+	drawQuad(widgetState->position, widgetState->size, style.windowFgColor);
+
+	float mouseX = (m_mouseState.relativePosition - widgetState->position).x;
+	float mouseNormalized = mouseX / widgetState->size.x;
+
+	if (mouseDown)
+	{
+		value = glm::clamp(mouseNormalized * (max - min), min, max);
+	}
+
+	float normalized = (value - min) / (max - min);
+	drawQuad(widgetState->position + glm::vec2(1.0f, 1.0f), glm::vec2( (widgetState->size.x * normalized) - 2.0f, widgetState->size.y - 2.0f ), style.accents[0]);
+
+	drawRasterText(e2::FontFace::Serif, 9, style.windowBgColorInactive, widgetState->position + glm::vec2(0.0f, widgetState->size.y / 2.0f), id.string());
+
+	std::string valueStr = std::format("{:.2f}", value);
+	float textWidth = calculateTextWidth(e2::FontFace::Monospace, 9, valueStr);
+	drawRasterText(e2::FontFace::Monospace, 9, style.windowBgColor, widgetState->position + glm::vec2(widgetState->size.x, widgetState->size.y / 2.0f) - glm::vec2(textWidth, 0.0f), valueStr);
 	return false;
 }
 

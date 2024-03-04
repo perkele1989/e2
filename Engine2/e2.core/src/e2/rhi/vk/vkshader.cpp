@@ -56,6 +56,7 @@ e2::IShader_Vk::IShader_Vk(IRenderContext* context, e2::ShaderCreateInfo const& 
 	, e2::ContextHolder_Vk(context)
 	
 {
+	m_valid = false;
 	m_vkStage = ::e2ToVk(createInfo.stage);
 
 	// Compile ze shader 
@@ -113,7 +114,9 @@ e2::IShader_Vk::IShader_Vk(IRenderContext* context, e2::ShaderCreateInfo const& 
 	shaderc::SpvCompilationResult sc_result = sc_compiler.CompileGlslToSpv(createInfo.source, sc_kind, "@todo", "main", sc_options);
 	if (sc_result.GetCompilationStatus() != shaderc_compilation_status_success)
 	{
-		LogError("Shader compilation failed: {} errors / {} warnings: {}", sc_result.GetNumErrors(), sc_result.GetNumWarnings(), sc_result.GetErrorMessage().c_str());
+		LogError("Shader compilation failed: {} errors / {} warnings:", sc_result.GetNumErrors(), sc_result.GetNumWarnings());
+		LogError("{}", sc_result.GetErrorMessage().c_str());
+		return;
 	}
 	
 	VkShaderModuleCreateInfo vkCreateInfo{ VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO };
@@ -125,10 +128,18 @@ e2::IShader_Vk::IShader_Vk(IRenderContext* context, e2::ShaderCreateInfo const& 
 	if (result != VK_SUCCESS)
 	{
 		LogError("vkCreateShaderModule failed: {}", int32_t(result));
+		return;
 	}
+
+	m_valid = true;
 }
 
 e2::IShader_Vk::~IShader_Vk()
 {
 	vkDestroyShaderModule(m_renderContextVk->m_vkDevice, m_vkHandle, nullptr);
+}
+
+bool e2::IShader_Vk::valid()
+{
+	return m_valid;
 }

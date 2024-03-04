@@ -24,15 +24,25 @@ e2::Game::~Game()
 
 void e2::Game::initialize()
 {
+	auto am = assetManager();
+
 	e2::ALJDescription alj;
-	assetManager()->prescribeALJ(alj, "assets/UI_ResourceIcons.e2a");
-	assetManager()->queueWaitALJ(alj);
-	m_uiTextureResources = assetManager()->get("assets/UI_ResourceIcons.e2a").cast<e2::Texture2D>();
+	am->prescribeALJ(alj, "assets/UI_ResourceIcons.e2a");
+	am->prescribeALJ(alj, "assets/SM_PalmTree001.e2a");
+	am->queueWaitALJ(alj);
+	m_uiTextureResources = am->get("assets/UI_ResourceIcons.e2a").cast<e2::Texture2D>();
+	m_cursorMesh = am->get("assets/SM_PalmTree001.e2a").cast<e2::Mesh>();
+
+	e2::MeshProxyConfiguration proxyConf;
+	proxyConf.mesh = m_cursorMesh;
+	m_cursorProxy = e2::create<e2::MeshProxy>(gameSession(), proxyConf);
+
 	m_hexGrid = e2::create<e2::HexGrid>(this);
 }
 
 void e2::Game::shutdown()
 {
+	e2::destroy(m_cursorProxy);
 	e2::destroy(m_hexGrid);
 }
 
@@ -48,6 +58,15 @@ void e2::Game::update(double seconds)
 	auto& mouse = ui->mouseState();
 
 
+	glm::vec2 resolution = renderer->resolution();
+	m_cursor = mouse.relativePosition;
+	m_cursorUnit = (m_cursor / resolution);
+	m_cursorNdc = m_cursorUnit * 2.0f - 1.0f;
+	m_cursorPlane = renderer->view().unprojectWorldPlane(renderer->resolution(), m_cursorNdc);
+	m_cursorHex = e2::Hex(m_cursorPlane);
+	m_cursorProxy->modelMatrix = glm::translate(glm::mat4(1.0f), m_cursorHex.localCoords());
+	m_cursorProxy->modelMatrix = glm::scale(m_cursorProxy->modelMatrix, glm::vec3(2.0f));
+	m_cursorProxy->modelMatrixDirty = true;
 
 	drawStatusUI();
 
@@ -83,10 +102,15 @@ void e2::Game::update(double seconds)
 		m_hexGrid->clearLoadTime();
 	}
 
+	if (kb.keys[int16_t(e2::Key::F5)].pressed)
+	{
+		renderManager()->invalidatePipelines();
+	}
+
 	updateMainCamera(seconds);
 	updateAltCamera(seconds);
 
-	m_hexGrid->assertChunksWithinRangeVisible({m_viewOrigin.x, m_viewOrigin.z}, m_viewPoints, m_viewVelocity > 2.0f);
+	m_hexGrid->assertChunksWithinRangeVisible(m_viewOrigin, m_viewPoints, m_viewVelocity);
 
 	renderer->debugLine(glm::vec3(1.0f), m_viewPoints.topLeft, m_viewPoints.topRight);
 	renderer->debugLine(glm::vec3(1.0f), m_viewPoints.topRight, m_viewPoints.bottomRight);
@@ -210,7 +234,6 @@ void e2::Game::drawStatusUI()
 
 void e2::Game::drawDebugUI()
 {
-	return;
 
 	e2::GameSession* session = gameSession();
 	e2::Renderer* renderer = session->renderer();
@@ -232,7 +255,7 @@ void e2::Game::drawDebugUI()
 	ui->drawRasterText(e2::FontFace::Monospace, 14, 0xFFFFFFFF, { xOffset, yOffset + (18.0f * 5.0f) }, std::format("^7Num. chunk meshes: {}", m_hexGrid->numChunkMeshes()));
 	ui->drawRasterText(e2::FontFace::Monospace, 14, 0xFFFFFFFF, { xOffset, yOffset + (18.0f * 6.0f) }, std::format("^8High loadtime: {:.2f}ms", m_hexGrid->highLoadTime()));
 	ui->drawRasterText(e2::FontFace::Monospace, 14, 0xFFFFFFFF, { xOffset, yOffset + (18.0f * 7.0f) }, std::format("^9Jobs in flight: {}", m_hexGrid->numJobsInFlight()));
-	ui->drawRasterText(e2::FontFace::Monospace, 14, 0xFFFFFFFF, { xOffset, yOffset + (18.0f * 8.0f) }, std::format("^2View Origin: {}", glm::vec2(m_viewOrigin.x, m_viewOrigin.z)));
+	ui->drawRasterText(e2::FontFace::Monospace, 14, 0xFFFFFFFF, { xOffset, yOffset + (18.0f * 8.0f) }, std::format("^2View Origin: {}", m_viewOrigin));
 	ui->drawRasterText(e2::FontFace::Monospace, 14, 0xFFFFFFFF, { xOffset, yOffset + (18.0f * 9.0f) }, std::format("^3View Velocity: {}", m_viewVelocity));
 
 }
@@ -261,7 +284,7 @@ void e2::Game::updateMainCamera(double seconds)
 	float viewAngle = glm::mix(35.0f, 50.0f, m_viewZoom);
 	float viewDistance = glm::mix(5.0f, 25.0f, m_viewZoom);
 
-	glm::vec3 oldOrigin = m_viewOrigin;
+	glm::vec2 oldOrigin = m_viewOrigin;
 
 	// move main camera 
 	if (kb.keys[int16_t(e2::Key::Left)].state)
@@ -275,35 +298,59 @@ void e2::Game::updateMainCamera(double seconds)
 
 	if (kb.keys[int16_t(e2::Key::Up)].state)
 	{
-		m_viewOrigin.z -= moveSpeed * seconds;
+		m_viewOrigin.y -= moveSpeed * seconds;
 	}
 	if (kb.keys[int16_t(e2::Key::Down)].state)
 	{
-		m_viewOrigin.z += moveSpeed * seconds;
+		m_viewOrigin.y += moveSpeed * seconds;
 	}
 
+	if (leftMouse.pressed)
+	{
+		m_dragView = calculateRenderView(m_viewDragOrigin);
+		// save where in world we pressed
+		m_cursorDragOrigin = m_dragView.unprojectWorldPlane(renderer->resolution(), m_cursorNdc);
+		m_viewDragOrigin = m_viewOrigin;
+		
+	}
+
+
+	const float dragMultiplier = glm::mix(0.01f, 0.025f, m_viewZoom);
 	if (leftMouse.held)
 	{
-		m_viewOrigin.x += leftMouse.dragOffset.x * 0.005f;
-		m_viewOrigin.z += leftMouse.dragOffset.y * 0.005f;
+		glm::vec2 newDrag = m_dragView.unprojectWorldPlane(renderer->resolution(), m_cursorNdc);
+		glm::vec2 dragOffset = newDrag - m_cursorDragOrigin;
+		
+
+		m_viewOrigin = m_viewDragOrigin - dragOffset;
 	}
 
-	m_viewVelocity = glm::length(m_viewOrigin - oldOrigin);
+	m_viewVelocity = m_viewOrigin - oldOrigin;
 
+	m_view = calculateRenderView(m_viewOrigin);
+	m_viewPoints = e2::Viewpoints2D(renderer->resolution(), m_view);
+	if (!m_altView)
+	{
+		renderer->setView(m_view);
+	}
+}
+
+
+e2::RenderView e2::Game::calculateRenderView(glm::vec2 const &viewOrigin)
+{
+	float viewFov = glm::mix(65.0f, 45.0f, m_viewZoom);
+	float viewAngle = glm::mix(35.0f, 50.0f, m_viewZoom);
+	float viewDistance = glm::mix(5.0f, 25.0f, m_viewZoom);
 
 	glm::quat orientation = glm::rotate(glm::quat(1.0f, 0.0f, 0.0f, 0.0f), glm::radians(viewAngle), { 1.0f, 0.0f, 0.0f });
 
-	// update the main render view
-	e2::RenderView mainView{};
-	mainView.fov = viewFov;
-	mainView.clipPlane = { 0.01f, 1000.0f };
-	mainView.origin = m_viewOrigin + (orientation * e2::worldForward() * -viewDistance);
-	mainView.orientation = orientation;
-	m_viewPoints = e2::Viewpoints2D(renderer->resolution(), mainView);
-	if (!m_altView)
-	{
-		renderer->setView(mainView);
-	}
+	e2::RenderView newView{};
+	newView.fov = viewFov;
+	newView.clipPlane = { 0.01f, 1000.0f };
+	newView.origin = glm::vec3(viewOrigin.x, 0.0f, viewOrigin.y) + (orientation * e2::worldForward() * -viewDistance);
+	newView.orientation = orientation;
+
+	return newView;
 }
 
 void e2::Game::updateAltCamera(double seconds)

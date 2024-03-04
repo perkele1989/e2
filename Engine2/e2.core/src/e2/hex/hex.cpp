@@ -335,18 +335,25 @@ insert_sorted(std::vector<T>& vec, T const& item, Pred pred)
 }
 
 
-void e2::HexGrid::assertChunksWithinRangeVisible(glm::vec2 const& streamCenter, e2::Viewpoints2D const& viewPoints, bool pauseNewJobs)
+void e2::HexGrid::assertChunksWithinRangeVisible(glm::vec2 const& streamCenter, e2::Viewpoints2D const& viewPoints, glm::vec2 const& viewVelocity)
 {
+	auto renderer = gameSession()->renderer();
+	float viewSpeed = glm::length(viewVelocity);
+
 	e2::Aabb2D viewpointsAabb = viewPoints.toAabb();
 
 	glm::ivec2 lowerIndex = chunkIndexFromPlanarCoords(viewpointsAabb.min);
 	glm::ivec2 upperIndex = chunkIndexFromPlanarCoords(viewpointsAabb.max);
 	
-	gameSession()->renderer()->debugLine(glm::vec3(1.0, 1.0, 0.0), { viewpointsAabb.min.x, viewpointsAabb.min.y }, { viewpointsAabb.max.x, viewpointsAabb.min.y });
-	gameSession()->renderer()->debugLine(glm::vec3(1.0, 1.0, 0.0), { viewpointsAabb.max.x, viewpointsAabb.min.y }, { viewpointsAabb.max.x, viewpointsAabb.max.y });
-	gameSession()->renderer()->debugLine(glm::vec3(1.0, 1.0, 0.0), { viewpointsAabb.max.x, viewpointsAabb.max.y }, { viewpointsAabb.min.x, viewpointsAabb.max.y });
-	gameSession()->renderer()->debugLine(glm::vec3(1.0, 1.0, 0.0), { viewpointsAabb.min.x, viewpointsAabb.max.y }, { viewpointsAabb.min.x, viewpointsAabb.min.y });
+	constexpr bool debugRender = false;
 
+	if (debugRender)
+	{
+		renderer->debugLine(glm::vec3(1.0, 1.0, 0.0), { viewpointsAabb.min.x, viewpointsAabb.min.y }, { viewpointsAabb.max.x, viewpointsAabb.min.y });
+		renderer->debugLine(glm::vec3(1.0, 1.0, 0.0), { viewpointsAabb.max.x, viewpointsAabb.min.y }, { viewpointsAabb.max.x, viewpointsAabb.max.y });
+		renderer->debugLine(glm::vec3(1.0, 1.0, 0.0), { viewpointsAabb.max.x, viewpointsAabb.max.y }, { viewpointsAabb.min.x, viewpointsAabb.max.y });
+		renderer->debugLine(glm::vec3(1.0, 1.0, 0.0), { viewpointsAabb.min.x, viewpointsAabb.max.y }, { viewpointsAabb.min.x, viewpointsAabb.min.y });
+	}
 
 	// flag all chunks as invisible this frame
 	for (auto [chunkIndex, chunkState] : m_chunkStates)
@@ -354,19 +361,62 @@ void e2::HexGrid::assertChunksWithinRangeVisible(glm::vec2 const& streamCenter, 
 		chunkState->visible = false;
 	}
 
-	m_visibleChunkIndices.clear();
-	// generate visible chunk indices for this frame
-	for (int32_t y = lowerIndex.y-1; y <= upperIndex.y; y++)
-	{
-		for (int32_t x = lowerIndex.x-1; x <= upperIndex.x; x++)
-		{
-			//constexpr float inf = std::numeric_limits<float>::infinity();
-			
-			constexpr uint32_t r = e2::HexGridChunkResolution;
-			e2::Aabb2D chunkAabb;
-			chunkAabb.min = e2::Hex(glm::ivec2(x*r, y*r)).planarCoords();
-			chunkAabb.max = chunkAabb.min + chunkSize();
+	glm::vec2 _chunkSize = chunkSize();
 
+	// Setup stream-ahead offsets
+	// --
+	// ints are offsets to be inclusive for broadphase, they are chunks indices so units are chunk widths and heights
+	// floats are margins for whether a chunk is in view or not
+	float tresholdMin = 0.01f;
+	float tresholdMax = 0.1f;
+
+	int32_t leftOffset = 2;
+	float narrowLeftOffset = 1.0f;
+	if (viewVelocity.x < 0.0f)
+	{
+		leftOffset += glm::smoothstep(tresholdMin, tresholdMax, glm::abs(viewVelocity.x)) * 4.0f;
+		narrowLeftOffset += glm::smoothstep(tresholdMin, tresholdMax, glm::abs(viewVelocity.x)) * 4.0f;
+	}
+
+	int32_t upOffset = 2;
+	float narrowUpOffset = 1.0f;
+	if (viewVelocity.y < 0.0f)
+	{
+		upOffset += glm::smoothstep(tresholdMin, tresholdMax, glm::abs(viewVelocity.y)) * 4.0f;
+		narrowUpOffset += glm::smoothstep(tresholdMin, tresholdMax, glm::abs(viewVelocity.y)) * 4.0f;
+	}
+
+	int32_t rightOffset = 2;
+	float narrowRightOffset = 1.0f;
+	if (viewVelocity.x > 0.0f)
+	{
+		rightOffset += glm::smoothstep(tresholdMin, tresholdMax, viewVelocity.x) * 4.0f;
+		narrowRightOffset += glm::smoothstep(tresholdMin, tresholdMax, viewVelocity.x) * 4.0f;
+	}
+
+	int32_t downOffset = 2;
+	float narrowDownOffset = 1.0f;
+	if (viewVelocity.y > 0.0f)
+	{
+		downOffset += glm::smoothstep(tresholdMin, tresholdMax, viewVelocity.y) * 4.0f;
+		narrowDownOffset += glm::smoothstep(tresholdMin, tresholdMax, viewVelocity.y) * 4.0f;
+	}
+	
+	m_chunkStreamQueue.clear();
+	m_numVisibleChunks = 0;
+	// generate visible chunk indices for this frame
+	for (int32_t y = lowerIndex.y-1 - upOffset; y <= upperIndex.y + downOffset; y++)
+	{
+		for (int32_t x = lowerIndex.x-1 - leftOffset; x <= upperIndex.x + rightOffset; x++)
+		{
+			constexpr uint32_t r = e2::HexGridChunkResolution;
+			glm::vec2 chunkBoundsOffset = e2::Hex(glm::ivec2(x * r, y * r)).planarCoords();
+
+			e2::Aabb2D chunkAabb;
+			chunkAabb.min = chunkBoundsOffset;
+			chunkAabb.max = chunkBoundsOffset + _chunkSize;
+
+			// points ONLY used for debug rendering!
 			glm::vec2 chunkPoints[4] = {
 				chunkAabb.min,
 				{chunkAabb.max.x, chunkAabb.min.y},
@@ -374,83 +424,77 @@ void e2::HexGrid::assertChunksWithinRangeVisible(glm::vec2 const& streamCenter, 
 				{chunkAabb.min.x, chunkAabb.max.y},
 			};
 
-			if (viewPoints.test(chunkAabb))
+			e2::Aabb2D chunkAabbStream = chunkAabb;
+
+			chunkAabbStream.min = chunkAabbStream.min + glm::vec2(narrowLeftOffset, narrowUpOffset) *_chunkSize;
+			chunkAabbStream.max = chunkAabbStream.max - glm::vec2(narrowRightOffset, narrowDownOffset) * _chunkSize;
+
+			glm::vec3 debugColor = glm::vec3(1.0f, 0.0f, 1.0f) * 0.1f;
+
+			// check if relevant for streaming or visiblity
+			if (viewPoints.test(chunkAabbStream))
 			{
+				auto finder = m_chunkStates.find({x, y});
+				if (finder == m_chunkStates.end())
+				{
+					debugColor = glm::vec3(1.0f, 1.0f, 0.0f);
+					if (viewSpeed < 2.0f)
+						insert_sorted(m_chunkStreamQueue, { x, y }, [&streamCenter](const glm::ivec2& a, const glm::ivec2& b) {
+						float distanceToA = glm::distance(e2::Hex(a * int32_t(e2::HexGridChunkResolution)).planarCoords(), streamCenter);
+						float distanceToB = glm::distance(e2::Hex(b * int32_t(e2::HexGridChunkResolution)).planarCoords(), streamCenter);
+						return  distanceToA < distanceToB;
+					});
+				}
+				// state exists, is it relevant for visibility? (narrower check than streaming)
+				else if (viewPoints.test(chunkAabb))
+				{
+					// update last seen
+					e2::ChunkState* state = finder->second;
+					state->visible = true;
+					state->lastVisible = e2::timeNow();
 
-				insert_sorted(m_visibleChunkIndices, { x, y }, [&streamCenter](const glm::ivec2& a, const glm::ivec2& b) {
-					return glm::distance(e2::Hex(a).planarCoords(), streamCenter) < glm::distance(e2::Hex(b).planarCoords(), streamCenter);
-				});
-
-				//m_visibleChunkIndices.push_back({ x, y });
-				//gameSession()->renderer()->debugLine(glm::vec3(0.0, 1.0, 1.0), chunkPoints[0], chunkPoints[1]);
-				//gameSession()->renderer()->debugLine(glm::vec3(0.0, 1.0, 1.0), chunkPoints[1], chunkPoints[2]);
-				//gameSession()->renderer()->debugLine(glm::vec3(0.0, 1.0, 1.0), chunkPoints[2], chunkPoints[3]);
-				//gameSession()->renderer()->debugLine(glm::vec3(0.0, 1.0, 1.0), chunkPoints[3], chunkPoints[0]);
-				
-				//prepareChunk({ x, y });
-
+					// if this chunk isnt currently streaming, set it as visible 
+					if (!state->task)
+					{
+						ensureChunkVisible(state);
+						m_numVisibleChunks++;
+					}
+					debugColor = glm::vec3(0.0f, 1.0f, 1.0f);
+				}
+				else
+					debugColor = glm::vec3(1.0f, 0.0f, 1.0f);
 			}
-			else
+			
+			if (debugRender)
 			{
-				//gameSession()->renderer()->debugLine(glm::vec3(1.0, 0.0, 1.0), chunkPoints[0], chunkPoints[1]);
-				//gameSession()->renderer()->debugLine(glm::vec3(1.0, 0.0, 1.0), chunkPoints[1], chunkPoints[2]);
-				//gameSession()->renderer()->debugLine(glm::vec3(1.0, 0.0, 1.0), chunkPoints[2], chunkPoints[3]);
-				//gameSession()->renderer()->debugLine(glm::vec3(1.0, 0.0, 1.0), chunkPoints[3], chunkPoints[0]);
+				renderer->debugLine(debugColor, chunkPoints[0], chunkPoints[1]);
+				renderer->debugLine(debugColor, chunkPoints[1], chunkPoints[2]);
+				renderer->debugLine(debugColor, chunkPoints[2], chunkPoints[3]);
+				renderer->debugLine(debugColor, chunkPoints[3], chunkPoints[0]);
 			}
 		}
 	}
-
-	m_numVisibleChunks = m_visibleChunkIndices.size();
-
-	// sort visible chunks by distance, to make the mstream from stream center
-	std::sort(m_visibleChunkIndices.begin(), m_visibleChunkIndices.end(), [&](const glm::ivec2& a, const glm::ivec2& b) {
-		return glm::distance(e2::Hex(a).planarCoords(), streamCenter)  < glm::distance(e2::Hex(b).planarCoords(), streamCenter);
-	});
 
 	// ensure visible chunks are visible
-	for (glm::ivec2& offsetIndex : m_visibleChunkIndices)
-	{
-		// find the chunk, if it doesnt exist, then start streaming it
-		auto finder = m_chunkStates.find(offsetIndex);
-		if (finder == m_chunkStates.end())
-		{
-			if(m_numJobsInFlight < e2::maxNumJobsInFlight && !pauseNewJobs)
-				prepareChunk(offsetIndex);
-			continue;
-		}
+	for (glm::ivec2 const& index: m_chunkStreamQueue)
+		prepareChunk(index);
 
-		// update last seen
-		e2::ChunkState* state = finder->second;
-		state->visible = true;
-		state->lastVisible = e2::timeNow();
-
-		// if this chunk is currently streaming in, we skip early
-		if (state->task)
-		{
-			continue;
-		}
-
-		ensureChunkVisible(state);
-	}
-
-	m_sortedChunks.clear();
-	// gather all invisible chunks and sort them by lifetime
+	// Gather all hidden chunks, sort them by lifetime, and nuke excessive
+	m_hiddenChunks.clear();
 	for (auto [chunkIndex, chunkState] : m_chunkStates)
 	{
 		if (chunkState->visible)
 			continue;
 		
-		insert_sorted(m_sortedChunks, chunkState, [](e2::ChunkState* a, e2::ChunkState* b) {
+		insert_sorted(m_hiddenChunks, chunkState, [](e2::ChunkState* a, e2::ChunkState* b) {
 			double ageA = a->lastVisible.durationSince().seconds();
 			double ageB = b->lastVisible.durationSince().seconds();
 
 			return ageA < ageB;
 		});
 	}
-
-	// then ensure extra chunks are invisible, and nuke the excessive chunks
 	uint32_t i = 0;
-	for (e2::ChunkState* state : m_sortedChunks)
+	for (e2::ChunkState* state : m_hiddenChunks)
 	{
 		ensureChunkHidden(state);
 
@@ -464,22 +508,94 @@ void e2::HexGrid::assertChunksWithinRangeVisible(glm::vec2 const& streamCenter, 
 		}
 	}
 
+
+	// debug render only!
+	if (debugRender)
+	{
+		for (auto stateIt : m_chunkStates)
+		{
+			auto chunkIndex = stateIt.first;
+			auto chunkState = stateIt.second;
+
+			constexpr uint32_t r = e2::HexGridChunkResolution;
+			glm::vec2 chunkBoundsOffset = e2::Hex(glm::ivec2(chunkIndex.x * r, chunkIndex.y * r)).planarCoords();
+			e2::Aabb2D chunkAabb;
+			chunkAabb.min = chunkBoundsOffset;
+			chunkAabb.max = chunkBoundsOffset + _chunkSize;
+
+
+
+			float smallSize = 2.0f;
+			glm::vec2 smallOffsetMin = (_chunkSize / 2.0f) - (smallSize / 2.0f);
+			glm::vec2 smallOffsetMax = -(_chunkSize / 2.0f) + (smallSize / 2.0f);
+
+			glm::vec2 chunkPointsSmall[4] = {
+				chunkAabb.min + smallOffsetMin,
+				{chunkAabb.max.x + smallOffsetMax.x, chunkAabb.min.y + smallOffsetMin.y} ,
+				chunkAabb.max + smallOffsetMax,
+				{chunkAabb.min.x + smallOffsetMin.x, chunkAabb.max.y + smallOffsetMax.y},
+			};
+
+			if (chunkState->mesh)
+			{
+				renderer->debugLine(glm::vec3(0.0, 1.0, 0.0), chunkPointsSmall[0], chunkPointsSmall[1]);
+				renderer->debugLine(glm::vec3(0.0, 1.0, 0.0), chunkPointsSmall[1], chunkPointsSmall[2]);
+				renderer->debugLine(glm::vec3(0.0, 1.0, 0.0), chunkPointsSmall[2], chunkPointsSmall[3]);
+				renderer->debugLine(glm::vec3(0.0, 1.0, 0.0), chunkPointsSmall[3], chunkPointsSmall[0]);
+			}
+			else
+			{
+				renderer->debugLine(glm::vec3(1.0, 0.0, 0.0), chunkPointsSmall[0], chunkPointsSmall[1]);
+				renderer->debugLine(glm::vec3(1.0, 0.0, 0.0), chunkPointsSmall[1], chunkPointsSmall[2]);
+				renderer->debugLine(glm::vec3(1.0, 0.0, 0.0), chunkPointsSmall[2], chunkPointsSmall[3]);
+				renderer->debugLine(glm::vec3(1.0, 0.0, 0.0), chunkPointsSmall[3], chunkPointsSmall[0]);
+			}
+		}
+	}
+
+
+
 	
+}
+
+float e2::HexGrid::sampleSimplex(glm::vec2 const& position, float scale)
+{
+	return glm::simplex(position * scale) * 0.5 + 0.5;
+}
+// @notice this function needs to stay in sync with procgen.fragment.glsl !!
+float e2::HexGrid::sampleBaseHeight(glm::vec2 const& position)
+{
+	float h1p = 0.42;
+	float scale1 = 0.058;
+	float h1 = glm::pow(sampleSimplex(position, scale1), h1p);
+
+	float semiStart = 0.31;
+	float semiSize = 0.47;
+	float h2p = 0.013;
+	float h2 = glm::smoothstep(semiStart, semiStart + semiSize, sampleSimplex(position, h2p));
+
+	float semiStart2 = 0.65;
+	float semiSize2 = 0.1;
+	float h3p = (0.75 * 20) / 5000;
+	float h3 = 1.0 - glm::smoothstep(semiStart2, semiStart2 + semiSize2, sampleSimplex(position, h3p));
+
+	return h1 * h2 * h3;
 }
 
 e2::TileData e2::HexGrid::calculateTileDataForHex(Hex hex)
 {
 	glm::vec2 planarCoords = hex.planarCoords();
 
-	float simplex = pow(glm::simplex(planarCoords*0.05f), 0.5f);
+	float h = sampleBaseHeight(planarCoords);
 
 	TileData newTileData;
 
-	if(simplex > 0.75f)
+	// @notice these constants/literals need to stay in sync with procgen.fragment.glsl !!
+	if(h > 0.81f)
 		newTileData.flags |= TileFlags::BiomeMountain;
-	else if (simplex > 0.5f)
+	else if (h > 0.39f)
 		newTileData.flags |= TileFlags::BiomeGrassland;
-	else if (simplex > 0.25f)
+	else if (h > 0.03f)
 		newTileData.flags |= TileFlags::BiomeShallow;
 	else 
 		newTileData.flags |= TileFlags::BiomeOcean;
@@ -570,6 +686,20 @@ void e2::HexGrid::clearLoadTime()
 
 void e2::HexGrid::prepareChunk(glm::ivec2 const& chunkIndex)
 {
+	// max num of threads to use for chunk streaming
+	uint32_t numThreads = std::thread::hardware_concurrency();
+	if (numThreads <= 4)
+		numThreads = 2;
+	else if (numThreads <= 6)
+		numThreads = 4;
+	else if (numThreads <= 8)
+		numThreads = 6;
+	else
+		numThreads -= 4;
+
+	if (m_numJobsInFlight > numThreads)
+		return;
+
 	LogNotice("Requesting new world chunk at {}", chunkIndex);
 
 	m_numJobsInFlight++;
@@ -686,7 +816,8 @@ bool e2::ChunkLoadTask::execute()
 
 		}
 	}
-	newChunkMesh->cutSlack();
+	//newChunkMesh->calculateFaceNormals();
+	//newChunkMesh->calculateVertexNormals();
 	newChunkMesh->calculateVertexTangents();
 	m_generatedMesh = newChunkMesh->bake(m_grid->hexMaterial(), e2::VertexAttributeFlags(uint8_t(e2::VertexAttributeFlags::Normal) | uint8_t(e2::VertexAttributeFlags::Color)));
 	e2::destroy(newChunkMesh);

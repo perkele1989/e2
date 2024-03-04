@@ -31,8 +31,8 @@ void e2::Viewport::update(e2::UIContext* ui, double seconds)
 	e2::UIWidgetState* widget = ui->reserve(id, {});
 	
 	// recreate the renderer if the resolution changed (lets do 2x supersampling for now)
-	glm::uvec2 newResolution = glm::max(glm::vec2(1.0f, 1.0f), widget->size * 2.0f);
-	if (!m_renderer || m_renderer->resolution() != newResolution)
+	glm::uvec2 newResolution = glm::max(glm::vec2(1.0f, 1.0f), widget->size);
+	if (!m_renderer || (m_lastRecreate.durationSince().milliseconds() > 50.0f && m_renderer->resolution() != newResolution))
 	{
 		if (m_renderer)
 		{
@@ -41,6 +41,7 @@ void e2::Viewport::update(e2::UIContext* ui, double seconds)
 		}
 
 		m_renderer = e2::create<e2::Renderer>(m_session, newResolution);
+		m_lastRecreate = e2::timeNow();
 	}
 
 	// update the renderview
@@ -96,7 +97,7 @@ void e2::OrbitalViewport::updateRenderView(e2::UIContext* ui, e2::UIWidgetState*
 	bool shift = keyboard.keys[int16_t(e2::Key::LeftShift)].state;
 
 	// Handle zoom inputs
-	if (!e2::nearlyEqual(mouse.scrollOffset, 0.0f, 0.001f))
+	if (!e2::nearlyEqual(mouse.scrollOffset, 0.0f, 0.001f) && widget->hovered)
 	{
 		float sign = glm::sign(mouse.scrollOffset);
 

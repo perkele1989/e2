@@ -992,6 +992,13 @@ namespace e2
 	void destroy(Type* instance)
 	{
 		return e2::Allocator<Type>::destroy(instance);
+	} 
+
+	template<typename Type>
+	void discard(Type* instance)
+	{
+		instance->keepAround();
+		e2::destroy(instance);
 	}
 
 	/** Stupid helper function. Dont know why we have it. We usually just use e2::Type::fromName(...) and create from that in most cases. */

@@ -420,6 +420,26 @@ e2::IPipeline* e2::LightweightModel::getOrCreatePipeline(e2::MeshProxy* proxy, u
 	return newEntry.pipeline;
 }
 
+void e2::LightweightModel::invalidatePipelines()
+{
+	for (uint16_t i = 0; i < uint16_t(e2::LightweightFlags::Count); i++)
+	{
+		e2::LightweightCacheEntry& entry = m_pipelineCache[i];
+
+		if (entry.vertexShader)
+			e2::discard(entry.vertexShader);
+		entry.vertexShader = nullptr;
+
+		if (entry.fragmentShader)
+			e2::discard(entry.fragmentShader);
+		entry.fragmentShader = nullptr;
+
+		if (entry.pipeline)
+			e2::discard(entry.pipeline);
+		entry.pipeline = nullptr;
+	}
+}
+
 e2::LightweightProxy::LightweightProxy(e2::Session* inSession, e2::MaterialPtr materialAsset)
 	: e2::MaterialProxy(inSession, materialAsset)
 {

@@ -263,11 +263,13 @@ namespace e2
 		void drawStatusUI();
 		void drawDebugUI();
 
+		e2::RenderView calculateRenderView(glm::vec2 const& viewOrigin);
+
 	protected:
 		// main world grid
 		e2::HexGrid* m_hexGrid{};
 
-		// better make it uint64, who knows how autistic my playerbase is
+		// better make it uint64, who knows how autistic my player-base will be
 		uint64_t m_turn{};
 
 		// game economy
@@ -275,12 +277,28 @@ namespace e2
 		GameResources m_resources;
 		e2::Texture2DPtr m_uiTextureResources;
 
+		
+		glm::vec2 m_cursor; // mouse position in pixels, from topleft corner
+		glm::vec2 m_cursorUnit; // mouse position scaled between 0.0 - 1.0
+		glm::vec2 m_cursorNdc; // mouse position scaled between -1.0 and 1.0
+		glm::vec2 m_cursorPlane; // mouse position as projected on to the world xz plane
+		e2::Hex m_cursorHex; // mouse position as projected upon a hex
+		e2::MeshPtr m_cursorMesh;
+		e2::MeshProxy* m_cursorProxy{};
+
 		// camera stuff 
 		void updateMainCamera(double seconds);
+		e2::RenderView m_view;
+
+		// stuff to navigate camera main view by dragging
+		glm::vec2 m_cursorDragOrigin;
+		glm::vec2 m_viewDragOrigin;
+		e2::RenderView m_dragView;
+
 		e2::Viewpoints2D m_viewPoints;
-		glm::vec3 m_viewOrigin{ 0.0f, 0.0f, 0.0f };
+		glm::vec2 m_viewOrigin{ 0.0f, 0.0f };
 		float m_viewZoom{0.0f};
-		float m_viewVelocity{};
+		glm::vec2 m_viewVelocity{};
 		void updateAltCamera(double seconds);
 		// alt view lets you fly around freely, without affecting world streaming
 		bool m_altView = false;

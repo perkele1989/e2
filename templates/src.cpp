@@ -37,7 +37,7 @@ namespace
 
 void e2::Allocator<{{c.fqn}}>::destroy({{c.fqn}}* instance)
 {
-	{% if "e2::ManagedObject" in c.deep_bases %}
+	{% if c.fqn == "e2::ManagedObject" or "e2::ManagedObject" in c.deep_bases %}
 	if(instance->block()->isPendingKill())
 		if(instance->block()->objRef <= 0)
 			instance->type()->destroy(instance);

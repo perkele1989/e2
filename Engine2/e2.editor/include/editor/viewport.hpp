@@ -5,6 +5,7 @@
 #include <editor/editorcontext.hpp>
 #include <e2/renderer/camera.hpp>
 
+#include <e2/timer.hpp>
 #include <string>
 
 namespace e2
@@ -34,6 +35,7 @@ namespace e2
 
 		e2::Session* m_session{};
 		e2::Renderer* m_renderer{};
+		e2::Moment m_lastRecreate;
 
 		e2::Editor* m_editor{};
 	};

@@ -132,11 +132,11 @@ namespace e2
 
 	constexpr uint32_t HexGridChunkResolution = 6;
 
-	constexpr uint32_t maxNumExtraChunks = 64;
-	constexpr uint32_t maxNumChunkStates = 256;
+	constexpr uint32_t maxNumExtraChunks = 128;
+	constexpr uint32_t maxNumChunkStates = 512;
 
-	constexpr uint32_t maxNumChunkLoadTasks = 64;
-	constexpr uint32_t maxNumJobsInFlight = 32;
+	constexpr uint32_t maxNumChunkLoadTasks = 256;
+
 
 	class HexGrid;
 
@@ -213,7 +213,11 @@ namespace e2
 		static glm::vec3 chunkOffsetFromIndex(glm::ivec2 const& index);
 
 		/** Ensures all chunks within the range are visible, given range in planar coords, updates them as visible, nukes any excessive hcunks */
-		void assertChunksWithinRangeVisible(glm::vec2 const& streamCenter, e2::Viewpoints2D const& viewPoints, bool pauseNewJobs);
+		void assertChunksWithinRangeVisible(glm::vec2 const& streamCenter, e2::Viewpoints2D const& viewPoints, glm::vec2 const& viewVelocity);
+
+		static float sampleSimplex(glm::vec2 const& position, float scale);
+
+		static float sampleBaseHeight(glm::vec2 const& position);
 
 		static e2::TileData calculateTileDataForHex(Hex hex);
 
@@ -274,8 +278,9 @@ namespace e2
 		double m_highLoadTime{};
 
 		// temp vectors
-		std::vector<glm::ivec2> m_visibleChunkIndices;
-		std::vector<e2::ChunkState*> m_sortedChunks;
+		//std::vector<glm::ivec2> m_visibleChunkIndices;
+		std::vector<glm::ivec2> m_chunkStreamQueue;
+		std::vector<e2::ChunkState*> m_hiddenChunks;
 		//
 
 		std::vector<TileData> m_tiles;

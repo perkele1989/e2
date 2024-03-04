@@ -56,6 +56,8 @@ namespace e2
 
 		e2::IdArena<uint32_t, e2::maxNumLightweightProxies> proxyIds;
 
+		virtual void invalidatePipelines() override;
+
 	protected:
 		friend e2::OptikusProxy;
 		

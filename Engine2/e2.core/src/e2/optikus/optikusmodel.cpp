@@ -51,3 +51,8 @@ e2::IPipeline* e2::OptikusModel::getOrCreatePipeline(e2::MeshProxy* proxy, uint8
 {
 	return nullptr;
 }
+
+void e2::OptikusModel::invalidatePipelines()
+{
+
+}

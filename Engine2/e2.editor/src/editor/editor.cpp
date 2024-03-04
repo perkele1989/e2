@@ -26,6 +26,9 @@
 
 #include <filesystem>
 
+#define WIN32_LEAN_AND_MEAN
+#include <Windows.h>
+
 
 // these will do, piggy
 #define STB_IMAGE_IMPLEMENTATION
@@ -133,7 +136,8 @@ void e2::Editor::initialize()
 	}
 
 	spawnWindow();
-	spawnWorldEditor();
+	spawnProcGen();
+	//spawnWorldEditor();
 
 }
 
@@ -224,8 +228,7 @@ void e2::Editor::destroyWindow(e2::EditorWindow* wnd)
 }
 
 e2::WorldEditorWorkspace* e2::Editor::spawnWorldEditor()
-{
-		
+{		
 	// create a new workspace
 	e2::WorldEditorWorkspace* newWorkspace = e2::create<e2::WorldEditorWorkspace>(this);
 	m_workspaces.insert(newWorkspace);
@@ -236,7 +239,6 @@ e2::WorldEditorWorkspace* e2::Editor::spawnWorldEditor()
 	else
 		defaultWindow = spawnWindow();
 
-
 	// add it to the default window 
 	if(defaultWindow)
 		defaultWindow->setActiveWorkspace(newWorkspace);
@@ -245,6 +247,30 @@ e2::WorldEditorWorkspace* e2::Editor::spawnWorldEditor()
 }
 
 void e2::Editor::destroyWorldEditor(e2::WorldEditorWorkspace* wrksp)
+{
+	m_workspaceDestroySet.insert(wrksp);
+}
+
+e2::ProcGenWorkspace* e2::Editor::spawnProcGen()
+{
+	// create a new workspace
+	e2::ProcGenWorkspace* newWorkspace = e2::create<e2::ProcGenWorkspace>(this);
+	m_workspaces.insert(newWorkspace);
+
+	e2::EditorWindow* defaultWindow = nullptr;
+	if (m_windows.size() > 0)
+		defaultWindow = *m_windows.begin();
+	else
+		defaultWindow = spawnWindow();
+
+	// add it to the default window 
+	if (defaultWindow)
+		defaultWindow->setActiveWorkspace(newWorkspace);
+
+	return newWorkspace;
+}
+
+void e2::Editor::destroyProcGen(e2::ProcGenWorkspace* wrksp)
 {
 	m_workspaceDestroySet.insert(wrksp);
 }
@@ -552,19 +578,6 @@ void e2::WorldEditorWorkspace::update(double deltaSeconds)
 	}
 	ui->endFlexV();
 
-
-
-	if (m_editorSession->m3)
-	{
-		if (ui->keyboardState().keys[int16_t(e2::Key::Right)].pressed)
-		{
-			m_editorSession->m3->getTransform()->translate({ 0.2f, 0.0f, 0.0f }, TransformSpace::World);
-		}
-		if (ui->keyboardState().keys[int16_t(e2::Key::Left)].pressed)
-		{
-			m_editorSession->m3->getTransform()->translate({ -0.2f, 0.0f, 0.0f }, TransformSpace::World);
-		}
-	}
 }
 
 e2::WorldEditorSession::WorldEditorSession(e2::Context* ctx)
@@ -575,76 +588,12 @@ e2::WorldEditorSession::WorldEditorSession(e2::Context* ctx)
 	am->prescribeALJ(desc, "assets/SM_CoordinateSpace.e2a");
 	am->prescribeALJ(desc, "assets/SM_Cube.e2a");
 	am->prescribeALJ(desc, "assets/SM_HexBase.e2a");
-	m_ticket = am->queueALJ(desc);
-	m_loaded = false;
-
-
-	e2::MeshPtr proc = e2::create<e2::Mesh>();
-	e2::destroy(proc.get()); // @todo make this usagepattern for ptr's prettier 
-
-	proc->postConstruct(ctx, e2::UUID());
-
-
-	e2::StackVector<glm::vec4, 7> vertexData;
-	e2::StackVector<uint32_t, 18> indexData;
-
-	glm::vec2 v = { 0.0f, 1.0f };
-
-	glm::vec3 origo{};
-	vertexData.push({ origo, 1.0f });
+	am->queueWaitALJ(desc);
 	
-	float topAngle = -30.0f;
-	glm::vec2 topTheta = e2::rotate2d(v, topAngle);
+	e2::Entity* e = persistentWorld()->spawnEntity<e2::Entity>("p");
+	e2::MeshComponent* m2 = e->spawnComponent<e2::MeshComponent>("m2");
+	m2->mesh(am->get("assets/SM_Cube.e2a")->cast<e2::Mesh>());
 
-	glm::vec3 top{topTheta.x, 0.0f, topTheta.y };
-	vertexData.push({top, 1.0f});
-	uint32_t topId = 1;
-
-
-	for (uint32_t i = 0; i < 6; i++)
-	{
-
-		float iAngle = 60.0f * float(i);
-		float bAngle = iAngle + 30.0f;
-		glm::vec2 bTheta = e2::rotate2d(v, bAngle);
-
-		indexData.push(0);
-
-		indexData.push(topId);
-
-		if (i == 5)
-		{
-			indexData.push(1);
-		}
-		else
-		{
-			topId = vertexData.size();
-			vertexData.push({ bTheta.x, 0.0f, bTheta.y, 1.0f });
-			indexData.push(topId);
-		}
-	}
-
-
-
-	e2::ProceduralSubmesh procSm;
-	procSm.material = renderManager()->defaultMaterial();
-	procSm.attributes = VertexAttributeFlags::None;
-	procSm.numVertices = 7;
-	procSm.numIndices = 18;
-	procSm.sourcePositions = vertexData.data();
-	procSm.sourceIndices = indexData.data();
-
-
-
-	proc->addProceduralSubmesh(procSm);
-	proc->flagDone();
-
-	e2::Entity* z = persistentWorld()->spawnEntity<e2::Entity>("z");
-	e2::MeshComponent* zm = z->spawnComponent<e2::MeshComponent>("zm");
-	zm->mesh(proc);
-	zm->getTransform()->setTransformParent(z->getTransform());
-
-	z->getTransform()->setTranslation({ 3.0f, 0.0f, 0.0f }, TransformSpace::World);
 
 }
 
@@ -657,23 +606,228 @@ void e2::WorldEditorSession::tick(double seconds)
 {
 	e2::Session::tick(seconds);
 
-	if (!m_loaded)
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+/*
+	if(simplex > 0.75f)
+		newTileData.flags |= TileFlags::BiomeMountain;
+	else if (simplex > 0.5f)
+		newTileData.flags |= TileFlags::BiomeGrassland;
+	else if (simplex > 0.25f)
+		newTileData.flags |= TileFlags::BiomeShallow;
+	else
+		newTileData.flags |= TileFlags::BiomeOcean;
+
+*/
+
+
+
+e2::ProcGenWorkspace::ProcGenWorkspace(e2::Editor* ed)
+	: e2::Workspace(ed)
+{
+	glm::uvec2 resolution{ 512, 512};
+
+	e2::TextureCreateInfo texInf{};
+	texInf.initialLayout = e2::TextureLayout::ShaderRead;
+	texInf.format = TextureFormat::SRGB8A8;
+	texInf.resolution = { resolution, 1 };
+	m_outputTexture = renderContext()->createTexture(texInf);
+
+	e2::RenderTargetCreateInfo renderTargetInfo{};
+	renderTargetInfo.areaExtent = resolution;
+
+	e2::RenderAttachment colorAttachment{};
+	colorAttachment.target = m_outputTexture;
+	colorAttachment.clearMethod = ClearMethod::ColorFloat;
+	colorAttachment.clearValue.clearColorf32 = { 0.f, 0.f, 0.f, 1.0f };
+	colorAttachment.loadOperation = LoadOperation::Clear;
+	colorAttachment.storeOperation = StoreOperation::Store;
+	renderTargetInfo.colorAttachments.push(colorAttachment);
+	m_outputTarget = renderContext()->createRenderTarget(renderTargetInfo);
+
+	e2::PipelineLayoutCreateInfo layInf{};
+	layInf.pushConstantSize = sizeof(e2::ProcGenConstants);
+	m_pipelineLayout = renderContext()->createPipelineLayout(layInf);
+
+	m_commandBuffers[0] = renderManager()->framePool(0)->createBuffer({});
+	m_commandBuffers[1] = renderManager()->framePool(1)->createBuffer({});
+
+	std::string sourceData;
+	if (!e2::readFileWithIncludes("shaders/procgen.fragment.glsl", sourceData))
 	{
-		e2::AssetManager* am = assetManager();
-
-		e2::ALJState state = am->queryALJ(m_ticket);
-		if (state.status == ALJStatus::Completed)
-		{
-			e2::Entity* e = persistentWorld()->spawnEntity<e2::Entity>("p");
-			e2::MeshComponent* m2 = e->spawnComponent<e2::MeshComponent>("m2");
-			m2->mesh(am->get("assets/SM_Cube.e2a")->cast<e2::Mesh>());
-
-			m3 = m2;
-
-			am->returnALJ(m_ticket);
-
-			m_loaded = true;
-		}
+		LogError("Failed to read shader file.");
 	}
 
+	e2::ShaderCreateInfo shdrInf{};
+	shdrInf.source = sourceData.c_str();
+	shdrInf.stage = ShaderStage::Fragment;
+	m_fragShader = renderContext()->createShader(shdrInf);
+
+	e2::PipelineCreateInfo pipeInf{};
+	pipeInf.shaders.push(renderManager()->fullscreenTriangleShader());
+	pipeInf.shaders.push(m_fragShader);
+	pipeInf.colorFormats = { e2::TextureFormat::SRGB8A8 };
+	pipeInf.layout = m_pipelineLayout;
+	m_pipeline = renderContext()->createPipeline(pipeInf);
+
+	m_watchdogStamp = std::filesystem::last_write_time(std::filesystem::path("shaders/procgen.fragment.glsl"));
+
+	m_watchdogHandle = FindFirstChangeNotificationW(L"shaders/", false, FILE_NOTIFY_CHANGE_LAST_WRITE);
+	if (m_watchdogHandle == INVALID_HANDLE_VALUE)
+	{
+		LogError("{}", GetLastError());
+	}
+}
+
+e2::ProcGenWorkspace::~ProcGenWorkspace()
+{
+	e2::discard(m_commandBuffers[1]);
+	e2::discard(m_commandBuffers[0]);
+	e2::discard(m_pipeline);
+	e2::discard(m_pipelineLayout);
+	e2::discard(m_fragShader);
+	e2::discard(m_outputTexture);
+	e2::discard(m_outputTarget);
+}
+
+void e2::ProcGenWorkspace::update(double deltaSeconds)
+{
+	e2::Workspace::update(deltaSeconds);
+
+	updateShaderWatchdog();
+
+	e2::UIStyle& style = uiManager()->workingStyle();
+	e2::UIContext* ui = window()->uiContext();
+
+
+	e2::ICommandBuffer* buff = m_commandBuffers[renderManager()->frameIndex()];
+
+	m_constants.resolution = { 512, 512 };
+
+
+	const e2::Name id_flexH = "flexH";
+	const e2::Name id_flexHL = "flexHL";
+	const e2::Name id_flexHSL = "flexHSL";
+	const e2::Name id_flexHR = "flexHR";
+
+	const float sliderSize = 4.0 * style.scale;
+
+	const float flexH[] = { m_leftSize, sliderSize, 0.0f};
+	ui->beginFlexH(id_flexH, flexH, 3);
+	{
+		
+		ui->beginStackV("stackV_shiii");
+		ui->sliderFloat("view", m_constants.zoom, 0.00f, 5000.0f);
+
+		ui->renderState().cursor.y += 12.0f;
+
+		ui->sliderFloat("param1", m_constants.param1, 0.0f, 5.0f);
+		ui->sliderFloat("param2", m_constants.param2, 0.0f, 5.0f);
+		ui->sliderFloat("param3", m_constants.param3, 0.0f, 5.0f);
+		ui->sliderFloat("param4", m_constants.param4, 0.0f, 5.0f);
+		
+		ui->renderState().cursor.y += 12.0f;
+
+		ui->sliderFloat("param5", m_constants.param5, 0.0f, 5.0f);
+		ui->sliderFloat("param6", m_constants.param6, 0.0f, 5.0f);
+		ui->sliderFloat("param7", m_constants.param7, 0.0f, 5.0f);
+		ui->sliderFloat("param8", m_constants.param8, 0.0f, 5.0f);
+		
+		ui->renderState().cursor.y += 12.0f;
+
+		ui->sliderFloat("param9", m_constants.param9, 0.0f, 5.0f);
+		ui->sliderFloat("param10", m_constants.param10, 0.0f, 5.0f);
+		ui->sliderFloat("param11", m_constants.param11, 0.0f, 5.0f);
+		ui->sliderFloat("param12", m_constants.param12, 0.0f, 5.0f);
+		
+		ui->renderState().cursor.y += 12.0f;
+
+		ui->sliderFloat("param13", m_constants.param13, 0.0f, 5.0f);
+		ui->sliderFloat("param14", m_constants.param14, 0.0f, 5.0f);
+		ui->sliderFloat("param15", m_constants.param15, 0.0f, 5.0f);
+		ui->sliderFloat("param16", m_constants.param16, 0.0f, 5.0f);
+
+
+		ui->endStackV();
+
+
+		ui->flexHSlider(id_flexHSL, m_leftSize, 1.0f);
+
+		e2::UIWidgetState* widgetState = ui->reserve(id_flexHR, {512.f, 512.f});
+		glm::vec2 actualSize((glm::min)(widgetState->size.x, widgetState->size.y));
+
+		ui->drawTexturedQuad(widgetState->position, actualSize,  0xFFFFFFFF, m_outputTexture);
+	}
+	ui->endFlexH();
+
+	e2::PipelineSettings defaultSettings;
+	buff->beginRecord(true, defaultSettings);
+	buff->useAsAttachment(m_outputTexture);
+	buff->beginRender(m_outputTarget);
+	buff->bindPipeline(m_pipeline);
+	buff->nullVertexLayout();
+	buff->pushConstants(m_pipelineLayout, 0, sizeof(e2::ProcGenConstants), reinterpret_cast<uint8_t*>(&m_constants));
+	buff->drawNonIndexed(3, 1);
+	buff->endRender();
+	buff->useAsDefault(m_outputTexture);
+	buff->endRecord();
+
+	renderManager()->queue(buff, nullptr, nullptr);
+
+}
+
+void e2::ProcGenWorkspace::updateShaderWatchdog()
+{
+	if (WaitForSingleObject(m_watchdogHandle, 0) == WAIT_OBJECT_0)
+	{
+		auto newStamp = std::filesystem::last_write_time(std::filesystem::path("shaders/procgen.fragment.glsl"));
+		if (m_watchdogStamp != newStamp)
+		{
+			std::string sourceData;
+			if (!e2::readFileWithIncludes("shaders/procgen.fragment.glsl", sourceData))
+			{
+				LogError("Failed to read shader file.");
+			}
+
+			e2::ShaderCreateInfo shdrInf{};
+			shdrInf.source = sourceData.c_str();
+			shdrInf.stage = ShaderStage::Fragment;
+			e2::IShader* newShader = renderContext()->createShader(shdrInf);
+
+
+			if (newShader->valid())
+			{
+				e2::discard(m_pipeline);
+				e2::discard(m_fragShader);
+
+				m_fragShader = newShader;
+
+				e2::PipelineCreateInfo pipeInf{};
+				pipeInf.shaders.push(renderManager()->fullscreenTriangleShader());
+				pipeInf.shaders.push(m_fragShader);
+				pipeInf.colorFormats = { e2::TextureFormat::SRGB8A8 };
+				pipeInf.layout = m_pipelineLayout;
+				m_pipeline = renderContext()->createPipeline(pipeInf);
+			}
+			else
+			{
+				e2::discard(newShader);
+			}
+
+			FindNextChangeNotification(m_watchdogHandle);
+			m_watchdogStamp = newStamp;
+		}
+	}
 }

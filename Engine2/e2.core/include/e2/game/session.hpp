@@ -82,6 +82,8 @@ namespace e2
 
 		e2::MaterialProxy* getOrCreateDefaultMaterialProxy(e2::MaterialPtr material);
 
+		void invalidateAllPipelines();
+
 	protected:
 
 		e2::Engine* m_engine{};
@@ -118,6 +120,8 @@ struct std::hash<e2::MeshProxySubmesh>
 {
 	std::size_t operator()(const e2::MeshProxySubmesh& k) const
 	{
+		// @todo use our own hashing here 
+		// e2::hash_combine()
 		std::size_t res = 17;
 		res = res * 31 + std::hash<e2::MeshProxy*>{}(k.proxy);
 		res = res * 31 + std::hash<uint8_t>{}(k.submesh);

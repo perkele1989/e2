@@ -96,6 +96,8 @@ namespace e2
 
 		e2::IdArena<uint32_t, e2::maxNumWaterProxies> proxyIds;
 
+		virtual void invalidatePipelines() override;
+
 		virtual e2::RenderLayer renderLayer() override;
 
 	protected:

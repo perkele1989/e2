@@ -14,7 +14,6 @@ e2::ShaderModel::ShaderModel()
 
 e2::ShaderModel::~ShaderModel()
 {
-
 }
 
 void e2::ShaderModel::postConstruct(e2::Context* ctx)

@@ -30,14 +30,11 @@ e2::Mesh::~Mesh()
 		for (uint8_t j = 0; j < spec.vertexAttributes.size(); j++)
 		{
 			spec.vertexAttributes[j]->keepAround();
-			e2::destroy(spec.vertexAttributes[j]);
-			spec.vertexAttributes[j] = nullptr;
+			e2::discard(spec.vertexAttributes[j]);
 		}
 		spec.indexBuffer->keepAround();
-		e2::destroy(spec.indexBuffer);
-		spec.indexBuffer = nullptr;
+		e2::discard(spec.indexBuffer);
 	}
-	m_specifications.resize(0);
 }
 
 void e2::Mesh::write(Buffer& destination) const

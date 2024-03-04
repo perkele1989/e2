@@ -46,6 +46,16 @@ namespace e2
 		alignas(16) glm::vec4 time; // t, sin(t), cos(t), tan(t)
 	};
 
+	E2_API bool isCounterClockwise(glm::vec2 const& a, glm::vec2 const& b, glm::vec2 const& c);
+
+	struct Line2D
+	{
+		glm::vec2 start;
+		glm::vec2 end;
+
+		bool intersects(Line2D const& other);
+	};
+
 	struct Aabb2D
 	{
 		glm::vec2 min;
@@ -61,7 +71,6 @@ namespace e2
 		glm::vec2 position;
 		glm::vec2 parallel;
 		glm::vec2 perpendicular;
-
 	};
 
 	E2_API bool boxRayIntersection2D(Aabb2D box, Ray2D ray);
@@ -140,6 +149,11 @@ namespace e2
 		void debugLine(glm::vec3 const& color, glm::vec3 const& start, glm::vec3 const& end);
 		void debugLine(glm::vec3 const& color, glm::vec2 const& start, glm::vec2 const& end);
 
+		e2::RenderView const& view() 
+		{
+			return m_view;
+		}
+
 	protected:
 		e2::Session* m_session{};
 
@@ -178,7 +192,7 @@ namespace e2
 		e2::IPipeline* m_linePipeline{};
 
 		// @todo set configurable or just change to dynamic because this is debug shit anyway
-		e2::StackVector<Line, 1024> m_debugLines;
+		std::vector<Line> m_debugLines;
 
 
 	};

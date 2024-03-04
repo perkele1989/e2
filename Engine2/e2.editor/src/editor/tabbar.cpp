@@ -24,6 +24,7 @@ void e2::Tabbar::update(double seconds)
 	const e2::Name id_stack = "stackH";
 	ui->beginStackH(id_stack);
 
+	/*
 		if (ui->button("IdPoop", "+"))
 		{
 			style.scale += 0.1f;
@@ -35,6 +36,7 @@ void e2::Tabbar::update(double seconds)
 		}
 
 		ui->label("IdPoop3", std::format("**Current Scale:** {}", style.scale));
+		*/
 
 		uint32_t i = 0;
 		for (e2::Workspace* wrkspc : m_editorWindow->workspaces())

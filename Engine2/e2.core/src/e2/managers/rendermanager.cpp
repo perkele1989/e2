@@ -9,6 +9,8 @@
 #include "e2/rhi/vertexlayout.hpp"
 #include "e2/timer.hpp"
 
+#include "e2/managers/gamemanager.hpp"
+
 #include "e2/rhi/vk/vkrendercontext.hpp"
 
 #include "e2/e2.hpp"
@@ -137,6 +139,26 @@ e2::FontPtr e2::RenderManager::defaultFont(e2::FontFace face)
 e2::MaterialPtr e2::RenderManager::defaultMaterial()
 {
 	return m_defaultMaterial;
+}
+
+e2::IShader* e2::RenderManager::fullscreenTriangleShader()
+{
+	return m_fullscreenTriangleShader;
+}
+
+void e2::RenderManager::invalidatePipelines()
+{
+	// Invalidate all shader models, this effectively discards all current pipelines
+	for (e2::ShaderModel* model : m_shaderModels)
+	{
+		model->invalidatePipelines();
+	}
+
+	// invalidate all mesh proxies across all sessions, this makes them fetch new pipelines from their respective shadermodel 
+	for (e2::Session* session : gameManager()->allSessions())
+	{
+		session->invalidateAllPipelines();
+	}
 }
 
 e2::RenderManager::RenderManager(Engine* owner)
@@ -283,12 +305,20 @@ void e2::RenderManager::initialize()
 	m_defaultMaterial->postConstruct(this, e2::UUID());
 	m_defaultMaterial->overrideModel(getShaderModel("e2::LightweightModel"));
 	
+	std::string srcData;
+	e2::readFileWithIncludes("shaders/fullscreen_triangle.vertex.glsl", srcData);
+	e2::ShaderCreateInfo shaderInfo{};
+	shaderInfo.stage = e2::ShaderStage::Vertex;
+	shaderInfo.source = srcData.c_str();
+	m_fullscreenTriangleShader = m_renderContext->createShader(shaderInfo);
+
 }
 
 void e2::RenderManager::shutdown()
 {
 	m_renderContext->waitIdle();
 
+	e2::destroy(m_fullscreenTriangleShader);
 	e2::destroy(m_defaultMaterial);
 
 	e2::destroy(m_frontBufferSampler);

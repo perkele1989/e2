@@ -18,7 +18,7 @@ e2::Texture2D::Texture2D()
 e2::Texture2D::~Texture2D()
 {
 	if(m_texture)
-		e2::destroy(m_texture);
+		e2::discard(m_texture);
 
 	::numTextures--;
 	LogNotice("Num textures decreased to {}", ::numTextures);

@@ -100,9 +100,27 @@ static char const* commonSource = R"SRC(
 		  return 130.0 * dot(m, g);
 	}
 
-	float sampleMainHeight(vec2 position)
+	float sampleSimplex(vec2 position, float scale)
 	{
-		return clamp(simplex(position*0.05f) * 0.5 + 0.5, 0.0, 1.0);
+		return simplex(position*scale) * 0.5 + 0.5;
+	}
+
+	float sampleBaseHeight(vec2 position)
+	{
+		float h1p = 0.42;
+		float scale1 = 0.058;
+		float h1 = pow(sampleSimplex(position, scale1), h1p);
+
+		float semiStart = 0.31;
+		float semiSize = 0.47;
+		float h2p = 0.013;
+		float h2 = smoothstep(semiStart, semiStart + semiSize, sampleSimplex(position, h2p));
+
+		float semiStart2 = 0.65; 
+		float semiSize2 = 0.1;
+		float h3p = (0.75 * 20) / 5000;
+		float h3 = 1.0 - smoothstep(semiStart2, semiStart2 + semiSize2, sampleSimplex(position, h3p));
+		return h1 * h2 * h3;
 	}
 
 
@@ -276,12 +294,14 @@ void main()
 
 	float smallSimplexS = simplex(fragmentPosition.xz * 1.1) * 0.5 + 0.5;
 
-	float mainHeight = sampleMainHeight(fragmentPosition.xz);
-	float greenCoeff = clamp(smoothstep(0.6 + 0.1 * smallSimplexS, 0.7+ 0.1 * smallSimplexS, mainHeight), 0.0, 1.0);
+	float mainHeight = sampleBaseHeight(fragmentPosition.xz);
+	float greenCoeff = clamp(smoothstep(0.4 + 0.1 * smallSimplexS, 0.5+ 0.1 * smallSimplexS, mainHeight), 0.0, 1.0);
 
 	greenCoeff = clamp(fragmentColor.r * greenCoeff, 0.0, 1.0);
 
 
+
+	albedoSand = heightlerp(pow(albedoSand, vec3(1.4)), 0.5, albedoSand, smallSimplexS, smoothstep(-0.1, 0.0, -fragmentPosition.y));
 
 	vec3 albedo;
 	albedo = heightlerp(albedoSand, 0.5, albedoGreen, bigSimplex * smallSimplex, greenCoeff);
@@ -332,10 +352,13 @@ void main()
 
 	//outColor.rgb = vec3(brdf.g);
 
+	// debug ndotl 
+	//outColor.rgb = ndotl;
+
 
 	float gridCoeff2 = smoothstep(0.92, 0.95, fragmentColor.a);
-	gridCoeff2 *= 0.1;
-	//outColor.rgb = mix(outColor.rgb, vec3(0.0), gridCoeff2);
+	gridCoeff2 *= 0.22;
+	outColor.rgb = mix(outColor.rgb, vec3(0.0), gridCoeff2);
 
 }
 )SRC";
@@ -562,18 +585,20 @@ e2::IPipeline* e2::TerrainModel::getOrCreatePipeline(e2::MeshProxy* proxy, uint8
 	if ((lwFlags & e2::TerrainFlags::Albedo) == e2::TerrainFlags::Albedo)
 		shaderInfo.defines.push({ "Material_Albedo", "1" });
 
-	std::stringstream vertexBuilder;
-	vertexBuilder << vertexHeader << commonSource << vertexSource;
-	std::string vs = vertexBuilder.str();
+	std::string vertexSource;
+	if (!e2::readFileWithIncludes("shaders/terrain/terrain.vertex.glsl", vertexSource))
+		LogError("broken distribution");
+
 	shaderInfo.stage = ShaderStage::Vertex;
-	shaderInfo.source = vs.c_str();
+	shaderInfo.source = vertexSource.c_str();
 	newEntry.vertexShader = renderContext()->createShader(shaderInfo);
 
-	std::stringstream fragmentBuilder;
-	fragmentBuilder << fragmentHeader << commonSource << fragmentSource;
-	std::string fs = fragmentBuilder.str();
+	std::string fragmentSource;
+	if (!e2::readFileWithIncludes("shaders/terrain/terrain.fragment.glsl", fragmentSource))
+		LogError("broken distribution");
+
 	shaderInfo.stage = ShaderStage::Fragment;
-	shaderInfo.source = fs.c_str();
+	shaderInfo.source = fragmentSource.c_str();
 	newEntry.fragmentShader = renderContext()->createShader(shaderInfo);
 
 	e2::PipelineCreateInfo pipelineInfo;
@@ -586,6 +611,26 @@ e2::IPipeline* e2::TerrainModel::getOrCreatePipeline(e2::MeshProxy* proxy, uint8
 
 	m_pipelineCache[uint16_t(lwFlags)] = newEntry;
 	return newEntry.pipeline;
+}
+
+void e2::TerrainModel::invalidatePipelines()
+{
+	for (uint16_t i = 0; i < uint16_t(e2::TerrainFlags::Count);i++)
+	{
+		e2::TerrainCacheEntry &entry = m_pipelineCache[i];
+
+		if(entry.vertexShader)
+			e2::discard(entry.vertexShader);
+		entry.vertexShader = nullptr;
+
+		if(entry.fragmentShader)
+			e2::discard(entry.fragmentShader);
+		entry.fragmentShader = nullptr;
+
+		if(entry.pipeline)
+			e2::discard(entry.pipeline);
+		entry.pipeline = nullptr;
+	}
 }
 
 e2::TerrainProxy::TerrainProxy(e2::Session* inSession, e2::MaterialPtr materialAsset)

@@ -219,32 +219,27 @@ e2::Renderer::Renderer(e2::Session* session, glm::uvec2 const& resolution)
 
 e2::Renderer::~Renderer()
 {
-	renderContext()->waitIdle();
 
-	e2::destroy(m_linePipeline);
-	e2::destroy(m_lineVertexShader);
-	e2::destroy(m_lineFragmentShader);
+	e2::discard(m_linePipeline);
+	e2::discard(m_lineVertexShader);
+	e2::discard(m_lineFragmentShader);
+	e2::discard(m_rendererBuffers[0]);
+	e2::discard(m_rendererBuffers[1]);
+	e2::discard(m_renderBuffers[0].renderTarget);
+	e2::discard(m_renderBuffers[0].colorTexture);
+	e2::discard(m_renderBuffers[0].positionTexture);
+	e2::discard(m_renderBuffers[0].depthTexture);
+	e2::discard(m_renderBuffers[0].sets[0]);
+	e2::discard(m_renderBuffers[0].sets[1]);
+	e2::discard(m_renderBuffers[1].renderTarget);
+	e2::discard(m_renderBuffers[1].colorTexture);
+	e2::discard(m_renderBuffers[1].positionTexture);
+	e2::discard(m_renderBuffers[1].depthTexture);
+	e2::discard(m_renderBuffers[1].sets[0]);
+	e2::discard(m_renderBuffers[1].sets[1]);
 
-
-	e2::destroy(m_rendererBuffers[0]);
-	e2::destroy(m_rendererBuffers[1]);
-
-	e2::destroy(m_renderBuffers[0].renderTarget);
-	e2::destroy(m_renderBuffers[0].colorTexture);
-	e2::destroy(m_renderBuffers[0].positionTexture);
-	e2::destroy(m_renderBuffers[0].depthTexture);
-	e2::destroy(m_renderBuffers[0].sets[0]);
-	e2::destroy(m_renderBuffers[0].sets[1]);
-	e2::destroy(m_renderBuffers[1].renderTarget);
-	e2::destroy(m_renderBuffers[1].colorTexture);
-	e2::destroy(m_renderBuffers[1].positionTexture);
-	e2::destroy(m_renderBuffers[1].depthTexture);
-	e2::destroy(m_renderBuffers[1].sets[0]);
-	e2::destroy(m_renderBuffers[1].sets[1]);
-
-	e2::destroy(m_commandBuffers[1]);
-	e2::destroy(m_commandBuffers[0]);
-	//e2::IRenderContext* renderContext = renderManager()->context();
+	e2::discard(m_commandBuffers[1]);
+	e2::discard(m_commandBuffers[0]);
 }
 
 e2::Engine* e2::Renderer::engine()
@@ -464,7 +459,7 @@ void e2::Renderer::recordFrame(double deltaTime)
 
 
 	renderManager()->queue(buff, nullptr, nullptr);
-	m_debugLines.resize(0);
+	m_debugLines.clear();
 }
 
 e2::Session* e2::Renderer::session() const
@@ -503,6 +498,27 @@ glm::vec3 e2::RenderView::findWorldspaceViewRayFromNdc(glm::vec2 const& resoluti
 	return ray;
 }
 
+glm::vec2 e2::RenderView::unprojectWorldPlane(glm::vec2 const& resolution, glm::vec2 const& xyCoords) const
+{
+	glm::mat4 projectionMatrix = calculateProjectionMatrix(resolution);
+	glm::mat4 viewMatrix = calculateViewMatrix();
+
+	glm::vec3 near = glm::unProject(glm::vec3(xyCoords.x, xyCoords.y, 0.0f), viewMatrix, projectionMatrix, glm::vec4(-1.0f, -1.0f, 2.0f, 2.0f));
+	glm::vec3 far = glm::unProject(glm::vec3(xyCoords.x, xyCoords.y, 1.0f), viewMatrix, projectionMatrix, glm::vec4(-1.0f, -1.0f, 2.0f, 2.0f));
+	glm::vec3 viewRay = glm::normalize(far - near);
+
+	constexpr float renderDistance = 100.0f;
+	float rayDistanceToPlane = 0.0f;
+	if (!glm::intersectRayPlane(near, viewRay, { 0.0f, 0.0f, 0.0f }, e2::worldUp(), rayDistanceToPlane))
+	{
+		rayDistanceToPlane = renderDistance;
+	}
+
+	glm::vec3 offset = near + viewRay * rayDistanceToPlane;
+	glm::vec3 worldPoint = offset - e2::worldUp() * glm::dot(offset, e2::worldUp());
+	return {worldPoint.x, worldPoint.z};
+}
+
 e2::Viewpoints2D const & e2::Renderer::viewpoints() const
 {
 	return m_viewPoints;
@@ -510,7 +526,7 @@ e2::Viewpoints2D const & e2::Renderer::viewpoints() const
 
 void e2::Renderer::debugLine(glm::vec3 const& color, glm::vec3 const& start, glm::vec3 const& end)
 {
-	m_debugLines.push({color, start, end });
+	m_debugLines.push_back({color, start, end });
 }
 
 void e2::Renderer::swapRenderBuffers()
@@ -530,40 +546,10 @@ void e2::Renderer::debugLine(glm::vec3 const& color, glm::vec2 const& start, glm
 
 e2::Viewpoints2D::Viewpoints2D(glm::vec2 const& resolution, e2::RenderView const& view)
 {
-	constexpr float renderDistance = 100.0f;
-
-	glm::vec3 viewPoints3[4];
-	glm::vec3 cornerRays3[4] = {
-		// 0 top left
-		view.findWorldspaceViewRayFromNdc(resolution, { -1.0f, -1.0f }),
-		// 1 top right
-		view.findWorldspaceViewRayFromNdc(resolution, { 1.0f, -1.0f }),
-		// 2 bottom right
-		view.findWorldspaceViewRayFromNdc(resolution, { 1.0f,  1.0f }),
-		// 3 bottom left
-		view.findWorldspaceViewRayFromNdc(resolution, { -1.0f,  1.0f })
-	};
-
-
-	float rayDistanceToPlane = 0.0f;
-	for (uint8_t i = 0; i < 4; i++)
-	{
-		if (!glm::intersectRayPlane(view.origin, cornerRays3[i], { 0.0f, 0.0f, 0.0f }, e2::worldUp(), rayDistanceToPlane))
-		{
-			rayDistanceToPlane = renderDistance;
-		}
-
-		//if (rayDistanceToPlane > renderDistance)
-		//	rayDistanceToPlane = renderDistance;
-
-		glm::vec3 offset = view.origin + cornerRays3[i] * rayDistanceToPlane;
-		viewPoints3[i] = offset - e2::worldUp() * glm::dot(offset, e2::worldUp());
-	}
-
-	topLeft = { viewPoints3[0].x, viewPoints3[0].z };
-	topRight = { viewPoints3[1].x, viewPoints3[1].z };
-	bottomRight = { viewPoints3[2].x, viewPoints3[2].z };
-	bottomLeft = { viewPoints3[3].x, viewPoints3[3].z };
+	topLeft = view.unprojectWorldPlane(resolution, { -1.0f, -1.0f });
+	topRight = view.unprojectWorldPlane(resolution, { 1.0f, -1.0f });
+	bottomRight = view.unprojectWorldPlane(resolution, { 1.0f,  1.0f });
+	bottomLeft = view.unprojectWorldPlane(resolution, { -1.0f,  1.0f });
 
 	calculateDerivatives();
 }
@@ -588,7 +574,7 @@ bool e2::Viewpoints2D::isWithin(glm::vec2 const& point) const
 
 bool e2::Viewpoints2D::test(e2::Aabb2D const& aabb) const
 {
-	glm::vec2 aabbPoints[4] = { aabb.min, aabb.max, {aabb.min.x, aabb.max.y}, {aabb.max.x, aabb.min.y} };
+	glm::vec2 aabbPoints[4] = { aabb.min, {aabb.max.x, aabb.min.y}, aabb.max, {aabb.min.x, aabb.max.y} };
 	for (uint8_t i = 0; i < 4; i++)
 	{
 		if (isWithin(aabbPoints[i]))
@@ -603,6 +589,26 @@ bool e2::Viewpoints2D::test(e2::Aabb2D const& aabb) const
 		return true;
 	if (aabb.isWithin(bottomRight))
 		return true;
+
+
+	e2::Line2D aabbLines[4] = {
+		{aabbPoints[0], aabbPoints[1]},
+		{aabbPoints[1], aabbPoints[2]},
+		{aabbPoints[2], aabbPoints[3]},
+		{aabbPoints[3], aabbPoints[0]}
+	};
+
+	e2::Line2D viewLines[4] = {
+		{topLeft, topRight},
+		{topRight, bottomRight},
+		{bottomRight, bottomLeft},
+		{bottomLeft, topLeft}
+	};
+
+	for (int32_t x = 0; x < 4; x++)
+		for (int32_t y = 0; y < 4; y++)
+			if (viewLines[x].intersects(aabbLines[y]))
+				return true;
 
 	return false;
 }
@@ -653,6 +659,11 @@ e2::Aabb2D e2::Viewpoints2D::toAabb() const
 	return returner;
 }
 
+bool e2::isCounterClockwise(glm::vec2 const& a, glm::vec2 const& b, glm::vec2 const& c)
+{
+	return (c.y - a.y) * (b.x - a.x) > (b.y - a.y) * (c.x - a.x);
+}
+
 E2_API bool e2::boxRayIntersection2D(Aabb2D box, Ray2D ray)
 {
 	float tmin = -std::numeric_limits<float>::infinity();
@@ -687,4 +698,10 @@ bool e2::Ray2D::edgeTest(glm::vec2 const& point) const
 bool e2::Aabb2D::isWithin(glm::vec2 const& point) const
 {
 	return point.x >= min.x && point.x < max.x && point.y >= min.y && point.y < max.y;
+}
+
+bool e2::Line2D::intersects(Line2D const& other)
+{
+	return e2::isCounterClockwise(start, other.start, other.end) != e2::isCounterClockwise(end, other.start, other.end)
+		&& e2::isCounterClockwise(start, end, other.start) != e2::isCounterClockwise(start, end, other.end);
 }
