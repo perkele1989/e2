@@ -754,41 +754,77 @@ void e2::HexGrid::initializeFogOfWar()
 	layInf.pushConstantSize = sizeof(e2::FogOfWarConstants);
 	m_fogOfWarPipelineLayout = renderContext()->createPipelineLayout(layInf);
 
+	e2::DescriptorSetLayoutCreateInfo setLayoutInf{};
+	setLayoutInf.bindings = {
+		{e2::DescriptorBindingType::Texture},
+		{e2::DescriptorBindingType::Sampler},
+	};
+	m_blurSetLayout = renderContext()->createDescriptorSetLayout(setLayoutInf);
+
+	layInf.pushConstantSize = sizeof(e2::BlurConstants);
+	layInf.sets.push(m_blurSetLayout);
+	m_blurPipelineLayout = renderContext()->createPipelineLayout(layInf);
+
 	m_fogOfWarCommandBuffers[0] = renderManager()->framePool(0)->createBuffer({});
 	m_fogOfWarCommandBuffers[1] = renderManager()->framePool(1)->createBuffer({});
+
+	e2::DescriptorPoolCreateInfo poolCreateInfo{};
+	poolCreateInfo.maxSets = 2 * e2::maxNumSessions;
+	poolCreateInfo.numSamplers = 2 * e2::maxNumSessions;
+	poolCreateInfo.numTextures = 2 * e2::maxNumSessions;
+	m_blurPool = mainThreadContext()->createDescriptorPool(poolCreateInfo);
+
+	m_blurSet[0] = m_blurPool->createDescriptorSet(m_blurSetLayout);
+	m_blurSet[1] = m_blurPool->createDescriptorSet(m_blurSetLayout);
 
 	invalidateFogOfWarShaders();
 }
 
 void e2::HexGrid::invalidateFogOfWarRenderTarget(glm::uvec2 const& newResolution)
 {
-	if (m_fogOfWarMask)
-		e2::discard(m_fogOfWarMask);
+	if (m_fogOfWarMask[0])
+		e2::discard(m_fogOfWarMask[0]);
 
-	if (m_fogOfWarTarget)
-		e2::discard(m_fogOfWarTarget);
+	if (m_fogOfWarMask[1])
+		e2::discard(m_fogOfWarMask[1]);
+
+	if (m_fogOfWarTarget[0])
+		e2::discard(m_fogOfWarTarget[0]);
+
+	if (m_fogOfWarTarget[1])
+		e2::discard(m_fogOfWarTarget[1]);
 
 	e2::TextureCreateInfo texInf{};
 	texInf.initialLayout = e2::TextureLayout::ShaderRead;
 	texInf.format = TextureFormat::RGBA8;
 	texInf.resolution = { newResolution, 1 };
 	texInf.mips = 1;
-	m_fogOfWarMask = renderContext()->createTexture(texInf);
+	m_fogOfWarMask[0] = renderContext()->createTexture(texInf);
+	m_fogOfWarMask[1] = renderContext()->createTexture(texInf);
 
 	e2::RenderTargetCreateInfo renderTargetInfo{};
 	renderTargetInfo.areaExtent = newResolution;
 
 	e2::RenderAttachment colorAttachment{};
-	colorAttachment.target = m_fogOfWarMask;
+	colorAttachment.target = m_fogOfWarMask[0];
 	colorAttachment.clearMethod = ClearMethod::ColorFloat;
 	colorAttachment.clearValue.clearColorf32 = { 0.f, 0.f, 0.f, 0.0f };
 	colorAttachment.loadOperation = LoadOperation::Clear;
 	colorAttachment.storeOperation = StoreOperation::Store;
 	renderTargetInfo.colorAttachments.push(colorAttachment);
-	m_fogOfWarTarget = renderContext()->createRenderTarget(renderTargetInfo);
+	m_fogOfWarTarget[0] = renderContext()->createRenderTarget(renderTargetInfo);
 
-	m_waterProxy->visibilityMask.set(m_fogOfWarMask);
-	m_terrainProxy->visibilityMask.set(m_fogOfWarMask);
+	renderTargetInfo.colorAttachments[0].target = m_fogOfWarMask[1];
+	m_fogOfWarTarget[1] = renderContext()->createRenderTarget(renderTargetInfo);
+
+	m_waterProxy->visibilityMask.set(m_fogOfWarMask[0]);
+	m_terrainProxy->visibilityMask.set(m_fogOfWarMask[0]);
+
+
+	m_blurSet[0]->writeTexture(0, m_fogOfWarMask[0]);
+	m_blurSet[1]->writeTexture(0, m_fogOfWarMask[1]);
+	m_blurSet[0]->writeSampler(1, renderManager()->frontBufferSampler());
+	m_blurSet[1]->writeSampler(1, renderManager()->frontBufferSampler());
 }
 
 void e2::HexGrid::invalidateFogOfWarShaders()
@@ -831,6 +867,39 @@ void e2::HexGrid::invalidateFogOfWarShaders()
 	pipeInf.colorFormats = { e2::TextureFormat::RGBA8 };
 	pipeInf.layout = m_fogOfWarPipelineLayout;
 	m_fogOfWarPipeline = renderContext()->createPipeline(pipeInf);
+
+
+
+
+
+
+
+
+	if (m_blurFragmentShader)
+		e2::discard(m_blurFragmentShader);
+
+	if (m_blurPipeline)
+		e2::discard(m_blurPipeline);
+
+	std::string blurSource;
+	if (!e2::readFileWithIncludes("shaders/blur.fragment.glsl", blurSource))
+	{
+		LogError("Failed to read shader file.");
+	}
+
+	shdrInf = e2::ShaderCreateInfo();
+	shdrInf.source = blurSource.c_str();
+	shdrInf.stage = ShaderStage::Fragment;
+	m_blurFragmentShader = renderContext()->createShader(shdrInf);
+
+
+	pipeInf = e2::PipelineCreateInfo();
+	pipeInf.shaders.push(renderManager()->fullscreenTriangleShader());
+	pipeInf.shaders.push(m_blurFragmentShader);
+	pipeInf.colorFormats = { e2::TextureFormat::RGBA8 };
+	pipeInf.layout = m_blurPipelineLayout;
+	m_blurPipeline = renderContext()->createPipeline(pipeInf);
+
 }
 
 void e2::HexGrid::renderFogOfWar()
@@ -849,8 +918,9 @@ void e2::HexGrid::renderFogOfWar()
 	e2::PipelineSettings defaultSettings;
 	defaultSettings.frontFace = e2::FrontFace::CCW;
 	buff->beginRecord(true, defaultSettings);
-	buff->useAsAttachment(m_fogOfWarMask);
-	buff->beginRender(m_fogOfWarTarget);
+
+	buff->useAsAttachment(m_fogOfWarMask[0]);
+	buff->beginRender(m_fogOfWarTarget[0]);
 	buff->bindPipeline(m_fogOfWarPipeline);
 
 	e2::SubmeshSpecification const& spec = m_baseHex->specification(0);
@@ -918,11 +988,6 @@ void e2::HexGrid::renderFogOfWar()
 
 		glm::mat4 vpMatrix = m_viewpoints.view.calculateProjectionMatrix(m_viewpoints.resolution) * m_viewpoints.view.calculateViewMatrix();
 
-
-
-
-
-
 		for (int32_t y = 0; y < e2::HexGridChunkResolution; y++)
 		{
 			for (int32_t x = 0; x < e2::HexGridChunkResolution; x++)
@@ -954,9 +1019,33 @@ void e2::HexGrid::renderFogOfWar()
 	}
 
 	buff->endRender();
-	//m_fogOfWarMask->generateMipsCmd(buff);
+	
+	buff->useAsDefault(m_fogOfWarMask[0]);
 
-	buff->useAsDefault(m_fogOfWarMask);
+	buff->setFrontFace(e2::FrontFace::CW);
+	BlurConstants bc;
+	bc.direction = { 1.0f, 0.0f };
+	buff->useAsAttachment(m_fogOfWarMask[1]);
+	buff->beginRender(m_fogOfWarTarget[1]);
+	buff->bindPipeline(m_blurPipeline);
+	buff->nullVertexLayout();
+	buff->bindDescriptorSet(m_blurPipelineLayout, 0, m_blurSet[0]);
+	buff->pushConstants(m_blurPipelineLayout, 0, sizeof(e2::BlurConstants), reinterpret_cast<uint8_t*>(&bc));
+	buff->drawNonIndexed(3, 1);
+	buff->endRender();
+	buff->useAsDefault(m_fogOfWarMask[1]);
+
+	bc.direction = { 0.0f, 1.0f };
+	buff->useAsAttachment(m_fogOfWarMask[0]);
+	buff->beginRender(m_fogOfWarTarget[0]);
+	buff->bindPipeline(m_blurPipeline);
+	buff->nullVertexLayout();
+	buff->bindDescriptorSet(m_blurPipelineLayout, 0, m_blurSet[1]);
+	buff->pushConstants(m_blurPipelineLayout, 0, sizeof(e2::BlurConstants), reinterpret_cast<uint8_t*>(&bc));
+	buff->drawNonIndexed(3, 1);
+	buff->endRender();
+	buff->useAsDefault(m_fogOfWarMask[0]);
+
 
 	buff->endRecord();
 
@@ -965,14 +1054,42 @@ void e2::HexGrid::renderFogOfWar()
 
 void e2::HexGrid::destroyFogOfWar()
 {
+	if (m_blurSet[0])
+		e2::discard(m_blurSet[0]);
+
+	if (m_blurSet[1])
+		e2::discard(m_blurSet[1]);
+
+	if (m_blurPool)
+		e2::discard(m_blurPool);
+
+	if (m_blurFragmentShader)
+		e2::discard(m_blurFragmentShader);
+
+	if (m_blurPipeline)
+		e2::discard(m_blurPipeline);
+
+	if (m_blurSetLayout)
+		e2::discard(m_blurSetLayout);
+
+	if (m_blurPipelineLayout)
+		e2::discard(m_blurPipelineLayout);
+
 	if (m_fogOfWarPipelineLayout)
 		e2::discard(m_fogOfWarPipelineLayout);
 
-	if (m_fogOfWarMask)
-		e2::discard(m_fogOfWarMask);
+	if (m_fogOfWarMask[0])
+		e2::discard(m_fogOfWarMask[0]);
 
-	if (m_fogOfWarTarget)
-		e2::discard(m_fogOfWarTarget);
+
+	if (m_fogOfWarMask[1])
+		e2::discard(m_fogOfWarMask[1]);
+
+	if (m_fogOfWarTarget[0])
+		e2::discard(m_fogOfWarTarget[0]);
+
+	if (m_fogOfWarTarget[1])
+		e2::discard(m_fogOfWarTarget[1]);
 
 	if (m_fogOfWarVertexShader)
 		e2::discard(m_fogOfWarVertexShader);

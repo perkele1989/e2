@@ -196,22 +196,26 @@ vec3 tint = vec3(250, 187, 107) / 255.0;
 
 vec3 fogOfWar(vec3 color, vec3 position, vec3 vis, float time)
 {
+    //vis.xy = pow(vis.xy, vec2(1.0));
+    //vis.x = smoothstep(0.2, 0.8, vis.x);
+    //vis.y = smoothstep(0.2, 0.8, vis.y);
+    //return vec3(vis.x, vis.y,0.0);
     vec3 oos = outOfSight(color, position, vis, time);
     vec3 und = undiscovered(color, position, vis, time);
     vec3 fow = mix(und, oos, vis.x);
     return fow;
 }
 
-vec4 blur9(sampler2D image, vec2 uv, vec2 direction)
+vec4 blur9(texture2D sourceTexture, sampler sourceSampler, vec2 uv, vec2 direction)
 {
-    vec2 resolution = textureSize(image, 0);
+    vec2 resolution = textureSize(sampler2D(sourceTexture, sourceSampler), 0);
     vec4 color = vec4(0.0);
     vec2 off1 = vec2(1.3846153846) * direction;
     vec2 off2 = vec2(3.2307692308) * direction;
-    color += texture(image, uv) * 0.2270270270;
-    color += texture(image, uv + (off1 / resolution)) * 0.3162162162;
-    color += texture(image, uv - (off1 / resolution)) * 0.3162162162;
-    color += texture(image, uv + (off2 / resolution)) * 0.0702702703;
-    color += texture(image, uv - (off2 / resolution)) * 0.0702702703;
+    color += texture(sampler2D(sourceTexture, sourceSampler), uv) * 0.2270270270;
+    color += texture(sampler2D(sourceTexture, sourceSampler), uv + (off1 / resolution)) * 0.3162162162;
+    color += texture(sampler2D(sourceTexture, sourceSampler), uv - (off1 / resolution)) * 0.3162162162;
+    color += texture(sampler2D(sourceTexture, sourceSampler), uv + (off2 / resolution)) * 0.0702702703;
+    color += texture(sampler2D(sourceTexture, sourceSampler), uv - (off2 / resolution)) * 0.0702702703;
     return color;
 }

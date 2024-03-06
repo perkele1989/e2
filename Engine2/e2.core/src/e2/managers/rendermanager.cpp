@@ -205,6 +205,8 @@ void e2::RenderManager::initialize()
 	m_frontBufferSampler = m_renderContext->createSampler(samplerInfo);
 
 
+
+
 	// Create model pool and sets
 	e2::DescriptorPoolCreateInfo modelPoolCreateInfo{};
 	modelPoolCreateInfo.maxSets = 2 * e2::maxNumSessions;

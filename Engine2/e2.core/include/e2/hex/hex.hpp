@@ -199,6 +199,11 @@ namespace e2
 		glm::vec3 visibility;
 	};
 
+	struct BlurConstants
+	{
+		glm::vec2 direction;
+	};
+
 	/** 
 	 * Procedural hex grid
 	 * --
@@ -277,7 +282,7 @@ namespace e2
 
 		e2::ITexture* fogOfWarMask()
 		{
-			return m_fogOfWarMask;
+			return m_fogOfWarMask[0];
 		}
 
 		void initializeFogOfWar();
@@ -338,13 +343,23 @@ namespace e2
 
 
 		FogOfWarConstants m_fogOfWarConstants;
-		e2::IRenderTarget* m_fogOfWarTarget{};
-		e2::ITexture* m_fogOfWarMask{};
+		e2::IRenderTarget* m_fogOfWarTarget[2] = {nullptr, nullptr};
+		e2::ITexture* m_fogOfWarMask[2] = {nullptr, nullptr};
 		glm::uvec2 m_fogOfWarMaskSize{};
 		e2::IShader* m_fogOfWarVertexShader{};
 		e2::IShader* m_fogOfWarFragmentShader{};
 		e2::IPipelineLayout* m_fogOfWarPipelineLayout{};
 		e2::IPipeline* m_fogOfWarPipeline{};
+
+		e2::IShader* m_blurFragmentShader{};
+		e2::IPipelineLayout* m_blurPipelineLayout{};
+		e2::IPipeline* m_blurPipeline{};
+		e2::IDescriptorSetLayout* m_blurSetLayout{};
+		e2::IDescriptorSet* m_blurSet[2] = {nullptr, nullptr};
+
+		e2::IDescriptorPool* m_blurPool{};
+
+
 		e2::Pair<e2::ICommandBuffer*> m_fogOfWarCommandBuffers{ nullptr };
 
 	};
