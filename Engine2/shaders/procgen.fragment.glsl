@@ -57,16 +57,26 @@ void main()
 	else 
 		o = 1.0;
 
+	float f = sampleBaseHeight((position + vec2(321.4, 2928.0)) * 4);
+	if(f > -0.1 && h > 0.6)
+		f = 1.0;
+	else
+		f = 0.0;
+
+	f = f * g;
+	g = g - f;
+
 	vec3 m_C = vec3(0.25, 0.255, 0.26);
 	vec3 g_C = vec3(0.2, 0.6, 0.05);
 	vec3 s_C = vec3(0.0, 0.1, 0.6);
 	vec3 o_C = vec3(0.0, 0.05, 0.3);
-
+	vec3 f_C = vec3(0.05, 0.2, 0.01);
 
 	outColor.rgb = o_C;
 	outColor.rgb = mix(outColor.rgb, s_C, s);
 	outColor.rgb = mix(outColor.rgb, g_C, g);
 	outColor.rgb = mix(outColor.rgb, m_C, m);
+	outColor.rgb = mix(outColor.rgb, f_C, f);
 
 	//outColor.r = h;
 

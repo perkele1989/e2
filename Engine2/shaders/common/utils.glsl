@@ -109,7 +109,7 @@ float sampleHeight2(vec2 position)
 float sampleFogHeight(vec2 position, float time)
 {
 
-    float timeCoeff = 1.0;
+    float timeCoeff = 0.7;
     float speed1 = 0.3*timeCoeff;
     vec2 dir1 = normalize(vec2(0.2, 0.4));
     vec2 pos1 = position + (dir1 * speed1 * time);
@@ -125,6 +125,19 @@ float sampleFogHeight(vec2 position, float time)
     return mix(height1, height2, 0.2);
 }
 
+
+vec3 sampleFogNormal(vec2 position, float time)
+{
+    float eps = 0.4;
+    float eps2 = eps * 2;
+    vec3 off = vec3(1.0, 1.0, 0.0)* eps;
+    float hL = sampleFogHeight(position.xy - off.xz, time);
+    float hR = sampleFogHeight(position.xy + off.xz, time);
+    float hD = sampleFogHeight(position.xy - off.zy, time);
+    float hU = sampleFogHeight(position.xy + off.zy, time);
+
+    return normalize(vec3(hR - hL, -eps2 * 0.2, hU - hD));
+}
 
 vec3 undiscovered(vec3 color, vec3 position, vec3 vis, float time)
 {
@@ -155,7 +168,8 @@ vec3 undiscovered(vec3 color, vec3 position, vec3 vis, float time)
     vec3 tint = vec3(250, 187, 107) / 255.0;
     float f = sampleFogHeight(position.xz, time);
     float y = -position.y + f - 0.5;
-    vec3 gg = mix(vec3(0.1), vec3(0.25), f);
+    //vec3 gg = mix(vec3(0.15), vec3(0.0), f);
+    vec3 gg = mix(vec3(0.1), vec3(0.15), f);
     gg = mix(gg, gg*tint, 0.7);
 
     float h = 1.0 -smoothstep(0.2, 1.0, y);
@@ -167,17 +181,27 @@ vec3 undiscovered(vec3 color, vec3 position, vec3 vis, float time)
     gr = mix(gr, gg, h2);
     vec3 undis = mix(color, gr, h * 0.99);
     
+    vec3 n = sampleFogNormal(position.xz, time);
+	vec3 l = normalize(vec3(-1.0, -1.0, -1.0));
+    vec3 ndotl = vec3(clamp(pow(dot(n, l), 1.2), 0.0, 1.0));
+    //return ndotl;
+
+    //return undis;
+
+    undis += ndotl * tint * 0.05;
     
-    
-    return mix(undis, color, vis.y);
+
+
+    return mix(undis*0.8, color, vis.y);
 }
 
 vec3 outOfSight(vec3 color, vec3 position, vec3 vis, float time) 
 {
-vec3 tint = vec3(250, 187, 107) / 255.0;
+    vec3 tint = vec3(250, 187, 107) / 255.0;
     float f = sampleFogHeight(position.xz, time);
     float y = -position.y + f;
-    vec3 gg = mix(vec3(0.1), vec3(0.25), f);
+    //vec3 gg = mix(vec3(0.15), vec3(0.0), f);
+    vec3 gg = mix(vec3(0.1), vec3(0.15), f);
     gg = mix(gg, gg*tint, 0.8);
 
     float h = 1.0 -smoothstep(0.2, 1.0, y);
@@ -185,12 +209,17 @@ vec3 tint = vec3(250, 187, 107) / 255.0;
     vec3 grb = color * 0.95;
     vec3 gra = mix(grb, vec3(desaturate(grb)), 0.7);
     
-    vec3 gr = mix(gra,gg, 0.68);
+    vec3 gr = mix(gra,gg, 0.758);
     gr = mix(gr, gg, h2*0.9);
     vec3 undis = mix(color, gr, h * 0.99);
     
-    
-    
+    vec3 n = sampleFogNormal(position.xz, time);
+	vec3 l = normalize(vec3(-1.0, -1.0, -1.0));
+    vec3 ndotl = vec3(clamp(pow(dot(n, l), 2.2), 0.0, 1.0));
+    //return ndotl;
+
+    undis += ndotl * tint * 0.05;
+
     return mix(undis, color, vis.y*0.7);
 }
 
