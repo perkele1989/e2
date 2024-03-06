@@ -5,8 +5,9 @@
 
 #include <glm/gtc/noise.hpp>
 
-e2::HexGrid::HexGrid(e2::Context* ctx)
+e2::HexGrid::HexGrid(e2::Context* ctx, e2::GameSession* session)
 	: m_engine(ctx->engine())
+	, m_session(session)
 {
 	constexpr size_t prewarmSize = 16'384;
 	m_tiles.reserve(prewarmSize);
@@ -84,16 +85,21 @@ e2::HexGrid::HexGrid(e2::Context* ctx)
 	m_waterMaterial = e2::create<e2::Material>();
 	m_waterMaterial->postConstruct(this, {});
 	m_waterMaterial->overrideModel(renderManager()->getShaderModel("e2::WaterModel"));
+	m_waterProxy = m_session->getOrCreateDefaultMaterialProxy(m_waterMaterial)->unsafeCast<e2::WaterProxy>();
 	m_waterChunk = dynaWater.bake(m_waterMaterial, VertexAttributeFlags::None);
 
 	m_terrainMaterial = e2::create<e2::Material>();
 	m_terrainMaterial->postConstruct(this, {});
 	m_terrainMaterial->overrideModel(renderManager()->getShaderModel("e2::TerrainModel"));
+	m_terrainProxy = m_session->getOrCreateDefaultMaterialProxy(m_terrainMaterial)->unsafeCast<e2::TerrainProxy>();
+
+	initializeFogOfWar();
 }
 
 e2::HexGrid::~HexGrid()
 {
 	clearAllChunks();
+	destroyFogOfWar();
 }
 
 e2::Engine* e2::HexGrid::engine()
@@ -337,8 +343,10 @@ insert_sorted(std::vector<T>& vec, T const& item, Pred pred)
 
 void e2::HexGrid::assertChunksWithinRangeVisible(glm::vec2 const& streamCenter, e2::Viewpoints2D const& viewPoints, glm::vec2 const& viewVelocity)
 {
-	auto renderer = gameSession()->renderer();
+	auto renderer = m_session->renderer();
 	float viewSpeed = glm::length(viewVelocity);
+
+	m_viewpoints = viewPoints;
 
 	e2::Aabb2D viewpointsAabb = viewPoints.toAabb();
 
@@ -475,7 +483,7 @@ void e2::HexGrid::assertChunksWithinRangeVisible(glm::vec2 const& streamCenter, 
 		}
 	}
 
-	// ensure visible chunks are visible
+	// send streaming jobs down the pipe
 	for (glm::ivec2 const& index: m_chunkStreamQueue)
 		prepareChunk(index);
 
@@ -501,7 +509,7 @@ void e2::HexGrid::assertChunksWithinRangeVisible(glm::vec2 const& streamCenter, 
 		// excessive? NUKE!
 		if (i++ >= e2::maxNumExtraChunks)
 		{
-			LogNotice("Nuking excessive chunk {}", state->chunkIndex);
+			//LogNotice("Nuking excessive chunk {}", state->chunkIndex);
 			glm::ivec2 index = state->chunkIndex;
 			e2::destroy(state);
 			m_chunkStates.erase(index);
@@ -609,6 +617,7 @@ e2::TileData e2::HexGrid::calculateTileDataForHex(Hex hex)
 size_t e2::HexGrid::discover(Hex hex)
 {
 	m_tiles.push_back(calculateTileDataForHex(hex));
+	m_tileVisibility.push_back(0);
 	m_tileIndex[hex] = m_tiles.size() - 1;
 
 	return m_tiles.size() - 1;
@@ -700,7 +709,7 @@ void e2::HexGrid::prepareChunk(glm::ivec2 const& chunkIndex)
 	if (m_numJobsInFlight > numThreads)
 		return;
 
-	LogNotice("Requesting new world chunk at {}", chunkIndex);
+	//LogNotice("Requesting new world chunk at {}", chunkIndex);
 
 	m_numJobsInFlight++;
 	e2::ChunkState* newState = e2::create<e2::ChunkState>();
@@ -722,14 +731,14 @@ void e2::HexGrid::notifyChunkReady(glm::ivec2 const& chunkIndex, e2::MeshPtr gen
 	auto finder = m_chunkStates.find(chunkIndex);
 	if (finder == m_chunkStates.end())
 	{
-		LogError("Hardworking task came home to find himself abandoned. {}", chunkIndex);
+		//LogError("Hardworking task came home to find himself abandoned. {}", chunkIndex);
 		return;
 	}
 
 	if (ms > m_highLoadTime)
 		m_highLoadTime = ms;
 
-	LogNotice("New world chunk at {}", chunkIndex);
+	//LogNotice("New world chunk at {}", chunkIndex);
 
 	e2::ChunkState* chunk = m_chunkStates[chunkIndex];
 	chunk->mesh = generatedMesh;
@@ -737,6 +746,287 @@ void e2::HexGrid::notifyChunkReady(glm::ivec2 const& chunkIndex, e2::MeshPtr gen
 
 	if (chunk->visible)
 		ensureChunkVisible(chunk);
+}
+
+void e2::HexGrid::initializeFogOfWar()
+{
+	e2::PipelineLayoutCreateInfo layInf{};
+	layInf.pushConstantSize = sizeof(e2::FogOfWarConstants);
+	m_fogOfWarPipelineLayout = renderContext()->createPipelineLayout(layInf);
+
+	m_fogOfWarCommandBuffers[0] = renderManager()->framePool(0)->createBuffer({});
+	m_fogOfWarCommandBuffers[1] = renderManager()->framePool(1)->createBuffer({});
+
+	invalidateFogOfWarShaders();
+}
+
+void e2::HexGrid::invalidateFogOfWarRenderTarget(glm::uvec2 const& newResolution)
+{
+	if (m_fogOfWarMask)
+		e2::discard(m_fogOfWarMask);
+
+	if (m_fogOfWarTarget)
+		e2::discard(m_fogOfWarTarget);
+
+	e2::TextureCreateInfo texInf{};
+	texInf.initialLayout = e2::TextureLayout::ShaderRead;
+	texInf.format = TextureFormat::RGBA8;
+	texInf.resolution = { newResolution, 1 };
+	texInf.mips = 1;
+	m_fogOfWarMask = renderContext()->createTexture(texInf);
+
+	e2::RenderTargetCreateInfo renderTargetInfo{};
+	renderTargetInfo.areaExtent = newResolution;
+
+	e2::RenderAttachment colorAttachment{};
+	colorAttachment.target = m_fogOfWarMask;
+	colorAttachment.clearMethod = ClearMethod::ColorFloat;
+	colorAttachment.clearValue.clearColorf32 = { 0.f, 0.f, 0.f, 0.0f };
+	colorAttachment.loadOperation = LoadOperation::Clear;
+	colorAttachment.storeOperation = StoreOperation::Store;
+	renderTargetInfo.colorAttachments.push(colorAttachment);
+	m_fogOfWarTarget = renderContext()->createRenderTarget(renderTargetInfo);
+
+	m_waterProxy->visibilityMask.set(m_fogOfWarMask);
+	m_terrainProxy->visibilityMask.set(m_fogOfWarMask);
+}
+
+void e2::HexGrid::invalidateFogOfWarShaders()
+{
+	if (m_fogOfWarVertexShader)
+		e2::discard(m_fogOfWarVertexShader);
+
+	if (m_fogOfWarFragmentShader)
+		e2::discard(m_fogOfWarVertexShader);
+
+	if (m_fogOfWarPipeline)
+		e2::discard(m_fogOfWarPipeline);
+
+	std::string vertexSource;
+	if (!e2::readFileWithIncludes("shaders/fogofwar.vertex.glsl", vertexSource))
+	{
+		LogError("Failed to read shader file.");
+	}
+
+	e2::ShaderCreateInfo shdrInf{};
+	e2::applyVertexAttributeDefines(m_baseHex->specification(0).attributeFlags, shdrInf);
+
+	shdrInf.source = vertexSource.c_str();
+	shdrInf.stage = ShaderStage::Vertex;
+	m_fogOfWarVertexShader = renderContext()->createShader(shdrInf);
+
+	std::string fragmentSource;
+	if (!e2::readFileWithIncludes("shaders/fogofwar.fragment.glsl", fragmentSource))
+	{
+		LogError("Failed to read shader file.");
+	}
+
+	shdrInf.source = fragmentSource.c_str();
+	shdrInf.stage = ShaderStage::Fragment;
+	m_fogOfWarFragmentShader = renderContext()->createShader(shdrInf);
+
+	e2::PipelineCreateInfo pipeInf{};
+	pipeInf.shaders.push(m_fogOfWarVertexShader);
+	pipeInf.shaders.push(m_fogOfWarFragmentShader);
+	pipeInf.colorFormats = { e2::TextureFormat::RGBA8 };
+	pipeInf.layout = m_fogOfWarPipelineLayout;
+	m_fogOfWarPipeline = renderContext()->createPipeline(pipeInf);
+}
+
+void e2::HexGrid::renderFogOfWar()
+{
+	glm::uvec2 newResolution = m_viewpoints.resolution / 16.0f;
+	if (newResolution != m_fogOfWarMaskSize || !m_fogOfWarMask)
+	{
+		invalidateFogOfWarRenderTarget(newResolution);
+	}
+
+	e2::FogOfWarConstants fogOfWarConstants;
+
+
+
+	e2::ICommandBuffer* buff = m_fogOfWarCommandBuffers[renderManager()->frameIndex()];
+	e2::PipelineSettings defaultSettings;
+	defaultSettings.frontFace = e2::FrontFace::CCW;
+	buff->beginRecord(true, defaultSettings);
+	buff->useAsAttachment(m_fogOfWarMask);
+	buff->beginRender(m_fogOfWarTarget);
+	buff->bindPipeline(m_fogOfWarPipeline);
+
+	e2::SubmeshSpecification const& spec = m_baseHex->specification(0);
+	// Bind vertex states
+	buff->bindVertexLayout(spec.vertexLayout);
+	buff->bindIndexBuffer(spec.indexBuffer);
+	for (uint8_t i = 0; i < spec.vertexAttributes.size(); i++)
+		buff->bindVertexBuffer(i, spec.vertexAttributes[i]);
+
+	/*
+	for (auto pair : m_chunkStates)
+	{
+		glm::ivec2 chunkIndex = pair.first;
+		e2::ChunkState* chunk = pair.second;
+
+		if (!chunk->visible)
+		{
+			continue;
+		}
+
+		glm::ivec2 chunkTileOffset = chunkIndex * glm::ivec2(e2::HexGridChunkResolution);
+
+		glm::mat4 vpMatrix = m_viewpoints.view.calculateProjectionMatrix(m_viewpoints.resolution) * m_viewpoints.view.calculateViewMatrix();
+		// first outlines
+		for (int32_t y = 0; y < e2::HexGridChunkResolution; y++)
+		{
+			for (int32_t x = 0; x < e2::HexGridChunkResolution; x++)
+			{
+				glm::ivec2 worldIndex = chunkTileOffset + glm::ivec2(x, y);
+				auto finder = m_tileIndex.find(worldIndex);
+				if (finder == m_tileIndex.end())
+					continue;
+
+				e2::Hex currentHex(worldIndex);
+				glm::vec3 worldOffset = currentHex.localCoords();
+
+				glm::mat4 transform = glm::identity<glm::mat4>();
+				transform = glm::translate(transform, worldOffset);
+				transform = glm::scale(transform, { 1.15f, 1.15f, 1.15f });
+
+
+				fogOfWarConstants.mvpMatrix = vpMatrix * transform;
+
+				fogOfWarConstants.visibility.x = 0.0f;
+				fogOfWarConstants.visibility.y = 0.0f;
+				fogOfWarConstants.visibility.z = 1.0f;
+
+				buff->pushConstants(m_fogOfWarPipelineLayout, 0, sizeof(e2::FogOfWarConstants), reinterpret_cast<uint8_t*>(&fogOfWarConstants));
+				buff->draw(spec.indexCount, 1);
+			}
+		}
+	}*/
+
+	for (auto pair : m_chunkStates)
+	{
+		glm::ivec2 chunkIndex = pair.first;
+		e2::ChunkState* chunk = pair.second;
+
+		if (!chunk->visible)
+		{
+			continue;
+		}
+
+		glm::ivec2 chunkTileOffset = chunkIndex * glm::ivec2(e2::HexGridChunkResolution);
+
+		glm::mat4 vpMatrix = m_viewpoints.view.calculateProjectionMatrix(m_viewpoints.resolution) * m_viewpoints.view.calculateViewMatrix();
+
+
+
+
+
+
+		for (int32_t y = 0; y < e2::HexGridChunkResolution; y++)
+		{
+			for (int32_t x = 0; x < e2::HexGridChunkResolution; x++)
+			{
+				glm::ivec2 worldIndex = chunkTileOffset + glm::ivec2(x, y);
+				auto finder = m_tileIndex.find(worldIndex);
+				if (finder == m_tileIndex.end())
+					continue;
+
+				e2::Hex currentHex(worldIndex);
+				glm::vec3 worldOffset = currentHex.localCoords();
+
+				glm::mat4 transform = glm::identity<glm::mat4>();
+				transform = glm::translate(transform, worldOffset);
+
+
+				fogOfWarConstants.mvpMatrix = vpMatrix * transform;
+				fogOfWarConstants.visibility.x = 1.0;
+				fogOfWarConstants.visibility.y = m_tileVisibility[finder->second] > 0 ? 1.0 : 0.0;
+				fogOfWarConstants.visibility.z = 0.0f;
+
+
+				buff->pushConstants(m_fogOfWarPipelineLayout, 0, sizeof(e2::FogOfWarConstants), reinterpret_cast<uint8_t*>(&fogOfWarConstants));
+				buff->draw(spec.indexCount, 1);
+			}
+		}
+
+
+	}
+
+	buff->endRender();
+	//m_fogOfWarMask->generateMipsCmd(buff);
+
+	buff->useAsDefault(m_fogOfWarMask);
+
+	buff->endRecord();
+
+	renderManager()->queue(buff, nullptr, nullptr);
+}
+
+void e2::HexGrid::destroyFogOfWar()
+{
+	if (m_fogOfWarPipelineLayout)
+		e2::discard(m_fogOfWarPipelineLayout);
+
+	if (m_fogOfWarMask)
+		e2::discard(m_fogOfWarMask);
+
+	if (m_fogOfWarTarget)
+		e2::discard(m_fogOfWarTarget);
+
+	if (m_fogOfWarVertexShader)
+		e2::discard(m_fogOfWarVertexShader);
+
+	if (m_fogOfWarFragmentShader)
+		e2::discard(m_fogOfWarFragmentShader);
+
+	if (m_fogOfWarPipeline)
+		e2::discard(m_fogOfWarPipeline);
+
+	if (m_fogOfWarCommandBuffers[0])
+		e2::discard(m_fogOfWarCommandBuffers[0]);
+
+	if (m_fogOfWarCommandBuffers[1])
+		e2::discard(m_fogOfWarCommandBuffers[1]);
+
+}
+
+void e2::HexGrid::clearVisibility()
+{
+	for (bool vis : m_tileVisibility)
+		vis = 0;
+}
+
+void e2::HexGrid::flagVisible(glm::ivec2 const& v, bool onlyDiscover)
+{
+	auto finder = m_tileIndex.find(v);
+	int32_t index = 0;
+	if (finder == m_tileIndex.end())
+	{
+		index = discover(e2::Hex(v));
+
+	}
+	else
+	{
+		index = finder->second;
+	}
+
+	if(!onlyDiscover)
+		m_tileVisibility[index] = m_tileVisibility[index]  + 1;
+}
+
+void e2::HexGrid::unflagVisible(glm::ivec2 const& v)
+{
+	auto finder = m_tileIndex.find(v);
+	int32_t index = 0;
+	if (finder == m_tileIndex.end())
+	{
+		LogError("attempted to unflag visibility in nondiscovered area, this is likely a bug!");
+		return;
+	}
+	index = finder->second;
+
+	m_tileVisibility[index] = m_tileVisibility[index] - 1;
 }
 
 namespace
@@ -847,7 +1137,7 @@ void e2::HexGrid::ensureChunkVisible(e2::ChunkState* state)
 		e2::MeshProxyConfiguration proxyConf;
 		proxyConf.mesh = state->mesh;
 
-		state->proxy = e2::create<e2::MeshProxy>(gameSession(), proxyConf);
+		state->proxy = e2::create<e2::MeshProxy>(m_session, proxyConf);
 		state->proxy->modelMatrix = glm::translate(glm::mat4(1.0f), chunkOffset);
 		state->proxy->modelMatrixDirty = { true };
 		m_numChunkMeshes++;
@@ -858,7 +1148,7 @@ void e2::HexGrid::ensureChunkVisible(e2::ChunkState* state)
 		e2::MeshProxyConfiguration waterConf;
 		waterConf.mesh = m_waterChunk;
 
-		state->waterProxy = e2::create<e2::MeshProxy>(gameSession(), waterConf);
+		state->waterProxy = e2::create<e2::MeshProxy>(m_session, waterConf);
 		state->waterProxy->modelMatrix = glm::translate(glm::mat4(1.0f), chunkOffset + glm::vec3(0.0f, 0.1f, 0.0f));
 		state->waterProxy->modelMatrixDirty = { true };
 	}

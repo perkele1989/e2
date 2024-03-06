@@ -70,6 +70,11 @@ void e2::AsyncManager::shutdown()
 	}
 }
 
+void e2::AsyncManager::preUpdate(double deltaTime)
+{
+
+}
+
 void e2::AsyncManager::update(double deltaTime)
 {
 	m_queueSwap.clear();

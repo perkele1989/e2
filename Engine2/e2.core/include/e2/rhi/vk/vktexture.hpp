@@ -32,6 +32,8 @@ namespace e2
 		virtual ~ITexture_Vk();
 
 		virtual void generateMips() override;
+		virtual void generateMipsCmd(e2::ICommandBuffer* buff) override;
+		void mipsCmd(VkCommandBuffer buff);
 
 		virtual void upload(uint32_t mip, glm::uvec3 offset, glm::uvec3 size, uint8_t const* data, uint64_t dataSize) override;
 

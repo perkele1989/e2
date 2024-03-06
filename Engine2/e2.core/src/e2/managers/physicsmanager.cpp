@@ -27,6 +27,11 @@ void e2::PhysicsManager::shutdown()
 
 }
 
+void e2::PhysicsManager::preUpdate(double deltaTime)
+{
+
+}
+
 void e2::PhysicsManager::update(double deltaTime)
 {
 

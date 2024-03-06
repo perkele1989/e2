@@ -10,7 +10,9 @@ namespace e2
 	class GameContext
 	{
 	public:
+		virtual e2::HexGrid* hexGrid();
 		virtual e2::Game* game() = 0;
+		virtual e2::GameSession* gameSession();
 	};
 	
 	struct ResourceTable
@@ -44,26 +46,26 @@ namespace e2
 
 	class GameUnit : public e2::Object, public e2::GameContext
 	{
-		ObjectDeclaration();
+		ObjectDeclaration(); 
 	public:
-		GameUnit(e2::GameContext* ctx)
-			: m_game(ctx->game())
-		{
-
-		}
+		GameUnit(e2::GameContext* ctx, glm::ivec2 const& tile);
+		virtual ~GameUnit();
 
 		virtual e2::Game* game() override
 		{
 			return m_game;
 		}
 
-		virtual ~GameUnit();
+		void spreadVisibility();
+		void rollbackVisibility();
 
 		glm::ivec2 tileIndex; // offset coords
 		float health{ 100.0f };
+		uint32_t sightRange{5};
 
 	protected:
-		e2::Game* m_game;
+		e2::Game* m_game{};
+		e2::MeshProxy* m_proxy{};
 	};
 
 	enum class MilitaryUnitUpgrade : uint16_t
@@ -152,19 +154,20 @@ namespace e2
 			range = glm::max(range, 0);
 		}
 
-		float maxArmor{};
+		float maxArmor{}; 
 
 		float meleeDamage{};
 		float rangedDamage{};
 		float defensiveStrength{};
-		int32_t range{ };
+		int32_t range{ }; 
 	};
 
-	class MilitaryUnit : public GameUnit
+	/** @tags(arena, arenaSize=256)*/
+	class MilitaryUnit : public e2::GameUnit 
 	{
 		ObjectDeclaration();
 	public:
-		MilitaryUnit() = default;
+		MilitaryUnit(e2::GameContext* ctx, glm::ivec2 const& tile);
 		virtual ~MilitaryUnit();
 
 		// calculates stats for the given round 
@@ -265,7 +268,38 @@ namespace e2
 
 		e2::RenderView calculateRenderView(glm::vec2 const& viewOrigin);
 
+		void onTurnStart();
+		void onTurnEnd();
+
+		template<typename UnitType>
+		UnitType* spawnUnit(e2::Hex const& location)
+		{
+			glm::ivec2 coords = location.offsetCoords();
+			if (m_unitIndex.find(coords) != m_unitIndex.end())
+				return nullptr;
+
+
+			UnitType* newUnit = e2::create<UnitType>(this, coords);
+			newUnit->spreadVisibility();
+
+			m_units.insert(newUnit);
+			m_unitIndex[coords] = newUnit;
+			return newUnit;
+		}
+
+		void destroyUnit(e2::Hex const& location);
+
+		e2::MeshPtr cursorMesh()
+		{
+			return m_cursorMesh;
+		}
+
+
 	protected:
+		friend class GameContext;
+
+		e2::GameSession* m_session{};
+
 		// main world grid
 		e2::HexGrid* m_hexGrid{};
 
@@ -285,6 +319,11 @@ namespace e2
 		e2::Hex m_cursorHex; // mouse position as projected upon a hex
 		e2::MeshPtr m_cursorMesh;
 		e2::MeshProxy* m_cursorProxy{};
+
+		// game units 
+
+		std::unordered_set<GameUnit*> m_units;
+		std::unordered_map<glm::ivec2, GameUnit*> m_unitIndex;
 
 		// camera stuff 
 		void updateMainCamera(double seconds);

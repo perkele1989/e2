@@ -31,7 +31,7 @@ layout(push_constant) uniform ConstantData
 	float param16;
 };
 
-#include <shaders/common/procgen.glsl>
+#include <shaders/common/utils.glsl>
 
 void main()
 {

@@ -615,6 +615,11 @@ void e2::UIManager::shutdown()
 	e2::destroy(m_quadVertexBuffer);
 }
 
+void e2::UIManager::preUpdate(double deltaTime)
+{
+
+}
+
 void e2::UIManager::update(double deltaTime)
 {
 

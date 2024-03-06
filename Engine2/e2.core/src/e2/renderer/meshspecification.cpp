@@ -28,3 +28,23 @@
 		return 0;
 	}
 }*/
+
+void e2::applyVertexAttributeDefines(VertexAttributeFlags flags, ShaderCreateInfo& outInfo)
+{
+	// @todo utility functions to get defines from these 
+	if ((flags & e2::VertexAttributeFlags::Normal) == e2::VertexAttributeFlags::Normal)
+		outInfo.defines.push({ "Vertex_Normals", "1" });
+
+	if ((flags & e2::VertexAttributeFlags::TexCoords01) == e2::VertexAttributeFlags::TexCoords01)
+		outInfo.defines.push({ "Vertex_TexCoords01", "1" });
+
+	if ((flags & e2::VertexAttributeFlags::TexCoords23) == e2::VertexAttributeFlags::TexCoords23)
+		outInfo.defines.push({ "Vertex_TexCoords23", "1" });
+
+	if ((flags & e2::VertexAttributeFlags::Color) == e2::VertexAttributeFlags::Color)
+		outInfo.defines.push({ "Vertex_Color", "1" });
+
+	if ((flags & e2::VertexAttributeFlags::Bones) == e2::VertexAttributeFlags::Bones)
+		outInfo.defines.push({ "Vertex_Bones", "1" });
+
+}

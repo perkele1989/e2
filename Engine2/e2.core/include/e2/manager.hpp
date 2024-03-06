@@ -15,7 +15,7 @@ namespace e2
 
 		virtual void initialize() = 0;
 		virtual void shutdown() = 0;
-
+		virtual void preUpdate(double deltaTime) =0;
 		virtual void update(double deltaTime) = 0;
 
 		virtual Engine* engine() override;

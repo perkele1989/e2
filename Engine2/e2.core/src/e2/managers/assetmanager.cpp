@@ -260,6 +260,11 @@ void e2::AssetManager::shutdown()
 	m_uuidIndex.clear();
 }
 
+void e2::AssetManager::preUpdate(double deltaTime)
+{
+
+}
+
 void e2::AssetManager::update(double deltaTime)
 {
 	// if we're processing an ALJ, keep doing that

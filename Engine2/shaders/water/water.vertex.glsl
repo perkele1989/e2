@@ -36,15 +36,21 @@ out vec3 fragmentNormal;
 
 void main()
 {
+    vec4 clipSpace = renderer.projectionMatrix * renderer.viewMatrix * mesh.modelMatrix * vertexPosition;
+    clipSpace.xy = clipSpace.xy * 0.5 + 0.5;
+
+    vec2 visibility = texture(sampler2D(visibilityMask, frontBufferSampler), clipSpace.xy).xy;
+    //float time = mix(0.0, renderer.time.x, visibility.x);
+    float time = renderer.time.x;
 	vec4 vertexWorld = mesh.modelMatrix * vertexPosition;
 	vec4 waterPosition = vertexPosition;
-    float wh = sampleWaterHeight(vertexWorld.xz);
+    float wh = sampleWaterHeight(vertexWorld.xz, time);
     float wd = sampleWaterDepth(vertexWorld.xz);
     wh = mix(wh*0.5, wh, wd);
 
 	waterPosition.y -= wh * 0.24;
 
-	fragmentNormal = sampleWaterNormal(vertexWorld.xz);
+	fragmentNormal = sampleWaterNormal(vertexWorld.xz, time);
 
 	gl_Position = renderer.projectionMatrix * renderer.viewMatrix * mesh.modelMatrix * waterPosition;
 

@@ -11,12 +11,13 @@ namespace e2
 
 	class Renderer;
 	class IWindow;
-	class GameSession : public e2::Session, public e2::RenderCallbacks
+	class E2_API GameSession : public e2::Session, public e2::RenderCallbacks
 	{
 	public:
 		GameSession(e2::Context* ctx);
 		virtual ~GameSession();
 
+		virtual void preTick(double seconds) override;
 		virtual void tick(double seconds) override;
 
 		virtual void onNewFrame(uint8_t frameIndex) override;

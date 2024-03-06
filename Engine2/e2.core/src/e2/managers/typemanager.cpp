@@ -26,6 +26,11 @@ void e2::TypeManager::shutdown()
 
 }
 
+void e2::TypeManager::preUpdate(double deltaTime)
+{
+
+}
+
 void e2::TypeManager::update(double deltaTime)
 {
 

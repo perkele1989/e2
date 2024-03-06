@@ -51,6 +51,7 @@ layout(set = 2, binding = 9) uniform texture2D sandNormal;
 
 layout(set = 2, binding = 10) uniform texture2D greenAlbedo;
 layout(set = 2, binding = 11) uniform texture2D greenNormal;
+layout(set = 2, binding = 12) uniform texture2D visibilityMask;
 
 
 // End Set2

@@ -50,6 +50,7 @@ namespace e2
 		Session(e2::Context* ctx);
 		virtual ~Session();
 
+		virtual void preTick(double seconds);
 		virtual void tick(double seconds);
 
 		virtual Engine* engine() override;

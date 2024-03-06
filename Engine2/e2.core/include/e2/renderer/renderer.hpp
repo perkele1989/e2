@@ -80,7 +80,7 @@ namespace e2
 	struct E2_API Viewpoints2D
 	{
 		Viewpoints2D();
-		Viewpoints2D(glm::vec2 const& resolution, e2::RenderView const& view);
+		Viewpoints2D(glm::vec2 const& _resolution, e2::RenderView const& _view);
 
 		union
 		{
@@ -93,6 +93,10 @@ namespace e2
 			};
 			glm::vec2 corners[4];
 		};
+
+		// these are the inputs to the viewpoints generation, not neccessarily set 
+		e2::RenderView view;
+		glm::vec2 resolution;
 
 		// The following are derivatives 
 		glm::vec2 center;

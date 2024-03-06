@@ -7,6 +7,8 @@
 #include <e2/renderer/meshproxy.hpp>
 #include <e2/managers/rendermanager.hpp>
 #include <e2/dmesh/dmesh.hpp>
+#include <e2/renderer/shadermodels/water.hpp>
+#include <e2/renderer/shadermodels/terrain.hpp>
 
 #include <vector>
 #include <unordered_map>
@@ -127,7 +129,6 @@ namespace e2
 
 		ImprovementFlags improvementFlags{ ImprovementFlags::None };
 		e2::ufloat8 improvementHealth{ 1.0f };
-		
 	};
 
 	constexpr uint32_t HexGridChunkResolution = 6;
@@ -191,6 +192,13 @@ namespace e2
 
 	};
 
+	// fog of war 
+	struct FogOfWarConstants
+	{
+		glm::mat4 mvpMatrix;
+		glm::vec3 visibility;
+	};
+
 	/** 
 	 * Procedural hex grid
 	 * --
@@ -201,7 +209,7 @@ namespace e2
 	{
 	public:
 
-		HexGrid(e2::Context* ctx);
+		HexGrid(e2::Context* ctx, e2::GameSession* session);
 		~HexGrid();
 
 		virtual e2::Engine* engine() override;
@@ -267,10 +275,30 @@ namespace e2
 			return m_dynamicMutex;
 		}
 
+		e2::ITexture* fogOfWarMask()
+		{
+			return m_fogOfWarMask;
+		}
+
+		void initializeFogOfWar();
+		void invalidateFogOfWarRenderTarget(glm::uvec2 const& newResolution);
+		void invalidateFogOfWarShaders();
+		void renderFogOfWar();
+		void destroyFogOfWar();
+
+		void clearVisibility();
+		void flagVisible(glm::ivec2 const& v, bool onlyDiscover = false);
+		void unflagVisible(glm::ivec2 const& v);
 	protected:
+
+
+
 		e2::Engine* m_engine{};
+		e2::GameSession* m_session{};
 
 		std::mutex m_dynamicMutex;
+
+		e2::Viewpoints2D m_viewpoints;
 
 		uint32_t m_numVisibleChunks{};
 		uint32_t m_numChunkMeshes{};
@@ -284,6 +312,7 @@ namespace e2
 		//
 
 		std::vector<TileData> m_tiles;
+		std::vector<int32_t> m_tileVisibility;
 		std::unordered_map<Hex, size_t> m_tileIndex;
 		
 		void ensureChunkVisible(e2::ChunkState* state);
@@ -293,15 +322,31 @@ namespace e2
 
 		e2::MeshPtr m_baseHex;
 		e2::DynamicMesh m_dynaHex;
-
 		e2::MeshPtr m_baseHexHigh;
 		e2::DynamicMesh m_dynaHexHigh;
 
 		e2::MaterialPtr m_terrainMaterial;
+		e2::TerrainProxy* m_terrainProxy{};
 
 		e2::MaterialPtr m_waterMaterial;
-		
+		e2::WaterProxy* m_waterProxy{};
+
 		e2::MeshPtr m_waterChunk;
+
+
+
+
+
+		FogOfWarConstants m_fogOfWarConstants;
+		e2::IRenderTarget* m_fogOfWarTarget{};
+		e2::ITexture* m_fogOfWarMask{};
+		glm::uvec2 m_fogOfWarMaskSize{};
+		e2::IShader* m_fogOfWarVertexShader{};
+		e2::IShader* m_fogOfWarFragmentShader{};
+		e2::IPipelineLayout* m_fogOfWarPipelineLayout{};
+		e2::IPipeline* m_fogOfWarPipeline{};
+		e2::Pair<e2::ICommandBuffer*> m_fogOfWarCommandBuffers{ nullptr };
+
 	};
 
 }

@@ -33,9 +33,6 @@ namespace e2
 		// extra helpers for common stuff
 		e2::IRenderContext* renderContext();
 		e2::IThreadContext* mainThreadContext();
-		GameSession* gameSession();
-		
-
 
 		RenderManager* renderManager();
 		AssetManager* assetManager();

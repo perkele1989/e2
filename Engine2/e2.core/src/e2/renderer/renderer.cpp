@@ -348,6 +348,9 @@ void e2::Renderer::recordFrame(double deltaTime)
 				e2::MeshProxy* meshProxy = meshProxySubmesh.proxy;
 				uint8_t submeshIndex = meshProxySubmesh.submesh;
 
+				if (!meshProxy->pipelines[submeshIndex])
+					continue;
+
 				buff->bindPipeline(meshProxy->pipelines[submeshIndex]);
 
 				e2::MeshPtr mesh = meshProxy->asset;
@@ -442,21 +445,10 @@ void e2::Renderer::recordFrame(double deltaTime)
 			buff->useAsDefault(backBuff.depthTexture);
 
 			swapRenderBuffers();
-
-
 		}
-
-
-
-
 
 		buff->endRecord();
 	}
-
-
-
-
-
 
 	renderManager()->queue(buff, nullptr, nullptr);
 	m_debugLines.clear();
@@ -544,7 +536,9 @@ void e2::Renderer::debugLine(glm::vec3 const& color, glm::vec2 const& start, glm
 	debugLine(color, { start.x, 0.0f, start.y }, { end.x, 0.0f, end.y });
 }
 
-e2::Viewpoints2D::Viewpoints2D(glm::vec2 const& resolution, e2::RenderView const& view)
+e2::Viewpoints2D::Viewpoints2D(glm::vec2 const& _resolution, e2::RenderView const& _view)
+	: view(_view)
+	, resolution(_resolution)
 {
 	topLeft = view.unprojectWorldPlane(resolution, { -1.0f, -1.0f });
 	topRight = view.unprojectWorldPlane(resolution, { 1.0f, -1.0f });

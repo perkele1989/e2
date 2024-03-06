@@ -68,6 +68,11 @@ e2::Session::~Session()
 	e2::destroy(m_modelSets[1]);
 }
 
+void e2::Session::preTick(double seconds)
+{
+
+}
+
 void e2::Session::tick(double seconds)
 {
 

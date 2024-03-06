@@ -41,6 +41,11 @@ e2::GameSession::~GameSession()
 	e2::destroy(m_window);
 }
 
+void e2::GameSession::preTick(double seconds)
+{
+
+}
+
 void e2::GameSession::tick(double seconds)
 {
 	e2::Session::tick(seconds);
@@ -61,7 +66,6 @@ void e2::GameSession::tick(double seconds)
 
 	m_renderer->recordFrame(seconds);
 	m_uiContext->drawTexturedQuad({}, m_uiContext->size(), 0xFFFFFFFF, m_renderer->colorTarget());
-
 
 }
 

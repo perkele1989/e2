@@ -35,11 +35,6 @@ e2::IThreadContext* e2::Context::mainThreadContext()
 //	return renderManager()->context();
 //}
 
-e2::GameSession* e2::Context::gameSession()
-{
-	return gameManager()->session();
-}
-
 e2::RenderManager* e2::Context::renderManager()
 {
 	return engine()->m_renderManager;

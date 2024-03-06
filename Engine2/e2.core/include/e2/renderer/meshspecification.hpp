@@ -5,6 +5,7 @@
 #include <e2/utils.hpp>
 #include <e2/rhi/enums.hpp>
 #include <e2/rhi/databuffer.hpp>
+#include <e2/rhi/shader.hpp>
 
 #include <cstdint> 
 #include <vector>
@@ -118,6 +119,8 @@ namespace e2
 
         All = Normal | TexCoords01 | TexCoords23 | Color | Bones
     };
+
+    E2_API void applyVertexAttributeDefines(e2::VertexAttributeFlags flags, e2::ShaderCreateInfo& outInfo);
 
     class IVertexLayout;
 

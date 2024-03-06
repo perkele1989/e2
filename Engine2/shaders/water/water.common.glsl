@@ -1,6 +1,6 @@
 
 
-#include <shaders/common/procgen.glsl>
+#include <shaders/common/utils.glsl>
 
 // Push constants
 layout(push_constant) uniform ConstantData
@@ -39,39 +39,11 @@ layout(set = 2, binding = 0) uniform MaterialData
     vec4 albedo;
 } material;
 
-layout(set = 2, binding = 1) uniform texture2D albedoTexture;
-layout(set = 2, binding = 2) uniform sampler albedoSampler;
+layout(set = 2, binding = 1) uniform texture2D reflectionHdr;
+layout(set = 2, binding = 2) uniform sampler genericSampler;
+layout(set = 2, binding = 3) uniform texture2D visibilityMask;
 // End Set2
 
-const mat2 myt = mat2(.12121212, .13131313, -.13131313, .12121212);
-const vec2 mys = vec2(1e4, 1e6);
-
-vec2 rhash(vec2 uv) {
-    uv *= myt;
-    uv *= mys;
-    return fract(fract(uv / mys) * uv);
-}
-
-vec3 hash(vec3 p) {
-    return fract(sin(vec3(dot(p, vec3(1.0, 57.0, 113.0)),
-                        dot(p, vec3(57.0, 113.0, 1.0)),
-                        dot(p, vec3(113.0, 1.0, 57.0)))) *
-                43758.5453);
-}
-
-float voronoi2d(const in vec2 point) {
-    vec2 p = floor(point);
-    vec2 f = fract(point);
-    float res = 0.0;
-    for (int j = -1; j <= 1; j++) {
-    for (int i = -1; i <= 1; i++) {
-        vec2 b = vec2(i, j);
-        vec2 r = vec2(b) - f + rhash(p + b);
-        res += 1. / pow(dot(r, r), 8.);
-    }
-    }
-    return pow(1. / res, 0.0625);
-}
 
 
 float sampleHeight(vec2 position)
@@ -101,28 +73,33 @@ float sampleWaterDepth(vec2 position)
     return 1.0 - depthCoeff;
 }
 
-float sampleWaterHeight(vec2 position)
+float sampleWaterHeight(vec2 position, float time)
 {
     //float depthCoeff = sampleWaterDepth(position);
+
+    float s = simplex(position * 0.2) * 0.5 + 0.5;
+    float size = mix(1.3, 2.2, s);
+
+    //return s;
 
     float variance1 = 0.2;
     float varianceOffset1 = 1.0 - variance1;
     float varianceSpeed1 = 3.0;
-    float waveCoeff1 = (sin(renderer.time.x * varianceSpeed1) * 0.5 + 0.5) * variance1 + varianceOffset1;
+    float waveCoeff1 = (sin(time * varianceSpeed1) * 0.5 + 0.5) * variance1 + varianceOffset1;
 
     float variance2 = 0.5;
     float varianceOffset2 = 1.0 - variance2;
     float varianceSpeed2 = 2.5;
-    float waveCoeff2 = (sin(renderer.time.x * varianceSpeed2) * 0.5 + 0.5) * variance2 + varianceOffset2;
+    float waveCoeff2 = (sin(time * varianceSpeed2) * 0.5 + 0.5) * variance2 + varianceOffset2;
 
     float speed1 = 0.5;
     vec2 dir1 = normalize(vec2(0.2, 0.4));
-    vec2 pos1 = position + (dir1 * speed1 * renderer.time.x);
+    vec2 pos1 = position + (dir1 * speed1 * time);
     float height1 = sampleHeight(pos1 * 2.0) * waveCoeff1;
 
     float speed2 = 0.3;
     vec2 dir2 = normalize(vec2(-0.22, -0.3));
-    vec2 pos2 = position + (dir2 * speed2 * renderer.time.x);
+    vec2 pos2 = position + (dir2 * speed2 * time);
     float height2 = sampleHeight(pos2) *  waveCoeff2;
 
     float weight1 = 0.36;
@@ -133,15 +110,15 @@ float sampleWaterHeight(vec2 position)
     return (height1 * weight1 + height2 * weight2);// * multiplier;
 }
 
-vec3 sampleWaterNormal(vec2 position)
+vec3 sampleWaterNormal(vec2 position, float time)
 {
     float eps = 0.1;
     float eps2 = eps * 2;
     vec3 off = vec3(1.0, 1.0, 0.0)* eps;
-    float hL = sampleWaterHeight(position.xy - off.xz);
-    float hR = sampleWaterHeight(position.xy + off.xz);
-    float hD = sampleWaterHeight(position.xy - off.zy);
-    float hU = sampleWaterHeight(position.xy + off.zy);
+    float hL = sampleWaterHeight(position.xy - off.xz, time);
+    float hR = sampleWaterHeight(position.xy + off.xz, time);
+    float hD = sampleWaterHeight(position.xy - off.zy, time);
+    float hU = sampleWaterHeight(position.xy + off.zy, time);
 
     return normalize(vec3(hR - hL, -eps2 * 0.2, hU - hD));
 }

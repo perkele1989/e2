@@ -376,21 +376,7 @@ e2::IPipeline* e2::LightweightModel::getOrCreatePipeline(e2::MeshProxy* proxy, u
 
 	e2::ShaderCreateInfo shaderInfo;
 
-	// @todo utility functions to get defines from these 
-	if ((lwFlags & e2::LightweightFlags::Normal) == e2::LightweightFlags::Normal)
-		shaderInfo.defines.push({ "Vertex_Normals", "1" });
-
-	if ((lwFlags & e2::LightweightFlags::TexCoords01) == e2::LightweightFlags::TexCoords01)
-		shaderInfo.defines.push({ "Vertex_TexCoords01", "1" });
-
-	if ((lwFlags & e2::LightweightFlags::TexCoords23) == e2::LightweightFlags::TexCoords23)
-		shaderInfo.defines.push({ "Vertex_TexCoords23", "1" });
-
-	if ((lwFlags & e2::LightweightFlags::Color) == e2::LightweightFlags::Color)
-		shaderInfo.defines.push({ "Vertex_Color", "1" });
-
-	if ((lwFlags & e2::LightweightFlags::Bones) == e2::LightweightFlags::Bones)
-		shaderInfo.defines.push({ "Vertex_Bones", "1" });
+	e2::applyVertexAttributeDefines(spec.attributeFlags, shaderInfo);
 
 	if ((lwFlags & e2::LightweightFlags::Shadow) == e2::LightweightFlags::Shadow)
 		shaderInfo.defines.push({ "Renderer_Shadow", "1" });

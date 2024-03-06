@@ -357,6 +357,11 @@ void e2::RenderManager::shutdown()
 
 }
 
+void e2::RenderManager::preUpdate(double deltaTime)
+{
+
+}
+
 void e2::RenderManager::update(double deltaTime)
 {
 	m_renderContext->tick(deltaTime);

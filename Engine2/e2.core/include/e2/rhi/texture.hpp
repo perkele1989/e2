@@ -41,7 +41,7 @@ namespace e2
 		uint32_t arrayLayers{ 1 };
 		uint32_t mips { 1 };
 	};
-
+	class ICommandBuffer;
 
 	class E2_API ITexture : public e2::RenderResource
 	{
@@ -53,6 +53,7 @@ namespace e2
 		virtual void upload(uint32_t mip, glm::uvec3 offset, glm::uvec3 size, uint8_t const* data, uint64_t dataSize) = 0;
 
 		virtual void generateMips() = 0;
+		virtual void generateMipsCmd(e2::ICommandBuffer* buff) = 0;
 	};
 }
 

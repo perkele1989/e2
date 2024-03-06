@@ -1,4 +1,4 @@
-
+﻿
 #include "e2/utils.hpp"
 
 #include "e2/log.hpp"
@@ -850,6 +850,24 @@ e2::StackVector<e2::Hex, 6> e2::Hex::neighbours()
 	returner.push(*this + w());
 
 	return returner;
+}
+
+int32_t e2::Hex::circle(Hex const& c, int32_t radius, std::vector<Hex> &output)
+{
+	/*
+	var results = []
+	for each -N ≤ q ≤ +N:
+		for each max(-N, -q-N) ≤ r ≤ min(+N, -q+N):
+			var s = -q-r
+			results.append(cube_add(center, Cube(q, r, s)))
+	*/
+
+	int32_t i = 0;
+	for (int32_t q = -radius; q <= radius; q++)
+		for (int32_t r = glm::max(-radius, -q - radius); r <= glm::min(radius, -q + radius); r++)
+			output.push_back( c + e2::Hex(q, r, -q-r));
+
+	return i;
 }
 
 e2::Hex e2::Hex::zero()

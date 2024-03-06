@@ -14,7 +14,6 @@ out vec4 outColor;
 out vec4 outPosition;
 
 #include <shaders/common/utils.glsl>
-#include <shaders/common/procgen.glsl>
 #include <shaders/terrain/terrain.common.glsl>
 
 vec3 fresnelSchlickRoughness(float cosTheta, vec3 F0, float roughness)
@@ -39,6 +38,8 @@ vec3 heightlerp(vec3 input1, float height1, vec3 input2, float height2, float t)
 
 void main()
 {
+    vec3 visibility = textureLod(sampler2D(visibilityMask, frontBufferSampler), gl_FragCoord.xy / vec2(resolution.x, resolution.y), 0).xyz;
+
 	outPosition = fragmentPosition;
 	outColor = vec4(1.0, 1.0, 1.0, 1.0);
 
@@ -83,7 +84,7 @@ void main()
 	float vdotn3 = pow(1.0 - clamp(dot(v, wn), EPSILON, 1.0), 0.25);
 
 	vec3 albedoSand = texture(sampler2D(sandAlbedo, mainSampler), fragmentPosition.xz * texScaleSand).rgb;
-	vec3 albedoMountains = texture(sampler2D(mountainAlbedo, mainSampler), fragmentPosition.xz * texScaleMountains).rgb;
+	vec3 albedoMountains = pow(texture(sampler2D(mountainAlbedo, mainSampler), fragmentPosition.xz * texScaleMountains).rgb, vec3(1.1));
 	vec3 albedoFields = texture(sampler2D(fieldsAlbedo, mainSampler), fragmentPosition.xz * texScaleFields).rgb;
 	vec3 albedoGreen = texture(sampler2D(greenAlbedo, mainSampler), fragmentPosition.xz * texScaleGreen).rgb;
 
@@ -98,8 +99,9 @@ void main()
 	greenCoeff = clamp(fragmentColor.r * greenCoeff, 0.0, 1.0);
 
 
-
-	albedoSand = heightlerp(pow(albedoSand, vec3(1.4)), 0.5, albedoSand, smallSimplexS, smoothstep(-0.1, 0.0, -fragmentPosition.y));
+    float waterLineCoeff = smoothstep(-0.1, 0.0, -fragmentPosition.y);
+    float waterLineCoeff2 = pow(smoothstep(-0.4, 0.0, -fragmentPosition.y), 0.2);
+	albedoSand = heightlerp(pow(albedoSand, vec3(1.4)), 0.5, albedoSand, smallSimplexS, waterLineCoeff);
 
 	vec3 albedo;
 	albedo = heightlerp(albedoSand, 0.5, albedoGreen, bigSimplex * smallSimplex, greenCoeff);
@@ -109,11 +111,11 @@ void main()
 	//albedo = mix(albedo, albedoMountains, fragmentColor.g);
 
 	float brdfy = clamp(dot(wn, v), EPSILON, 1.0);
-	float roughness = 0.3;
-	float metallic = 0.0;
+	float roughness = 0.8;
+	float metallic = (1.0 - waterLineCoeff) * 0.5;
 	 
 	vec3 F0 = vec3(0.04); 
-    vec3 specularCoeff = mix(F0, albedo, metallic); 
+    vec3 specularCoeff = mix(F0, albedo, metallic) * waterLineCoeff2; 
 
 	vec3 diffuseCoeff = albedo * (1.0 - F0) * (1.0 - metallic);
 
@@ -131,16 +133,24 @@ void main()
 	outColor.rgb =  vec3(0.0);
 
 	// soft base sun light, beautiful
-	outColor.rgb += albedo * vec3(0.76, 0.8, 1.0) * softl * 1.0;
+	//outColor.rgb += albedo * vec3(0.76, 0.8, 1.0) * softl * 1.0;
+    outColor.rgb += albedo * vec3(0.76, 0.8, 1.0) * ndotl * 1.0;
 
 	// bravissimo!!! mountain fresnel is beaut!!
-	outColor.rgb += vec3(1.0, 0.8, 0.76) * mountainFresnel * 0.65;
+	outColor.rgb += vec3(1.0, 0.8, 0.76) * mountainFresnel * 0.30; 
 
 	// ibl specular
 	outColor.rgb += rad * specularCoeff *  (brdf.x + brdf.y) ;	
 
 	// ibl diffuse 
 	outColor.rgb += diffuseCoeff * irr;
+
+    //outColor.rgb =vec3(1.0 - waterLineCoeff);
+
+    //outColor.rgb = rad * specularCoeff *  (brdf.x + brdf.y);
+
+
+    //outColor.rgb = albedo * vec3(0.76, 0.8, 1.0) * ndotl * 1.0;
 
 	// debug refl
 	//outColor.rgb = F;
@@ -153,9 +163,11 @@ void main()
 	// debug ndotl 
 	//outColor.rgb = ndotl;
 
+    
+    outColor.rgb = fogOfWar(outColor.rgb, fragmentPosition.xyz, visibility, renderer.time.x);
 
 	float gridCoeff2 = smoothstep(0.92, 0.95, fragmentColor.a);
 	gridCoeff2 *= 0.15;
-	outColor.rgb = mix(outColor.rgb, vec3(0.0), gridCoeff2);
+	//outColor.rgb = mix(outColor.rgb, vec3(0.0), gridCoeff2 * visibility.y);
 
 }

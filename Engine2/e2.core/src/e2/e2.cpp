@@ -83,9 +83,12 @@ void e2::Engine::run(e2::Application* app)
 			m_assetManager->update(deltaTime);
 			m_renderManager->update(deltaTime);
 			m_uiManager->update(deltaTime);
-			m_gameManager->update(deltaTime);
+			
+			m_gameManager->preUpdate(deltaTime);
 
 			m_application->update(deltaTime);
+
+			m_gameManager->update(deltaTime);
 
 			// Only dispatch render stuff if we are actually still running
 			if (m_running)

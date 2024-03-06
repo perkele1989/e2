@@ -23,7 +23,7 @@ namespace e2
 		virtual void initialize() override;
 		virtual void shutdown() override;
 
-
+		virtual void preUpdate(double deltaTime) override;
 		virtual void update(double deltaTime) override;
 
 		e2::IPhysicsWorld* createWorld(e2::PhysicsWorldCreateInfo const& info);

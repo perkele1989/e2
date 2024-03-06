@@ -48,7 +48,7 @@ namespace e2
 
 		/**
 		 * Procedural generation steps:
-		 * 1. Create a clean mesh: auto mesh = e2::create<e2::Mesh>();
+		 * 1. Create a clean mesh: auto mesh = e2::MeshPtr::create();
 		 * 2. Add your procedurally generated submeshes: mesh->addProceduralSubmesh(pikachu);
 		 * 3. When you've added the submeshes you want, invoke flagDone() to notify the systems that use this mesh that it's in a usable state.
 		 */

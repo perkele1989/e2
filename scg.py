@@ -661,18 +661,20 @@ def generate(intermediate_path:str, source_path:str, options:list[str], extra_in
 
         # populate class index from this queue
         for f in q:
-            print("\tF: {}".format(f.relative_path))
             for c in f.classes:
-                print("\t\tC: {}".format(c.fqn))
                 db.class_index[c.fqn] = c 
 
 
         # Populate deep bases from this queue
         for f in q:
+            print("\tF: {}".format(f.relative_path))
             for c in f.classes:
+                print("\t\tC: {}".format(c.fqn))
                 tmpset:set[str] = set()
                 find_all_bases(c.fqn, tmpset, db.class_index, extra_dbs)
                 c.deep_bases = tmpset
+                for dbb in c.deep_bases:
+                    print("\t\t\tDB: {}".format(dbb))
 
         print("Generating files.. (pass {})..".format(i))
         generate_jobs = [GenerateJob(file) for file in q if file.needs_generation()]

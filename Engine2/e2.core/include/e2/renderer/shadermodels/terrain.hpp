@@ -30,9 +30,8 @@ namespace e2
 
 		// Maps 
 		MaterialFlagsOffset = 7,
-		Albedo = 1 << 7,
 
-		Count = 1 << 8
+		Count = 1 << 7
 
 	};
 
@@ -76,7 +75,7 @@ namespace e2
 
 		e2::DirtyParameter<TerrainData> uniformData{};
 
-		e2::DirtyParameter<e2::ITexture*> albedoTexture;
+		e2::DirtyParameter<e2::ITexture*> visibilityMask;
 
 	};
 
@@ -125,6 +124,10 @@ namespace e2
 		e2::Texture2DPtr m_greenNormal{};
 
 		e2::StackVector<e2::TerrainCacheEntry, uint16_t(e2::TerrainFlags::Count)> m_pipelineCache;
+		bool m_shadersReadFromDisk{};
+		bool m_shadersOnDiskOK{};
+		std::string m_vertexSource;
+		std::string m_fragmentSource;
 
 
 		e2::Pair<e2::IDataBuffer*> m_proxyUniformBuffers;

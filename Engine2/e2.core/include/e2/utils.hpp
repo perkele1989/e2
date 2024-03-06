@@ -1246,6 +1246,9 @@ namespace e2
 
 		e2::StackVector<Hex, 6> neighbours();
 
+		/** */
+		static int32_t circle(Hex const& c, int32_t radius, std::vector<Hex>& output);
+
 		static Hex zero();
 
 		static Hex nw();

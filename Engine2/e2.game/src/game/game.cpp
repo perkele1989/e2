@@ -24,6 +24,8 @@ e2::Game::~Game()
 
 void e2::Game::initialize()
 {
+	m_session = e2::create<e2::GameSession>(this);
+
 	auto am = assetManager();
 
 	e2::ALJDescription alj;
@@ -35,15 +37,17 @@ void e2::Game::initialize()
 
 	e2::MeshProxyConfiguration proxyConf;
 	proxyConf.mesh = m_cursorMesh;
-	m_cursorProxy = e2::create<e2::MeshProxy>(gameSession(), proxyConf);
+	m_cursorProxy = e2::create<e2::MeshProxy>(m_session, proxyConf);
 
-	m_hexGrid = e2::create<e2::HexGrid>(this);
+	m_hexGrid = e2::create<e2::HexGrid>(this, m_session);
 }
 
 void e2::Game::shutdown()
 {
+	
 	e2::destroy(m_cursorProxy);
 	e2::destroy(m_hexGrid);
+	e2::destroy(m_session);
 }
 
 void e2::Game::update(double seconds)
@@ -68,9 +72,7 @@ void e2::Game::update(double seconds)
 	m_cursorProxy->modelMatrix = glm::scale(m_cursorProxy->modelMatrix, glm::vec3(2.0f));
 	m_cursorProxy->modelMatrixDirty = true;
 
-	drawStatusUI();
 
-	drawDebugUI();
 
 
 	/*ui->beginStackV(debugStackV, {6.0f, 6.0f});
@@ -107,10 +109,39 @@ void e2::Game::update(double seconds)
 		renderManager()->invalidatePipelines();
 	}
 
+	if (kb.keys[int16_t(e2::Key::F9)].pressed)
+	{
+		m_hexGrid->invalidateFogOfWarShaders();
+	}
+
 	updateMainCamera(seconds);
 	updateAltCamera(seconds);
 
+
+	if (mouse.buttons[uint8_t(e2::MouseButton::Left)].clicked && mouse.buttons[uint8_t(e2::MouseButton::Left)].dragDistance <= 0.5f)
+	{
+		LogNotice("spawning unit at {}", m_cursorHex.offsetCoords());
+		spawnUnit<e2::MilitaryUnit>(m_cursorHex);
+	}
+
+	if (mouse.buttons[uint8_t(e2::MouseButton::Right)].clicked && mouse.buttons[uint8_t(e2::MouseButton::Right)].dragDistance <= 0.5f)
+	{
+		LogNotice("destroying unit at {}", m_cursorHex.offsetCoords());
+		destroyUnit(m_cursorHex);
+	}
+
+
 	m_hexGrid->assertChunksWithinRangeVisible(m_viewOrigin, m_viewPoints, m_viewVelocity);
+
+	m_hexGrid->renderFogOfWar();
+
+	m_session->tick(seconds);
+
+	drawStatusUI();
+
+	drawDebugUI();
+
+	//ui->drawTexturedQuad({}, resolution, 0xFFFFFFFF, m_hexGrid->fogOfWarMask());
 
 	renderer->debugLine(glm::vec3(1.0f), m_viewPoints.topLeft, m_viewPoints.topRight);
 	renderer->debugLine(glm::vec3(1.0f), m_viewPoints.topRight, m_viewPoints.bottomRight);
@@ -316,7 +347,7 @@ void e2::Game::updateMainCamera(double seconds)
 
 
 	const float dragMultiplier = glm::mix(0.01f, 0.025f, m_viewZoom);
-	if (leftMouse.held)
+	if (leftMouse.held && leftMouse.dragDistance > 0.5f)
 	{
 		glm::vec2 newDrag = m_dragView.unprojectWorldPlane(renderer->resolution(), m_cursorNdc);
 		glm::vec2 dragOffset = newDrag - m_cursorDragOrigin;
@@ -352,6 +383,32 @@ e2::RenderView e2::Game::calculateRenderView(glm::vec2 const &viewOrigin)
 
 	return newView;
 }
+
+void e2::Game::onTurnStart()
+{
+	// clear and calculate visibility
+	m_hexGrid->clearVisibility();
+
+	for (e2::GameUnit* unit : m_units)
+	{
+		unit->spreadVisibility();
+	}
+}
+
+void e2::Game::destroyUnit(e2::Hex const& location)
+{
+	auto finder = m_unitIndex.find(location.offsetCoords());
+	if (finder == m_unitIndex.end())
+		return;
+
+	e2::GameUnit* unit = finder->second;
+	unit->rollbackVisibility();
+
+	m_unitIndex.erase(unit->tileIndex);
+	m_units.erase(unit);
+	e2::destroy(unit);
+}
+
 
 void e2::Game::updateAltCamera(double seconds)
 {
@@ -418,9 +475,43 @@ void e2::Game::updateAltCamera(double seconds)
 
 }
 
+
+e2::GameUnit::GameUnit(e2::GameContext* ctx, glm::ivec2 const& tile)
+	: m_game(ctx->game())
+	, tileIndex(tile)
+{
+	e2::MeshProxyConfiguration proxyConf{};
+	proxyConf.mesh = game()->cursorMesh();
+	m_proxy = e2::create<e2::MeshProxy>(gameSession(), proxyConf);
+	m_proxy->modelMatrix = glm::translate(glm::mat4(1.0), e2::Hex(tile).localCoords());
+	m_proxy->modelMatrixDirty = true;
+}
+
+void e2::GameUnit::spreadVisibility()
+{
+	// @todo reuse vector 
+	e2::Hex thisHex(tileIndex);
+	std::vector<e2::Hex> hexes;
+	e2::Hex::circle(thisHex, sightRange, hexes);
+
+	for(e2::Hex h : hexes)
+		hexGrid()->flagVisible(h.offsetCoords(), e2::Hex::distance(h, thisHex) == sightRange);
+}
+
+void e2::GameUnit::rollbackVisibility()
+{
+	// @todo reuse vector 
+	e2::Hex thisHex(tileIndex);
+	std::vector<e2::Hex> hexes;
+	e2::Hex::circle(thisHex, sightRange-1, hexes);
+
+	for (e2::Hex h : hexes)
+		hexGrid()->unflagVisible(h.offsetCoords());
+}
+
 e2::GameUnit::~GameUnit()
 {
-
+	e2::destroy(m_proxy);
 }
 
 void e2::GameResources::calculateProfits()
@@ -432,4 +523,30 @@ void e2::GameResources::calculateProfits()
 	profits.oil = revenue.oil - expenditures.oil;
 	profits.uranium = revenue.uranium - expenditures.uranium;
 	profits.meteorite = revenue.meteorite - expenditures.meteorite;
+}
+
+e2::MilitaryUnit::MilitaryUnit(e2::GameContext* ctx, glm::ivec2 const& tile)
+	: e2::GameUnit(ctx, tile)
+{
+
+}
+
+e2::MilitaryUnit::~MilitaryUnit()
+{
+
+}
+
+void e2::MilitaryUnit::calculateStats()
+{
+
+}
+
+e2::HexGrid* e2::GameContext::hexGrid()
+{
+	return game()->m_hexGrid;
+}
+
+e2::GameSession* e2::GameContext::gameSession()
+{
+	return game()->m_session;
 }
