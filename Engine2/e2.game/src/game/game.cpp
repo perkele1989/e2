@@ -54,6 +54,8 @@ void e2::Game::shutdown()
 
 void e2::Game::update(double seconds)
 {
+	m_timeDelta = seconds;
+
 	constexpr float moveSpeed = 10.0f;
 	constexpr float viewSpeed = .3f;
 
@@ -64,32 +66,25 @@ void e2::Game::update(double seconds)
 	auto& mouse = ui->mouseState();
 
 
+
+	// update input state
 	glm::vec2 resolution = renderer->resolution();
 	m_cursor = mouse.relativePosition;
 	m_cursorUnit = (m_cursor / resolution);
 	m_cursorNdc = m_cursorUnit * 2.0f - 1.0f;
 	m_cursorPlane = renderer->view().unprojectWorldPlane(renderer->resolution(), m_cursorNdc);
-	m_cursorHex = e2::Hex(m_cursorPlane);
+	e2::Hex newHex = e2::Hex(m_cursorPlane);
+	bool hexChanged = newHex != m_prevCursorHex;
+	m_prevCursorHex = m_cursorHex;
+	m_cursorHex = newHex;
+	
 	m_cursorProxy->modelMatrix = glm::translate(glm::mat4(1.0f), m_cursorHex.localCoords());
 	m_cursorProxy->modelMatrix = glm::scale(m_cursorProxy->modelMatrix, glm::vec3(2.0f));
 	m_cursorProxy->modelMatrixDirty = true;
 
-
-
-
-	/*ui->beginStackV(debugStackV, {6.0f, 6.0f});
-	ui->label(fpsLabel, std::format("^2Avg. {:.1f} ms, potential fps: {:.1f}", metrics.frameTimeMsMean, 1000.0f / metrics.frameTimeMsMean), 14);
-	ui->label(fpsLabel2, std::format("^3High {:.1f} ms, potential fps: {:.1f}", metrics.frameTimeMsHigh, 1000.0f / metrics.frameTimeMsHigh), 14);
-	ui->label(fpsLabel3, std::format("^4Real fps: {:.1f}", metrics.realCpuFps), 14);
-	ui->label(chunksLabel, std::format("^5Num. chunks: {}", m_hexGrid->numChunks()), 14);
-	ui->label(chunksLabel2, std::format("^6Visible chunks: {}", m_hexGrid->numVisibleChunks()), 14);
-	ui->label(chunksLabel2, std::format("^7Num. chunk meshes: {}", m_hexGrid->numChunkMeshes()), 14);
-	ui->label(chunksLabel3, std::format("^8High loadtime: {:.2f}ms", m_hexGrid->highLoadTime()), 14);
-	ui->endStackV();*/
-
 	constexpr float invisibleChunkLifetime = 3.0f;
 
-
+	// debug buttons 
 	if (kb.keys[int16_t(e2::Key::Num1)].pressed)
 	{
 		m_altView = !m_altView;
@@ -116,35 +111,59 @@ void e2::Game::update(double seconds)
 		m_hexGrid->invalidateFogOfWarShaders();
 	}
 
-	updateMainCamera(seconds);
-	updateAltCamera(seconds);
+	updateCamera(seconds);
 
-
-	if (mouse.buttons[uint8_t(e2::MouseButton::Left)].clicked && mouse.buttons[uint8_t(e2::MouseButton::Left)].dragDistance <= 0.5f)
+	if (hexChanged)
 	{
-		LogNotice("spawning unit at {}", m_cursorHex.offsetCoords());
-		spawnUnit<e2::MilitaryUnit>(m_cursorHex);
+		onNewCursorHex();
 	}
 
-	if (mouse.buttons[uint8_t(e2::MouseButton::Right)].clicked && mouse.buttons[uint8_t(e2::MouseButton::Right)].dragDistance <= 0.5f)
-	{
-		LogNotice("destroying unit at {}", m_cursorHex.offsetCoords());
-		destroyUnit(m_cursorHex);
-	}
+	updateGameState();
 
 
 	m_hexGrid->assertChunksWithinRangeVisible(m_viewOrigin, m_viewPoints, m_viewVelocity);
 
 	m_hexGrid->renderFogOfWar();
 
+	// ticking session renders renderer too, and blits it to the UI, so we need to do it precisely here (after rendering fog of war and before rendering UI)
 	m_session->tick(seconds);
 
-	drawStatusUI();
+	ui->drawTexturedQuad({}, resolution, 0xFFFFFFFF, m_hexGrid->outlineTexture());
 
-	drawDebugUI();
+	drawUI();
+
+	if (m_selectedUnit)
+	{
+		int32_t i = 0;
+		e2::Hex prev;
+		for (e2::Hex h : m_unitHoverPath)
+		{
+			if (i++ == 0)
+			{
+				prev = h;
+				continue;
+			}
+
+			glm::vec3 start = prev.localCoords();
+			glm::vec3 end = h.localCoords();
+			renderer->debugLine({ 0.0, 0.0, 1.0 }, start + e2::worldUp() * 0.2f , end + e2::worldUp() * 0.2f);
+			prev = h;
+		}
+
+		for (auto& [index, hexAS] : m_unitAS.hexIndex)
+		{
+			if (!hexAS->towardsOrigin)
+				continue;
+
+			glm::vec3 start = e2::Hex(hexAS->index).localCoords();
+			glm::vec3 end = e2::Hex(hexAS->towardsOrigin->index).localCoords();
+			renderer->debugLine({ 1.0, 0.0, 0.0 }, start, end);
+		}
+	}
 
 	//ui->drawTexturedQuad({}, resolution, 0xFFFFFFFF, m_hexGrid->fogOfWarMask());
 
+	/*
 	renderer->debugLine(glm::vec3(1.0f), m_viewPoints.topLeft, m_viewPoints.topRight);
 	renderer->debugLine(glm::vec3(1.0f), m_viewPoints.topRight, m_viewPoints.bottomRight);
 	renderer->debugLine(glm::vec3(1.0f), m_viewPoints.bottomRight, m_viewPoints.bottomLeft);
@@ -157,7 +176,7 @@ void e2::Game::update(double seconds)
 	renderer->debugLine(glm::vec3(0.0f, 1.0f, 0.0f), m_viewPoints.leftRay.position, m_viewPoints.leftRay.position + m_viewPoints.leftRay.perpendicular);
 	renderer->debugLine(glm::vec3(0.0f, 1.0f, 0.0f), m_viewPoints.topRay.position, m_viewPoints.topRay.position + m_viewPoints.topRay.perpendicular);
 	renderer->debugLine(glm::vec3(0.0f, 1.0f, 0.0f), m_viewPoints.rightRay.position, m_viewPoints.rightRay.position + m_viewPoints.rightRay.perpendicular);
-	renderer->debugLine(glm::vec3(0.0f, 1.0f, 0.0f), m_viewPoints.bottomRay.position, m_viewPoints.bottomRay.position + m_viewPoints.bottomRay.perpendicular);
+	renderer->debugLine(glm::vec3(0.0f, 1.0f, 0.0f), m_viewPoints.bottomRay.position, m_viewPoints.bottomRay.position + m_viewPoints.bottomRay.perpendicular);*/
 }
 
 e2::ApplicationType e2::Game::type()
@@ -168,6 +187,108 @@ e2::ApplicationType e2::Game::type()
 e2::Game* e2::Game::game()
 {
 	return this;
+}
+
+void e2::Game::updateCamera(double seconds)
+{
+	updateMainCamera(seconds);
+	updateAltCamera(seconds);
+}
+
+void e2::Game::updateGameState()
+{
+	if (m_state == GameState::TurnPreparing)
+	{
+		// do turn prepare things here , and then move on to turn when done 
+		bool notDoneYet = false;
+		if (notDoneYet)
+			return;
+
+		onTurnPreparingEnd();
+		m_state = GameState::Turn;
+		onStartOfTurn();
+	}
+	else if (m_state == GameState::Turn)
+	{
+		if (m_turnState == TurnState::Unlocked)
+			updateTurn();
+		else if (m_turnState == TurnState::UnitAction_Move)
+			updateUnitMove();
+		else if (m_turnState == TurnState::UnitAction_Attack)
+			updateUnitAttack();
+	}
+	else if (m_state == GameState::TurnEnding)
+	{
+		bool notDoneYet = false;
+		if (notDoneYet)
+			return;
+
+		onTurnEndingEnd();
+		m_state = GameState::TurnPreparing;
+		onTurnPreparingBegin();
+	}
+}
+
+void e2::Game::updateTurn()
+{
+	constexpr float moveSpeed = 10.0f;
+	constexpr float viewSpeed = .3f;
+
+	e2::GameSession* session = gameSession();
+	e2::Renderer* renderer = session->renderer();
+	e2::UIContext* ui = session->uiContext();
+	auto& kb = ui->keyboardState();
+	auto& mouse = ui->mouseState();
+
+	auto& leftMouse = mouse.buttons[uint8_t(e2::MouseButton::Left)];
+	auto& rightMouse = mouse.buttons[uint8_t(e2::MouseButton::Right)];
+
+	// turn logic here
+	if (leftMouse.clicked && leftMouse.dragDistance <= 2.0f)
+	{
+		if (kb.state(e2::Key::LeftShift))
+		{
+			spawnUnit<e2::MilitaryUnit>(m_cursorHex);
+			return;
+		}
+
+		auto finder = m_unitIndex.find(m_cursorHex.offsetCoords());
+		if (finder != m_unitIndex.end())
+			selectUnit(finder->second);
+		else
+			deselectUnit();
+	}
+
+	if (rightMouse.clicked && rightMouse.dragDistance <= 2.0f)
+	{
+		if (kb.state(e2::Key::LeftShift))
+		{
+			LogNotice("destroying unit at {}", m_cursorHex.offsetCoords());
+			destroyUnit(m_cursorHex);
+			return;
+		}
+
+		deselectUnit();
+	}
+}
+
+void e2::Game::updateUnitAttack()
+{
+
+}
+
+void e2::Game::updateUnitMove()
+{
+
+}
+
+void e2::Game::drawUI()
+{
+	drawStatusUI();
+
+	drawUnitUI();
+
+	drawDebugUI();
 }
 
 void e2::Game::drawStatusUI()
@@ -265,6 +386,38 @@ void e2::Game::drawStatusUI()
 }
 
 
+void e2::Game::drawUnitUI()
+{
+	if (!m_selectedUnit)
+		return;
+
+	e2::GameSession* session = gameSession();
+	e2::Renderer* renderer = session->renderer();
+	e2::UIContext* ui = session->uiContext();
+	auto& kb = ui->keyboardState();
+	auto& mouse = ui->mouseState();
+	auto& leftMouse = mouse.buttons[uint16_t(e2::MouseButton::Left)];
+
+	e2::IWindow* wnd = session->window();
+	glm::vec2 winSize = wnd->size();
+
+	float width = 450.0f;
+	float height = 220.0f;
+
+	glm::vec2 offset = { winSize.x - width - 16.0f - 256.0f - 16.0f, winSize.y - height - 16.0f };
+
+	ui->drawQuadShadow(offset, {width, height}, 8.0f, 0.9f, 4.0f);
+
+	
+	uint8_t fontSize = 12;
+
+	std::string str = m_selectedUnit->displayName;
+	ui->drawRasterText(e2::FontFace::Serif, 14, 0xFFFFFFFF, offset + glm::vec2(8.f, 14.f), str);
+
+
+
+}
+
 void e2::Game::drawDebugUI()
 {
 
@@ -293,9 +446,41 @@ void e2::Game::drawDebugUI()
 
 }
 
+void e2::Game::onNewCursorHex()
+{
+	if (m_selectedUnit)
+	{
+		m_unitHoverPath = m_unitAS.find(m_cursorHex);
+	}
+}
+
 void e2::Game::updateResources()
 {
 	
+}
+
+void e2::Game::selectUnit(e2::GameUnit* unit)
+{
+	if (!unit || unit == m_selectedUnit)
+		return;
+
+	m_selectedUnit = unit;
+	m_unitAS = PathFindingAccelerationStructure(m_selectedUnit);
+
+	m_hexGrid->clearOutline();
+
+	for (auto& [coords, hexAS] : m_unitAS.hexIndex)
+	{
+		m_hexGrid->pushOutline(coords);
+	}
+	
+}
+
+void e2::Game::deselectUnit()
+{
+	m_selectedUnit = nullptr;
+	m_unitAS = PathFindingAccelerationStructure();
+	m_hexGrid->clearOutline();
 }
 
 void e2::Game::updateMainCamera(double seconds)
@@ -349,7 +534,7 @@ void e2::Game::updateMainCamera(double seconds)
 
 
 	const float dragMultiplier = glm::mix(0.01f, 0.025f, m_viewZoom);
-	if (leftMouse.held && leftMouse.dragDistance > 0.5f)
+	if (leftMouse.held && leftMouse.dragDistance > 2.0f)
 	{
 		glm::vec2 newDrag = m_dragView.unprojectWorldPlane(renderer->resolution(), m_cursorNdc);
 		glm::vec2 dragOffset = newDrag - m_cursorDragOrigin;
@@ -386,16 +571,7 @@ e2::RenderView e2::Game::calculateRenderView(glm::vec2 const &viewOrigin)
 	return newView;
 }
 
-void e2::Game::onTurnStart()
-{
-	// clear and calculate visibility
-	m_hexGrid->clearVisibility();
 
-	for (e2::GameUnit* unit : m_units)
-	{
-		unit->spreadVisibility();
-	}
-}
 
 void e2::Game::destroyUnit(e2::Hex const& location)
 {
@@ -406,11 +582,25 @@ void e2::Game::destroyUnit(e2::Hex const& location)
 	e2::GameUnit* unit = finder->second;
 	unit->rollbackVisibility();
 
+	if (m_selectedUnit == unit)
+		deselectUnit();
+
 	m_unitIndex.erase(unit->tileIndex);
 	m_units.erase(unit);
 	e2::destroy(unit);
 }
 
+
+
+
+e2::GameUnit* e2::Game::unitAtHex(glm::ivec2 const& hex)
+{
+	auto finder = m_unitIndex.find(hex);
+	if (finder == m_unitIndex.end())
+		return nullptr;
+
+	return finder->second;
+}
 
 void e2::Game::updateAltCamera(double seconds)
 {
@@ -478,19 +668,163 @@ void e2::Game::updateAltCamera(double seconds)
 }
 
 
+void e2::Game::endTurn()
+{
+	if (m_state != GameState::Turn || m_turnState != TurnState::Unlocked)
+		return;
 
-e2::MilitaryUnit::MilitaryUnit(e2::GameContext* ctx, glm::ivec2 const& tile)
-	: e2::GameUnit(ctx, tile)
+	onEndOfTurn();
+	m_state = GameState::TurnEnding;
+	onTurnEndingBegin();
+}
+
+void e2::Game::onTurnPreparingBegin()
 {
 
 }
 
-e2::MilitaryUnit::~MilitaryUnit()
+void e2::Game::onTurnPreparingEnd()
 {
 
 }
 
-void e2::MilitaryUnit::calculateStats()
+void e2::Game::onStartOfTurn()
+{
+	// clear and calculate visibility
+	m_hexGrid->clearVisibility();
+
+	for (e2::GameUnit* unit : m_units)
+	{
+		unit->spreadVisibility();
+	}
+}
+
+void e2::Game::onEndOfTurn()
+{
+
+}
+
+
+
+void e2::Game::onTurnEndingBegin()
+{
+
+}
+
+void e2::Game::onTurnEndingEnd()
+{
+
+}
+
+e2::PathFindingAccelerationStructure::PathFindingAccelerationStructure(e2::GameUnit* unit)
+{
+	if (!unit)
+		return;
+
+	e2::Game* game = unit->game();
+	e2::HexGrid* grid = game->hexGrid();
+
+	e2::Hex originHex = e2::Hex(unit->tileIndex);
+	origin = e2::create<e2::PathFindingHex>(originHex);
+	origin->isBegin = true;
+
+	hexIndex[unit->tileIndex] = origin;
+
+
+	std::queue<e2::PathFindingHex*> queue;
+	std::unordered_set<e2::Hex> processed;
+
+	queue.push(origin);
+
+	while (!queue.empty())
+	{
+		e2::PathFindingHex* curr  = queue.front();
+		queue.pop();
+
+		for (e2::Hex n : curr->index.neighbours())
+		{
+			if (curr->stepsFromOrigin + 1 > unit->moveRange)
+				continue;
+
+			if (processed.contains(n))
+				continue;
+
+			glm::ivec2 coords = n.offsetCoords();
+
+			if (hexIndex.contains(coords))
+				continue;
+
+			// ignore hexes not directly visible
+			if (!grid->isVisible(coords))
+				continue;
+
+			// ignore hexes that are occupied by unpassable biome
+			e2::TileData* tile = grid->getTileData(coords);
+			e2::TileFlags biome = tile->getBiome();
+			bool walkable = (biome == e2::TileFlags::BiomeGrassland) || (biome == e2::TileFlags::BiomeForest) || (biome == e2::TileFlags::BiomeDesert) || (biome == e2::TileFlags::BiomeTundra);
+			if (!walkable)
+				continue;
+
+			// ignore hexes that are occupied by units
+			e2::GameUnit* otherUnit = game->unitAtHex(coords);
+			if (otherUnit)
+				continue;
+
+			e2::PathFindingHex* newHex = e2::create<e2::PathFindingHex>(n);
+			newHex->towardsOrigin = curr;
+			newHex->stepsFromOrigin = curr->stepsFromOrigin + 1;
+			hexIndex[coords] = newHex;
+			
+
+			queue.push(newHex);
+		}
+
+		processed.insert(curr->index);
+	}
+}
+
+e2::PathFindingAccelerationStructure::~PathFindingAccelerationStructure()
+{
+	for (auto& [coords, as] : hexIndex)
+		e2::destroy(as);
+}
+
+e2::PathFindingAccelerationStructure::PathFindingAccelerationStructure()
+{
+
+}
+
+std::vector<e2::Hex> e2::PathFindingAccelerationStructure::find(e2::Hex const& target)
+{
+
+	auto targetFinder = hexIndex.find(target.offsetCoords());
+	if (targetFinder == hexIndex.end())
+		return {};
+
+
+	std::vector<e2::Hex> returner;
+	e2::PathFindingHex* cursor = targetFinder->second;
+	while (cursor)
+	{
+		returner.push_back(cursor->index);
+		if (cursor->isBegin)
+			break;
+		cursor = cursor->towardsOrigin;
+	}
+
+	std::reverse(returner.begin(), returner.end());
+
+	return returner;
+
+}
+
+e2::PathFindingHex::PathFindingHex(e2::Hex const& _index)
+	: index(_index)
+{
+
+}
+
+e2::PathFindingHex::~PathFindingHex()
 {
 
 }

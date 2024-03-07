@@ -22,9 +22,13 @@ namespace e2
 		void spreadVisibility();
 		void rollbackVisibility();
 
-		glm::ivec2 tileIndex; // offset coords
+		std::string displayName{ "Unit" };
+
 		float health{ 100.0f };
 		uint32_t sightRange{ 5 };
+		uint32_t moveRange{ 3 };
+
+		glm::ivec2 tileIndex; // offset coords
 
 	protected:
 		e2::Game* m_game{};

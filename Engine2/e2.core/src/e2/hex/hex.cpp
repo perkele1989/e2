@@ -640,6 +640,15 @@ size_t e2::HexGrid::getTileIndexFromHex(Hex hex)
 	return tileIndex;
 }
 
+e2::TileData* e2::HexGrid::getTileData(glm::ivec2 const& hex)
+{
+	auto finder = m_tileIndex.find(hex);
+	if (finder == m_tileIndex.end())
+		return nullptr;
+
+	return &m_tiles[finder->second];
+}
+
 e2::TileData& e2::HexGrid::getTileFromIndex(size_t index)
 {
 	static TileData empty;
@@ -754,6 +763,9 @@ void e2::HexGrid::initializeFogOfWar()
 	layInf.pushConstantSize = sizeof(e2::FogOfWarConstants);
 	m_fogOfWarPipelineLayout = renderContext()->createPipelineLayout(layInf);
 
+	layInf.pushConstantSize = sizeof(e2::OutlineConstants);
+	m_outlinePipelineLayout = renderContext()->createPipelineLayout(layInf);
+
 	e2::DescriptorSetLayoutCreateInfo setLayoutInf{};
 	setLayoutInf.bindings = {
 		{e2::DescriptorBindingType::Texture},
@@ -782,6 +794,12 @@ void e2::HexGrid::initializeFogOfWar()
 
 void e2::HexGrid::invalidateFogOfWarRenderTarget(glm::uvec2 const& newResolution)
 {
+	if (m_outlineTarget)
+		e2::discard(m_outlineTarget);
+
+	if (m_outlineTexture)
+		e2::discard(m_outlineTexture);
+
 	if (m_fogOfWarMask[0])
 		e2::discard(m_fogOfWarMask[0]);
 
@@ -797,13 +815,13 @@ void e2::HexGrid::invalidateFogOfWarRenderTarget(glm::uvec2 const& newResolution
 	e2::TextureCreateInfo texInf{};
 	texInf.initialLayout = e2::TextureLayout::ShaderRead;
 	texInf.format = TextureFormat::RGBA8;
-	texInf.resolution = { newResolution, 1 };
+	texInf.resolution = { glm::vec2(newResolution) / 16.0f, 1 };
 	texInf.mips = 1;
 	m_fogOfWarMask[0] = renderContext()->createTexture(texInf);
 	m_fogOfWarMask[1] = renderContext()->createTexture(texInf);
 
 	e2::RenderTargetCreateInfo renderTargetInfo{};
-	renderTargetInfo.areaExtent = newResolution;
+	renderTargetInfo.areaExtent = glm::vec2(newResolution) / 16.0f;
 
 	e2::RenderAttachment colorAttachment{};
 	colorAttachment.target = m_fogOfWarMask[0];
@@ -820,15 +838,33 @@ void e2::HexGrid::invalidateFogOfWarRenderTarget(glm::uvec2 const& newResolution
 	m_waterProxy->visibilityMask.set(m_fogOfWarMask[0]);
 	m_terrainProxy->visibilityMask.set(m_fogOfWarMask[0]);
 
-
 	m_blurSet[0]->writeTexture(0, m_fogOfWarMask[0]);
 	m_blurSet[1]->writeTexture(0, m_fogOfWarMask[1]);
 	m_blurSet[0]->writeSampler(1, renderManager()->frontBufferSampler());
 	m_blurSet[1]->writeSampler(1, renderManager()->frontBufferSampler());
+
+
+	// outline target
+	texInf.initialLayout = e2::TextureLayout::ShaderRead;
+	texInf.format = TextureFormat::RGBA8;
+	texInf.resolution = { newResolution, 1 };
+	texInf.mips = 1;
+	m_outlineTexture = renderContext()->createTexture(texInf);
+
+	renderTargetInfo.areaExtent = newResolution;
+	colorAttachment.target = m_outlineTexture;
+	colorAttachment.clearMethod = ClearMethod::ColorFloat;
+	colorAttachment.clearValue.clearColorf32 = { 0.f, 0.f, 0.f, 0.0f };
+	colorAttachment.loadOperation = LoadOperation::Clear;
+	colorAttachment.storeOperation = StoreOperation::Store;
+	renderTargetInfo.colorAttachments = { colorAttachment };
+	m_outlineTarget = renderContext()->createRenderTarget(renderTargetInfo);
 }
 
 void e2::HexGrid::invalidateFogOfWarShaders()
 {
+
+
 	if (m_fogOfWarVertexShader)
 		e2::discard(m_fogOfWarVertexShader);
 
@@ -900,35 +936,125 @@ void e2::HexGrid::invalidateFogOfWarShaders()
 	pipeInf.layout = m_blurPipelineLayout;
 	m_blurPipeline = renderContext()->createPipeline(pipeInf);
 
+
+
+
+
+	if (m_outlineVertexShader)
+		e2::discard(m_outlineVertexShader);
+
+	if (m_outlineFragmentShader)
+		e2::discard(m_outlineFragmentShader);
+
+	if (m_outlinePipeline)
+		e2::discard(m_outlinePipeline);
+
+	std::string outlineVertexSource;
+	if (!e2::readFileWithIncludes("shaders/outline.vertex.glsl", outlineVertexSource))
+	{
+		LogError("Failed to read shader file.");
+	}
+
+	shdrInf = e2::ShaderCreateInfo();
+	shdrInf.source = outlineVertexSource.c_str();
+	shdrInf.stage = ShaderStage::Vertex;
+	m_outlineVertexShader = renderContext()->createShader(shdrInf);
+
+	std::string outlineFragmentSource;
+	if (!e2::readFileWithIncludes("shaders/outline.fragment.glsl", outlineFragmentSource))
+	{
+		LogError("Failed to read shader file.");
+	}
+
+	shdrInf = e2::ShaderCreateInfo();
+	shdrInf.source = outlineFragmentSource.c_str();
+	shdrInf.stage = ShaderStage::Fragment;
+	m_outlineFragmentShader = renderContext()->createShader(shdrInf);
+
+
+	pipeInf = e2::PipelineCreateInfo();
+	pipeInf.shaders.push(m_outlineVertexShader);
+	pipeInf.shaders.push(m_outlineFragmentShader);
+	pipeInf.colorFormats = { e2::TextureFormat::RGBA8 };
+	pipeInf.layout = m_outlinePipelineLayout;
+	m_outlinePipeline = renderContext()->createPipeline(pipeInf);
+
 }
 
 void e2::HexGrid::renderFogOfWar()
 {
-	glm::uvec2 newResolution = m_viewpoints.resolution / 16.0f;
+	glm::uvec2 newResolution = m_viewpoints.resolution;
 	if (newResolution != m_fogOfWarMaskSize || !m_fogOfWarMask)
 	{
 		invalidateFogOfWarRenderTarget(newResolution);
+		m_fogOfWarMaskSize = newResolution;
 	}
 
-	e2::FogOfWarConstants fogOfWarConstants;
+	e2::SubmeshSpecification const& hexSpec = m_baseHex->specification(0);
 
-
+	// outlines first 
+	e2::OutlineConstants outlineConstants;
+	glm::mat4 vpMatrix = m_viewpoints.view.calculateProjectionMatrix(m_viewpoints.resolution) * m_viewpoints.view.calculateViewMatrix();
 
 	e2::ICommandBuffer* buff = m_fogOfWarCommandBuffers[renderManager()->frameIndex()];
 	e2::PipelineSettings defaultSettings;
 	defaultSettings.frontFace = e2::FrontFace::CCW;
 	buff->beginRecord(true, defaultSettings);
+	buff->useAsAttachment(m_outlineTexture);
+	buff->beginRender(m_outlineTarget);
+	buff->bindPipeline(m_outlinePipeline);
+	buff->bindVertexLayout(hexSpec.vertexLayout);
+	buff->bindIndexBuffer(hexSpec.indexBuffer);
+	for (uint8_t i = 0; i < hexSpec.vertexAttributes.size(); i++)
+		buff->bindVertexBuffer(i, hexSpec.vertexAttributes[i]);
+
+	// additive outline
+	for (glm::ivec2 const& hexIndex : m_outlineTiles)
+	{
+		glm::vec3 worldOffset = e2::Hex(hexIndex).localCoords();
+
+		glm::mat4 transform = glm::identity<glm::mat4>();
+		transform = glm::translate(transform, worldOffset);
+		transform = glm::scale(transform, { 1.15f, 1.15f, 1.15f });
+
+
+		outlineConstants.mvpMatrix = vpMatrix * transform;
+		outlineConstants.color = { 0.5f, 0.00f, 0.00f, 0.5f };
+
+		buff->pushConstants(m_outlinePipelineLayout, 0, sizeof(e2::OutlineConstants), reinterpret_cast<uint8_t*>(&outlineConstants));
+		buff->draw(hexSpec.indexCount, 1);
+	}
+	// subtractive step 
+	for (glm::ivec2 const& hexIndex : m_outlineTiles)
+	{
+		glm::vec3 worldOffset = e2::Hex(hexIndex).localCoords();
+
+		glm::mat4 transform = glm::identity<glm::mat4>();
+		transform = glm::translate(transform, worldOffset);
+
+		outlineConstants.mvpMatrix = vpMatrix * transform;
+		outlineConstants.color = { 0.5f, 0.04f, 0.03f, 0.0f };
+
+		buff->pushConstants(m_outlinePipelineLayout, 0, sizeof(e2::OutlineConstants), reinterpret_cast<uint8_t*>(&outlineConstants));
+		buff->draw(hexSpec.indexCount, 1);
+	}
+	buff->endRender();
+	buff->useAsDefault(m_outlineTexture);
+
+	//fog of war
+
+
+	e2::FogOfWarConstants fogOfWarConstants;
 
 	buff->useAsAttachment(m_fogOfWarMask[0]);
 	buff->beginRender(m_fogOfWarTarget[0]);
 	buff->bindPipeline(m_fogOfWarPipeline);
 
-	e2::SubmeshSpecification const& spec = m_baseHex->specification(0);
 	// Bind vertex states
-	buff->bindVertexLayout(spec.vertexLayout);
-	buff->bindIndexBuffer(spec.indexBuffer);
-	for (uint8_t i = 0; i < spec.vertexAttributes.size(); i++)
-		buff->bindVertexBuffer(i, spec.vertexAttributes[i]);
+	buff->bindVertexLayout(hexSpec.vertexLayout);
+	buff->bindIndexBuffer(hexSpec.indexBuffer);
+	for (uint8_t i = 0; i < hexSpec.vertexAttributes.size(); i++)
+		buff->bindVertexBuffer(i, hexSpec.vertexAttributes[i]);
 
 	/*
 	for (auto pair : m_chunkStates)
@@ -1011,7 +1137,7 @@ void e2::HexGrid::renderFogOfWar()
 
 
 				buff->pushConstants(m_fogOfWarPipelineLayout, 0, sizeof(e2::FogOfWarConstants), reinterpret_cast<uint8_t*>(&fogOfWarConstants));
-				buff->draw(spec.indexCount, 1);
+				buff->draw(hexSpec.indexCount, 1);
 			}
 		}
 
@@ -1144,6 +1270,32 @@ void e2::HexGrid::unflagVisible(glm::ivec2 const& v)
 	index = finder->second;
 
 	m_tileVisibility[index] = m_tileVisibility[index] - 1;
+}
+
+bool e2::HexGrid::isVisible(glm::ivec2 const& v)
+{
+	auto finder = m_tileIndex.find(v);
+	if (finder == m_tileIndex.end())
+	{
+		return false;
+	}
+	int32_t index = finder->second;
+	return m_tileVisibility[index];
+}
+
+void e2::HexGrid::clearOutline()
+{
+	m_outlineTiles.clear();
+}
+
+void e2::HexGrid::pushOutline(glm::ivec2 const& tile)
+{
+	m_outlineTiles.push_back(tile);
+}
+
+e2::ITexture* e2::HexGrid::outlineTexture()
+{
+	return m_outlineTexture;
 }
 
 namespace
@@ -1289,4 +1441,24 @@ void e2::HexGrid::ensureChunkHidden(e2::ChunkState* state)
 e2::ChunkState::~ChunkState()
 {
 
+}
+
+e2::TileFlags e2::TileData::getBiome()
+{
+	return (flags & e2::TileFlags::BiomeMask);
+}
+
+e2::TileFlags e2::TileData::getResource()
+{
+	return (flags & e2::TileFlags::ResourceMask);
+}
+
+e2::TileFlags e2::TileData::getAbundance()
+{
+	return (flags & e2::TileFlags::AbundanceMask);
+}
+
+e2::TileFlags e2::TileData::getImprovement()
+{
+	return (flags & e2::TileFlags::ImprovementMask);
 }

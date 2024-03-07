@@ -19,12 +19,14 @@ namespace e2
 	enum class TileFlags : uint16_t
 	{
 		None					= 0b0000'0000'0000'0000,
-		BiomeMask				= 0b1110'0000'0000'0000,
 
 		// Hills is a special little baby, we love it very dearly but it only applies to grasslands, desert, and tundra biomes. it's irrelevant (and 0) for the others
 		// if we find specific usecases where we need a bit for any of the other biomes, we can reuse this!
+		// @todo this is actually unused 
 		HillsMask				= 0b0000'0000'0000'0001,
 
+
+		BiomeMask				= 0b1110'0000'0000'0000,
 		BiomeGrassland			= 0b0000'0000'0000'0000,
 		BiomeForest				= 0b0010'0000'0000'0000,
 		BiomeDesert				= 0b0100'0000'0000'0000,
@@ -125,6 +127,11 @@ namespace e2
 		// flags control biome, resource, improvements
 		TileFlags flags{ TileFlags::None }; // 16 bits
 
+		TileFlags getBiome();
+		TileFlags getResource();
+		TileFlags getAbundance();
+		TileFlags getImprovement();
+
 		uint8_t empireId{255}; // 255 means no empire claim this, 254 empire ids that are recycled (max 254 concurrent empires)
 
 		ImprovementFlags improvementFlags{ ImprovementFlags::None };
@@ -199,6 +206,12 @@ namespace e2
 		glm::vec3 visibility;
 	};
 
+	struct OutlineConstants
+	{
+		glm::mat4 mvpMatrix;
+		glm::vec4 color;
+	};
+
 	struct BlurConstants
 	{
 		glm::vec2 direction;
@@ -238,6 +251,8 @@ namespace e2
 
 		/** Retrieves reference to the given tile, creates it if necessary */
 		size_t getTileIndexFromHex(Hex hex);
+
+		e2::TileData* getTileData(glm::ivec2 const & hex);
 
 		TileData &getTileFromIndex(size_t index);
 
@@ -285,6 +300,7 @@ namespace e2
 			return m_fogOfWarMask[0];
 		}
 
+		// fog of war in this function actually means fog of war, outlines and blur 
 		void initializeFogOfWar();
 		void invalidateFogOfWarRenderTarget(glm::uvec2 const& newResolution);
 		void invalidateFogOfWarShaders();
@@ -294,6 +310,13 @@ namespace e2
 		void clearVisibility();
 		void flagVisible(glm::ivec2 const& v, bool onlyDiscover = false);
 		void unflagVisible(glm::ivec2 const& v);
+		bool isVisible(glm::ivec2 const& v);
+
+		void clearOutline();
+		void pushOutline(glm::ivec2 const& tile);
+
+		e2::ITexture* outlineTexture();
+
 	protected:
 
 
@@ -339,10 +362,9 @@ namespace e2
 		e2::MeshPtr m_waterChunk;
 
 
+		std::vector<glm::ivec2> m_outlineTiles;
 
 
-
-		FogOfWarConstants m_fogOfWarConstants;
 		e2::IRenderTarget* m_fogOfWarTarget[2] = {nullptr, nullptr};
 		e2::ITexture* m_fogOfWarMask[2] = {nullptr, nullptr};
 		glm::uvec2 m_fogOfWarMaskSize{};
@@ -356,10 +378,16 @@ namespace e2
 		e2::IPipeline* m_blurPipeline{};
 		e2::IDescriptorSetLayout* m_blurSetLayout{};
 		e2::IDescriptorSet* m_blurSet[2] = {nullptr, nullptr};
-
 		e2::IDescriptorPool* m_blurPool{};
 
+		e2::IRenderTarget* m_outlineTarget { nullptr };
+		e2::ITexture* m_outlineTexture { nullptr };
+		e2::IShader* m_outlineVertexShader{};
+		e2::IShader* m_outlineFragmentShader{};
+		e2::IPipelineLayout* m_outlinePipelineLayout{};
+		e2::IPipeline* m_outlinePipeline{};
 
+		// does more than fogofwar, actually renders everything custom this hex grid needs
 		e2::Pair<e2::ICommandBuffer*> m_fogOfWarCommandBuffers{ nullptr };
 
 	};

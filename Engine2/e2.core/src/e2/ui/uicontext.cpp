@@ -1448,3 +1448,38 @@ e2::UIKeyboardState& e2::UIContext::keyboardState()
 {
 	return m_keyboardState;
 }
+
+bool e2::UIKeyboardState::state(e2::Key k)
+{
+	return keys[uint16_t(k)].state;
+}
+
+bool e2::UIKeyboardState::pressed(e2::Key k)
+{
+	return keys[uint16_t(k)].pressed;
+}
+
+bool e2::UIKeyboardState::released(e2::Key k)
+{
+	return keys[uint16_t(k)].released;
+}
+
+bool e2::UIMouseState::buttonState(e2::MouseButton btn)
+{
+	return buttons[uint8_t(btn)].state;
+}
+
+bool e2::UIMouseState::buttonPressed(e2::MouseButton btn)
+{
+	return buttons[uint8_t(btn)].pressed;
+}
+
+bool e2::UIMouseState::buttonReleased(e2::MouseButton btn)
+{
+	return buttons[uint8_t(btn)].released;
+}
+
+bool e2::UIMouseState::buttonDoubleClick(e2::MouseButton btn)
+{
+	return buttons[uint8_t(btn)].doubleClicked;
+}

@@ -86,6 +86,11 @@ namespace e2
 
 	struct E2_API UIMouseState
 	{
+		bool buttonState(e2::MouseButton btn);
+		bool buttonPressed(e2::MouseButton btn);
+		bool buttonReleased(e2::MouseButton btn);
+		bool buttonDoubleClick(e2::MouseButton btn);
+
 		glm::vec2 bufferedPosition;
 
 		glm::vec2 position;
@@ -128,6 +133,10 @@ namespace e2
 
 	struct E2_API UIKeyboardState
 	{
+		bool state(e2::Key k);
+		bool pressed(e2::Key k);
+		bool released(e2::Key k);
+
 		std::array<UIKeyState, size_t(e2::Key::Count)> keys;
 	};
 
