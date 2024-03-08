@@ -58,7 +58,7 @@ void main()
 		o = 1.0;
 
 	float f = sampleBaseHeight((position + vec2(321.4, 2928.0)) * 4);
-	if(f > -0.1 && h > 0.6)
+	if(f > 0.2 && h > 0.6)
 		f = 1.0;
 	else
 		f = 0.0;

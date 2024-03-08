@@ -83,7 +83,7 @@ void main()
 #endif
 
 	metalness = 0.0;
-	roughness = 0.0;
+	roughness = 0.85;
 
 	vec3 ndotl = vec3(clamp(dot(worldNormal, worldLight), EPSILON, 1.0));
 	vec3 worldReflect = reflect(worldView, worldNormal);

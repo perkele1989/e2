@@ -195,6 +195,7 @@ E2_API std::vector<std::string> e2::split(std::string const& input, char delimit
 	return output;
 }
 
+
 std::string e2::toLower(std::string const& input)
 {
 	std::string output = input;

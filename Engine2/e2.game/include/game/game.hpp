@@ -49,8 +49,11 @@ namespace e2
 		uint32_t stepsFromOrigin{};
 	};
 
-	struct PathFindingAccelerationStructure
+	/** @tags(arena, arenaSize=4096) */
+	class PathFindingAccelerationStructure : public e2::Object
 	{
+		ObjectDeclaration();
+	public:
 		PathFindingAccelerationStructure();
 		PathFindingAccelerationStructure(e2::GameUnit* unit);
 		~PathFindingAccelerationStructure();
@@ -177,7 +180,7 @@ namespace e2
 		void deselectUnit();
 		void moveSelectedUnitTo(e2::Hex const& to);
 
-		PathFindingAccelerationStructure m_unitAS;
+		e2::PathFindingAccelerationStructure *m_unitAS;
 		std::vector<e2::Hex> m_unitHoverPath;
 		std::vector<e2::Hex> m_unitMovePath;
 		uint32_t m_unitMoveIndex{};

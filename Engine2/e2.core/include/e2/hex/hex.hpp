@@ -139,13 +139,13 @@ namespace e2
 		e2::ufloat8 improvementHealth{ 1.0f };
 	};
 
-	constexpr uint32_t HexGridChunkResolution = 6;
+	constexpr uint32_t hexChunkResolution = 6;
 
 	constexpr uint32_t maxNumExtraChunks = 128;
 	constexpr uint32_t maxNumChunkStates = 512;
 
 	constexpr uint32_t maxNumChunkLoadTasks = 256;
-
+	constexpr uint32_t maxNumTreesPerChunk = hexChunkResolution * hexChunkResolution * 4;
 
 	class HexGrid;
 
@@ -168,6 +168,8 @@ namespace e2
 
 		e2::DynamicMesh* m_dynaHex{};
 		e2::DynamicMesh* m_dynaHexHigh{};
+
+		e2::StackVector<glm::vec4, e2::maxNumTreesPerChunk> treeOffsets;
 
 		float m_ms;
 	};
@@ -198,6 +200,9 @@ namespace e2
 		e2::MeshProxy* proxy{};
 		e2::MeshProxy* waterProxy{};
 		e2::MeshProxy* fogProxy{};
+
+		e2::StackVector<glm::vec4, e2::maxNumTreesPerChunk> treeWorldOffsets;
+		e2::StackVector<e2::MeshProxy*, e2::maxNumTreesPerChunk> treeProxys;
 
 	};
 
@@ -290,7 +295,7 @@ namespace e2
 
 
 		void prepareChunk(glm::ivec2 const& chunkIndex);
-		void notifyChunkReady(glm::ivec2 const& chunkIndex, e2::MeshPtr generatedMesh, double ms);
+		void notifyChunkReady(glm::ivec2 const& chunkIndex, e2::MeshPtr generatedMesh, double ms, e2::StackVector<glm::vec4, e2::maxNumTreesPerChunk> *offsets);
 
 		std::mutex& dynamicMutex()
 		{
@@ -349,6 +354,8 @@ namespace e2
 		void ensureChunkHidden(e2::ChunkState* state);
 
 		std::unordered_map<glm::ivec2, e2::ChunkState*> m_chunkStates;
+
+		e2::MeshPtr m_treeMesh[4];
 
 		e2::MeshPtr m_baseHex;
 		e2::DynamicMesh m_dynaHex;

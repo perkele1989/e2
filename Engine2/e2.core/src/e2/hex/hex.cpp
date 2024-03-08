@@ -3,6 +3,8 @@
 #include "e2/game/gamesession.hpp"
 #include "e2/managers/asyncmanager.hpp"
 
+#include "e2/transform.hpp"
+
 #include <glm/gtc/noise.hpp>
 
 e2::HexGrid::HexGrid(e2::Context* ctx, e2::GameSession* session)
@@ -17,11 +19,17 @@ e2::HexGrid::HexGrid(e2::Context* ctx, e2::GameSession* session)
 	assetManager()->prescribeALJ(aljDesc, "assets/SM_HexBase.e2a");
 	assetManager()->prescribeALJ(aljDesc, "assets/SM_HexBaseHigh.e2a");
 	assetManager()->prescribeALJ(aljDesc, "assets/SM_CoordinateSpace.e2a");
+	assetManager()->prescribeALJ(aljDesc, "assets/environment/trees/SM_PalmTree001.e2a");
 	if (!assetManager()->queueWaitALJ(aljDesc))
 	{
 		LogError("Failed to load hex base mesh");
 		return;
 	}
+
+	m_treeMesh[0] = assetManager()->get("assets/environment/trees/SM_PalmTree001.e2a")->cast<e2::Mesh>();
+	m_treeMesh[1] = assetManager()->get("assets/environment/trees/SM_PalmTree002.e2a")->cast<e2::Mesh>();
+	m_treeMesh[2] = assetManager()->get("assets/environment/trees/SM_PalmTree003.e2a")->cast<e2::Mesh>();
+	m_treeMesh[3] = assetManager()->get("assets/environment/trees/SM_PalmTree004.e2a")->cast<e2::Mesh>();
 
 	m_baseHex = assetManager()->get("assets/SM_HexBase.e2a")->cast<e2::Mesh>();
 	m_dynaHex = e2::DynamicMesh(m_baseHex, 0, VertexAttributeFlags::Color);
@@ -31,7 +39,7 @@ e2::HexGrid::HexGrid(e2::Context* ctx, e2::GameSession* session)
 
 
 	glm::vec2 waterOrigin = e2::Hex(glm::ivec2(0)).planarCoords();
-	glm::vec2 waterEnd = e2::Hex(glm::ivec2(e2::HexGridChunkResolution)).planarCoords();
+	glm::vec2 waterEnd = e2::Hex(glm::ivec2(e2::hexChunkResolution)).planarCoords();
 	glm::vec2 waterSize = waterEnd - waterOrigin;
 	uint32_t waterResolution = 64;
 	glm::vec2 waterTileSize = waterSize / float(waterResolution);
@@ -117,7 +125,7 @@ e2::Engine* e2::HexGrid::engine()
 
 glm::vec2 e2::HexGrid::chunkSize()
 {
-	return e2::Hex(glm::ivec2(e2::HexGridChunkResolution)).planarCoords();
+	return e2::Hex(glm::ivec2(e2::hexChunkResolution)).planarCoords();
 }
 
 glm::ivec2 e2::HexGrid::chunkIndexFromPlanarCoords(glm::vec2 const& planarCoords)
@@ -128,7 +136,7 @@ glm::ivec2 e2::HexGrid::chunkIndexFromPlanarCoords(glm::vec2 const& planarCoords
 glm::vec3 e2::HexGrid::chunkOffsetFromIndex(glm::ivec2 const& index)
 {
 	
-	return e2::Hex(index * glm::ivec2(e2::HexGridChunkResolution)).localCoords();
+	return e2::Hex(index * glm::ivec2(e2::hexChunkResolution)).localCoords();
 }
 
 namespace
@@ -429,7 +437,7 @@ void e2::HexGrid::assertChunksWithinRangeVisible(glm::vec2 const& streamCenter, 
 	{
 		for (int32_t x = lowerIndex.x-1 - leftOffset; x <= upperIndex.x + rightOffset; x++)
 		{
-			constexpr uint32_t r = e2::HexGridChunkResolution;
+			constexpr uint32_t r = e2::hexChunkResolution;
 			glm::vec2 chunkBoundsOffset = e2::Hex(glm::ivec2(x * r, y * r)).planarCoords();
 
 			e2::Aabb2D chunkAabb;
@@ -460,8 +468,8 @@ void e2::HexGrid::assertChunksWithinRangeVisible(glm::vec2 const& streamCenter, 
 					debugColor = glm::vec3(1.0f, 1.0f, 0.0f);
 					if (viewSpeed < 2.0f)
 						insert_sorted(m_chunkStreamQueue, { x, y }, [&streamCenter](const glm::ivec2& a, const glm::ivec2& b) {
-						float distanceToA = glm::distance(e2::Hex(a * int32_t(e2::HexGridChunkResolution)).planarCoords(), streamCenter);
-						float distanceToB = glm::distance(e2::Hex(b * int32_t(e2::HexGridChunkResolution)).planarCoords(), streamCenter);
+						float distanceToA = glm::distance(e2::Hex(a * int32_t(e2::hexChunkResolution)).planarCoords(), streamCenter);
+						float distanceToB = glm::distance(e2::Hex(b * int32_t(e2::hexChunkResolution)).planarCoords(), streamCenter);
 						return  distanceToA < distanceToB;
 					});
 				}
@@ -537,7 +545,7 @@ void e2::HexGrid::assertChunksWithinRangeVisible(glm::vec2 const& streamCenter, 
 			auto chunkIndex = stateIt.first;
 			auto chunkState = stateIt.second;
 
-			constexpr uint32_t r = e2::HexGridChunkResolution;
+			constexpr uint32_t r = e2::hexChunkResolution;
 			glm::vec2 chunkBoundsOffset = e2::Hex(glm::ivec2(chunkIndex.x * r, chunkIndex.y * r)).planarCoords();
 			e2::Aabb2D chunkAabb;
 			chunkAabb.min = chunkBoundsOffset;
@@ -614,7 +622,13 @@ e2::TileData e2::HexGrid::calculateTileDataForHex(Hex hex)
 	if(h > 0.81f)
 		newTileData.flags |= TileFlags::BiomeMountain;
 	else if (h > 0.39f)
-		newTileData.flags |= TileFlags::BiomeGrassland;
+	{
+		float f = sampleBaseHeight((planarCoords + glm::vec2(321.4f, 2928.0f)) * 4.0f);
+		if (f > 0.2f && h > 0.6f)
+			newTileData.flags |= TileFlags::BiomeForest;
+		else 
+			newTileData.flags |= TileFlags::BiomeGrassland;
+	}
 	else if (h > 0.03f)
 		newTileData.flags |= TileFlags::BiomeShallow;
 	else 
@@ -745,7 +759,7 @@ void e2::HexGrid::prepareChunk(glm::ivec2 const& chunkIndex)
 	asyncManager()->enqueue({ newState->task });
 }
 
-void e2::HexGrid::notifyChunkReady(glm::ivec2 const& chunkIndex, e2::MeshPtr generatedMesh, double ms)
+void e2::HexGrid::notifyChunkReady(glm::ivec2 const& chunkIndex, e2::MeshPtr generatedMesh, double ms, e2::StackVector<glm::vec4, e2::maxNumTreesPerChunk>* offsets)
 {
 	m_numJobsInFlight--;
 	// no longer loading for whatever reason
@@ -764,6 +778,7 @@ void e2::HexGrid::notifyChunkReady(glm::ivec2 const& chunkIndex, e2::MeshPtr gen
 	e2::ChunkState* chunk = m_chunkStates[chunkIndex];
 	chunk->mesh = generatedMesh;
 	chunk->task = nullptr;
+	chunk->treeWorldOffsets = *offsets;
 
 	if (chunk->visible)
 		ensureChunkVisible(chunk);
@@ -1123,13 +1138,13 @@ void e2::HexGrid::renderFogOfWar()
 			continue;
 		}
 
-		glm::ivec2 chunkTileOffset = chunkIndex * glm::ivec2(e2::HexGridChunkResolution);
+		glm::ivec2 chunkTileOffset = chunkIndex * glm::ivec2(e2::hexChunkResolution);
 
 		glm::mat4 vpMatrix = m_viewpoints.view.calculateProjectionMatrix(m_viewpoints.resolution) * m_viewpoints.view.calculateViewMatrix();
 
-		for (int32_t y = 0; y < e2::HexGridChunkResolution; y++)
+		for (int32_t y = 0; y < e2::hexChunkResolution; y++)
 		{
-			for (int32_t x = 0; x < e2::HexGridChunkResolution; x++)
+			for (int32_t x = 0; x < e2::hexChunkResolution; x++)
 			{
 				glm::ivec2 worldIndex = chunkTileOffset + glm::ivec2(x, y);
 				auto finder = m_tileIndex.find(worldIndex);
@@ -1344,8 +1359,8 @@ bool e2::ChunkLoadTask::execute()
 {
 	e2::Moment begin = e2::timeNow();
 
-	constexpr uint32_t HexGridChunkResolutionSquared = e2::HexGridChunkResolution * e2::HexGridChunkResolution;
-	constexpr uint32_t HexGridChunkResolutionHalf = e2::HexGridChunkResolution / 2;
+	constexpr uint32_t HexGridChunkResolutionSquared = e2::hexChunkResolution * e2::hexChunkResolution;
+	constexpr uint32_t HexGridChunkResolutionHalf = e2::hexChunkResolution / 2;
 
 	glm::vec3 chunkOffset = e2::HexGrid::chunkOffsetFromIndex(m_chunkIndex);
 
@@ -1366,15 +1381,14 @@ bool e2::ChunkLoadTask::execute()
 	HexShaderData shaderData;
 	shaderData.chunkOffset = { chunkOffset.x, chunkOffset.z };
 
-
-	for (int32_t y = 0; y < e2::HexGridChunkResolution; y++)
+	for (int32_t y = 0; y < e2::hexChunkResolution; y++)
 	{
-		for (int32_t x = 0; x < e2::HexGridChunkResolution; x++)
+		for (int32_t x = 0; x < e2::hexChunkResolution; x++)
 		{
 			glm::vec3 tileOffset = e2::Hex(glm::ivec2(x, y)).localCoords();
 			glm::mat4 transform = glm::translate(glm::identity<glm::mat4>(), tileOffset);
 
-			shaderData.hex = e2::Hex(m_chunkIndex * glm::ivec2(e2::HexGridChunkResolution) + glm::ivec2(x, y));
+			shaderData.hex = e2::Hex(m_chunkIndex * glm::ivec2(e2::hexChunkResolution) + glm::ivec2(x, y));
 			e2::TileData tileData = e2::HexGrid::calculateTileDataForHex(shaderData.hex);
 
 			if ((tileData.flags & e2::TileFlags::BiomeMask) == e2::TileFlags::BiomeMountain)
@@ -1384,6 +1398,26 @@ bool e2::ChunkLoadTask::execute()
 			else
 			{
 				newChunkMesh->addMeshWithShaderFunction(m_dynaHex, transform, ::hexShader, &shaderData);
+			}
+
+			if ((tileData.flags & e2::TileFlags::BiomeMask) == e2::TileFlags::BiomeForest)
+			{
+				for (uint8_t i = 0; i < 4; i++)
+				{
+					glm::vec3 randomOffset;
+					randomOffset.x = glm::simplex(chunkOffset + tileOffset + i*34.2f);
+					randomOffset.z = glm::simplex(-chunkOffset + -tileOffset + i*22.34f);
+					randomOffset = glm::normalize(randomOffset);
+					randomOffset *= 0.3f;
+
+					randomOffset.y = (glm::simplex(chunkOffset + tileOffset + i * 2334.2f) * 0.5 + 0.5) * 0.1f;
+
+					float randomRotation = (glm::simplex(chunkOffset + tileOffset + i * 2334.2f) * 0.5 + 0.5) * 360.0f;
+
+					glm::vec4 off(chunkOffset + tileOffset + randomOffset, randomRotation);
+
+					treeOffsets.push(off);
+				}
 			}
 
 		}
@@ -1402,7 +1436,7 @@ bool e2::ChunkLoadTask::execute()
 
 bool e2::ChunkLoadTask::finalize()
 {
-	m_grid->notifyChunkReady(m_chunkIndex, m_generatedMesh, m_ms);
+	m_grid->notifyChunkReady(m_chunkIndex, m_generatedMesh, m_ms, &treeOffsets);
 	return true;
 }
 
@@ -1423,6 +1457,35 @@ void e2::HexGrid::ensureChunkVisible(e2::ChunkState* state)
 		state->proxy->modelMatrix = glm::translate(glm::mat4(1.0f), chunkOffset);
 		state->proxy->modelMatrixDirty = { true };
 		m_numChunkMeshes++;
+
+		
+		const float scales[16] = {
+			1.4f, 1.2f, 1.63f, 1.12f,
+			1.332f, 1.25f, 1.63f, 1.23f,
+			1.441f, 1.244f, 1.64f, 1.23f,
+			1.34f, 1.11f, 1.43f, 1.32f,
+		};
+		uint8_t j = 0;
+		uint8_t i = 0;
+		for (glm::vec4 const& offset : state->treeWorldOffsets)
+		{
+			e2::MeshProxyConfiguration treeConf;
+			treeConf.mesh = m_treeMesh[i];
+
+			e2::MeshProxy* newTree = e2::create<e2::MeshProxy>(m_session, treeConf);
+			newTree->modelMatrix = glm::translate(glm::mat4(1.0f), glm::vec3(offset.x, offset.y, offset.z));
+			newTree->modelMatrix = glm::rotate(newTree->modelMatrix, glm::radians(offset.w), e2::worldUp());
+			newTree->modelMatrix = glm::scale(newTree->modelMatrix, glm::vec3(scales[j]*0.86));
+			newTree->modelMatrixDirty = { true };
+			state->treeProxys.push(newTree);
+
+			if (++i > 3)
+				i = 0;
+
+			if (++j > 15)
+				j = 0;
+			
+		}
 	}
 
 	if (!state->waterProxy)
@@ -1462,6 +1525,12 @@ void e2::HexGrid::ensureChunkHidden(e2::ChunkState* state)
 		e2::destroy(state->proxy);
 		state->proxy = nullptr;
 		m_numChunkMeshes--;
+
+		for (e2::MeshProxy* treeProxy : state->treeProxys)
+		{
+			e2::destroy(treeProxy);
+		}
+		state->treeProxys.resize(0);
 	}
 }
 

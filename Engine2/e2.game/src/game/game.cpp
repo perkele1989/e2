@@ -59,7 +59,8 @@ void e2::Game::initialize()
 
 void e2::Game::shutdown()
 {
-	
+	if (m_unitAS)
+		e2::destroy(m_unitAS);
 	e2::destroy(m_cursorProxy);
 	e2::destroy(m_hexGrid);
 	e2::destroy(m_session);
@@ -331,9 +332,11 @@ void e2::Game::updateUnitMove()
 
 			float angle = radiansBetween(finalHex.localCoords(), prevHex.localCoords());
 			m_selectedUnit->setMeshTransform(finalHex.localCoords(), angle);
-			m_unitAS = e2::PathFindingAccelerationStructure(m_selectedUnit);
+			if (m_unitAS)
+				e2::destroy(m_unitAS);
+			m_unitAS = e2::create<PathFindingAccelerationStructure>(m_selectedUnit);
 			m_hexGrid->clearOutline();
-			for (auto& [coords, hexAS] : m_unitAS.hexIndex)
+			for (auto& [coords, hexAS] : m_unitAS->hexIndex)
 			{
 				m_hexGrid->pushOutline(coords);
 			}
@@ -529,7 +532,7 @@ void e2::Game::onNewCursorHex()
 {
 	if (m_selectedUnit)
 	{
-		m_unitHoverPath = m_unitAS.find(m_cursorHex);
+		m_unitHoverPath = m_unitAS->find(m_cursorHex);
 	}
 }
 
@@ -544,11 +547,14 @@ void e2::Game::selectUnit(e2::GameUnit* unit)
 		return;
 
 	m_selectedUnit = unit;
-	m_unitAS = PathFindingAccelerationStructure(m_selectedUnit);
+
+	if (m_unitAS)
+		e2::destroy(m_unitAS);
+	m_unitAS = e2::create<PathFindingAccelerationStructure>(m_selectedUnit);
 
 	m_hexGrid->clearOutline();
 
-	for (auto& [coords, hexAS] : m_unitAS.hexIndex)
+	for (auto& [coords, hexAS] : m_unitAS->hexIndex)
 	{
 		m_hexGrid->pushOutline(coords);
 	}
@@ -558,7 +564,9 @@ void e2::Game::selectUnit(e2::GameUnit* unit)
 void e2::Game::deselectUnit()
 {
 	m_selectedUnit = nullptr;
-	m_unitAS = PathFindingAccelerationStructure();
+	if (m_unitAS)
+		e2::destroy(m_unitAS);
+	m_unitAS = nullptr;
 	m_hexGrid->clearOutline();
 }
 
@@ -570,7 +578,7 @@ void e2::Game::moveSelectedUnitTo(e2::Hex const& to)
 	if (to.offsetCoords() == m_selectedUnit->tileIndex)
 		return;
 
-	m_unitMovePath = m_unitAS.find(to);
+	m_unitMovePath = m_unitAS->find(to);
 	if (m_unitMovePath.size() == 0)
 		return;
 
