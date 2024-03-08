@@ -38,55 +38,20 @@ vec3 heightlerp(vec3 input1, float height1, vec3 input2, float height2, float t)
 
 void main()
 {
-    vec3 visibility = textureLod(sampler2D(visibilityMask, frontBufferSampler), gl_FragCoord.xy / vec2(resolution.x, resolution.y), 0).xyz;
-
 	outPosition = fragmentPosition;
 	outColor = vec4(1.0, 1.0, 1.0, 1.0);
 
 	float texScaleMountains = 0.1;
 	float texScaleFields = 0.5;
-	float texScaleSand = 0.2;
+	float texScaleSand = 0.1;
 	float texScaleGreen = 0.2;
-
-	vec3 n = normalize(fragmentNormal.xyz);
-	vec3 t = normalize(fragmentTangent.xyz);
-	vec3 b = fragmentTangent.w * cross(n, t);
-
-	vec3 nmMountains = normalize(texture(sampler2D(mountainNormal, mainSampler), fragmentPosition.xz * texScaleMountains).xyz * 2.0 - 1.0);
-	vec3 nmFields = normalize(texture(sampler2D(fieldsNormal, mainSampler), fragmentPosition.xz * texScaleFields).xyz * 2.0 - 1.0);
-	vec3 nmSand = normalize(texture(sampler2D(sandNormal, mainSampler), fragmentPosition.xz * texScaleFields).xyz * 2.0 - 1.0);
-	
-	vec3 nm;
-	//nm = normalize(mix(nmSand, nmFields, fragmentColor.r));	
-	//nm = normalize(mix(nm, nmMountains, fragmentColor.g));
-	nm = normalize(mix(nmSand, nmMountains, fragmentColor.g));
-	
-	vec3 wn = normalize(nm.x * t + nm.y * b + nm.z * n);
-
-	vec3 l = normalize(vec3(-1.0, -1.0, -1.0));
-
-	vec3 ndotl = vec3(clamp(dot(wn, l), EPSILON, 1.0));
-	vec3 softl = vec3(dot(wn,l) *0.5 + 0.5);
-
-	vec3 v = normalize(fragmentPosition.xyz - (inverse(renderer.viewMatrix) * vec4(0.0, 0.0, 0.0, 1.0)).xyz);//-normalize((inverse(renderer.viewMatrix) * vec4(0.0, 0.0, -1.0, 0.0)).xyz);
-	float vdotn = pow(1.0 - clamp(dot(v, wn), EPSILON, 1.0), 5.0);
+    vec2 texUv = fragmentPosition.xz;
+    texUv.y = -texUv.y;
 
 
-
-
-	vec3 flatv = v;
-	flatv.y = 0.0;
-	flatv = normalize(flatv);
-	float vdotn2 = pow(1.0 - clamp(dot(flatv, n), EPSILON, 1.0), 16.0);
-	float heightCoeff = smoothstep(0.1, 1.0, -fragmentPosition.y);	
-	float mountainFresnel = vdotn2 * heightCoeff;
-	
-	float vdotn3 = pow(1.0 - clamp(dot(v, wn), EPSILON, 1.0), 0.25);
-
-	vec3 albedoSand = texture(sampler2D(sandAlbedo, mainSampler), fragmentPosition.xz * texScaleSand).rgb;
-	vec3 albedoMountains = pow(texture(sampler2D(mountainAlbedo, mainSampler), fragmentPosition.xz * texScaleMountains).rgb, vec3(1.1));
-	vec3 albedoFields = texture(sampler2D(fieldsAlbedo, mainSampler), fragmentPosition.xz * texScaleFields).rgb;
-	vec3 albedoGreen = texture(sampler2D(greenAlbedo, mainSampler), fragmentPosition.xz * texScaleGreen).rgb;
+	vec3 albedoSand = texture(sampler2D(sandAlbedo, repeatSampler), texUv * texScaleSand).rgb;
+	vec3 albedoMountains = pow(texture(sampler2D(mountainAlbedo, repeatSampler), texUv * texScaleMountains).rgb, vec3(1.1));
+	vec3 albedoGreen = texture(sampler2D(greenAlbedo, repeatSampler), texUv * texScaleGreen).rgb;
 
 	float bigSimplex = simplex(fragmentPosition.xz * 6) * 0.5 + 0.5;
 	float smallSimplex = simplex(fragmentPosition.xz * 2) * 0.5 + 0.5;
@@ -100,8 +65,8 @@ void main()
 
 
     float waterLineCoeff = smoothstep(-0.1, 0.0, -fragmentPosition.y);
-    float waterLineCoeff2 = pow(smoothstep(-0.4, 0.0, -fragmentPosition.y), 0.2);
-	albedoSand = heightlerp(pow(albedoSand, vec3(1.4)), 0.5, albedoSand, smallSimplexS, waterLineCoeff);
+    float waterLineCoeff2 = pow(smoothstep(-0.1, 0.0, -fragmentPosition.y), 0.2);
+	albedoSand = heightlerp(pow(albedoSand, vec3(1.2)), 0.5, albedoSand, smallSimplexS, waterLineCoeff);
 
 	vec3 albedo;
 	albedo = heightlerp(albedoSand, 0.5, albedoGreen, bigSimplex * smallSimplex, greenCoeff);
@@ -110,22 +75,78 @@ void main()
 	//albedo = mix(albedoSand, albedoGreen, greenCoeff);
 	//albedo = mix(albedo, albedoMountains, fragmentColor.g);
 
-	float brdfy = clamp(dot(wn, v), EPSILON, 1.0);
-	float roughness = 0.8;
+
+
+
+
+
+
+	vec3 nmMountains = normalize(texture(sampler2D(mountainNormal, repeatSampler), texUv * texScaleMountains).xyz * 2.0 - 1.0);
+    vec3 nmGreen = normalize(texture(sampler2D(greenNormal, repeatSampler), texUv * texScaleGreen).xyz * 2.0 - 1.0);
+	vec3 nmSand = normalize(texture(sampler2D(sandNormal, repeatSampler), texUv * texScaleSand).xyz * 2.0 - 1.0);
+
+    nmSand.y = -nmSand.y;
+    nmGreen.y = -nmGreen.y;
+    nmMountains.y = -nmMountains.y;
+
+    nmGreen.z *= 2.0;
+    nmGreen = normalize(nmGreen);
+
+    //nmSand.g = -nmSand.g;
+    //nmGreen.g = -nmGreen.g;
+    //nmMountains.g = -nmMountains.g;
+
+	vec3 nm;
+    //nm = normalize(mix(nmSand, nmGreen, fragmentColor.r));	
+	//nm = normalize(mix(nm, nmMountains, fragmentColor.g));
+
+	nm = normalize(heightlerp(nmSand, 0.5, nmGreen, bigSimplex * smallSimplex, greenCoeff));
+	nm = normalize(heightlerp(nm, 0.5, nmMountains, bigSimplex, fragmentColor.g));
+    //nm = nmSand;
+    
+    //nm = nmMountains;
+
+
+	vec3 n = normalize(fragmentNormal.xyz);
+	vec3 t = normalize(fragmentTangent.xyz);
+	vec3 b = fragmentTangent.w * cross(n, t);
+
+
+
+	vec3 wn = normalize(nm.x * t + nm.y * b + nm.z * n);
+	vec3 l = normalize(vec3(1.0, -1.0, 1.0));
+	vec3 ndotl = vec3(clamp(dot(wn, l), EPSILON, 1.0));
+	vec3 softl = vec3(dot(wn,l) *0.5 + 0.5);
+	vec3 v = normalize(fragmentPosition.xyz - (inverse(renderer.viewMatrix) * vec4(0.0, 0.0, 0.0, 1.0)).xyz);
+    //v = normalize((inverse(renderer.viewMatrix) * vec4(0.0, 0.0, -1.0, 0.0)).xyz);
+	//float vdotn = pow(1.0 - clamp(dot(v, wn), EPSILON, 1.0), 5.0);
+	vec3 flatv = v;
+	flatv.y = 0.0;
+	flatv = normalize(flatv);
+	float vdotn2 = max(0.0, pow(dot(flatv, n), 1.0 / 16.0));
+	float mountainFresnel = vdotn2 * smoothstep(0.1, 1.0, -fragmentPosition.y);
+	//float vdotn3 = pow(1.0 - clamp(dot(v, wn), EPSILON, 1.0), 0.25);
+
+	float brdfy = clamp(dot(wn, -v), EPSILON, 1.0);
+	float roughness = 0.2;
 	float metallic = (1.0 - waterLineCoeff) * 0.5;
 	 
+     metallic = 0.0;
+
+    //albedo= vec3(1.0, 1.0, 1.0);
+
 	vec3 F0 = vec3(0.04); 
     vec3 specularCoeff = mix(F0, albedo, metallic) * waterLineCoeff2; 
 
 	vec3 diffuseCoeff = albedo * (1.0 - F0) * (1.0 - metallic);
 
 	float lod = roughness * 6.0;
-	vec3 r = reflect(-v, wn);
-	float iblStrength = 1.0;
-	vec3 irr = texture(sampler2D(irradianceCube, mainSampler), equirectangularUv(wn)).rgb* iblStrength;
-	vec3 rad = textureLod(sampler2D(radianceCube, mainSampler), equirectangularUv(r), lod).rgb* iblStrength;
+	vec3 r = reflect(v, wn);
+	
+	vec3 irr = texture(sampler2D(irradianceCube, equirectSampler), equirectangularUv(wn)).rgb;
 
-	vec2 brdf = textureLod(sampler2D(integratedBrdf, brdfSampler), vec2(brdfy, roughness), 0.0).xy;
+	vec3 rad = textureLod(sampler2D(radianceCube, equirectSampler), equirectangularUv(r), lod).rgb;
+	vec2 brdf = textureLod(sampler2D(integratedBrdf, clampSampler), vec2(brdfy, 1.0 - roughness), 0.0).xy;
 	
 
 
@@ -134,37 +155,32 @@ void main()
 
 	// soft base sun light, beautiful
 	//outColor.rgb += albedo * vec3(0.76, 0.8, 1.0) * softl * 1.0;
-    outColor.rgb += albedo * vec3(0.76, 0.8, 1.0) * ndotl * 1.0;
+    outColor.rgb = albedo * vec3(0.76, 0.8, 1.0) * ndotl * 1.0;
 
 	// bravissimo!!! mountain fresnel is beaut!!
-	outColor.rgb += vec3(1.0, 0.8, 0.76) * mountainFresnel * 0.30; 
+	outColor.rgb += vec3(1.0, 0.8, 0.76) * mountainFresnel * 0.40; 
 
 	// ibl specular
-	outColor.rgb += rad * specularCoeff *  (brdf.x + brdf.y) ;	
-
+	outColor.rgb += rad * ( specularCoeff* brdf.x + brdf.y) ;	
+    
 	// ibl diffuse 
 	outColor.rgb += diffuseCoeff * irr;
 
-    //outColor.rgb =vec3(1.0 - waterLineCoeff);
+    //outColor.rgb = ndotl;
 
-    //outColor.rgb = rad * specularCoeff *  (brdf.x + brdf.y);
-
-
-    //outColor.rgb = albedo * vec3(0.76, 0.8, 1.0) * ndotl * 1.0;
-
-	// debug refl
-	//outColor.rgb = F;
 
 	// debug norm
 	//outColor.rgb = clamp(vec3(wn.x, wn.z, -wn.y) * 0.5 + 0.5, vec3(EPSILON), vec3(1.0));
+    //outColor.rgb = vec3(ndotl);
 
-	//outColor.rgb = vec3(brdf.g);
 
-	// debug ndotl 
-	//outColor.rgb = ndotl;
+    //outColor.rgb = v;
 
-    
-    outColor.rgb = fogOfWar(outColor.rgb, fragmentPosition.xyz, visibility, renderer.time.x);
+
+
+
+    //vec3 visibility = textureLod(sampler2D(visibilityMask, clampSampler), gl_FragCoord.xy / vec2(resolution.x, resolution.y), 0).xyz;
+    //outColor.rgb = fogOfWar(outColor.rgb, fragmentPosition.xyz, visibility, renderer.time.x);
 
 	float gridCoeff2 = smoothstep(0.92, 0.95, fragmentColor.a);
 	gridCoeff2 *= 0.15;

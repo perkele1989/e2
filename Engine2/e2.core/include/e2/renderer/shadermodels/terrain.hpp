@@ -75,8 +75,6 @@ namespace e2
 
 		e2::DirtyParameter<TerrainData> uniformData{};
 
-		e2::DirtyParameter<e2::ITexture*> visibilityMask;
-
 	};
 
 	/** @tags(dynamic, arena, arenaSize=1) */
@@ -105,20 +103,12 @@ namespace e2
 		// descriptor set layout, and pool for Terrain proxy sets 
 		e2::IDescriptorSetLayout* m_descriptorSetLayout{};
 		e2::IDescriptorPool* m_descriptorPool{};
-		e2::ISampler* m_sampler{};
-
-		e2::Texture2DPtr m_irradianceCube{};
-		e2::Texture2DPtr m_radianceCube{};
 		
 		e2::Texture2DPtr m_mountainAlbedo{};
 		e2::Texture2DPtr m_mountainNormal{};
 
 		e2::Texture2DPtr m_sandAlbedo{};
 		e2::Texture2DPtr m_sandNormal{};
-
-		e2::Texture2DPtr m_fieldsAlbedo{};
-		e2::Texture2DPtr m_fieldsNormal{};
-
 
 		e2::Texture2DPtr m_greenAlbedo{};
 		e2::Texture2DPtr m_greenNormal{};
@@ -136,4 +126,4 @@ namespace e2
 
 EnumFlagsDeclaration(e2::TerrainFlags)
 
-#include "Terrain.generated.hpp"
+#include "terrain.generated.hpp"

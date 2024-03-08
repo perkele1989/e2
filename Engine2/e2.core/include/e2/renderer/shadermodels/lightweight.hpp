@@ -30,9 +30,15 @@ namespace e2
 
 		// Maps 
 		MaterialFlagsOffset = 7,
-		Albedo = 1 << 7,
+		AlbedoTexture = 1 << 7,
+		RoughnessTexture = 1 << 8,
+		MetalnessTexture = 1 << 9,
+		NormalTexture = 1 << 10,
 
-		Count = 1 << 8
+		AlphaClip = 1 << 11,
+		DoubleSided = 1 << 12,
+
+		Count = 1 << 13
 
 	};
 
@@ -48,11 +54,10 @@ namespace e2
 	{
 		/** Albedo.rgb, ?.a */
 		alignas(16) glm::vec4 albedo;
+
+		/** roughness, metalness, ?? */
+		alignas(16) glm::vec4 rmxx; 
 	};
-
-
-	
-
 
 	class LightweightModel;
 
@@ -71,12 +76,18 @@ namespace e2
 
 		e2::LightweightModel* model{};
 
+		bool alphaClip{false};
+		bool doubleSided{ false };
+
 		uint32_t id{};
 		e2::Pair<e2::IDescriptorSet*> sets{ nullptr };
 
 		e2::DirtyParameter<LightweightData> uniformData{};
 
 		e2::DirtyParameter<e2::ITexture*> albedoTexture;
+		e2::DirtyParameter<e2::ITexture*> normalTexture;
+		e2::DirtyParameter<e2::ITexture*> roughnessTexture;
+		e2::DirtyParameter<e2::ITexture*> metalnessTexture;
 
 	};
 
@@ -107,10 +118,16 @@ namespace e2
 		// descriptor set layout, and pool for lightweight proxy sets 
 		e2::IDescriptorSetLayout *m_descriptorSetLayout{};
 		e2::IDescriptorPool* m_descriptorPool{};
-		e2::ISampler* m_sampler{};
+
+
 		e2::StackVector<e2::LightweightCacheEntry, uint16_t(e2::LightweightFlags::Count)> m_pipelineCache;
 		//std::unordered_map<e2::LightweightFlags, LightweightCacheEntry> m_pipelineCache;
 		
+		bool m_shadersReadFromDisk{};
+		bool m_shadersOnDiskOK{};
+		std::string m_vertexSource;
+		std::string m_fragmentSource;
+
 
 		e2::Pair<e2::IDataBuffer*> m_proxyUniformBuffers;
 	};

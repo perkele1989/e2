@@ -81,6 +81,7 @@ namespace e2
 		void updateCamera(double seconds);
 		void updateMainCamera(double seconds);
 		void updateAltCamera(double seconds);
+		void updateAnimation(double seconds);
 
 		void updateGameState();
 		void updateTurn();
@@ -147,6 +148,11 @@ namespace e2
 
 		TurnState m_turnState{ TurnState::Unlocked };
 
+
+		e2::Texture2DPtr m_irradianceMap;
+		e2::Texture2DPtr m_radianceMap;
+
+		
 		// main world grid
 		e2::HexGrid* m_hexGrid{};
 
@@ -169,9 +175,14 @@ namespace e2
 		// game units 
 		void selectUnit(e2::GameUnit* unit);
 		void deselectUnit();
+		void moveSelectedUnitTo(e2::Hex const& to);
 
 		PathFindingAccelerationStructure m_unitAS;
 		std::vector<e2::Hex> m_unitHoverPath;
+		std::vector<e2::Hex> m_unitMovePath;
+		uint32_t m_unitMoveIndex{};
+		float m_unitMoveDelta{};
+
 
 		GameUnit* m_selectedUnit{};
 		std::unordered_set<GameUnit*> m_units;

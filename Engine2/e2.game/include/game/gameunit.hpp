@@ -19,6 +19,8 @@ namespace e2
 			return m_game;
 		}
 
+		void setMeshTransform(glm::vec3 const& pos, float angle);
+
 		void spreadVisibility();
 		void rollbackVisibility();
 
@@ -30,9 +32,15 @@ namespace e2
 
 		glm::ivec2 tileIndex; // offset coords
 
+		virtual void updateAnimation(double seconds);
+
 	protected:
 		e2::Game* m_game{};
 		e2::MeshProxy* m_proxy{};
+		
+		glm::quat m_rotation;
+		glm::quat m_targetRotation;
+		glm::vec3 m_position;
 	};
 }
 

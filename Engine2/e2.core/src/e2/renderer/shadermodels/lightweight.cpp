@@ -11,241 +11,6 @@
 #include "e2/utils.hpp"
 
 
-static char const* vertexSource = R"SRC(
-#version 460 core
-
-
-// Vertex attributes 
-in vec4 vertexPosition;
-
-#if defined(Vertex_Normals)
-in vec4 vertexNormal;
-in vec4 vertexTangent;
-#endif
-
-#if defined(Vertex_TexCoords01)
-in vec4 vertexUv01;
-#endif 
-
-#if defined(Vertex_TexCoords23)
-in vec4 vertexUv23;
-#endif 
-
-#if defined(Vertex_Color)
-in vec4 vertexColor;
-#endif
-
-#if defined(Vertex_Bones)
-in vec4 vertexWeights;
-in uvec4 vertexIds;
-#endif
-
-// Fragment attributes
-
-out vec4 fragmentPosition;
-
-#if defined(Vertex_Normals)
-out vec3 fragmentNormal;
-out vec3 fragmentTangent;
-out vec3 fragmentBitangent;
-#endif
-
-#if defined(Vertex_TexCoords01)
-out vec4 fragmentUv01;
-#endif
-
-#if defined(Vertex_TexCoords23)
-out vec4 fragmentUv23;
-#endif
-
-#if defined(Vertex_Color)
-out vec4 fragmentColor;
-#endif
-
-// Push constants
-layout(push_constant) uniform ConstantData
-{
-	mat4 normalMatrix;
-	uvec2 resolution;
-};
-
-// Begin Set0: Renderer
-layout(set = 0, binding = 0) uniform RendererData
-{
-	mat4 viewMatrix;
-	mat4 projectionMatrix;
-	vec4 time; // t, sin(t), cos(t), tan(t)
-} renderer;
-
-layout(set = 0, binding = 1)  uniform texture2D integratedBrdf;
-layout(set = 0, binding = 2) uniform sampler brdfSampler;
-layout(set = 0, binding = 3)  uniform texture2D frontBufferColor;
-layout(set = 0, binding = 4)  uniform texture2D frontBufferPosition;
-layout(set = 0, binding = 5)  uniform texture2D frontBufferDepth;
-layout(set = 0, binding = 6) uniform sampler frontBufferSampler;
-// End Set0
-
-// Begin Set1: Mesh 
-layout(set = 1, binding = 0) uniform MeshData 
-{
-	mat4 modelMatrix;
-} mesh;
-// End Set1
-
-// Begin Set2: Material
-layout(set = 2, binding = 0) uniform MaterialData
-{
-	vec4 albedo;
-} material;
-
-layout(set = 2, binding = 1) uniform texture2D albedoTexture;
-layout(set = 2, binding = 2) uniform sampler albedoSampler;
-// End Set2
-
-void main()
-{
-	gl_Position = renderer.projectionMatrix * renderer.viewMatrix * mesh.modelMatrix * vertexPosition;
-
-	// Write fragment attributes (in worldspace where applicable)
-	// @todo skinned 
-	fragmentPosition = mesh.modelMatrix * vertexPosition;
-#if defined(Vertex_Normals)
-
-	fragmentNormal = normalize(mesh.modelMatrix * normalize(vertexNormal)).xyz;
-	fragmentTangent =  normalize(mesh.modelMatrix * normalize(vertexTangent)).xyz;
-	fragmentBitangent = normalize(cross(fragmentNormal.xyz, fragmentTangent.xyz));
-#endif
-
-#if defined(Vertex_TexCoords01)
-	fragmentUv01 = vertexUv01;
-#endif
-
-#if defined(Vertex_TexCoords23)
-	fragmentUv23 = vertexUv23;
-#endif
-
-#if defined(Vertex_Color)
-	fragmentColor = vertexColor;
-#endif
-}
-)SRC";
-
-static char const* fragmentSource = R"SRC(
-#version 460 core
-
-// Fragment attributes
-
-in vec4 fragmentPosition;
-
-#if defined(Vertex_Normals)
-in vec3 fragmentNormal;
-in vec3 fragmentTangent;
-in vec3 fragmentBitangent;
-#endif
-
-#if defined(Vertex_TexCoords01)
-in vec4 fragmentUv01;
-#endif
-
-#if defined(Vertex_TexCoords23)
-in vec4 fragmentUv23;
-#endif
-
-#if defined(Vertex_Color)
-in vec4 fragmentColor;
-#endif
-
-// Out color
-out vec4 outColor;
-out vec4 outPosition;
-
-// Push constants
-layout(push_constant) uniform ConstantData
-{
-	mat4 normalMatrix;
-	uvec2 resolution;
-};
-
-// Begin Set0: Renderer
-layout(set = 0, binding = 0) uniform RendererData
-{
-	mat4 viewMatrix;
-	mat4 projectionMatrix;
-	vec4 time; // t, sin(t), cos(t), tan(t)
-} renderer;
-
-layout(set = 0, binding = 1)  uniform texture2D integratedBrdf;
-layout(set = 0, binding = 2) uniform sampler brdfSampler;
-layout(set = 0, binding = 3)  uniform texture2D frontBufferColor;
-layout(set = 0, binding = 4)  uniform texture2D frontBufferDepth;
-layout(set = 0, binding = 5) uniform sampler frontBufferSampler;
-// End Set0
-
-// Begin Set1: Mesh 
-layout(set = 1, binding = 0) uniform MeshData 
-{
-	mat4 modelMatrix;
-} mesh;
-// End Set1
-
-// Begin Set2: Material
-layout(set = 2, binding = 0) uniform MaterialData
-{
-	vec4 albedo;
-} material;
-
-layout(set = 2, binding = 1) uniform texture2D albedoTexture;
-layout(set = 2, binding = 2) uniform sampler albedoSampler;
-// End Set2
-
-float map(float value, float min1, float max1, float min2, float max2)
-{
-  return min2 + (value - min1) * (max2 - min2) / (max1 - min1);
-}
-
-void main()
-{
-	outColor = vec4(1.0, 1.0, 1.0, 1.0);
-
-	
-#if defined(Vertex_Normals)
-	
-	vec3 n = normalize(fragmentNormal);
-
-	vec3 l = normalize(vec3(1.0, 1.0, 1.0));
-	vec3 ndotl = vec3(clamp(dot(n, l), 0.0, 1.0));
-	vec3 softl = vec3(dot(n,l) *0.5 + 0.5);
-
-
-	//outColor.rgb = (ndotl * vec3(0.79, 0.87, 1.0) * 0.15) + (softl * vec3(1.0, 0.8, 0.6) *0.85);
-	outColor.rgb = (ndotl * 0.15) + (softl *0.85);
-
-#endif
-
-	outColor *= material.albedo;
-
-#if defined(Material_Albedo) && defined(Vertex_TexCoords01)
-	vec4 albedoSample = texture(sampler2D(albedoTexture, albedoSampler), fragmentUv01.xy);
-	outColor *= albedoSample;
-#endif
-
-#if defined(Vertex_Color)
-	//outColor *= fragmentColor;
-	//outColor = fragmentColor;
-
-	outColor.rgb *= fragmentColor.rgb;
-
-	float gridCoeff = smoothstep(0.9f, 0.95, fragmentColor.a);
-	gridCoeff *= 0.1;
-	outColor.rgb = mix(outColor.rgb, vec3(0.0, 0.0, 0.0), gridCoeff);
-
-#endif
-
-	outPosition = fragmentPosition;
-}
-
-)SRC";
-
 e2::LightweightModel::LightweightModel()
 	: e2::ShaderModel()
 {
@@ -267,7 +32,7 @@ e2::LightweightModel::~LightweightModel()
 		if (m_pipelineCache[i].pipeline)
 			e2::destroy(m_pipelineCache[i].pipeline);
 	}
-	e2::destroy(m_sampler);
+
 	e2::destroy(m_proxyUniformBuffers[0]);
 	e2::destroy(m_proxyUniformBuffers[1]);
 	e2::destroy(m_descriptorPool);
@@ -283,8 +48,10 @@ void e2::LightweightModel::postConstruct(e2::Context* ctx)
 	e2::DescriptorSetLayoutCreateInfo setLayoutCreateInfo{};
 	setLayoutCreateInfo.bindings = {
 		{ e2::DescriptorBindingType::UniformBuffer , 1}, // ubo params
-		{ e2::DescriptorBindingType::Texture, 1}, // texture
-		{ e2::DescriptorBindingType::Sampler, 1}, // sampler
+		{ e2::DescriptorBindingType::Texture, 1}, // albedoTexture
+		{ e2::DescriptorBindingType::Texture, 1}, // normalTexture
+		{ e2::DescriptorBindingType::Texture, 1}, // roughnessTexture
+		{ e2::DescriptorBindingType::Texture, 1}, // metalnessTexture
 	};
 	m_descriptorSetLayout = renderContext()->createDescriptorSetLayout(setLayoutCreateInfo);
 
@@ -303,8 +70,7 @@ void e2::LightweightModel::postConstruct(e2::Context* ctx)
 
 	e2::DescriptorPoolCreateInfo poolCreateInfo{};
 	poolCreateInfo.maxSets = e2::maxNumLightweightProxies * 2;
-	poolCreateInfo.numTextures = e2::maxNumLightweightProxies * 2 * 1;
-	poolCreateInfo.numSamplers = e2::maxNumLightweightProxies * 2 * 1;
+	poolCreateInfo.numTextures = e2::maxNumLightweightProxies * 2 * 4;
 	poolCreateInfo.numUniformBuffers = e2::maxNumLightweightProxies * 2 * 1;
 	m_descriptorPool = mainThreadContext()->createDescriptorPool(poolCreateInfo);
 
@@ -316,21 +82,47 @@ void e2::LightweightModel::postConstruct(e2::Context* ctx)
 	m_proxyUniformBuffers[0] = renderContext()->createDataBuffer(bufferCreateInfo);
 	m_proxyUniformBuffers[1] = renderContext()->createDataBuffer(bufferCreateInfo);
 
-	e2::SamplerCreateInfo samplerInfo{};
-	samplerInfo.filter = SamplerFilter::Anisotropic;
-	samplerInfo.wrap = SamplerWrap::Clamp;
-	m_sampler = renderContext()->createSampler(samplerInfo);
 }
 
 e2::MaterialProxy* e2::LightweightModel::createMaterialProxy(e2::Session* session, e2::MaterialPtr material)
 {
 	e2::LightweightProxy *newProxy = e2::create<e2::LightweightProxy>(session, material);
 
+	newProxy->alphaClip = material->hasDefine("ALPHACLIP");
+	newProxy->doubleSided = material->hasDefine("DOUBLESIDED");
+
+	auto albedoAsset = material->getTexture("albedo", nullptr);
+	if(albedoAsset)
+		newProxy->albedoTexture.set(albedoAsset->handle());
+
+	auto normalAsset = material->getTexture("normal", nullptr);
+	if(normalAsset)
+		newProxy->normalTexture.set(normalAsset->handle());
+
+	auto roughnessAsset = material->getTexture("roughness", nullptr);
+	if(roughnessAsset)
+		newProxy->roughnessTexture.set(roughnessAsset->handle());
+	
+	auto metalnessAsset = material->getTexture("metalness", nullptr);
+	if(metalnessAsset)
+		newProxy->metalnessTexture.set(metalnessAsset->handle());
+
 	for (uint8_t i = 0; i < 2; i++)
 	{
 		newProxy->sets[i] = m_descriptorPool->createDescriptorSet(m_descriptorSetLayout);
 		newProxy->sets[i]->writeUniformBuffer(0, m_proxyUniformBuffers[i], sizeof(e2::LightweightData), renderManager()->paddedBufferSize(sizeof(e2::LightweightData)) * newProxy->id);
-		newProxy->sets[i]->writeSampler(2, m_sampler);
+
+		if(newProxy->albedoTexture.data())
+			newProxy->sets[i]->writeTexture(1, newProxy->albedoTexture.data());
+
+		if (newProxy->normalTexture.data())
+			newProxy->sets[i]->writeTexture(2, newProxy->normalTexture.data());
+
+		if (newProxy->roughnessTexture.data())
+			newProxy->sets[i]->writeTexture(3, newProxy->roughnessTexture.data());
+
+		if (newProxy->metalnessTexture.data())
+			newProxy->sets[i]->writeTexture(4, newProxy->metalnessTexture.data());
 	}
 
 	e2::LightweightData newData;
@@ -347,6 +139,36 @@ e2::IPipelineLayout* e2::LightweightModel::getOrCreatePipelineLayout(e2::MeshPro
 
 e2::IPipeline* e2::LightweightModel::getOrCreatePipeline(e2::MeshProxy* proxy, uint8_t submeshIndex, e2::RendererFlags rendererFlags)
 {
+
+	if (!m_shadersReadFromDisk)
+	{
+		m_shadersOnDiskOK = true;
+
+		if (!e2::readFileWithIncludes("shaders/lightweight/lightweight.vertex.glsl", m_vertexSource))
+		{
+			m_shadersOnDiskOK = false;
+			LogError("failed to read vertex source from disk");
+		}
+
+		if (!e2::readFileWithIncludes("shaders/lightweight/lightweight.fragment.glsl", m_fragmentSource))
+		{
+			m_shadersOnDiskOK = false;
+			LogError("failed to read fragment source from disk");
+		}
+
+		m_shadersReadFromDisk = true;
+	}
+
+	if (!m_shadersOnDiskOK)
+	{
+		return nullptr;
+	}
+
+
+
+
+
+
 	e2::SubmeshSpecification const &spec = proxy->asset->specification(submeshIndex);
 	e2::LightweightProxy* lwProxy = static_cast<e2::LightweightProxy*>(proxy->materialProxies[submeshIndex]);
 
@@ -354,7 +176,22 @@ e2::IPipeline* e2::LightweightModel::getOrCreatePipeline(e2::MeshProxy* proxy, u
 	
 	uint16_t materialFlags = 0;
 	if (lwProxy->albedoTexture.data())
-		materialFlags |= uint16_t(e2::LightweightFlags::Albedo);
+		materialFlags |= uint16_t(e2::LightweightFlags::AlbedoTexture);
+
+	if (lwProxy->normalTexture.data())
+		materialFlags |= uint16_t(e2::LightweightFlags::NormalTexture);
+
+	if (lwProxy->roughnessTexture.data())
+		materialFlags |= uint16_t(e2::LightweightFlags::RoughnessTexture);
+
+	if (lwProxy->metalnessTexture.data())
+		materialFlags |= uint16_t(e2::LightweightFlags::MetalnessTexture);
+
+	if (lwProxy->alphaClip)
+		materialFlags |= uint16_t(e2::LightweightFlags::AlphaClip);
+
+	if (lwProxy->doubleSided)
+		materialFlags |= uint16_t(e2::LightweightFlags::DoubleSided);
 
 	uint16_t lwFlagsInt = (geometryFlags << (uint16_t)e2::LightweightFlags::VertexFlagsOffset)
 		| (uint16_t(rendererFlags) << (uint16_t)e2::LightweightFlags::RendererFlagsOffset)
@@ -384,23 +221,46 @@ e2::IPipeline* e2::LightweightModel::getOrCreatePipeline(e2::MeshProxy* proxy, u
 	if ((lwFlags & e2::LightweightFlags::Skin) == e2::LightweightFlags::Skin)
 		shaderInfo.defines.push({ "Renderer_Skin", "1" });
 
-	if ((lwFlags & e2::LightweightFlags::Albedo) == e2::LightweightFlags::Albedo)
-		shaderInfo.defines.push({"Material_Albedo", "1"});
+	if ((lwFlags & e2::LightweightFlags::AlbedoTexture) == e2::LightweightFlags::AlbedoTexture)
+		shaderInfo.defines.push({"Material_AlbedoTexture", "1"});
+
+	if ((lwFlags & e2::LightweightFlags::RoughnessTexture) == e2::LightweightFlags::RoughnessTexture)
+		shaderInfo.defines.push({ "Material_RoughnessTexture", "1" });
+
+	if ((lwFlags & e2::LightweightFlags::MetalnessTexture) == e2::LightweightFlags::MetalnessTexture)
+		shaderInfo.defines.push({ "Material_MetalnessTexture", "1" });
+
+	if ((lwFlags & e2::LightweightFlags::NormalTexture) == e2::LightweightFlags::NormalTexture)
+		shaderInfo.defines.push({ "Material_NormalTexture", "1" });
+
+	if ((lwFlags & e2::LightweightFlags::AlphaClip) == e2::LightweightFlags::AlphaClip)
+		shaderInfo.defines.push({ "Material_AlphaClip", "1" });
+
+	if ((lwFlags & e2::LightweightFlags::DoubleSided) == e2::LightweightFlags::DoubleSided)
+		shaderInfo.defines.push({ "Material_DoubleSided", "1" });
 
 	shaderInfo.stage = ShaderStage::Vertex;
-	shaderInfo.source = vertexSource;
+	shaderInfo.source = m_vertexSource.c_str();
 	newEntry.vertexShader = renderContext()->createShader(shaderInfo);
 
 	shaderInfo.stage = ShaderStage::Fragment;
-	shaderInfo.source = fragmentSource;
+	shaderInfo.source = m_fragmentSource.c_str();
 	newEntry.fragmentShader = renderContext()->createShader(shaderInfo);
 
-	e2::PipelineCreateInfo pipelineInfo;
-	pipelineInfo.layout = m_pipelineLayout;
-	pipelineInfo.shaders = { newEntry.vertexShader, newEntry.fragmentShader };
-	pipelineInfo.colorFormats = { e2::TextureFormat::RGBA8,  e2::TextureFormat::RGBA32 };
-	pipelineInfo.depthFormat = { e2::TextureFormat::D32 };
-	newEntry.pipeline = renderContext()->createPipeline(pipelineInfo);
+	if (newEntry.vertexShader && newEntry.fragmentShader && newEntry.vertexShader->valid() && newEntry.fragmentShader->valid())
+	{
+		e2::PipelineCreateInfo pipelineInfo;
+		pipelineInfo.layout = m_pipelineLayout;
+		pipelineInfo.shaders = { newEntry.vertexShader, newEntry.fragmentShader };
+		pipelineInfo.colorFormats = { e2::TextureFormat::RGBA8, e2::TextureFormat::RGBA32 };
+		pipelineInfo.depthFormat = { e2::TextureFormat::D32 };
+		newEntry.pipeline = renderContext()->createPipeline(pipelineInfo);
+	}
+	else
+	{
+		LogError("shader compilation failed for the given bitflags: {:b}", lwFlagsInt);
+	}
+
 
 	m_pipelineCache[uint16_t(lwFlags)] = newEntry;
 	return newEntry.pipeline;
@@ -408,6 +268,13 @@ e2::IPipeline* e2::LightweightModel::getOrCreatePipeline(e2::MeshProxy* proxy, u
 
 void e2::LightweightModel::invalidatePipelines()
 {
+
+	m_shadersReadFromDisk = false;
+	m_shadersOnDiskOK = false;
+	m_vertexSource.clear();
+	m_fragmentSource.clear();
+
+
 	for (uint16_t i = 0; i < uint16_t(e2::LightweightFlags::Count); i++)
 	{
 		e2::LightweightCacheEntry& entry = m_pipelineCache[i];
@@ -424,6 +291,7 @@ void e2::LightweightModel::invalidatePipelines()
 			e2::discard(entry.pipeline);
 		entry.pipeline = nullptr;
 	}
+
 }
 
 e2::LightweightProxy::LightweightProxy(e2::Session* inSession, e2::MaterialPtr materialAsset)
@@ -466,5 +334,23 @@ void e2::LightweightProxy::invalidate(uint8_t frameIndex)
 		e2::ITexture* tex = albedoTexture.data();
 		if(tex)
 			sets[frameIndex]->writeTexture(1, tex);
+	}
+	if (normalTexture.invalidate(frameIndex))
+	{
+		e2::ITexture* tex = normalTexture.data();
+		if (tex)
+			sets[frameIndex]->writeTexture(2, tex);
+	}
+	if (roughnessTexture.invalidate(frameIndex))
+	{
+		e2::ITexture* tex = roughnessTexture.data();
+		if (tex)
+			sets[frameIndex]->writeTexture(3, tex);
+	}
+	if (metalnessTexture.invalidate(frameIndex))
+	{
+		e2::ITexture* tex = metalnessTexture.data();
+		if (tex)
+			sets[frameIndex]->writeTexture(4, tex);
 	}
 }

@@ -1,0 +1,3 @@
+source SM_PalmTree004.fbx 
+material M_PalmTree_Trunk assets/environment/trees/M_PalmTree_Trunk.e2a
+material M_PalmTree_Leaf assets/environment/trees/M_PalmTree_Leaf.e2a

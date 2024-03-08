@@ -38,7 +38,6 @@ bool e2::Texture2D::read(Buffer& source)
 
 	source >> m_resolution;
 
-	bool loadMips = false;
 	bool generateMips = true;
 	if (version >= e2::AssetVersion::AddMipsToTexture)
 	{
@@ -46,7 +45,6 @@ bool e2::Texture2D::read(Buffer& source)
 		source >> m_mipLevels;
 		source >> genmips8;
 		generateMips = genmips8 != 0;
-		loadMips = true;
 	}
 	else
 	{
@@ -67,7 +65,7 @@ bool e2::Texture2D::read(Buffer& source)
 	m_texture = renderContext()->createTexture(createInfo);
 
 
-	if (loadMips)
+	if (!generateMips)
 	{
 		glm::uvec2 res = m_resolution;
 		for (uint8_t i = 0; i < m_mipLevels; i++)

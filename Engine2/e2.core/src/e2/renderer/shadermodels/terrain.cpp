@@ -32,7 +32,7 @@ e2::TerrainModel::~TerrainModel()
 		if (m_pipelineCache[i].pipeline)
 			e2::destroy(m_pipelineCache[i].pipeline);
 	}
-	e2::destroy(m_sampler);
+
 	e2::destroy(m_proxyUniformBuffers[0]);
 	e2::destroy(m_proxyUniformBuffers[1]);
 	e2::destroy(m_descriptorPool);
@@ -48,18 +48,12 @@ void e2::TerrainModel::postConstruct(e2::Context* ctx)
 	e2::DescriptorSetLayoutCreateInfo setLayoutCreateInfo{};
 	setLayoutCreateInfo.bindings = {
 		{ e2::DescriptorBindingType::UniformBuffer , 1}, // ubo params
-		{ e2::DescriptorBindingType::Sampler, 1}, // sampler
-		{ e2::DescriptorBindingType::Texture, 1}, // irr
-		{ e2::DescriptorBindingType::Texture, 1}, // rad
 		{ e2::DescriptorBindingType::Texture, 1}, // mountainAlbedo
 		{ e2::DescriptorBindingType::Texture, 1}, // mountainNormal
-		{ e2::DescriptorBindingType::Texture, 1}, // fieldsAlbedo
-		{ e2::DescriptorBindingType::Texture, 1}, // fieldsNormal
 		{ e2::DescriptorBindingType::Texture, 1}, // sandAlbedo
 		{ e2::DescriptorBindingType::Texture, 1}, // sandNormal
 		{ e2::DescriptorBindingType::Texture, 1}, // greenAlbedo
 		{ e2::DescriptorBindingType::Texture, 1}, // greenNormal
-		{ e2::DescriptorBindingType::Texture, 1}, // visibilitymask
 		
 	};
 	m_descriptorSetLayout = renderContext()->createDescriptorSetLayout(setLayoutCreateInfo);
@@ -79,8 +73,7 @@ void e2::TerrainModel::postConstruct(e2::Context* ctx)
 
 	e2::DescriptorPoolCreateInfo poolCreateInfo{};
 	poolCreateInfo.maxSets = e2::maxNumTerrainProxies * 2;
-	poolCreateInfo.numTextures = e2::maxNumTerrainProxies * 2 * 4;
-	poolCreateInfo.numSamplers = e2::maxNumTerrainProxies * 2 * 1;
+	poolCreateInfo.numTextures = e2::maxNumTerrainProxies * 2 * 6;
 	poolCreateInfo.numUniformBuffers = e2::maxNumTerrainProxies * 2 * 1;
 	m_descriptorPool = mainThreadContext()->createDescriptorPool(poolCreateInfo);
 
@@ -92,11 +85,6 @@ void e2::TerrainModel::postConstruct(e2::Context* ctx)
 	m_proxyUniformBuffers[0] = renderContext()->createDataBuffer(bufferCreateInfo);
 	m_proxyUniformBuffers[1] = renderContext()->createDataBuffer(bufferCreateInfo);
 
-	e2::SamplerCreateInfo samplerInfo{};
-	samplerInfo.filter = SamplerFilter::Anisotropic;
-	samplerInfo.wrap = SamplerWrap::Repeat;
-	m_sampler = renderContext()->createSampler(samplerInfo);
-
 	//std::string cubemapName = "assets/lakeside_4k.e2a";
 	//std::string cubemapName = "assets/the_sky_is_on_fire_4k.e2a";
 	//std::string cubemapName = "assets/studio_small_03_4k.e2a";
@@ -104,42 +92,26 @@ void e2::TerrainModel::postConstruct(e2::Context* ctx)
 	std::string mountainAlbedoPath = "assets/Landscape_albedo_srgb.e2a";
 	std::string mountainNormalPath = "assets/Landscape_normal_linear.e2a";
 
-	std::string fieldsAlbedoPath = "assets/Fields_albedo_srgb.e2a";
-	std::string fieldsNormalPath = "assets/Fields_normal_linear.e2a";
-
 	std::string sandAlbedoPath = "assets/T_SandDesert_Albedo.e2a";
 	std::string sandNormalPath = "assets/T_SandDesert_Normal.e2a";
 
 	std::string greenAlbedoPath = "assets/T_Greenlands_Albedo.e2a";
 	std::string greenNormalPath = "assets/T_Greenlands_Normal.e2a";
 
-	std::string irrName = "assets/kloofendal_irr.e2a";
-	std::string radName = "assets/kloofendal_rad.e2a";
-
 	e2::ALJDescription aljDesc;
 	assetManager()->prescribeALJ(aljDesc, mountainAlbedoPath);
 	assetManager()->prescribeALJ(aljDesc, mountainNormalPath);
-	assetManager()->prescribeALJ(aljDesc, fieldsAlbedoPath);
-	assetManager()->prescribeALJ(aljDesc, fieldsNormalPath);
 	assetManager()->prescribeALJ(aljDesc, sandAlbedoPath);
 	assetManager()->prescribeALJ(aljDesc, sandNormalPath);
 	assetManager()->prescribeALJ(aljDesc, greenAlbedoPath);
 	assetManager()->prescribeALJ(aljDesc, greenNormalPath);
-	assetManager()->prescribeALJ(aljDesc, irrName);
-	assetManager()->prescribeALJ(aljDesc, radName);
 	assetManager()->queueWaitALJ(aljDesc);
 
-	m_irradianceCube = assetManager()->get(irrName).cast<e2::Texture2D>();
-	m_radianceCube = assetManager()->get(radName).cast<e2::Texture2D>();
 	m_mountainAlbedo = assetManager()->get(mountainAlbedoPath).cast<e2::Texture2D>();
 	m_mountainNormal = assetManager()->get(mountainNormalPath).cast<e2::Texture2D>();
 
 	m_sandAlbedo = assetManager()->get(sandAlbedoPath).cast<e2::Texture2D>();
 	m_sandNormal = assetManager()->get(sandNormalPath).cast<e2::Texture2D>();
-
-	m_fieldsAlbedo = assetManager()->get(fieldsAlbedoPath).cast<e2::Texture2D>();
-	m_fieldsNormal = assetManager()->get(fieldsNormalPath).cast<e2::Texture2D>();
-
 
 	m_greenAlbedo = assetManager()->get(greenAlbedoPath).cast<e2::Texture2D>();
 	m_greenNormal = assetManager()->get(greenNormalPath).cast<e2::Texture2D>();
@@ -153,21 +125,15 @@ e2::MaterialProxy* e2::TerrainModel::createMaterialProxy(e2::Session* session, e
 	{
 		newProxy->sets[i] = m_descriptorPool->createDescriptorSet(m_descriptorSetLayout);
 		newProxy->sets[i]->writeUniformBuffer(0, m_proxyUniformBuffers[i], sizeof(e2::TerrainData), renderManager()->paddedBufferSize(sizeof(e2::TerrainData)) * newProxy->id);
-		newProxy->sets[i]->writeSampler(1, m_sampler);
-		newProxy->sets[i]->writeTexture(2, m_irradianceCube->handle());
-		newProxy->sets[i]->writeTexture(3, m_radianceCube->handle());
 
-		newProxy->sets[i]->writeTexture(4, m_mountainAlbedo->handle());
-		newProxy->sets[i]->writeTexture(5, m_mountainNormal->handle());
+		newProxy->sets[i]->writeTexture(1, m_mountainAlbedo->handle());
+		newProxy->sets[i]->writeTexture(2, m_mountainNormal->handle());
 
-		newProxy->sets[i]->writeTexture(6, m_fieldsAlbedo->handle());
-		newProxy->sets[i]->writeTexture(7, m_fieldsNormal->handle());
-
-		newProxy->sets[i]->writeTexture(8, m_sandAlbedo->handle());
-		newProxy->sets[i]->writeTexture(9, m_sandNormal->handle());
+		newProxy->sets[i]->writeTexture(3, m_sandAlbedo->handle());
+		newProxy->sets[i]->writeTexture(4, m_sandNormal->handle());
 		
-		newProxy->sets[i]->writeTexture(10, m_greenAlbedo->handle());
-		newProxy->sets[i]->writeTexture(11, m_greenNormal->handle());
+		newProxy->sets[i]->writeTexture(5, m_greenAlbedo->handle());
+		newProxy->sets[i]->writeTexture(6, m_greenNormal->handle());
 
 	}
 
@@ -325,12 +291,5 @@ void e2::TerrainProxy::invalidate(uint8_t frameIndex)
 	{
 		uint32_t proxyOffset = renderManager()->paddedBufferSize(sizeof(TerrainData)) * id;
 		model->m_proxyUniformBuffers[frameIndex]->upload(reinterpret_cast<uint8_t const*>(&uniformData.data()), sizeof(TerrainData), 0, proxyOffset);
-	}
-
-	if (visibilityMask.invalidate(frameIndex))
-	{
-		e2::ITexture* tex = visibilityMask.data();
-		if (tex)
-			sets[frameIndex]->writeTexture(12, tex);
 	}
 }

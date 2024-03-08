@@ -7,6 +7,7 @@
 
 #include "editor/importers/meshimporter.hpp"
 #include "editor/importers/textureimporter.hpp"
+#include "editor/importers/materialimporter.hpp"
 
 #include <filesystem>
 
@@ -45,13 +46,17 @@ void e2::AssetBrowser::update(e2::UIContext* ui, double seconds)
 		{
 			std::string ext = e2::toLower(std::filesystem::path(file).extension().string());
 
-			if (ext == ".fbx")
+			if (ext == ".mesh" || ext == ".fbx" || ext == ".lods")
 			{
-				editor()->spawnMeshImporter(file);
+				e2::MeshImportConfig cfg;
+				cfg.input = file;
+				cfg.outputDirectory = std::format(".{}", m_path->fullPath());
+				e2::MeshImporter* newImporter = e2::create<e2::MeshImporter>(editor(), cfg);
+				editor()->oneShotImporter(newImporter);
 			}
 			else if (ext == ".mips" || ext == ".png" || ext == ".tga" || ext == ".jpg" || ext == ".jpeg" || ext == ".hdr")
 			{
-				// We dont have options or UI for the texture import, so can just import inline 
+
 				e2::TextureImportConfig cfg;
 				cfg.input = file;
 				cfg.outputDirectory = std::format(".{}", m_path->fullPath());
@@ -60,7 +65,19 @@ void e2::AssetBrowser::update(e2::UIContext* ui, double seconds)
 				{
 					LogError("Failed to import file: {} to location {}", cfg.input, cfg.outputDirectory);
 				}
-				e2::destroy(newImporter);
+				editor()->oneShotImporter(newImporter);
+			}
+			else if (ext == ".material")
+			{
+				e2::MaterialImportConfig cfg;
+				cfg.input = file;
+				cfg.outputDirectory = std::format(".{}", m_path->fullPath());
+				e2::MaterialImporter* newImporter = e2::create<e2::MaterialImporter>(editor(), cfg);
+				if (!newImporter->writeAssets())
+				{
+					LogError("Failed to import file: {} to location {}", cfg.input, cfg.outputDirectory);
+				}
+				editor()->oneShotImporter(newImporter);
 			}
 		}
 

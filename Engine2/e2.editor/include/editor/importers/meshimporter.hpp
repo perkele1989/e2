@@ -26,6 +26,8 @@ namespace e2
 	{
 		std::string input;
 		std::string outputDirectory{"./assets/"};
+
+		std::unordered_map<std::string, std::string> materialMappings;
 	};
 
 	enum ImportAttributeMode : uint32_t
@@ -58,9 +60,7 @@ namespace e2
 		std::map<std::string, uint32_t> boneMap;
 
 		std::string materialName;
-		ImportMaterialMode materialMode{ IMM_New };
 		e2::UUID existingMaterialUUID;
-		std::string newMaterialName;
 
 		// this includes tangents
 		bool hasNormals{};

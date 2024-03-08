@@ -12,6 +12,7 @@
 #include "game/militaryunit.hpp"
 
 #include <glm/gtx/intersect.hpp>
+#include <glm/gtx/vector_angle.hpp>
 
 e2::Game::Game(e2::Context* ctx)
 	: e2::Application(ctx)
@@ -32,10 +33,22 @@ void e2::Game::initialize()
 
 	e2::ALJDescription alj;
 	am->prescribeALJ(alj, "assets/UI_ResourceIcons.e2a");
-	am->prescribeALJ(alj, "assets/SM_PalmTree001.e2a");
+	am->prescribeALJ(alj, "assets/environment/trees/SM_PalmTree001.e2a");
+	am->prescribeALJ(alj, "assets/environment/trees/SM_PalmTree002.e2a");
+	am->prescribeALJ(alj, "assets/environment/trees/SM_PalmTree003.e2a");
+	am->prescribeALJ(alj, "assets/environment/trees/SM_PalmTree004.e2a");
+
+	am->prescribeALJ(alj, "assets/kloofendal_irr.e2a");
+	am->prescribeALJ(alj, "assets/kloofendal_rad.e2a");
+
 	am->queueWaitALJ(alj);
 	m_uiTextureResources = am->get("assets/UI_ResourceIcons.e2a").cast<e2::Texture2D>();
-	m_cursorMesh = am->get("assets/SM_PalmTree001.e2a").cast<e2::Mesh>();
+	m_cursorMesh = am->get("assets/environment/trees/SM_PalmTree001.e2a").cast<e2::Mesh>();
+
+	m_irradianceMap = am->get("assets/kloofendal_irr.e2a").cast<e2::Texture2D>();
+	m_radianceMap = am->get("assets/kloofendal_rad.e2a").cast<e2::Texture2D>();
+
+	m_session->renderer()->setEnvironment(m_irradianceMap->handle(), m_radianceMap->handle());
 
 	e2::MeshProxyConfiguration proxyConf;
 	proxyConf.mesh = m_cursorMesh;
@@ -64,6 +77,8 @@ void e2::Game::update(double seconds)
 	e2::UIContext* ui = session->uiContext();
 	auto& kb = ui->keyboardState();
 	auto& mouse = ui->mouseState();
+
+	m_session->renderer()->setEnvironment(m_irradianceMap->handle(), m_radianceMap->handle());
 
 
 
@@ -120,6 +135,7 @@ void e2::Game::update(double seconds)
 
 	updateGameState();
 
+	updateAnimation(seconds);
 
 	m_hexGrid->assertChunksWithinRangeVisible(m_viewOrigin, m_viewPoints, m_viewVelocity);
 
@@ -132,6 +148,7 @@ void e2::Game::update(double seconds)
 
 	drawUI();
 
+	/*
 	if (m_selectedUnit)
 	{
 		int32_t i = 0;
@@ -159,7 +176,7 @@ void e2::Game::update(double seconds)
 			glm::vec3 end = e2::Hex(hexAS->towardsOrigin->index).localCoords();
 			renderer->debugLine({ 1.0, 0.0, 0.0 }, start, end);
 		}
-	}
+	}*/
 
 	//ui->drawTexturedQuad({}, resolution, 0xFFFFFFFF, m_hexGrid->fogOfWarMask());
 
@@ -268,7 +285,7 @@ void e2::Game::updateTurn()
 			return;
 		}
 
-		deselectUnit();
+		moveSelectedUnitTo(m_cursorHex);
 	}
 }
 
@@ -279,7 +296,69 @@ void e2::Game::updateUnitAttack()
 
 void e2::Game::updateUnitMove()
 {
+	// how many hexes per second it moves
+	constexpr float unitMoveSpeed = 2.4f;
+	m_unitMoveDelta += m_timeDelta * unitMoveSpeed;
 
+	auto radiansBetween = [](glm::vec3 const& a, glm::vec3 const & b) -> float {
+
+		glm::vec2 a2 = { a.x, a.z };
+		glm::vec2 b2 = { b.x, b.z };
+		glm::vec2 na = glm::normalize(a2 - b2);
+
+		glm::vec2 nb = glm::normalize(glm::vec2(0.0f, -1.0f));
+
+		return glm::orientedAngle(nb, na);
+	};
+
+	while (m_unitMoveDelta > 1.0f)
+	{
+		m_unitMoveDelta -= 1.0;
+		m_unitMoveIndex++;
+
+		if (m_unitMoveIndex >= m_unitMovePath.size() - 1)
+		{
+			e2::Hex prevHex = m_unitMovePath[m_unitMovePath.size() - 2];
+			e2::Hex finalHex = m_unitMovePath[m_unitMovePath.size() - 1];
+			// we are done
+			m_selectedUnit->rollbackVisibility();
+			m_unitIndex.erase(m_selectedUnit->tileIndex);
+			m_selectedUnit->tileIndex = finalHex.offsetCoords();
+			m_unitIndex[m_selectedUnit->tileIndex] = m_selectedUnit;
+			m_selectedUnit->spreadVisibility();
+
+			
+
+			float angle = radiansBetween(finalHex.localCoords(), prevHex.localCoords());
+			m_selectedUnit->setMeshTransform(finalHex.localCoords(), angle);
+			m_unitAS = e2::PathFindingAccelerationStructure(m_selectedUnit);
+			m_hexGrid->clearOutline();
+			for (auto& [coords, hexAS] : m_unitAS.hexIndex)
+			{
+				m_hexGrid->pushOutline(coords);
+			}
+
+			m_turnState = TurnState::Unlocked;
+
+			return;
+		}
+	}
+
+	e2::Hex currHex = m_unitMovePath[m_unitMoveIndex];
+	e2::Hex nextHex = m_unitMovePath[m_unitMoveIndex +1];
+
+	glm::vec3 currHexPos = currHex.localCoords();
+	glm::vec3 nextHexPos = nextHex.localCoords();
+
+	glm::vec3 newPos = glm::mix(currHexPos, nextHexPos, m_unitMoveDelta);
+
+
+	float angle = radiansBetween(nextHexPos, currHexPos);
+	//m_session->uiContext()->drawRasterText(e2::FontFace::Sans, 16, 0xFFFF00FF, { 4.0f, 450.0f }, std::format("Angle: {}", angle));
+	//LogNotice("Angle: {}", angle);
+	//glm::quat rotation = glm::angleAxis(angle, e2::worldUp());
+
+	m_selectedUnit->setMeshTransform(newPos, angle);
 }
 
 void e2::Game::drawUI()
@@ -483,6 +562,26 @@ void e2::Game::deselectUnit()
 	m_hexGrid->clearOutline();
 }
 
+void e2::Game::moveSelectedUnitTo(e2::Hex const& to)
+{
+	if (m_state != GameState::Turn || m_turnState != TurnState::Unlocked || !m_selectedUnit)
+		return;
+
+	if (to.offsetCoords() == m_selectedUnit->tileIndex)
+		return;
+
+	m_unitMovePath = m_unitAS.find(to);
+	if (m_unitMovePath.size() == 0)
+		return;
+
+	m_hexGrid->clearOutline();
+
+	m_turnState = TurnState::UnitAction_Move;
+	m_unitMoveIndex = 0;
+	m_unitMoveDelta = 0.0f;
+	
+}
+
 void e2::Game::updateMainCamera(double seconds)
 {
 	constexpr float moveSpeed = 10.0f;
@@ -667,6 +766,14 @@ void e2::Game::updateAltCamera(double seconds)
 
 }
 
+
+void e2::Game::updateAnimation(double seconds)
+{
+	for (e2::GameUnit* unit : m_units)
+	{
+		unit->updateAnimation(seconds);
+	}
+}
 
 void e2::Game::endTurn()
 {

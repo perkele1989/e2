@@ -18,7 +18,9 @@ namespace e2
 	{
 		Default = 0,
 
-		Water = 1000
+		Water = 1000,
+
+		Fog = 5000
 	};
 
 }

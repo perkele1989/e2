@@ -39,7 +39,7 @@ void main()
     vec4 clipSpace = renderer.projectionMatrix * renderer.viewMatrix * mesh.modelMatrix * vertexPosition;
     clipSpace.xy = clipSpace.xy * 0.5 + 0.5;
 
-    vec2 visibility = texture(sampler2D(visibilityMask, frontBufferSampler), clipSpace.xy).xy;
+    //vec2 visibility = texture(sampler2D(visibilityMask, frontBufferSampler), clipSpace.xy).xy;
     //float time = mix(0.0, renderer.time.x, visibility.x);
     float time = renderer.time.x;
 	vec4 vertexWorld = mesh.modelMatrix * vertexPosition;

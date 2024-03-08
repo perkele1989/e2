@@ -10,18 +10,18 @@
 namespace e2
 {
 	class Editor;
-	class Importer : public e2::UIWindow, public e2::EditorContext
+	class Importer : public e2::EditorContext, public e2::UIWindow
 	{
 	public:
 		Importer(e2::Editor* editor);
 		virtual ~Importer();
 
+		virtual void update(double seconds) override;
+
 		inline virtual e2::Editor* editor() override
 		{
 			return m_editor;
 		}
-
-		virtual void update(double seconds) override;
 
 		virtual e2::Engine* engine() override;
 

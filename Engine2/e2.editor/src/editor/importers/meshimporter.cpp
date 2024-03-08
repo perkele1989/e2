@@ -25,6 +25,39 @@ e2::MeshImporter::MeshImporter(e2::Editor* editor, MeshImportConfig const& confi
 	: e2::Importer(editor)
 	, m_config(config)
 {
+
+	std::filesystem::path inputPath = std::filesystem::path(m_config.input);
+	std::filesystem::path folderPath = inputPath.parent_path();
+
+	if (inputPath.extension() == ".mesh")
+	{
+		std::string linesStr;
+		if (!e2::readFile(m_config.input, linesStr))
+		{
+			LogError("failed to read mesh file");
+			return;
+		}
+		std::vector<std::string> lines = e2::split(linesStr, '\n');
+		for (std::string& l : lines)
+		{
+			std::string trimmed = e2::trim(l);
+			std::vector<std::string> parts = e2::split(trimmed, ' ');
+
+			if (parts.size() < 2)
+				continue;
+
+			std::string cmd = e2::toLower(parts[0]);
+			if (cmd == "source" && parts.size() == 2)
+			{
+				m_config.input = (folderPath / parts[1]).string();
+			}
+			if (cmd == "material" && parts.size() == 3)
+			{
+				m_config.materialMappings[parts[1]] = parts[2];
+			}
+		}
+	}
+
 	std::string inputName = std::filesystem::path(m_config.input).filename().string();
 
 	m_title = std::format("Import {}...##import_mesh_{}", inputName, (uint64_t)this);
@@ -273,11 +306,6 @@ bool e2::MeshImporter::analyze()
 			submesh.assMesh = mesh;
 
 			submesh.materialName = m_mesh.assScene->mMaterials[mesh->mMaterialIndex]->GetName().C_Str();
-			if (!submesh.materialName.starts_with("M_"))
-			{
-				submesh.materialName = "M_" + submesh.materialName;
-			}
-			submesh.newMaterialName = submesh.materialName;
 
 			submesh.hasNormals = mesh->HasNormals() && mesh->HasTangentsAndBitangents();
 			submesh.normalsMode = submesh.hasNormals ? IAM_Import : IAM_Generate;
@@ -334,15 +362,21 @@ bool e2::MeshImporter::writeAssets()
 			e2::ImportSubmesh::IntermediateData& im = submesh.intermediate;
 			aiMesh* sm = submesh.assMesh;
 
-			// Handle material
-			if (submesh.materialMode == IMM_New)
+			auto matFinder = m_config.materialMappings.find(submesh.materialName);
+			if (matFinder == m_config.materialMappings.end())
 			{
-				im.materialUuid = createMaterial(submesh.newMaterialName);
+				im.materialUuid = createMaterial(submesh.materialName);
 			}
 			else
 			{
-				im.materialUuid = submesh.existingMaterialUUID;
+				im.materialUuid = assetManager()->database().entryFromPath(matFinder->second)->uuid;
+				if (!im.materialUuid.valid())
+				{
+					LogError("material mapping for {} pointed to invalid material: {}", submesh.materialName, matFinder->second);
+					return false;
+				}
 			}
+
 			meshHeader.dependencies.push({ im.materialUuid });
 
 			// vertex count
@@ -562,6 +596,13 @@ e2::UUID e2::MeshImporter::createMaterial(std::string const& outName)
 	e2::Buffer materialData;
 	e2::Name shaderModel = "e2::LightweightModel";
 	materialData << shaderModel;
+
+	// numdefines
+	materialData << uint8_t(0);
+	// numvectors 
+	materialData << uint8_t(0);
+	// numtextures
+	materialData << uint8_t(0);
 
 
 	materialHeader.size = materialData.size();

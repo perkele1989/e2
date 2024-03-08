@@ -9,6 +9,7 @@
 #include <e2/dmesh/dmesh.hpp>
 #include <e2/renderer/shadermodels/water.hpp>
 #include <e2/renderer/shadermodels/terrain.hpp>
+#include <e2/renderer/shadermodels/fog.hpp>
 
 #include <vector>
 #include <unordered_map>
@@ -196,6 +197,7 @@ namespace e2
 		// only for visible 
 		e2::MeshProxy* proxy{};
 		e2::MeshProxy* waterProxy{};
+		e2::MeshProxy* fogProxy{};
 
 	};
 
@@ -359,7 +361,11 @@ namespace e2
 		e2::MaterialPtr m_waterMaterial;
 		e2::WaterProxy* m_waterProxy{};
 
+		e2::MaterialPtr m_fogMaterial;
+		e2::FogProxy* m_fogProxy{};
+
 		e2::MeshPtr m_waterChunk;
+		e2::MeshPtr m_fogChunk;
 
 
 		std::vector<glm::ivec2> m_outlineTiles;

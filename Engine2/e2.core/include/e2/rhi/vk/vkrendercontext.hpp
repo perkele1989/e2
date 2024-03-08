@@ -148,7 +148,7 @@ namespace e2
 		e2::RenderCapabilities m_capabilities;
 
 		e2::StackVector<VkThreadLocals, e2::maxPersistentThreads> m_threadLocals;
-		e2::StackVector<VkSampler, 8> m_samplerCache;
+		e2::StackVector<VkSampler, 16> m_samplerCache;
 
 		void transientPrepare(bool blocking, e2::VkThreadLocals &threadLocals);
 		void transientFinalize(bool blocking, e2::VkThreadLocals &threadLocals);

@@ -216,7 +216,8 @@ namespace e2
 		virtual e2::ApplicationType type() override;
 
 
-		e2::MeshImporter* spawnMeshImporter(std::string const& file);
+		void oneShotImporter(e2::Importer* importer);
+
 		void destroyImporter(e2::Importer* importer);
 
 

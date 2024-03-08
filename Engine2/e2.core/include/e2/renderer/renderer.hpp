@@ -158,6 +158,8 @@ namespace e2
 			return m_view;
 		}
 
+		void setEnvironment(e2::ITexture* irradiance, e2::ITexture* radiance);
+
 	protected:
 		e2::Session* m_session{};
 
@@ -194,6 +196,9 @@ namespace e2
 		e2::IShader* m_lineFragmentShader{};
 		e2::IShader* m_lineVertexShader{};
 		e2::IPipeline* m_linePipeline{};
+
+		e2::ITexture* m_irradiance{};
+		e2::ITexture* m_radiance{};
 
 		// @todo set configurable or just change to dynamic because this is debug shit anyway
 		std::vector<Line> m_debugLines;

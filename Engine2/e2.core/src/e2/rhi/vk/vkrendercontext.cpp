@@ -332,7 +332,20 @@ VkSampler e2::IRenderContext_Vk::getOrCreateSampler(e2::SamplerFilter filter, e2
 		createInfo.mipmapMode = (filter == SamplerFilter::Nearest || filter == SamplerFilter::Bilinear) ? VK_SAMPLER_MIPMAP_MODE_NEAREST : VK_SAMPLER_MIPMAP_MODE_LINEAR;
 		createInfo.mipLodBias = 0.0f;
 		createInfo.unnormalizedCoordinates = VK_FALSE;
-		createInfo.addressModeU = createInfo.addressModeV = createInfo.addressModeW = wrap == SamplerWrap::Clamp ? VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE : VK_SAMPLER_ADDRESS_MODE_REPEAT;
+
+		if (wrap == SamplerWrap::Clamp)
+		{
+			createInfo.addressModeU = createInfo.addressModeV = createInfo.addressModeW =  VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+		}
+		else if (wrap == SamplerWrap::Repeat)
+		{
+			createInfo.addressModeU = createInfo.addressModeV = createInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+		}
+		else if (wrap == SamplerWrap::Equirect)
+		{
+			createInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+			createInfo.addressModeV = createInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+		}
 
 		VkResult result = vkCreateSampler(m_vkDevice, &createInfo, nullptr, &m_samplerCache[index]);
 		if (result != VK_SUCCESS)

@@ -41,9 +41,9 @@
 #include "stb_truetype.h"
 // oink oink
 
-#if !defined(E2_DEVELOPMENT)
-#pragma comment(linker, "/SUBSYSTEM:windows /ENTRY:mainCRTStartup")
-#endif
+//#if !defined(E2_DEVELOPMENT)
+//#pragma comment(linker, "/SUBSYSTEM:windows /ENTRY:mainCRTStartup")
+//#endif
 
 e2::Editor::Editor(e2::Context* ctx)
 	: e2::Application(ctx)
@@ -112,7 +112,7 @@ void e2::Editor::initialize()
 		e2::TextureImportConfig config;
 		config.input = "test.png";
 		config.outputDirectory = "./engine/";
-		e2::TextureImporter* newImporter = e2::create < e2::TextureImporter>(this, config);
+		e2::TextureImporter* newImporter = e2::create<e2::TextureImporter>(this, config);
 		newImporter->analyze();
 		newImporter->writeAssets();
 		e2::destroy(newImporter);
@@ -201,14 +201,9 @@ e2::ApplicationType e2::Editor::type()
 	return e2::ApplicationType::Tool;
 }
 
-e2::MeshImporter* e2::Editor::spawnMeshImporter(std::string const& file)
+void e2::Editor::oneShotImporter(e2::Importer* importer)
 {
-	e2::MeshImportConfig config;
-	config.input = file;
-	//config.outputDirectory = "./assets/" + assetBrowser()->currentPath();
-	e2::MeshImporter* newImporter = e2::create<e2::MeshImporter>(this, config);
-	m_importers.insert(newImporter);
-	return newImporter;
+	m_importers.insert(importer);
 }
 
 void e2::Editor::destroyImporter(e2::Importer* importer)

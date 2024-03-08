@@ -76,7 +76,6 @@ namespace e2
 		e2::DirtyParameter<WaterData> uniformData{};
 
 		e2::DirtyParameter<e2::ITexture*> reflectionHdr;
-		e2::DirtyParameter<e2::ITexture*> visibilityMask;
 
 
 	};
@@ -109,7 +108,7 @@ namespace e2
 		// descriptor set layout, and pool for water proxy sets 
 		e2::IDescriptorSetLayout* m_descriptorSetLayout{};
 		e2::IDescriptorPool* m_descriptorPool{};
-		e2::ISampler* m_sampler{};
+
 		e2::Texture2DPtr m_cubemap{};
 
 		e2::StackVector<e2::WaterCacheEntry, uint16_t(e2::WaterFlags::Count)> m_pipelineCache;

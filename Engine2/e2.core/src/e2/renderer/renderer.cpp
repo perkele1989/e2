@@ -31,21 +31,26 @@ static char const* lineVertexSource = R"SRC(
 		vec4 vertexPositions[2];
 	};
 
-	// Begin Set0: Renderer
-	layout(set = 0, binding = 0) uniform RendererData
-	{
-		mat4 viewMatrix;
-		mat4 projectionMatrix;
-		vec4 time; // t, sin(t), cos(t), tan(t)
-	} renderer;
+// Begin Set0: Renderer
+layout(set = 0, binding = 0) uniform RendererData
+{
+    mat4 viewMatrix;
+    mat4 projectionMatrix;
+    vec4 time; // t, sin(t), cos(t), tan(t)
+} renderer;
 
-	layout(set = 0, binding = 1)  uniform texture2D integratedBrdf;
-	layout(set = 0, binding = 2) uniform sampler brdfSampler;
+layout(set = 0, binding = 1) uniform sampler clampSampler;
+layout(set = 0, binding = 2) uniform sampler repeatSampler;
+layout(set = 0, binding = 3) uniform sampler equirectSampler;
+layout(set = 0, binding = 4) uniform texture2D integratedBrdf;
 
-	layout(set = 0, binding = 3)  uniform texture2D frontBufferColor;
-	layout(set = 0, binding = 4)  uniform texture2D frontBufferDepth;
-	layout(set = 0, binding = 5) uniform sampler frontBufferSampler;
-	// End Set0
+layout(set = 0, binding = 5) uniform texture2D irradianceCube;
+layout(set = 0, binding = 6) uniform texture2D radianceCube;
+
+layout(set = 0, binding = 7) uniform texture2D frontBufferColor;
+layout(set = 0, binding = 8) uniform texture2D frontBufferPosition;
+layout(set = 0, binding = 9) uniform texture2D frontBufferDepth;
+// End Set0
 
 	void main()
 	{
@@ -66,21 +71,26 @@ static char const* lineFragmentSource = R"SRC(
 		vec4 vertexPositions[2];
 	};
 
-	// Begin Set0: Renderer
-	layout(set = 0, binding = 0) uniform RendererData
-	{
-		mat4 viewMatrix;
-		mat4 projectionMatrix;
-		vec4 time; // t, sin(t), cos(t), tan(t)
-	} renderer;
+// Begin Set0: Renderer
+layout(set = 0, binding = 0) uniform RendererData
+{
+    mat4 viewMatrix;
+    mat4 projectionMatrix;
+    vec4 time; // t, sin(t), cos(t), tan(t)
+} renderer;
 
-	layout(set = 0, binding = 1)  uniform texture2D integratedBrdf;
-	layout(set = 0, binding = 2) uniform sampler brdfSampler;
+layout(set = 0, binding = 1) uniform sampler clampSampler;
+layout(set = 0, binding = 2) uniform sampler repeatSampler;
+layout(set = 0, binding = 3) uniform sampler equirectSampler;
+layout(set = 0, binding = 4) uniform texture2D integratedBrdf;
 
-	layout(set = 0, binding = 3)  uniform texture2D frontBufferColor;
-	layout(set = 0, binding = 4)  uniform texture2D frontBufferDepth;
-	layout(set = 0, binding = 5) uniform sampler frontBufferSampler;
-	// End Set0
+layout(set = 0, binding = 5) uniform texture2D irradianceCube;
+layout(set = 0, binding = 6) uniform texture2D radianceCube;
+
+layout(set = 0, binding = 7) uniform texture2D frontBufferColor;
+layout(set = 0, binding = 8) uniform texture2D frontBufferPosition;
+layout(set = 0, binding = 9) uniform texture2D frontBufferDepth;
+// End Set0
 
 	out vec4 outColor;
 	out vec4 outPosition;
@@ -117,6 +127,9 @@ e2::Renderer::Renderer(e2::Session* session, glm::uvec2 const& resolution)
 	m_rendererBuffers[0]->upload(reinterpret_cast<uint8_t const*>(&m_rendererData), sizeof(RendererData), 0, 0);
 	m_rendererBuffers[1]->upload(reinterpret_cast<uint8_t const*>(&m_rendererData), sizeof(RendererData), 0, 0);
 
+
+	m_radiance = renderManager()->defaultTexture()->handle();
+	m_irradiance = renderManager()->defaultTexture()->handle();
 
 	// Setup render buffers
 	for (uint8_t i = 0; i < 2; i++)
@@ -173,20 +186,26 @@ e2::Renderer::Renderer(e2::Session* session, glm::uvec2 const& resolution)
 	{
 		uint8_t other_i = i == 0 ? 1 : 0;
 		m_renderBuffers[i].sets[0]->writeUniformBuffer(0, m_rendererBuffers[0], sizeof(RendererData), 0);
-		m_renderBuffers[i].sets[0]->writeTexture(1, renderManager()->integratedBrdf()->handle());
-		m_renderBuffers[i].sets[0]->writeSampler(2, renderManager()->brdfSampler());
-		m_renderBuffers[i].sets[0]->writeTexture(3, m_renderBuffers[other_i].colorTexture);
-		m_renderBuffers[i].sets[0]->writeTexture(4, m_renderBuffers[other_i].positionTexture);
-		m_renderBuffers[i].sets[0]->writeTexture(5, m_renderBuffers[other_i].depthTexture);
-		m_renderBuffers[i].sets[0]->writeSampler(6, renderManager()->frontBufferSampler());
+		m_renderBuffers[i].sets[0]->writeSampler(1, renderManager()->clampSampler());
+		m_renderBuffers[i].sets[0]->writeSampler(2, renderManager()->repeatSampler());
+		m_renderBuffers[i].sets[0]->writeSampler(3, renderManager()->equirectSampler());
+		m_renderBuffers[i].sets[0]->writeTexture(4, renderManager()->integratedBrdf()->handle());
+		m_renderBuffers[i].sets[0]->writeTexture(5, renderManager()->defaultTexture()->handle());
+		m_renderBuffers[i].sets[0]->writeTexture(6, renderManager()->defaultTexture()->handle());
+		m_renderBuffers[i].sets[0]->writeTexture(7, m_renderBuffers[other_i].colorTexture);
+		m_renderBuffers[i].sets[0]->writeTexture(8, m_renderBuffers[other_i].positionTexture);
+		m_renderBuffers[i].sets[0]->writeTexture(9, m_renderBuffers[other_i].depthTexture);
 
 		m_renderBuffers[i].sets[1]->writeUniformBuffer(0, m_rendererBuffers[1], sizeof(RendererData), 0);
-		m_renderBuffers[i].sets[1]->writeTexture(1, renderManager()->integratedBrdf()->handle());
-		m_renderBuffers[i].sets[1]->writeSampler(2, renderManager()->brdfSampler());
-		m_renderBuffers[i].sets[1]->writeTexture(3, m_renderBuffers[other_i].colorTexture);
-		m_renderBuffers[i].sets[1]->writeTexture(4, m_renderBuffers[other_i].positionTexture);
-		m_renderBuffers[i].sets[1]->writeTexture(5, m_renderBuffers[other_i].depthTexture);
-		m_renderBuffers[i].sets[1]->writeSampler(6, renderManager()->frontBufferSampler());
+		m_renderBuffers[i].sets[1]->writeSampler(1, renderManager()->clampSampler());
+		m_renderBuffers[i].sets[1]->writeSampler(2, renderManager()->repeatSampler());
+		m_renderBuffers[i].sets[1]->writeSampler(3, renderManager()->equirectSampler());
+		m_renderBuffers[i].sets[1]->writeTexture(4, renderManager()->integratedBrdf()->handle());
+		m_renderBuffers[i].sets[1]->writeTexture(5, renderManager()->defaultTexture()->handle());
+		m_renderBuffers[i].sets[1]->writeTexture(6, renderManager()->defaultTexture()->handle());
+		m_renderBuffers[i].sets[1]->writeTexture(7, m_renderBuffers[other_i].colorTexture);
+		m_renderBuffers[i].sets[1]->writeTexture(8, m_renderBuffers[other_i].positionTexture);
+		m_renderBuffers[i].sets[1]->writeTexture(9, m_renderBuffers[other_i].depthTexture);
 	}
 
 
@@ -219,7 +238,6 @@ e2::Renderer::Renderer(e2::Session* session, glm::uvec2 const& resolution)
 
 e2::Renderer::~Renderer()
 {
-
 	e2::discard(m_linePipeline);
 	e2::discard(m_lineVertexShader);
 	e2::discard(m_lineFragmentShader);
@@ -265,7 +283,19 @@ void e2::Renderer::recordFrame(double deltaTime)
 	m_rendererData.time.w = glm::tan((float)m_rendererData.time.x);
 	
 	m_rendererBuffers[frameIndex]->upload(reinterpret_cast<uint8_t const*>(&m_rendererData), sizeof(RendererData), 0, 0);
-	
+
+	if (m_irradiance)
+	{
+		m_renderBuffers[0].sets[frameIndex]->writeTexture(5, m_irradiance);
+		m_renderBuffers[1].sets[frameIndex]->writeTexture(5, m_irradiance);
+	}
+
+	if (m_radiance)
+	{
+		m_renderBuffers[0].sets[frameIndex]->writeTexture(6, m_radiance);
+		m_renderBuffers[1].sets[frameIndex]->writeTexture(6, m_radiance);
+	}
+
 	// Begin command buffer
 	buff->beginRecord(true, m_defaultSettings);
 	{
@@ -305,9 +335,6 @@ void e2::Renderer::recordFrame(double deltaTime)
 
 			e2::IDescriptorSet* rendererSet = backBuff.sets[frameIndex];
 
-
-
-
 			buff->useAsAttachment(backBuff.colorTexture);
 			buff->useAsAttachment(backBuff.positionTexture);
 			buff->useAsDepthAttachment(backBuff.depthTexture);
@@ -319,9 +346,6 @@ void e2::Renderer::recordFrame(double deltaTime)
 			buff->useAsDefault(backBuff.colorTexture);
 			buff->useAsDefault(backBuff.positionTexture);
 			buff->useAsDefault(backBuff.depthTexture);
-
-
-
 
 			buff->useAsTransferDst(backBuff.colorTexture);
 			buff->useAsTransferSrc(frontBuff.colorTexture);
@@ -519,6 +543,12 @@ e2::Viewpoints2D const & e2::Renderer::viewpoints() const
 void e2::Renderer::debugLine(glm::vec3 const& color, glm::vec3 const& start, glm::vec3 const& end)
 {
 	m_debugLines.push_back({color, start, end });
+}
+
+void e2::Renderer::setEnvironment(e2::ITexture* irradiance, e2::ITexture* radiance)
+{
+	m_irradiance = irradiance;
+	m_radiance = radiance;
 }
 
 void e2::Renderer::swapRenderBuffers()

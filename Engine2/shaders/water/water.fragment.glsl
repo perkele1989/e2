@@ -15,8 +15,6 @@ out vec4 outPosition;
 
 void main()
 {
-    vec3 visibility = textureLod(sampler2D(visibilityMask, frontBufferSampler), gl_FragCoord.xy / vec2(resolution.x, resolution.y), 0).xyz;
-    //float time = mix(0.0, renderer.time.x, visibility.x);
     float time = renderer.time.x;
 
 	outPosition = fragmentPosition;
@@ -38,23 +36,23 @@ void main()
 	vec3 lightWater = vec3(28.0, 255.0, 255.0) / 255.0;
 	vec3 superLightWater = vec3(1.0, 1.0 ,1.0);//pow(lightWater, vec3(110.1));
 
-	vec3 shoreDark  = pow(darkWater, vec3(1.2));
+	vec3 shoreDark  = pow(darkWater, vec3(1.0));
 	vec3 oceanDark  = pow(darkWater, vec3(2.4));
 
-	//vec3 finalDark = mix(shoreDark, oceanDark, d);
-    vec3 finalDark = oceanDark;
-	//vec3 finalLight = mix(pow(lightWater, vec3(0.4)), lightWater, d);
-    vec3 finalLight = lightWater;
+	vec3 finalDark = mix(shoreDark, oceanDark, d);
+    //vec3 finalDark = oceanDark;
+	vec3 finalLight = mix(pow(lightWater, vec3(0.4)), lightWater, d);
+    //vec3 finalLight = lightWater;
 
 	//vec3 finalLight = lightWater;
 
 	vec3 r = reflect(v, n);
 
-	vec3 hdr = texture(sampler2D(reflectionHdr, genericSampler), equirectangularUv(r)).rgb;
+	vec3 hdr = texture(sampler2D(reflectionHdr, equirectSampler), equirectangularUv(r)).rgb;
 
 
-	vec3 frontBuffer = texture(sampler2D(frontBufferColor, frontBufferSampler), gl_FragCoord.xy / vec2(resolution.x, resolution.y)).rgb;
-	vec3 frontPosition = texture(sampler2D(frontBufferPosition, frontBufferSampler), gl_FragCoord.xy / vec2(resolution.x, resolution.y)).xyz;
+	vec3 frontBuffer = texture(sampler2D(frontBufferColor, clampSampler), gl_FragCoord.xy / vec2(resolution.x, resolution.y)).rgb;
+	vec3 frontPosition = texture(sampler2D(frontBufferPosition, clampSampler), gl_FragCoord.xy / vec2(resolution.x, resolution.y)).xyz;
 
 	float viewDistanceToDepth = distance(frontPosition, fragmentPosition.xyz);
 	float viewDepthCoeff = 1.0 - smoothstep(0.0, 0.2, viewDistanceToDepth);
@@ -64,14 +62,14 @@ void main()
 	float timeSin = (sin(time) * 0.5 + 0.5);
 	float timeSin2 = 1.0 - (sin( (time + timeSin * 0.3) * 1.2) * 0.5 + 0.5);
 
-	float viewDepthCoeffFoam = 1.0 - smoothstep(0.0,  (0.33 + timeSin2 * 0.2 ) * pow((simplex(fragmentPosition.xz * 4.0 + vec2(cos(time * 0.25), sin(time*0.2))) * 0.5 + 0.5), 1.0), viewDistanceToDepth);
+	float viewDepthCoeffFoam = 1.0 - smoothstep(0.0,  (0.33 + timeSin2 * 0.4 ) * pow((simplex(fragmentPosition.xz * 4.0 + vec2(cos(time * 0.25), sin(time*0.2))) * 0.5 + 0.5), 1.0), viewDistanceToDepth);
 
 	vec3 baseColor = mix(finalDark, finalLight,  pow(h, 1.4) * (ndotl * 0.5 + 0.5) );
 	vec3 dimBaseColor = mix(baseColor * frontBuffer, frontBuffer, 0.05);
 	baseColor = mix(baseColor, dimBaseColor, viewDepthCoeff2);
 	//baseColor = mix(baseColor, frontBuffer, viewDepthCoeff);
 	
-    baseColor = mix(baseColor, mix(baseColor, frontBuffer, 0.3), pow(1.0-d, 0.4));
+    baseColor = mix(baseColor, mix(baseColor, frontBuffer, 0.2), pow(1.0-d, 0.4));
 
 	vec3 foamColor = vec3(0.867, 0.89, 0.9);
 	baseColor = mix(baseColor, foamColor, (pow(viewDepthCoeffFoam, 0.25)*0.75));
@@ -89,15 +87,11 @@ void main()
 	// reflection 
 	outColor.rgb += hdr * 0.02;
 
-    float va = smoothstep(0.00, 0.5, visibility.x);
-    float vb = smoothstep(1.0 - 0.5, 1.0 , visibility.x);
-    float vc = va - vb;
 
-    //outColor.rgb = vec3(vc);
-    //outColor.rgb = mix(outColor.rgb, outColor.rgb * 0.05, vc);
+
+    //vec3 visibility = textureLod(sampler2D(visibilityMask, clampSampler), gl_FragCoord.xy / vec2(resolution.x, resolution.y), 0).xyz;
+    //outColor.rgb = fogOfWar(outColor.rgb, fragmentPosition.xyz, visibility, renderer.time.x);
     
-    outColor.rgb = fogOfWar(outColor.rgb, fragmentPosition.xyz, visibility, renderer.time.x);
-    //outColor.rgb = mix()
 
 	// debug normal 
 	//outColor.rgb = clamp(vec3(n.x, n.z, -n.y) * 0.5 + 0.5, vec3(0.0), vec3(1.0));

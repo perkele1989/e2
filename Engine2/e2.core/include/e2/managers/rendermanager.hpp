@@ -105,8 +105,9 @@ namespace e2
 
 		e2::ShaderModel* getShaderModel(e2::Name modelName);
 		
-		e2::ISampler* frontBufferSampler();
-		e2::ISampler* brdfSampler();
+		e2::ISampler* equirectSampler();
+		e2::ISampler* clampSampler();
+		e2::ISampler* repeatSampler();
 		e2::Texture2DPtr integratedBrdf();
 
 		e2::Texture2DPtr defaultTexture();
@@ -128,8 +129,10 @@ namespace e2
 		e2::IRenderContext* m_renderContext{};
 		e2::IThreadContext* m_mainThreadContext{};
 
-		e2::ISampler* m_frontBufferSampler;
-		e2::ISampler* m_brdfSampler;
+		e2::ISampler* m_equirectSampler;
+		e2::ISampler* m_clampSampler;
+		e2::ISampler* m_repeatSampler;
+
 		e2::Texture2DPtr m_integratedBrdf;
 
 		e2::IShader* m_fullscreenTriangleShader{};

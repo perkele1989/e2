@@ -43,7 +43,8 @@ void main()
 #if defined(Vertex_Normals)
 
 	fragmentNormal = normalize(mesh.modelMatrix * normalize(vertexNormal)).xyz;
-	fragmentTangent =  vec4(normalize(mesh.modelMatrix * normalize(vec4(vertexTangent.xyz, 0.0f))).xyz, vertexTangent.w);
+	fragmentTangent.xyz =  normalize(mesh.modelMatrix * normalize(vec4(vertexTangent.xyz, 0.0))).xyz;
+    fragmentTangent.w = vertexTangent.w;
 	//fragmentBitangent = normalize(cross(fragmentNormal.xyz, fragmentTangent.xyz));
 #endif
 

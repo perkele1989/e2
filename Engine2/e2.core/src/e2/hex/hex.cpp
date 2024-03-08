@@ -17,7 +17,6 @@ e2::HexGrid::HexGrid(e2::Context* ctx, e2::GameSession* session)
 	assetManager()->prescribeALJ(aljDesc, "assets/SM_HexBase.e2a");
 	assetManager()->prescribeALJ(aljDesc, "assets/SM_HexBaseHigh.e2a");
 	assetManager()->prescribeALJ(aljDesc, "assets/SM_CoordinateSpace.e2a");
-	assetManager()->prescribeALJ(aljDesc, "assets/SM_PalmTree001.e2a");
 	if (!assetManager()->queueWaitALJ(aljDesc))
 	{
 		LogError("Failed to load hex base mesh");
@@ -82,11 +81,19 @@ e2::HexGrid::HexGrid(e2::Context* ctx, e2::GameSession* session)
 	}
 
 	dynaWater.mergeDuplicateVertices();
+
 	m_waterMaterial = e2::create<e2::Material>();
 	m_waterMaterial->postConstruct(this, {});
 	m_waterMaterial->overrideModel(renderManager()->getShaderModel("e2::WaterModel"));
 	m_waterProxy = m_session->getOrCreateDefaultMaterialProxy(m_waterMaterial)->unsafeCast<e2::WaterProxy>();
 	m_waterChunk = dynaWater.bake(m_waterMaterial, VertexAttributeFlags::None);
+
+
+	m_fogMaterial = e2::create<e2::Material>();
+	m_fogMaterial->postConstruct(this, {});
+	m_fogMaterial->overrideModel(renderManager()->getShaderModel("e2::FogModel"));
+	m_fogProxy = m_session->getOrCreateDefaultMaterialProxy(m_fogMaterial)->unsafeCast<e2::FogProxy>();
+	m_fogChunk = dynaWater.bake(m_fogMaterial, VertexAttributeFlags::None);
 
 	m_terrainMaterial = e2::create<e2::Material>();
 	m_terrainMaterial->postConstruct(this, {});
@@ -265,12 +272,14 @@ namespace
 
 		float eps = 0.1f;
 		float eps2 = eps * 2.0f;
+
 		float hL = sampleHeight(worldPosition - glm::vec2(1.0f, 0.0f) * eps);
 		float hR = sampleHeight(worldPosition + glm::vec2(1.0f, 0.0f) * eps);
-		float hD = sampleHeight(worldPosition - glm::vec2(0.0f, 1.0f) * eps);
-		float hU = sampleHeight(worldPosition + glm::vec2(0.0f, 1.0f) * eps);
+		
+		float hU = sampleHeight(worldPosition - glm::vec2(0.0f, 1.0f) * eps);
+		float hD = sampleHeight(worldPosition + glm::vec2(0.0f, 1.0f) * eps);
 
-		return glm::normalize(glm::vec3(hL - hR, -eps2, hD - hU));
+		return glm::normalize(glm::vec3(hR - hL, -eps2, hD - hU));
 
 	}
 
@@ -298,6 +307,9 @@ namespace
 		vertex->uv01 = { worldVertexPosition, 0.0f, 0.0f };
 		vertex->position.y = sampleHeight(worldVertexPosition);
 		vertex->normal = sampleNormal(worldVertexPosition);
+
+		//vertex->tangent = glm::rotate(glm::quat(1.0f, 0.0f, 0.0f, 0.0f), glm::radians(90.0f), glm::vec3(0.0f, 0.0f, -1.0f)) * vertex->normal;
+		
 
 
 		bool currIsForest = (curr.flags & e2::TileFlags::BiomeMask) == e2::TileFlags::BiomeForest;
@@ -835,13 +847,14 @@ void e2::HexGrid::invalidateFogOfWarRenderTarget(glm::uvec2 const& newResolution
 	renderTargetInfo.colorAttachments[0].target = m_fogOfWarMask[1];
 	m_fogOfWarTarget[1] = renderContext()->createRenderTarget(renderTargetInfo);
 
-	m_waterProxy->visibilityMask.set(m_fogOfWarMask[0]);
-	m_terrainProxy->visibilityMask.set(m_fogOfWarMask[0]);
+	m_fogProxy->visibilityMask.set(m_fogOfWarMask[0]);
+	//m_waterProxy->visibilityMask.set(m_fogOfWarMask[0]);
+	//m_terrainProxy->visibilityMask.set(m_fogOfWarMask[0]);
 
 	m_blurSet[0]->writeTexture(0, m_fogOfWarMask[0]);
 	m_blurSet[1]->writeTexture(0, m_fogOfWarMask[1]);
-	m_blurSet[0]->writeSampler(1, renderManager()->frontBufferSampler());
-	m_blurSet[1]->writeSampler(1, renderManager()->frontBufferSampler());
+	m_blurSet[0]->writeSampler(1, renderManager()->clampSampler());
+	m_blurSet[1]->writeSampler(1, renderManager()->clampSampler());
 
 
 	// outline target
@@ -1421,6 +1434,15 @@ void e2::HexGrid::ensureChunkVisible(e2::ChunkState* state)
 		state->waterProxy->modelMatrix = glm::translate(glm::mat4(1.0f), chunkOffset + glm::vec3(0.0f, 0.1f, 0.0f));
 		state->waterProxy->modelMatrixDirty = { true };
 	}
+	if (!state->fogProxy)
+	{
+		e2::MeshProxyConfiguration fogConf;
+		fogConf.mesh = m_fogChunk;
+
+		state->fogProxy = e2::create<e2::MeshProxy>(m_session, fogConf);
+		state->fogProxy->modelMatrix = glm::translate(glm::mat4(1.0f), chunkOffset + glm::vec3(0.0f, -1.0f, 0.0f));
+		state->fogProxy->modelMatrixDirty = { true };
+	}
 }
 
 void e2::HexGrid::ensureChunkHidden(e2::ChunkState* state)
@@ -1429,6 +1451,11 @@ void e2::HexGrid::ensureChunkHidden(e2::ChunkState* state)
 	{
 		e2::destroy(state->waterProxy);
 		state->waterProxy = nullptr;
+	}
+	if (state->fogProxy)
+	{
+		e2::destroy(state->fogProxy);
+		state->fogProxy = nullptr;
 	}
 	if (state->proxy)
 	{

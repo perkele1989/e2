@@ -32,7 +32,7 @@ e2::WaterModel::~WaterModel()
 		if (m_pipelineCache[i].pipeline)
 			e2::destroy(m_pipelineCache[i].pipeline);
 	}
-	e2::destroy(m_sampler);
+
 	e2::destroy(m_proxyUniformBuffers[0]);
 	e2::destroy(m_proxyUniformBuffers[1]);
 	e2::destroy(m_descriptorPool);
@@ -49,8 +49,6 @@ void e2::WaterModel::postConstruct(e2::Context* ctx)
 	setLayoutCreateInfo.bindings = {
 		{ e2::DescriptorBindingType::UniformBuffer , 1}, // ubo params
 		{ e2::DescriptorBindingType::Texture, 1}, // reflection cubemap
-		{ e2::DescriptorBindingType::Sampler, 1}, // sampler
-		{ e2::DescriptorBindingType::Texture, 1}, // visibilitymask
 	};
 	m_descriptorSetLayout = renderContext()->createDescriptorSetLayout(setLayoutCreateInfo);
 
@@ -70,7 +68,6 @@ void e2::WaterModel::postConstruct(e2::Context* ctx)
 	e2::DescriptorPoolCreateInfo poolCreateInfo{};
 	poolCreateInfo.maxSets = e2::maxNumWaterProxies * 2;
 	poolCreateInfo.numTextures = e2::maxNumWaterProxies * 2 * 1;
-	poolCreateInfo.numSamplers = e2::maxNumWaterProxies * 2 * 1;
 	poolCreateInfo.numUniformBuffers = e2::maxNumWaterProxies * 2 * 1;
 	m_descriptorPool = mainThreadContext()->createDescriptorPool(poolCreateInfo);
 
@@ -81,11 +78,6 @@ void e2::WaterModel::postConstruct(e2::Context* ctx)
 	bufferCreateInfo.type = BufferType::UniformBuffer;
 	m_proxyUniformBuffers[0] = renderContext()->createDataBuffer(bufferCreateInfo);
 	m_proxyUniformBuffers[1] = renderContext()->createDataBuffer(bufferCreateInfo);
-
-	e2::SamplerCreateInfo samplerInfo{};
-	samplerInfo.filter = SamplerFilter::Anisotropic;
-	samplerInfo.wrap = SamplerWrap::Clamp;
-	m_sampler = renderContext()->createSampler(samplerInfo);
 
 	//std::string cubemapName = "assets/lakeside_4k.e2a";
 	//std::string cubemapName = "assets/the_sky_is_on_fire_4k.e2a";
@@ -108,7 +100,6 @@ e2::MaterialProxy* e2::WaterModel::createMaterialProxy(e2::Session* session, e2:
 		newProxy->sets[i] = m_descriptorPool->createDescriptorSet(m_descriptorSetLayout);
 		newProxy->sets[i]->writeUniformBuffer(0, m_proxyUniformBuffers[i], sizeof(e2::WaterData), renderManager()->paddedBufferSize(sizeof(e2::WaterData)) * newProxy->id);
 		newProxy->sets[i]->writeTexture(1, m_cubemap->handle());
-		newProxy->sets[i]->writeSampler(2, m_sampler);
 	}
 
 	e2::WaterData newData;
@@ -279,10 +270,4 @@ void e2::WaterProxy::invalidate(uint8_t frameIndex)
 			sets[frameIndex]->writeTexture(1, tex);
 	}
 
-	if (visibilityMask.invalidate(frameIndex))
-	{
-		e2::ITexture* tex = visibilityMask.data();
-		if (tex)
-			sets[frameIndex]->writeTexture(3, tex);
-	}
 }

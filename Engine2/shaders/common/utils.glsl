@@ -4,6 +4,9 @@ vec2 equirectangularUv(vec3 direction)
     vec2 uv = vec2(atan(direction.z, direction.x), asin(-direction.y));
     uv *= invAtan;
     uv += 0.5;
+
+    uv.y = 1.0 - uv.y;
+
     return uv;
 }
 

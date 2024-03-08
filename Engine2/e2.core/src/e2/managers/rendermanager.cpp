@@ -111,14 +111,19 @@ e2::ShaderModel* e2::RenderManager::getShaderModel(e2::Name modelName)
 	return nullptr;
 }
 
-e2::ISampler* e2::RenderManager::frontBufferSampler()
+e2::ISampler* e2::RenderManager::equirectSampler()
 {
-	return m_frontBufferSampler;
+	return m_equirectSampler;
 }
 
-e2::ISampler* e2::RenderManager::brdfSampler()
+e2::ISampler* e2::RenderManager::clampSampler()
 {
-	return m_brdfSampler;
+	return m_clampSampler;
+}
+
+e2::ISampler* e2::RenderManager::repeatSampler()
+{
+	return m_repeatSampler;
 }
 
 e2::Texture2DPtr e2::RenderManager::integratedBrdf()
@@ -196,15 +201,17 @@ void e2::RenderManager::initialize()
 	m_framePools[1] = m_mainThreadContext->createCommandPool(poolCreateInfo);
 
 	e2::SamplerCreateInfo samplerInfo{};
-	samplerInfo.filter = SamplerFilter::Bilinear;
+	samplerInfo.filter = SamplerFilter::Anisotropic;
 	samplerInfo.wrap = SamplerWrap::Clamp;
-	m_brdfSampler = m_renderContext->createSampler(samplerInfo);
+	m_clampSampler = m_renderContext->createSampler(samplerInfo);
 
-	samplerInfo.filter = SamplerFilter::Bilinear;
-	samplerInfo.wrap = SamplerWrap::Clamp;
-	m_frontBufferSampler = m_renderContext->createSampler(samplerInfo);
+	samplerInfo.filter = SamplerFilter::Anisotropic;
+	samplerInfo.wrap = SamplerWrap::Repeat;
+	m_repeatSampler = m_renderContext->createSampler(samplerInfo);
 
-
+	samplerInfo.filter = SamplerFilter::Anisotropic;
+	samplerInfo.wrap = SamplerWrap::Equirect;
+	m_equirectSampler = m_renderContext->createSampler(samplerInfo);
 
 
 	// Create model pool and sets
@@ -220,19 +227,21 @@ void e2::RenderManager::initialize()
 	e2::DescriptorPoolCreateInfo rendererPoolCreateInfo{};
 	rendererPoolCreateInfo.maxSets = 2 * e2::maxNumSessions * e2::maxNumRenderers;
 	rendererPoolCreateInfo.numUniformBuffers = 2 * e2::maxNumSessions * e2::maxNumRenderers;
-	rendererPoolCreateInfo.numSamplers = 2 * e2::maxNumSessions * e2::maxNumRenderers * 2;
-	rendererPoolCreateInfo.numTextures = 2 * e2::maxNumSessions * e2::maxNumRenderers * 4;
+	rendererPoolCreateInfo.numSamplers = 2 * e2::maxNumSessions * e2::maxNumRenderers * 3;
+	rendererPoolCreateInfo.numTextures = 2 * e2::maxNumSessions * e2::maxNumRenderers * 6;
 	m_rendererPool = mainThreadContext()->createDescriptorPool(rendererPoolCreateInfo);
 
 	e2::DescriptorSetLayoutCreateInfo rendererSetLayoutInfo{};
 	rendererSetLayoutInfo.bindings.push({ e2::DescriptorBindingType::UniformBuffer, 1 });
-	rendererSetLayoutInfo.bindings.push({ e2::DescriptorBindingType::Texture, 1 }); // intmegrated brdf
-	rendererSetLayoutInfo.bindings.push({ e2::DescriptorBindingType::Sampler, 1 }); // Brdf sampler
-
+	rendererSetLayoutInfo.bindings.push({ e2::DescriptorBindingType::Sampler, 1 }); // Clamp sampler
+	rendererSetLayoutInfo.bindings.push({ e2::DescriptorBindingType::Sampler, 1 }); // Repeat sampler
+	rendererSetLayoutInfo.bindings.push({ e2::DescriptorBindingType::Sampler, 1 }); // Equirect sampler
+	rendererSetLayoutInfo.bindings.push({ e2::DescriptorBindingType::Texture, 1 }); // integrated brdf
+	rendererSetLayoutInfo.bindings.push({ e2::DescriptorBindingType::Texture, 1 }); // irradiance 
+	rendererSetLayoutInfo.bindings.push({ e2::DescriptorBindingType::Texture, 1 }); // radiance
 	rendererSetLayoutInfo.bindings.push({ e2::DescriptorBindingType::Texture, 1 }); // frontbuffer color 
 	rendererSetLayoutInfo.bindings.push({ e2::DescriptorBindingType::Texture, 1 }); // frontbuffer position
 	rendererSetLayoutInfo.bindings.push({ e2::DescriptorBindingType::Texture, 1 }); // frontbuffer depth
-	rendererSetLayoutInfo.bindings.push({ e2::DescriptorBindingType::Sampler, 1 }); // frontbuffer sampler
 	m_rendererSetLayout = renderContext()->createDescriptorSetLayout(rendererSetLayoutInfo);
 	
 	e2::PipelineLayoutCreateInfo lineCreateInfo{};
@@ -323,8 +332,9 @@ void e2::RenderManager::shutdown()
 	e2::destroy(m_fullscreenTriangleShader);
 	e2::destroy(m_defaultMaterial);
 
-	e2::destroy(m_frontBufferSampler);
-	e2::destroy(m_brdfSampler);
+	e2::destroy(m_equirectSampler);
+	e2::destroy(m_repeatSampler);
+	e2::destroy(m_clampSampler);
 	m_integratedBrdf = nullptr;
 	m_defaultTexture = nullptr;
 	m_defaultFont[0] = nullptr;

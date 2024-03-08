@@ -26,6 +26,9 @@ namespace e2
 		// Optionally store multiple mips inside Texture2D assets, instead of just a basemip and then generating 
 		AddMipsToTexture,
 
+		// Add params to materiasl
+		AddMaterialParameters,
+
 		// New versions above this line 
 		End,
 		Latest = End - 1

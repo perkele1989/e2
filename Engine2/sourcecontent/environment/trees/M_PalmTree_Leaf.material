@@ -1,0 +1,4 @@
+model e2::LightweightModel
+define ALPHACLIP 1
+define DOUBLESIDED 1
+texture albedo assets/environment/trees/T_PalmTree_Leaf_Albedo.e2a

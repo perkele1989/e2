@@ -246,7 +246,7 @@ e2::MeshPtr e2::DynamicMesh::bake(e2::MaterialPtr material, e2::VertexAttributeF
 		if (hasNormals)
 		{
 			submesh.sourceNormals[vertexCounter] = glm::vec4(vertex.normal, 0.0f);
-			submesh.sourceTangents[vertexCounter] = glm::vec4(vertex.tangent, 0.0f);
+			submesh.sourceTangents[vertexCounter] = glm::vec4(vertex.tangent, vertex.tangentSign);
 		}
 
 		if (hasUv01)

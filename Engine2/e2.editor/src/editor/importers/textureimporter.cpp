@@ -46,6 +46,8 @@ bool e2::TextureImporter::writeAssets()
 	bool srgb = true;
 	bool hdr = false;
 
+	bool doGenMips = false;
+
 	if (inputPath.extension() == ".mips")
 	{
 		std::string linesStr;
@@ -88,6 +90,7 @@ bool e2::TextureImporter::writeAssets()
 
 		hdr = inFileLower.contains("hdr");
 
+		doGenMips = true;
 		mipSources.push_back(m_config.input);
 	}
 	
@@ -116,8 +119,16 @@ bool e2::TextureImporter::writeAssets()
 	glm::uvec2 resolution(x, y);
 	textureData << resolution;
 
-	textureData << uint8_t(mipSources.size());
-	textureData << uint8_t(mipSources.size() == 1);
+	if (doGenMips)
+	{
+		textureData << uint8_t(e2::calculateMipLevels(resolution));
+	}
+	else
+	{
+		textureData << uint8_t(mipSources.size());
+	}
+
+	textureData << (doGenMips ? uint8_t(1) : uint8_t(0));
 
 	textureData << uint8_t(srgb ? e2::TextureFormat::SRGB8A8 : hdr ? e2::TextureFormat::RGBA32 : e2::TextureFormat::RGBA8);
 	
@@ -158,8 +169,6 @@ bool e2::TextureImporter::writeAssets()
 	{
 		assetManager()->database().invalidateAsset(outFile);
 		assetManager()->database().validate(true);
-
-
 
 		return true;
 	}

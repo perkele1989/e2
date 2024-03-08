@@ -64,7 +64,8 @@ namespace e2
 	enum class SamplerWrap : uint8_t
 	{
 		Clamp = 0,
-		Repeat
+		Repeat,
+		Equirect // optimized for equirectangular flat HDR's
 	};
 
 	enum class TextureFormat : uint8_t

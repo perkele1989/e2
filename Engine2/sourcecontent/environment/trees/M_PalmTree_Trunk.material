@@ -1,0 +1,2 @@
+model e2::LightweightModel
+texture albedo assets/environment/trees/T_PalmTree_Trunk_Albedo.e2a
