@@ -176,6 +176,9 @@ namespace e2
 		e2::MeshPtr m_cursorMesh;
 		e2::MeshProxy* m_cursorProxy{};
 
+		bool m_uiHovered{};
+		bool m_viewDragging{};
+
 		// game units 
 		void selectUnit(e2::GameUnit* unit);
 		void deselectUnit();

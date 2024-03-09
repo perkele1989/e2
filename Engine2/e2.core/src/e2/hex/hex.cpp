@@ -588,7 +588,7 @@ void e2::HexGrid::updateStreaming(glm::vec2 const& streamCenter, e2::Viewpoints2
 		}
 	}
 
-	debugDraw();
+	//debugDraw();
 
 }
 
@@ -1122,7 +1122,7 @@ void e2::HexGrid::initializeFogOfWar()
 
 
 
-	m_minimapSize = {256, 220};
+	m_minimapSize = {320, 220};
 	e2::TextureCreateInfo minimapTexInf{};
 	minimapTexInf.initialLayout = e2::TextureLayout::ShaderRead;
 	minimapTexInf.format = TextureFormat::SRGB8A8;

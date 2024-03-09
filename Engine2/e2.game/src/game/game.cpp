@@ -367,6 +367,7 @@ void e2::Game::updateUnitMove()
 
 void e2::Game::drawUI()
 {
+	m_uiHovered = false;
 	drawStatusUI();
 
 	drawUnitUI();
@@ -491,6 +492,10 @@ void e2::Game::drawUnitUI()
 
 	glm::vec2 offset = { winSize.x - width - 16.0f - 256.0f - 16.0f, winSize.y - height - 16.0f };
 
+	if (mouse.position.x > offset.x && mouse.position.x < offset.x + width &&
+		mouse.position.y > offset.y && mouse.position.y < offset.y + height)
+		m_uiHovered = true;
+
 	ui->drawQuadShadow(offset, {width, height}, 8.0f, 0.9f, 4.0f);
 
 	
@@ -499,7 +504,7 @@ void e2::Game::drawUnitUI()
 	std::string str = m_selectedUnit->displayName;
 	ui->drawRasterText(e2::FontFace::Serif, 14, 0xFFFFFFFF, offset + glm::vec2(8.f, 14.f), str);
 
-
+	
 
 }
 
@@ -514,14 +519,32 @@ void e2::Game::drawMinimapUI()
 	e2::IWindow* wnd = session->window();
 	glm::vec2 winSize = wnd->size();
 
-	float width = 256.0f;
-	float height = 220.0f;
+	glm::uvec2 miniSize = m_hexGrid->minimapSize();
 
-	glm::vec2 offset = {  16.0f, winSize.y - height - 16.0f };
+	float width = miniSize.x;
+	float height = miniSize.y;
+
+	glm::vec2 offset = {  16.0f , winSize.y - height - 16.0f };
+
+	bool hovered = !m_viewDragging && 
+		(mouse.relativePosition.x > offset.x && mouse.relativePosition.x < offset.x + width &&
+		mouse.relativePosition.y > offset.y && mouse.relativePosition.y < offset.y + height);
+	if(hovered)
+	{
+		m_uiHovered = true;
+	}
 
 
-	ui->drawQuadShadow(offset, { width, height }, 8.0f, 0.9f, 4.0f);
+	ui->drawQuadShadow(offset- glm::vec2(4.0f, 4.0f), {width + 8.0f, height + 8.0f}, 8.0f, 0.9f, 4.0f);
 	ui->drawTexturedQuad(offset, { width, height }, 0xFFFFFFFF, m_hexGrid->minimapTexture());
+
+	if (hovered && leftMouse.state)
+	{
+		e2::Aabb2D viewBounds = m_hexGrid->viewBounds();
+		glm::vec2 normalizedMouse = (mouse.relativePosition - offset) / glm::vec2(width, height);
+		glm::vec2 worldMouse = viewBounds.min + normalizedMouse * (viewBounds.max - viewBounds.min);
+		m_viewOrigin = worldMouse;
+	}
 }
 
 void e2::Game::drawDebugUI()
@@ -629,9 +652,7 @@ void e2::Game::updateMainCamera(double seconds)
 	m_viewZoom -= float(mouse.scrollOffset) * 0.1f;
 	m_viewZoom = glm::clamp(m_viewZoom, 0.0f, 1.0f);
 
-	float viewFov = glm::mix(65.0f, 45.0f, m_viewZoom);
-	float viewAngle = glm::mix(35.0f, 50.0f, m_viewZoom);
-	float viewDistance = glm::mix(5.0f, 25.0f, m_viewZoom);
+	
 
 	glm::vec2 oldOrigin = m_viewOrigin;
 
@@ -654,25 +675,35 @@ void e2::Game::updateMainCamera(double seconds)
 		m_viewOrigin.y += moveSpeed * seconds;
 	}
 
-	if (leftMouse.pressed)
+	if (leftMouse.pressed && !m_uiHovered)
 	{
 		m_dragView = calculateRenderView(m_viewDragOrigin);
 		// save where in world we pressed
 		m_cursorDragOrigin = m_dragView.unprojectWorldPlane(renderer->resolution(), m_cursorNdc);
 		m_viewDragOrigin = m_viewOrigin;
-		
+		m_viewDragging = true;
 	}
 
 
 	const float dragMultiplier = glm::mix(0.01f, 0.025f, m_viewZoom);
-	if (leftMouse.held && leftMouse.dragDistance > 2.0f)
+	if (leftMouse.state)
 	{
-		glm::vec2 newDrag = m_dragView.unprojectWorldPlane(renderer->resolution(), m_cursorNdc);
-		glm::vec2 dragOffset = newDrag - m_cursorDragOrigin;
-		
+		if (m_viewDragging)
+		{
+			glm::vec2 newDrag = m_dragView.unprojectWorldPlane(renderer->resolution(), m_cursorNdc);
+			glm::vec2 dragOffset = newDrag - m_cursorDragOrigin;
 
-		m_viewOrigin = m_viewDragOrigin - dragOffset;
+			m_viewOrigin = m_viewDragOrigin - dragOffset;
+		}
 	}
+	else
+	{
+		m_viewDragging = false;
+	}
+
+	e2::Aabb2D viewBounds = m_hexGrid->viewBounds();
+	m_viewOrigin.x = glm::clamp(m_viewOrigin.x, viewBounds.min.x, viewBounds.max.x);
+	m_viewOrigin.y = glm::clamp(m_viewOrigin.y, viewBounds.min.y, viewBounds.max.y);
 
 	m_viewVelocity = m_viewOrigin - oldOrigin;
 
@@ -687,8 +718,8 @@ void e2::Game::updateMainCamera(double seconds)
 
 e2::RenderView e2::Game::calculateRenderView(glm::vec2 const &viewOrigin)
 {
-	float viewFov = glm::mix(65.0f, 45.0f, m_viewZoom);
-	float viewAngle = glm::mix(35.0f, 50.0f, m_viewZoom);
+	float viewFov = glm::mix(55.0f, 45.0f, m_viewZoom);
+	float viewAngle = glm::mix(42.5f, 50.0f, m_viewZoom);
 	float viewDistance = glm::mix(5.0f, 25.0f, m_viewZoom);
 
 	glm::quat orientation = glm::rotate(glm::quat(1.0f, 0.0f, 0.0f, 0.0f), glm::radians(viewAngle), { 1.0f, 0.0f, 0.0f });

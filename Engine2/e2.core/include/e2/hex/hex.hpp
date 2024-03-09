@@ -516,7 +516,12 @@ namespace e2
 		e2::IPipeline* m_outlinePipeline{};
 
 
-
+	public:
+		glm::uvec2 const& minimapSize()
+		{
+			return m_minimapSize;
+		}
+	protected:
 		glm::uvec2 m_minimapSize{};
 		e2::IRenderTarget* m_minimapTarget{};
 		e2::ITexture* m_minimapTexture{};
@@ -526,6 +531,11 @@ namespace e2
 
 	public:
 		void updateWorldBounds();
+
+		e2::Aabb2D const& viewBounds()
+		{
+			return m_minimapViewBounds;
+		}
 
 		e2::Aabb2D const& worldBounds()
 		{
