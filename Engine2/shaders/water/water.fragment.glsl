@@ -81,11 +81,13 @@ void main()
 
 	float vdotn = pow(clamp(-dot(v, n), 0.0, 1.0), 4.0);
 
+    float reflCoeff = smoothstep(0.0, 0.35, h);
+
 	// fresnel reflection
-	outColor.rgb += hdr * vdotn * 0.15;
+	outColor.rgb += hdr * vdotn * 0.15 * reflCoeff;
 
 	// reflection 
-	outColor.rgb += hdr * 0.02;
+	outColor.rgb += hdr * 0.02* reflCoeff;
 
 
 
