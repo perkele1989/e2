@@ -141,8 +141,8 @@ namespace e2
 
 	constexpr uint32_t hexChunkResolution = 6;
 
-	constexpr uint32_t maxNumExtraChunks = 128;
-	constexpr uint32_t maxNumChunkStates = 256;
+	constexpr uint32_t maxNumExtraChunks = 256;
+	constexpr uint32_t maxNumChunkStates = 512;
 
 	constexpr uint32_t maxNumChunkLoadTasks = 256;
 	constexpr uint32_t maxNumTreesPerChunk = hexChunkResolution * hexChunkResolution;
@@ -296,6 +296,7 @@ namespace e2
 		std::unordered_set<e2::ChunkState*> m_visibleChunks;
 		std::unordered_set<e2::ChunkState*> m_hiddenChunks;
 		std::unordered_set<e2::ChunkState*> m_chunksInView;
+		std::unordered_set<e2::ChunkState*> m_lookAheadChunks;
 
 
 		void updateStreaming(glm::vec2 const& streamCenter, e2::Viewpoints2D const& newStreamingView, glm::vec2 const& viewVelocity);
@@ -522,6 +523,8 @@ namespace e2
 		// i.e. fog of war, outlines, minimap, etc. 
 		e2::Pair<e2::ICommandBuffer*> m_fogOfWarCommandBuffers{ nullptr };
 
+private:
+	void debugDraw();
 	};
 
 }

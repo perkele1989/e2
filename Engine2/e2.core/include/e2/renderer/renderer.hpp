@@ -79,12 +79,20 @@ namespace e2
 
 	E2_API bool boxRayIntersection2D(Aabb2D box, Ray2D ray);
 
+	struct E2_API ConvexShape2D
+	{
+		e2::StackVector<glm::vec2, 32> points;
+		e2::StackVector<e2::Ray2D, 32> rays;
+	};
+
 	// A flat frustum, it represents the 4 corners of the camera frustum, projected to the flat xz plane at y=0.0
 	// Can be extended to work as a generic 2D convex hull but we dont need that right now 
 	struct E2_API Viewpoints2D
 	{
 		Viewpoints2D();
 		Viewpoints2D(glm::vec2 const& _resolution, e2::RenderView const& _view);
+
+		ConvexShape2D combine(Viewpoints2D const& other);
 
 		union
 		{

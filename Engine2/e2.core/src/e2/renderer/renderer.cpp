@@ -493,7 +493,7 @@ void e2::Renderer::setView(e2::RenderView const& renderView)
 
 glm::mat4 e2::RenderView::calculateViewMatrix() const
 {
-	glm::mat4 translateMatrix = glm::translate(glm::mat4(1.0f), origin);
+	glm::mat4 translateMatrix = glm::translate(glm::identity<glm::mat4>(), origin);
 	glm::mat4 rotateMatrix = glm::mat4_cast(orientation);
 	return glm::inverse(translateMatrix * rotateMatrix);
 }
@@ -576,6 +576,35 @@ e2::Viewpoints2D::Viewpoints2D(glm::vec2 const& _resolution, e2::RenderView cons
 	bottomLeft = view.unprojectWorldPlane(resolution, { -1.0f,  1.0f });
 
 	calculateDerivatives();
+}
+
+e2::ConvexShape2D e2::Viewpoints2D::combine(Viewpoints2D const& other)
+{
+	e2::ConvexShape2D output;
+
+	
+	return output;
+	/*
+
+	// S is the set of points
+	// P will be the set of points which form the convex hull. Final set size is i.
+
+	algorithm jarvis(S) is
+
+	pointOnHull = leftmost point in S // which is guaranteed to be part of the CH(S)
+	i := 0
+	repeat
+		P[i] := pointOnHull
+		endpoint := S[0]      // initial endpoint for a candidate edge on the hull
+		for j from 0 to |S| do
+			// endpoint == pointOnHull is a rare case and can happen only when j == 1 and a better endpoint has not yet been set for the loop
+			if (endpoint == pointOnHull) or (S[j] is on left of line from P[i] to endpoint) then
+				endpoint := S[j]   // found greater left turn, update endpoint
+		i := i + 1
+		pointOnHull = endpoint
+	until endpoint = P[0]      // wrapped around to first hull point
+	
+	*/
 }
 
 e2::Viewpoints2D::Viewpoints2D()

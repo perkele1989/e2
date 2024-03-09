@@ -407,7 +407,7 @@ void e2::HexGrid::updateStreaming(glm::vec2 const& streamCenter, e2::Viewpoints2
 		chunk->inView = false;
 	}
 
-	auto gatherChunkStatesInView = [this](e2::Viewpoints2D const& streamPoints, std::unordered_set<e2::ChunkState*> & outChunks) {
+	auto gatherChunkStatesInView = [this](e2::Viewpoints2D const& streamPoints, std::unordered_set<e2::ChunkState*> & outChunks, bool forLookAhead) {
 		e2::Aabb2D streamAabb = streamPoints.toAabb();
 		glm::ivec2 lowerIndex = chunkIndexFromPlanarCoords(streamAabb.min) - glm::ivec2(1, 1);
 		glm::ivec2 upperIndex = chunkIndexFromPlanarCoords(streamAabb.max);
@@ -421,8 +421,8 @@ void e2::HexGrid::updateStreaming(glm::vec2 const& streamCenter, e2::Viewpoints2
 				if (streamPoints.test(chunkAabb))
 				{
 					e2::ChunkState* newState = getOrCreateChunk(chunkIndex);
-
-					outChunks.insert(newState);
+					if(!forLookAhead || ((!newState->inView) && newState->streamState == StreamState::Poked))
+						outChunks.insert(newState);
 				}
 			}
 		}
@@ -430,7 +430,7 @@ void e2::HexGrid::updateStreaming(glm::vec2 const& streamCenter, e2::Viewpoints2
 
 	// gather all chunks in view, and pop them in if theyre ready, or queue them for streaming
 	m_chunksInView.clear();
-	gatherChunkStatesInView(m_streamingView, m_chunksInView);
+	gatherChunkStatesInView(m_streamingView, m_chunksInView, false);
 	for (e2::ChunkState* chunk : m_chunksInView)
 	{
 		chunk->inView = true;
@@ -438,22 +438,48 @@ void e2::HexGrid::updateStreaming(glm::vec2 const& streamCenter, e2::Viewpoints2
 		if (!chunk->visibilityState)
 			popInChunk(chunk);
 
-		if (chunk->streamState == StreamState::Ready)
-		{
-
-		}
-		else if (chunk->streamState == StreamState::Streaming)
-		{
-
-		}
-		else if (chunk->streamState == StreamState::Queued)
-		{
-		}
-		else if (chunk->streamState == StreamState::Poked)
+		if (chunk->streamState == StreamState::Poked)
 		{
 			queueStreamingChunk(chunk);
 		}
 	}
+
+
+	// gather chunks via trace 
+	constexpr float lookAheadTreshold = 0.1f;
+	const float lookAheadLength = chunkSize().x * 1.5f;
+	constexpr int32_t maxLookaheads = 3;
+
+	glm::vec2 lookDir = glm::normalize(m_streamingViewVelocity);
+	float lookSpeed = glm::length(m_streamingViewVelocity);
+	lookSpeed = glm::clamp(lookSpeed, 0.0f, maxLookaheads * lookAheadTreshold);
+
+
+	m_lookAheadChunks.clear();
+	uint32_t numLookAheads = lookSpeed / lookAheadTreshold;
+	for (uint32_t i = 0; i < numLookAheads; i++)
+	{
+		glm::vec2 lookAheadOffset = lookDir * (lookAheadLength*float(i));
+		e2::Viewpoints2D lookAheadView = m_streamingView;
+		lookAheadView.bottomLeft += lookAheadOffset;
+		lookAheadView.bottomRight += lookAheadOffset;
+		lookAheadView.topLeft += lookAheadOffset;
+		lookAheadView.topRight += lookAheadOffset;
+		lookAheadView.view.origin.x += lookAheadOffset.x;
+		lookAheadView.view.origin.z += lookAheadOffset.y;
+		lookAheadView.calculateDerivatives();
+		gatherChunkStatesInView(lookAheadView, m_lookAheadChunks, true);
+
+		renderer->debugLine({ 1.0f, 0.0f, 1.0f }, lookAheadView.corners[0], lookAheadView.corners[1]);
+		renderer->debugLine({ 1.0f, 0.0f, 1.0f }, lookAheadView.corners[2], lookAheadView.corners[3]);
+		renderer->debugLine({ 1.0f, 0.0f, 1.0f }, lookAheadView.corners[0], lookAheadView.corners[2]);
+		renderer->debugLine({ 1.0f, 0.0f, 1.0f }, lookAheadView.corners[1], lookAheadView.corners[3]);
+
+	}
+
+	// queue look ahead chunks
+	for (e2::ChunkState* chunk : m_lookAheadChunks)
+		queueStreamingChunk(chunk);
 
 	// go through all invalidated chunks(newly fresh steaming), and pop them in in case they arent 
 	for (e2::ChunkState* newChunk : m_invalidatedChunks)
@@ -516,7 +542,7 @@ void e2::HexGrid::updateStreaming(glm::vec2 const& streamCenter, e2::Viewpoints2
 		}
 	}
 
-	// prioritize and cull 
+	// prioritize and cull old chunks
 	int32_t numHidden = m_hiddenChunks.size();
 	int32_t numToCull = numHidden - e2::maxNumExtraChunks;
 	int32_t numToKeep = numHidden - numToCull;
@@ -561,6 +587,8 @@ void e2::HexGrid::updateStreaming(glm::vec2 const& streamCenter, e2::Viewpoints2
 		}
 	}
 
+	debugDraw();
+
 }
 
 
@@ -591,6 +619,7 @@ void e2::HexGrid::nukeChunk(e2::ChunkState* chunk)
 	m_visibleChunks.erase(chunk);
 	m_hiddenChunks.erase(chunk);
 	m_chunksInView.erase(chunk);
+	m_lookAheadChunks.erase(chunk);
 
 	m_chunkIndex.erase(chunk->chunkIndex);
 
@@ -1635,6 +1664,72 @@ void e2::HexGrid::pushOutline(glm::ivec2 const& tile)
 e2::ITexture* e2::HexGrid::outlineTexture()
 {
 	return m_outlineTexture;
+}
+
+void e2::HexGrid::debugDraw()
+{
+	glm::vec3 colorPoked{ 1.0f, 0.0f, 0.0f };
+	glm::vec3 colorQueued{ 1.0f, 1.0f, 0.0f };
+	glm::vec3 colorStreaming{ 0.0f, 1.0f, 0.0f };
+	glm::vec3 colorReady{ 0.0f, 1.0f, 1.0f };
+
+	glm::vec2 _chunkSize = chunkSize();
+	glm::vec3 _chunkSize3{ _chunkSize.x, 0.0f, _chunkSize.y };
+
+	glm::vec2 streamStateSize = _chunkSize * 0.125f;
+	glm::vec2 visibilitySize = _chunkSize * 0.4895f;
+
+	e2::Renderer* renderer = m_session->renderer();
+
+	for (auto& [chunkIndex, chunk] : m_chunkIndex)
+	{
+		e2::StreamState streamState = chunk->streamState;
+		bool inView = chunk->inView;
+
+		glm::vec3 chunkCenter = chunkOffsetFromIndex(chunkIndex) + _chunkSize3 / 2.0f;
+		glm::vec2 chunkCenter2{chunkCenter.x, chunkCenter.z};
+
+		glm::vec2 tl = chunkCenter2 - streamStateSize;
+		glm::vec2 br = chunkCenter2 + streamStateSize;
+		glm::vec2 tr = { br.x, tl.y };
+		glm::vec2 bl = { tl.x, br.y };
+
+
+		glm::vec2 tl2 = chunkCenter2 - visibilitySize;
+		glm::vec2 br2 = chunkCenter2 + visibilitySize;
+		glm::vec2 tr2 = { br2.x, tl2.y };
+		glm::vec2 bl2 = { tl2.x, br2.y };
+
+		glm::vec3 color = streamState == StreamState::Poked ? colorPoked :
+			streamState == StreamState::Queued ? colorQueued :
+			streamState == StreamState::Streaming ? colorStreaming :
+			streamState == StreamState::Ready ? colorReady : colorReady;
+
+		renderer->debugLine(color, tl, tr);
+		renderer->debugLine(color, tr, br);
+		renderer->debugLine(color, br, bl);
+		renderer->debugLine(color, bl, tl);
+
+		glm::vec3 color2{0.05f, 0.05f, 0.05f};
+		if (inView)
+			color2 = {0.65f, 0.65f, 0.65f};
+		renderer->debugLine(color2, tl2, tr2);
+		renderer->debugLine(color2, tr2, br2);
+		renderer->debugLine(color2, br2, bl2);
+		renderer->debugLine(color2, bl2, tl2);
+	}
+
+	renderer->debugLine({1.0f, 1.0f, 1.0f}, m_streamingView.corners[0], m_streamingView.corners[1]);
+	renderer->debugLine({ 1.0f, 1.0f, 1.0f }, m_streamingView.corners[2], m_streamingView.corners[3]);
+	renderer->debugLine({ 1.0f, 1.0f, 1.0f }, m_streamingView.corners[0], m_streamingView.corners[2]);
+	renderer->debugLine({ 1.0f, 1.0f, 1.0f }, m_streamingView.corners[1], m_streamingView.corners[3]);
+
+	e2::StackVector<glm::vec2, 4> p = m_streamingViewAabb.points();
+	renderer->debugLine({ 0.0f, 0.0f, 1.0f }, p[0], p[1]);
+	renderer->debugLine({ 0.0f, 0.0f, 1.0f }, p[1], p[2]);
+	renderer->debugLine({ 0.0f, 0.0f, 1.0f }, p[2], p[3]);
+	renderer->debugLine({ 0.0f, 0.0f, 1.0f }, p[3], p[0]);
+
 }
 
 namespace

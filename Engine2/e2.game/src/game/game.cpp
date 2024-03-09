@@ -593,7 +593,7 @@ void e2::Game::moveSelectedUnitTo(e2::Hex const& to)
 
 void e2::Game::updateMainCamera(double seconds)
 {
-	constexpr float moveSpeed = 10.0f;
+	constexpr float moveSpeed = 50.0f;
 	constexpr float viewSpeed = .3f;
 
 	e2::GameSession* session = gameSession();
