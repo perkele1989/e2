@@ -38,9 +38,9 @@ namespace e2
 		e2::Game* m_game{};
 		e2::MeshProxy* m_proxy{};
 		
-		glm::quat m_rotation;
-		glm::quat m_targetRotation;
-		glm::vec3 m_position;
+		glm::quat m_rotation{};
+		glm::quat m_targetRotation{};
+		glm::vec3 m_position{};
 	};
 }
 

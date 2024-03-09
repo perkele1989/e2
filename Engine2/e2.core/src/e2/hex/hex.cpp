@@ -539,6 +539,7 @@ void e2::HexGrid::updateStreaming(glm::vec2 const& streamCenter, e2::Viewpoints2
 			if (i >= sortedQueued.size())
 				break;
 			startStreamingChunk(sortedQueued[i]);
+			// @todo we need to limit hte queue size 
 		}
 	}
 
@@ -987,7 +988,8 @@ e2::TileData& e2::HexGrid::getTileFromIndex(size_t index)
 
 void e2::HexGrid::clearAllChunks()
 {
-	for (auto [chunkIndex, chunkState] : m_chunkIndex)
+	auto chunkIndexCopy = m_chunkIndex;
+	for (auto [chunkIndex, chunkState] : chunkIndexCopy)
 	{
 		nukeChunk(chunkState);
 	}
@@ -1116,13 +1118,6 @@ void e2::HexGrid::initializeFogOfWar()
 	m_blurSet[0] = m_blurPool->createDescriptorSet(m_blurSetLayout);
 	m_blurSet[1] = m_blurPool->createDescriptorSet(m_blurSetLayout);
 
-	invalidateFogOfWarShaders();
-
-
-
-
-
-
 
 
 
@@ -1150,28 +1145,8 @@ void e2::HexGrid::initializeFogOfWar()
 	minilayInf.pushConstantSize = sizeof(e2::MiniMapConstants);
 	m_minimapPipelineLayout = renderContext()->createPipelineLayout(minilayInf);
 
-	std::string miniSourceData;
-	if (!e2::readFileWithIncludes("shaders/minimap.fragment.glsl", miniSourceData))
-	{
-		LogError("Failed to read shader file.");
-	}
 
-	e2::ShaderCreateInfo miniShdrInf{};
-	miniShdrInf.source = miniSourceData.c_str();
-	miniShdrInf.stage = ShaderStage::Fragment;
-	m_minimapFragmentShader = renderContext()->createShader(miniShdrInf);
-
-	e2::PipelineCreateInfo miniPipeInfo{};
-	miniPipeInfo.shaders.push(renderManager()->fullscreenTriangleShader());
-	miniPipeInfo.shaders.push(m_minimapFragmentShader);
-	miniPipeInfo.colorFormats = { e2::TextureFormat::SRGB8A8 };
-	miniPipeInfo.layout = m_minimapPipelineLayout;
-	m_minimapPipeline = renderContext()->createPipeline(miniPipeInfo);
-
-
-
-
-
+	invalidateFogOfWarShaders();
 
 }
 
@@ -1363,6 +1338,32 @@ void e2::HexGrid::invalidateFogOfWarShaders()
 	pipeInf.layout = m_outlinePipelineLayout;
 	m_outlinePipeline = renderContext()->createPipeline(pipeInf);
 
+
+
+	if (m_minimapFragmentShader)
+		e2::discard(m_minimapFragmentShader);
+
+	if (m_minimapPipeline)
+		e2::discard(m_minimapPipeline);
+
+	std::string miniSourceData;
+	if (!e2::readFileWithIncludes("shaders/minimap.fragment.glsl", miniSourceData))
+	{
+		LogError("Failed to read shader file.");
+	}
+
+	e2::ShaderCreateInfo miniShdrInf{};
+	miniShdrInf.source = miniSourceData.c_str();
+	miniShdrInf.stage = ShaderStage::Fragment;
+	m_minimapFragmentShader = renderContext()->createShader(miniShdrInf);
+
+	e2::PipelineCreateInfo miniPipeInfo{};
+	miniPipeInfo.shaders.push(renderManager()->fullscreenTriangleShader());
+	miniPipeInfo.shaders.push(m_minimapFragmentShader);
+	miniPipeInfo.colorFormats = { e2::TextureFormat::SRGB8A8 };
+	miniPipeInfo.layout = m_minimapPipelineLayout;
+	m_minimapPipeline = renderContext()->createPipeline(miniPipeInfo);
+
 }
 
 void e2::HexGrid::renderFogOfWar()
@@ -1392,7 +1393,7 @@ void e2::HexGrid::renderFogOfWar()
 	for (uint8_t i = 0; i < hexSpec.vertexAttributes.size(); i++)
 		buff->bindVertexBuffer(i, hexSpec.vertexAttributes[i]);
 
-	// additive outline
+	// base
 	for (glm::ivec2 const& hexIndex : m_outlineTiles)
 	{
 		glm::vec3 worldOffset = e2::Hex(hexIndex).localCoords();
@@ -1408,7 +1409,7 @@ void e2::HexGrid::renderFogOfWar()
 		buff->pushConstants(m_outlinePipelineLayout, 0, sizeof(e2::OutlineConstants), reinterpret_cast<uint8_t*>(&outlineConstants));
 		buff->draw(hexSpec.indexCount, 1);
 	}
-	// subtractive step 
+	// subtractive
 	for (glm::ivec2 const& hexIndex : m_outlineTiles)
 	{
 		glm::vec3 worldOffset = e2::Hex(hexIndex).localCoords();
@@ -1426,8 +1427,6 @@ void e2::HexGrid::renderFogOfWar()
 	buff->useAsDefault(m_outlineTexture);
 
 	//fog of war
-
-
 	e2::FogOfWarConstants fogOfWarConstants;
 
 	buff->useAsAttachment(m_fogOfWarMask[0]);
@@ -1439,50 +1438,6 @@ void e2::HexGrid::renderFogOfWar()
 	buff->bindIndexBuffer(hexSpec.indexBuffer);
 	for (uint8_t i = 0; i < hexSpec.vertexAttributes.size(); i++)
 		buff->bindVertexBuffer(i, hexSpec.vertexAttributes[i]);
-
-	/*
-	for (auto pair : m_chunkStates)
-	{
-		glm::ivec2 chunkIndex = pair.first;
-		e2::ChunkState* chunk = pair.second;
-
-		if (!chunk->visible)
-		{
-			continue;
-		}
-
-		glm::ivec2 chunkTileOffset = chunkIndex * glm::ivec2(e2::HexGridChunkResolution);
-
-		glm::mat4 vpMatrix = m_viewpoints.view.calculateProjectionMatrix(m_viewpoints.resolution) * m_viewpoints.view.calculateViewMatrix();
-		// first outlines
-		for (int32_t y = 0; y < e2::HexGridChunkResolution; y++)
-		{
-			for (int32_t x = 0; x < e2::HexGridChunkResolution; x++)
-			{
-				glm::ivec2 worldIndex = chunkTileOffset + glm::ivec2(x, y);
-				auto finder = m_tileIndex.find(worldIndex);
-				if (finder == m_tileIndex.end())
-					continue;
-
-				e2::Hex currentHex(worldIndex);
-				glm::vec3 worldOffset = currentHex.localCoords();
-
-				glm::mat4 transform = glm::identity<glm::mat4>();
-				transform = glm::translate(transform, worldOffset);
-				transform = glm::scale(transform, { 1.15f, 1.15f, 1.15f });
-
-
-				fogOfWarConstants.mvpMatrix = vpMatrix * transform;
-
-				fogOfWarConstants.visibility.x = 0.0f;
-				fogOfWarConstants.visibility.y = 0.0f;
-				fogOfWarConstants.visibility.z = 1.0f;
-
-				buff->pushConstants(m_fogOfWarPipelineLayout, 0, sizeof(e2::FogOfWarConstants), reinterpret_cast<uint8_t*>(&fogOfWarConstants));
-				buff->draw(spec.indexCount, 1);
-			}
-		}
-	}*/
 
 	for (e2::ChunkState* chunk : m_chunksInView)
 	{
@@ -1551,13 +1506,117 @@ void e2::HexGrid::renderFogOfWar()
 	buff->useAsDefault(m_fogOfWarMask[0]);
 
 
+
+
+
+
+
+
+
+
+	// minimap
+
+
+
+
+	// update minimap view bounds 
+	m_minimapViewBounds = m_worldBounds;
+
+	glm::vec2 worldSize = m_minimapViewBounds.max - m_minimapViewBounds.min;
+	glm::vec2 worldOffset = m_minimapViewBounds.min;
+	glm::vec2 worldCenter = worldOffset + worldSize / 2.0f;
+
+	if (worldSize.x < worldSize.y)
+		worldSize.x = (worldSize.x / (worldSize.x / worldSize.y)) * (m_minimapSize.x / m_minimapSize.y);
+	else
+		worldSize.y = (worldSize.y / (worldSize.y / worldSize.x)) * (m_minimapSize.x / m_minimapSize.y);
+
+	worldCenter = worldCenter + m_minimapViewOffset;
+	worldSize = worldSize * m_minimapViewZoom;
+
+	m_minimapViewBounds.min = worldCenter - worldSize / 2.0f;
+	m_minimapViewBounds.max = worldCenter + worldSize / 2.0f;
+
+
+
+
+
+
+
+	e2::MiniMapConstants minimapConstants;
+	minimapConstants.viewCornerTL = m_streamingView.topLeft;
+	minimapConstants.viewCornerTR = m_streamingView.topRight;
+	minimapConstants.viewCornerBL = m_streamingView.bottomLeft;
+	minimapConstants.viewCornerBR = m_streamingView.bottomRight;
+	minimapConstants.resolution = m_minimapSize;
+	/*
+	// set world min and max to discoveredAABB + margin of 1 chunk (so we have space to explore)
+	minimapConstants.worldMin = m_discoveredChunksAABB.min - glm::vec2(chunkSize());
+	minimapConstants.worldMax = m_discoveredChunksAABB.max + glm::vec2(chunkSize());
+
+	// derive size, offset and center variables for later use 
+	glm::vec2 worldSize = minimapConstants.worldMax - minimapConstants.worldMin;
+	glm::vec2 worldOffset = minimapConstants.worldMin;
+	glm::vec2 worldCenter = worldOffset + worldSize / 2.0f;
+
+	// set owrld siize to aspect ratio of minimap texture, make sure to grow it in whatever direction it needs 
+	glm::vec2 minimapSize = m_minimapSize;
+
+	if(worldSize.x < worldSize.y)
+		worldSize.x = (worldSize.x / (worldSize.x / worldSize.y)) * (minimapSize.x / minimapSize.y);
+	else 
+		worldSize.y = (worldSize.y / (worldSize.y / worldSize.x)) * (minimapSize.y / minimapSize.x);
+	*/
+	minimapConstants.worldMin = m_minimapViewBounds.min;
+	minimapConstants.worldMax = m_minimapViewBounds.max;
+
+	buff->useAsAttachment(m_minimapTexture);
+	buff->beginRender(m_minimapTarget);
+	buff->bindPipeline(m_minimapPipeline);
+
+	// Bind vertex states
+	buff->nullVertexLayout();
+
+	buff->pushConstants(m_minimapPipelineLayout, 0, sizeof(e2::MiniMapConstants), reinterpret_cast<uint8_t*>(&minimapConstants));
+	buff->drawNonIndexed(3, 1);
+
+
+	buff->endRender();
+
+	buff->useAsDefault(m_fogOfWarMask[0]);
+
+
+
+
 	buff->endRecord();
 
 	renderManager()->queue(buff, nullptr, nullptr);
 }
 
+void e2::HexGrid::updateWorldBounds()
+{
+	glm::vec2 cs = chunkSize();
+
+	m_worldBounds = m_discoveredChunksAABB;
+	m_worldBounds.min -= cs;
+	m_worldBounds.max += cs;
+}
+
+
 void e2::HexGrid::destroyFogOfWar()
 {
+	if (m_minimapTexture)
+		e2::discard(m_minimapTexture);
+	if (m_minimapTarget)
+		e2::discard(m_minimapTarget);
+	if (m_minimapPipelineLayout)
+		e2::discard(m_minimapPipelineLayout);
+	if (m_minimapPipeline)
+		e2::discard(m_minimapPipeline);
+	if (m_minimapFragmentShader)
+		e2::discard(m_minimapFragmentShader);
+
+
 	if (m_blurSet[0])
 		e2::discard(m_blurSet[0]);
 
@@ -1665,6 +1724,12 @@ e2::ITexture* e2::HexGrid::outlineTexture()
 {
 	return m_outlineTexture;
 }
+
+e2::ITexture* e2::HexGrid::minimapTexture()
+{
+	return m_minimapTexture;
+}
+
 
 void e2::HexGrid::debugDraw()
 {

@@ -244,6 +244,11 @@ namespace e2
 
 	struct MiniMapConstants
 	{
+		glm::vec2 viewCornerTL;
+		glm::vec2 viewCornerTR;
+		glm::vec2 viewCornerBL;
+		glm::vec2 viewCornerBR;
+
 		glm::vec2 worldMin;
 		glm::vec2 worldMax;
 
@@ -441,6 +446,8 @@ namespace e2
 
 		e2::ITexture* outlineTexture();
 
+		e2::ITexture* minimapTexture();
+
 	protected:
 
 		int32_t m_numThreads{4};
@@ -517,7 +524,40 @@ namespace e2
 		e2::IPipelineLayout* m_minimapPipelineLayout{};
 		e2::IPipeline* m_minimapPipeline{};
 
+	public:
+		void updateWorldBounds();
 
+		e2::Aabb2D const& worldBounds()
+		{
+			return m_worldBounds;
+		}
+
+		void minimapZoom(float newZoom)
+		{
+			m_minimapViewZoom = newZoom;
+		}
+
+		float minimapZoom()
+		{
+			return m_minimapViewZoom;
+		}
+
+		glm::vec2 const& minimapOffset()
+		{
+			return m_minimapViewOffset;
+		}
+
+		void minimapOffset(glm::vec2 const& newOffset)
+		{
+			m_minimapViewOffset = newOffset;
+		}
+
+	protected:
+		/** the navigatable world bounds, i.e. discoveryaabb + margin */
+		e2::Aabb2D m_worldBounds{};
+		e2::Aabb2D m_minimapViewBounds{};
+		glm::vec2 m_minimapViewOffset{};
+		float m_minimapViewZoom{ 1.0f };
 
 		// does more than fogofwar, actually renders everything custom this hex grid needs
 		// i.e. fog of war, outlines, minimap, etc. 

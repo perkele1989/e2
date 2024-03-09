@@ -140,7 +140,7 @@ void e2::Game::update(double seconds)
 
 	//m_hexGrid->assertChunksWithinRangeVisible(m_viewOrigin, m_viewPoints, m_viewVelocity);
 	m_hexGrid->updateStreaming(m_viewOrigin, m_viewPoints, m_viewVelocity);
-
+	m_hexGrid->updateWorldBounds();
 	m_hexGrid->renderFogOfWar();
 
 	// ticking session renders renderer too, and blits it to the UI, so we need to do it precisely here (after rendering fog of war and before rendering UI)
@@ -371,6 +371,8 @@ void e2::Game::drawUI()
 
 	drawUnitUI();
 
+	drawMinimapUI();
+
 	drawDebugUI();
 }
 
@@ -499,6 +501,27 @@ void e2::Game::drawUnitUI()
 
 
 
+}
+
+void e2::Game::drawMinimapUI()
+{
+	e2::GameSession* session = gameSession();
+	e2::Renderer* renderer = session->renderer();
+	e2::UIContext* ui = session->uiContext();
+	auto& kb = ui->keyboardState();
+	auto& mouse = ui->mouseState();
+	auto& leftMouse = mouse.buttons[uint16_t(e2::MouseButton::Left)];
+	e2::IWindow* wnd = session->window();
+	glm::vec2 winSize = wnd->size();
+
+	float width = 256.0f;
+	float height = 220.0f;
+
+	glm::vec2 offset = {  16.0f, winSize.y - height - 16.0f };
+
+
+	ui->drawQuadShadow(offset, { width, height }, 8.0f, 0.9f, 4.0f);
+	ui->drawTexturedQuad(offset, { width, height }, 0xFFFFFFFF, m_hexGrid->minimapTexture());
 }
 
 void e2::Game::drawDebugUI()

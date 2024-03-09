@@ -7,17 +7,43 @@ out vec4 outColor;
 // Push constants
 layout(push_constant) uniform ConstantData
 {
+	vec2 viewCornerTL;
+	vec2 viewCornerTR;
+	vec2 viewCornerBL;
+	vec2 viewCornerBR;
+
     vec2 worldMin;
     vec2 worldMax;
 
 	uvec2 resolution;
 };
 
+
+float lineSegment(vec2 p, vec2 a, vec2 b)
+{
+    float renderSize = max(resolution.x, resolution.y);
+    float worldSize = max(worldMax.x - worldMin.x, worldMax.y - worldMin.y);
+
+    float renderThickness = 1.5;
+
+    float worldThickness = (renderThickness / renderSize) * worldSize;
+
+    vec2 pa = p - a;
+    vec2 ba = b - a;
+
+    float h = clamp( dot(pa,ba)/dot(ba,ba), 0.0, 1.0 );
+    // ????????
+    float idk = length(pa - ba*h);
+
+    return 1.0 - clamp(smoothstep(0.0, worldThickness, idk), 0.0, 1.0);
+}
+
 #include <shaders/common/utils.glsl>
 
 void main()
 {
-	vec2 position = inUv;//* zoom;
+    vec2 worldSize = worldMax - worldMin;
+	vec2 position = worldMin + inUv * worldSize;//* zoom;
 
 //	float h = pow(sampleSimplex(position, 0.05), 0.5);
 	
@@ -48,19 +74,25 @@ void main()
 	f = f * g;
 	g = g - f;
 
-	vec3 m_C = vec3(0.25, 0.255, 0.26);
-	vec3 g_C = vec3(0.2, 0.6, 0.05);
-	vec3 s_C = vec3(0.0, 0.1, 0.6);
-	vec3 o_C = vec3(0.0, 0.05, 0.3);
-	vec3 f_C = vec3(0.05, 0.2, 0.01);
+	vec4 m_C = vec4(0.6, 0.6, 0.6, 0.9);
+	vec4 g_C = vec4(0.2, 0.2, 0.2, 0.9);
+	vec4 s_C = vec4(0.2, 0.2, 0.2, 0.1);
+	vec4 o_C = vec4(0.0, 0.0, 0.0, 0.0);
+	vec4 f_C = vec4(0.4, 0.4, 0.4, 0.9);
 
-	outColor.rgb = o_C;
-	outColor.rgb = mix(outColor.rgb, s_C, s);
-	outColor.rgb = mix(outColor.rgb, g_C, g);
-	outColor.rgb = mix(outColor.rgb, m_C, m);
-	outColor.rgb = mix(outColor.rgb, f_C, f);
+	outColor.rgba = o_C;
+	outColor.rgba = mix(outColor.rgba, s_C, s);
+	outColor.rgba = mix(outColor.rgba, g_C, g);
+	outColor.rgba = mix(outColor.rgba, m_C, m);
+	outColor.rgba = mix(outColor.rgba, f_C, f);
+
+    //outColor.rgb = vec3(lineSegment(position, viewCornerTL, viewCornerTR ));
+    outColor.rgba = mix(outColor.rgba, vec4(1.0, 1.0, 1.0, 1.0), lineSegment(position,viewCornerTL, viewCornerTR ));
+    outColor.rgba = mix(outColor.rgba, vec4(1.0, 1.0, 1.0, 1.0), lineSegment(position,viewCornerTR, viewCornerBR ));
+    outColor.rgba = mix(outColor.rgba, vec4(1.0, 1.0, 1.0, 1.0), lineSegment(position,viewCornerBR, viewCornerBL ));
+    outColor.rgba = mix(outColor.rgba, vec4(1.0, 1.0, 1.0, 1.0), lineSegment(position,viewCornerBL, viewCornerTL ));
 
 	//outColor.r = h;
 
-	outColor.a = 1.0;
+	//outColor.a = 1.0;
 }

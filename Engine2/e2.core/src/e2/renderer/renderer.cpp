@@ -578,6 +578,7 @@ e2::Viewpoints2D::Viewpoints2D(glm::vec2 const& _resolution, e2::RenderView cons
 	calculateDerivatives();
 }
 
+
 e2::ConvexShape2D e2::Viewpoints2D::combine(Viewpoints2D const& other)
 {
 	e2::ConvexShape2D output;

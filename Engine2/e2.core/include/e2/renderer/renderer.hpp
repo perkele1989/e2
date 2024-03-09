@@ -58,8 +58,8 @@ namespace e2
 
 	struct Aabb2D
 	{
-		glm::vec2 min;
-		glm::vec2 max;
+		glm::vec2 min{};
+		glm::vec2 max{};
 
 		e2::StackVector<glm::vec2, 4> points();
 
@@ -72,9 +72,9 @@ namespace e2
 	{
 		bool edgeTest(glm::vec2 const& point) const;
 
-		glm::vec2 position;
-		glm::vec2 parallel;
-		glm::vec2 perpendicular;
+		glm::vec2 position{};
+		glm::vec2 parallel{};
+		glm::vec2 perpendicular{};
 	};
 
 	E2_API bool boxRayIntersection2D(Aabb2D box, Ray2D ray);

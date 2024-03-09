@@ -15,10 +15,12 @@ e2::GameUnit::GameUnit(e2::GameContext* ctx, glm::ivec2 const& tile)
 {
 	e2::MeshProxyConfiguration proxyConf{};
 	proxyConf.mesh = game()->cursorMesh();
-	m_proxy = e2::create<e2::MeshProxy>(gameSession(), proxyConf);
-	m_proxy->modelMatrix = glm::translate(glm::mat4(1.0), e2::Hex(tile).localCoords());
-	m_proxy->modelMatrixDirty = true;
+
 	m_position = e2::Hex(tile).localCoords();
+
+	m_proxy = e2::create<e2::MeshProxy>(gameSession(), proxyConf);
+	m_proxy->modelMatrix = glm::translate(glm::identity<glm::mat4>(), e2::Hex(tile).localCoords());
+	m_proxy->modelMatrixDirty = true;
 }
 
 void e2::GameUnit::setMeshTransform(glm::vec3 const& pos, float angle)

@@ -103,6 +103,7 @@ namespace e2
 		void drawUI();
 		void drawStatusUI();
 		void drawUnitUI();
+		void drawMinimapUI();
 		void drawDebugUI();
 
 		void onNewCursorHex();
