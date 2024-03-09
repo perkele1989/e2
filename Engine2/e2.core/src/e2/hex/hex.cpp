@@ -497,50 +497,48 @@ void e2::HexGrid::updateStreaming(glm::vec2 const& streamCenter, e2::Viewpoints2
 			popOutChunk(chunk);
 	}
 
-	// propritize and start stremaing from queue (but only if we have slots )
+	
+	// Proritize queue and then cap its size 
+	glm::vec2 halfChunkSize = chunkSize() / 2.0f;
+
+	std::vector<e2::ChunkState*> sortedQueued;
+	for (e2::ChunkState* queuedChunk : m_queuedChunks)
+	{
+		insert_sorted(sortedQueued, queuedChunk, [this, halfChunkSize](e2::ChunkState* a, e2::ChunkState* b) {
+			// a in view but b is not, then a is always first
+			if (a->inView && !b->inView)
+				return true;
+			// a not in view but b is, then a is always last
+			if (!a->inView && b->inView)
+				return false;
+			// both in view, sort by distance to streaming center 
+			if (a->inView && b->inView)
+			{
+				glm::vec3 ac = chunkOffsetFromIndex(a->chunkIndex) + glm::vec3(halfChunkSize.x, 0.0f, halfChunkSize.y);
+				glm::vec3 bc = chunkOffsetFromIndex(b->chunkIndex) + glm::vec3(halfChunkSize.x, 0.0f, halfChunkSize.y);
+				float ad = glm::distance(ac, glm::vec3(m_streamingCenter.x, 0.0f, m_streamingCenter.y));
+				float bd = glm::distance(bc, glm::vec3(m_streamingCenter.x, 0.0f, m_streamingCenter.y));
+				return ad < bd;
+			}
+
+			// none in view, go by time since they were in view
+			double ageA = a->lastTimeInView.durationSince().seconds();
+			double ageB = b->lastTimeInView.durationSince().seconds();
+
+			return ageA < ageB;
+			});
+	}
+
 	int32_t currStreaming = m_streamingChunks.size();
 	int32_t numFreeSlots = m_numThreads - currStreaming;
-	if (numFreeSlots > 0)
+	constexpr int32_t maxQueued = 32;
+	for (int32_t i = 0; i < sortedQueued.size(); i++)
 	{
-
-		glm::vec2 halfChunkSize = chunkSize() / 2.0f;
-
-
-		std::vector<e2::ChunkState*> sortedQueued;
-		for (e2::ChunkState* queuedChunk : m_queuedChunks)
-		{
-			insert_sorted(sortedQueued, queuedChunk, [this, halfChunkSize](e2::ChunkState* a, e2::ChunkState* b) {
-				// a in view but b is not, then a is always first
-				if (a->inView && !b->inView)
-					return true;
-				// a not in view but b is, then a is always last
-				if (!a->inView && b->inView)
-					return false;
-				// both in view, sort by distance to streaming center 
-				if (a->inView && b->inView)
-				{
-					glm::vec3 ac = chunkOffsetFromIndex(a->chunkIndex) + glm::vec3(halfChunkSize.x, 0.0f, halfChunkSize.y);
-					glm::vec3 bc = chunkOffsetFromIndex(b->chunkIndex) + glm::vec3(halfChunkSize.x, 0.0f, halfChunkSize.y);
-					float ad = glm::distance(ac, glm::vec3(m_streamingCenter.x, 0.0f, m_streamingCenter.y));
-					float bd = glm::distance(bc, glm::vec3(m_streamingCenter.x, 0.0f, m_streamingCenter.y));
-					return ad < bd;
-				}
-
-				// none in view, go by time since they were in view
-				double ageA = a->lastTimeInView.durationSince().seconds();
-				double ageB = b->lastTimeInView.durationSince().seconds();
-
-				return ageA < ageB;
-				});
-		}
-
-		for (int32_t i = 0; i < numFreeSlots; i++)
-		{
-			if (i >= sortedQueued.size())
-				break;
+		// if we are in range of free slots, start streaming from queue
+		if (i < numFreeSlots)
 			startStreamingChunk(sortedQueued[i]);
-			// @todo we need to limit hte queue size 
-		}
+		else if (i > maxQueued)
+			nukeChunk(sortedQueued[i]);
 	}
 
 	// prioritize and cull old chunks
@@ -588,7 +586,7 @@ void e2::HexGrid::updateStreaming(glm::vec2 const& streamCenter, e2::Viewpoints2
 		}
 	}
 
-	//debugDraw();
+	debugDraw();
 
 }
 
