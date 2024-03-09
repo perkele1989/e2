@@ -61,6 +61,10 @@ namespace e2
 		glm::vec2 min;
 		glm::vec2 max;
 
+		e2::StackVector<glm::vec2, 4> points();
+
+		void push(glm::vec2 const& point);
+
 		bool isWithin(glm::vec2 const& point) const;
 	};
 

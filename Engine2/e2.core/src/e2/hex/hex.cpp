@@ -15,6 +15,26 @@ e2::HexGrid::HexGrid(e2::Context* ctx, e2::GameSession* session)
 	m_tiles.reserve(prewarmSize);
 	m_tileIndex.reserve(prewarmSize);
 
+	// max num of threads to use for chunk streaming
+	m_numThreads = std::thread::hardware_concurrency();
+	if (m_numThreads > 1)
+	{
+		if (m_numThreads <= 4)
+			m_numThreads = 2;
+		else if (m_numThreads <= 6)
+			m_numThreads = 4;
+		else if (m_numThreads <= 8)
+			m_numThreads = 6;
+		else if (m_numThreads <= 12)
+			m_numThreads = 10;
+		else if (m_numThreads <= 16)
+			m_numThreads = 14;
+		else
+			m_numThreads = 16;
+	}
+
+
+
 	e2::ALJDescription aljDesc;
 	assetManager()->prescribeALJ(aljDesc, "assets/SM_HexBase.e2a");
 	assetManager()->prescribeALJ(aljDesc, "assets/SM_HexBaseHigh.e2a");
@@ -123,6 +143,19 @@ e2::Engine* e2::HexGrid::engine()
 }
 
 
+
+
+e2::Aabb2D e2::HexGrid::getChunkAabb(glm::ivec2 const& chunkIndex)
+{
+	glm::vec2 _chunkSize = chunkSize();
+	constexpr uint32_t r = e2::hexChunkResolution;
+	glm::vec2 chunkBoundsOffset = e2::Hex(glm::ivec2(chunkIndex.x * r, chunkIndex.y * r)).planarCoords();
+	e2::Aabb2D chunkAabb;
+	chunkAabb.min = chunkBoundsOffset;
+	chunkAabb.max = chunkBoundsOffset + _chunkSize;
+	return chunkAabb;
+}
+
 glm::vec2 e2::HexGrid::chunkSize()
 {
 	return e2::Hex(glm::ivec2(e2::hexChunkResolution)).planarCoords();
@@ -135,7 +168,6 @@ glm::ivec2 e2::HexGrid::chunkIndexFromPlanarCoords(glm::vec2 const& planarCoords
 
 glm::vec3 e2::HexGrid::chunkOffsetFromIndex(glm::ivec2 const& index)
 {
-	
 	return e2::Hex(index * glm::ivec2(e2::hexChunkResolution)).localCoords();
 }
 
@@ -360,7 +392,212 @@ insert_sorted(std::vector<T>& vec, T const& item, Pred pred)
 	);
 }
 
+void e2::HexGrid::updateStreaming(glm::vec2 const& streamCenter, e2::Viewpoints2D const& viewPoints, glm::vec2 const& viewVelocity)
+{
+	e2::Renderer* renderer = m_session->renderer();
+	float viewSpeed = glm::length(viewVelocity);
 
+	m_streamingCenter = streamCenter;
+	m_streamingView = viewPoints;
+	m_streamingViewVelocity= viewVelocity;
+	m_streamingViewAabb = m_streamingView.toAabb();
+
+	for (auto& [chunkIndex, chunk] : m_chunkIndex)
+	{
+		chunk->inView = false;
+	}
+
+	auto gatherChunkStatesInView = [this](e2::Viewpoints2D const& streamPoints, std::unordered_set<e2::ChunkState*> & outChunks) {
+		e2::Aabb2D streamAabb = streamPoints.toAabb();
+		glm::ivec2 lowerIndex = chunkIndexFromPlanarCoords(streamAabb.min) - glm::ivec2(1, 1);
+		glm::ivec2 upperIndex = chunkIndexFromPlanarCoords(streamAabb.max);
+		for (int32_t y = lowerIndex.y - 1; y <= upperIndex.y; y++)
+		{
+			for (int32_t x = lowerIndex.x - 1; x <= upperIndex.x; x++)
+			{
+				glm::ivec2 chunkIndex = glm::ivec2(x, y);
+				e2::Aabb2D chunkAabb = getChunkAabb(chunkIndex);
+
+				if (streamPoints.test(chunkAabb))
+				{
+					e2::ChunkState* newState = getOrCreateChunk(chunkIndex);
+
+					outChunks.insert(newState);
+				}
+			}
+		}
+	};
+
+	// gather all chunks in view, and pop them in if theyre ready, or queue them for streaming
+	m_chunksInView.clear();
+	gatherChunkStatesInView(m_streamingView, m_chunksInView);
+	for (e2::ChunkState* chunk : m_chunksInView)
+	{
+		chunk->inView = true;
+		chunk->lastTimeInView = e2::timeNow();
+		if (!chunk->visibilityState)
+			popInChunk(chunk);
+
+		if (chunk->streamState == StreamState::Ready)
+		{
+
+		}
+		else if (chunk->streamState == StreamState::Streaming)
+		{
+
+		}
+		else if (chunk->streamState == StreamState::Queued)
+		{
+		}
+		else if (chunk->streamState == StreamState::Poked)
+		{
+			queueStreamingChunk(chunk);
+		}
+	}
+
+	// go through all invalidated chunks(newly fresh steaming), and pop them in in case they arent 
+	for (e2::ChunkState* newChunk : m_invalidatedChunks)
+	{
+		if (newChunk->inView)
+			popInChunk(newChunk);
+	}
+	m_invalidatedChunks.clear();
+
+
+	// go through all chunks, check if they arent in view, but are in visible, if so pop them out
+	for (auto& [chunkIndex, chunk] : m_chunkIndex)
+	{
+		if (!chunk->inView && m_visibleChunks.contains(chunk))
+			popOutChunk(chunk);
+	}
+
+	// propritize and start stremaing from queue (but only if we have slots )
+	int32_t currStreaming = m_streamingChunks.size();
+	int32_t numFreeSlots = m_numThreads - currStreaming;
+	if (numFreeSlots > 0)
+	{
+
+		glm::vec2 halfChunkSize = chunkSize() / 2.0f;
+
+
+		std::vector<e2::ChunkState*> sortedQueued;
+		for (e2::ChunkState* queuedChunk : m_queuedChunks)
+		{
+			insert_sorted(sortedQueued, queuedChunk, [this, halfChunkSize](e2::ChunkState* a, e2::ChunkState* b) {
+				// a in view but b is not, then a is always first
+				if (a->inView && !b->inView)
+					return true;
+				// a not in view but b is, then a is always last
+				if (!a->inView && b->inView)
+					return false;
+				// both in view, sort by distance to streaming center 
+				if (a->inView && b->inView)
+				{
+					glm::vec3 ac = chunkOffsetFromIndex(a->chunkIndex) + glm::vec3(halfChunkSize.x, 0.0f, halfChunkSize.y);
+					glm::vec3 bc = chunkOffsetFromIndex(b->chunkIndex) + glm::vec3(halfChunkSize.x, 0.0f, halfChunkSize.y);
+					float ad = glm::distance(ac, glm::vec3(m_streamingCenter.x, 0.0f, m_streamingCenter.y));
+					float bd = glm::distance(bc, glm::vec3(m_streamingCenter.x, 0.0f, m_streamingCenter.y));
+					return ad < bd;
+				}
+
+				// none in view, go by time since they were in view
+				double ageA = a->lastTimeInView.durationSince().seconds();
+				double ageB = b->lastTimeInView.durationSince().seconds();
+
+				return ageA < ageB;
+				});
+		}
+
+		for (int32_t i = 0; i < numFreeSlots; i++)
+		{
+			if (i >= sortedQueued.size())
+				break;
+			startStreamingChunk(sortedQueued[i]);
+		}
+	}
+
+	// prioritize and cull 
+	int32_t numHidden = m_hiddenChunks.size();
+	int32_t numToCull = numHidden - e2::maxNumExtraChunks;
+	int32_t numToKeep = numHidden - numToCull;
+	if (numToCull > 0)
+	{
+
+		glm::vec2 halfChunkSize = chunkSize() / 2.0f;
+
+		std::vector<e2::ChunkState*> sortedQueued;
+		for (e2::ChunkState* queuedChunk : m_hiddenChunks)
+		{
+			insert_sorted(sortedQueued, queuedChunk, [this, halfChunkSize](e2::ChunkState* a, e2::ChunkState* b) {
+				// a in view but b is not, then a is always first
+				if (a->inView && !b->inView)
+					return true;
+				// a not in view but b is, then a is always last
+				if (!a->inView && b->inView)
+					return false;
+				// both in view, sort by distance to streaming center 
+				if (a->inView && b->inView)
+				{
+					glm::vec3 ac = chunkOffsetFromIndex(a->chunkIndex) + glm::vec3(halfChunkSize.x, 0.0f, halfChunkSize.y);
+					glm::vec3 bc = chunkOffsetFromIndex(b->chunkIndex) + glm::vec3(halfChunkSize.x, 0.0f, halfChunkSize.y);
+					float ad = glm::distance(ac, glm::vec3(m_streamingCenter.x, 0.0f, m_streamingCenter.y));
+					float bd = glm::distance(bc, glm::vec3(m_streamingCenter.x, 0.0f, m_streamingCenter.y));
+					return ad < bd;
+				}
+
+				// none in view, go by time since they were in view
+				double ageA = a->lastTimeInView.durationSince().seconds();
+				double ageB = b->lastTimeInView.durationSince().seconds();
+
+				return ageA < ageB;
+				});
+		}
+
+		for (int32_t i = numToKeep; i < numToKeep + numToCull; i++)
+		{
+			if (i >= sortedQueued.size())
+				break;
+			nukeChunk(sortedQueued[i]);
+		}
+	}
+
+}
+
+
+e2::ChunkState* e2::HexGrid::getOrCreateChunk(glm::ivec2 const& index)
+{
+	auto finder = m_chunkIndex.find(index);
+	if (finder == m_chunkIndex.end())
+	{
+		e2::ChunkState* newState = e2::create<e2::ChunkState>();
+		newState->chunkIndex = index;
+
+		m_chunkIndex[index] = newState;
+		m_hiddenChunks.insert(newState);
+
+		return newState;
+	}
+
+	return finder->second;
+}
+
+void e2::HexGrid::nukeChunk(e2::ChunkState* chunk)
+{
+	popOutChunk(chunk);
+
+	m_queuedChunks.erase(chunk);
+	m_streamingChunks.erase(chunk);
+	m_invalidatedChunks.erase(chunk);
+	m_visibleChunks.erase(chunk);
+	m_hiddenChunks.erase(chunk);
+	m_chunksInView.erase(chunk);
+
+	m_chunkIndex.erase(chunk->chunkIndex);
+
+	e2::destroy(chunk);
+}
+
+/*
 void e2::HexGrid::assertChunksWithinRangeVisible(glm::vec2 const& streamCenter, e2::Viewpoints2D const& viewPoints, glm::vec2 const& viewVelocity)
 {
 	auto renderer = m_session->renderer();
@@ -373,7 +610,7 @@ void e2::HexGrid::assertChunksWithinRangeVisible(glm::vec2 const& streamCenter, 
 	glm::ivec2 lowerIndex = chunkIndexFromPlanarCoords(viewpointsAabb.min);
 	glm::ivec2 upperIndex = chunkIndexFromPlanarCoords(viewpointsAabb.max);
 	
-	constexpr bool debugRender = false;
+	constexpr bool debugRender = true;
 
 	if (debugRender)
 	{
@@ -384,12 +621,12 @@ void e2::HexGrid::assertChunksWithinRangeVisible(glm::vec2 const& streamCenter, 
 	}
 
 	// flag all chunks as invisible this frame
-	for (auto [chunkIndex, chunkState] : m_chunkStates)
+	for (auto [chunkIndex, chunkState] : m_chunkIndex)
 	{
 		chunkState->visible = false;
 	}
 
-	glm::vec2 _chunkSize = chunkSize();
+	
 
 	// Setup stream-ahead offsets
 	// --
@@ -430,6 +667,7 @@ void e2::HexGrid::assertChunksWithinRangeVisible(glm::vec2 const& streamCenter, 
 		narrowDownOffset += glm::smoothstep(tresholdMin, tresholdMax, viewVelocity.y) * 4.0f;
 	}
 	
+	glm::vec2 _chunkSize = chunkSize();
 	m_chunkStreamQueue.clear();
 	m_numVisibleChunks = 0;
 	// generate visible chunk indices for this frame
@@ -437,23 +675,13 @@ void e2::HexGrid::assertChunksWithinRangeVisible(glm::vec2 const& streamCenter, 
 	{
 		for (int32_t x = lowerIndex.x-1 - leftOffset; x <= upperIndex.x + rightOffset; x++)
 		{
-			constexpr uint32_t r = e2::hexChunkResolution;
-			glm::vec2 chunkBoundsOffset = e2::Hex(glm::ivec2(x * r, y * r)).planarCoords();
+			//constexpr uint32_t r = e2::hexChunkResolution;
+			//glm::vec2 chunkBoundsOffset = e2::Hex(glm::ivec2(x * r, y * r)).planarCoords();
 
-			e2::Aabb2D chunkAabb;
-			chunkAabb.min = chunkBoundsOffset;
-			chunkAabb.max = chunkBoundsOffset + _chunkSize;
+			e2::Aabb2D chunkAabb = getChunkAabb( glm::ivec2(x, y));
 
-			// points ONLY used for debug rendering!
-			glm::vec2 chunkPoints[4] = {
-				chunkAabb.min,
-				{chunkAabb.max.x, chunkAabb.min.y},
-				chunkAabb.max,
-				{chunkAabb.min.x, chunkAabb.max.y},
-			};
-
+			
 			e2::Aabb2D chunkAabbStream = chunkAabb;
-
 			chunkAabbStream.min = chunkAabbStream.min + glm::vec2(narrowLeftOffset, narrowUpOffset) *_chunkSize;
 			chunkAabbStream.max = chunkAabbStream.max - glm::vec2(narrowRightOffset, narrowDownOffset) * _chunkSize;
 
@@ -462,8 +690,8 @@ void e2::HexGrid::assertChunksWithinRangeVisible(glm::vec2 const& streamCenter, 
 			// check if relevant for streaming or visiblity
 			if (viewPoints.test(chunkAabbStream))
 			{
-				auto finder = m_chunkStates.find({x, y});
-				if (finder == m_chunkStates.end())
+				auto finder = m_chunkIndex.find({x, y});
+				if (finder == m_chunkIndex.end())
 				{
 					debugColor = glm::vec3(1.0f, 1.0f, 0.0f);
 					if (viewSpeed < 2.0f)
@@ -474,32 +702,50 @@ void e2::HexGrid::assertChunksWithinRangeVisible(glm::vec2 const& streamCenter, 
 					});
 				}
 				// state exists, is it relevant for visibility? (narrower check than streaming)
-				else if (viewPoints.test(chunkAabb))
-				{
-					// update last seen
-					e2::ChunkState* state = finder->second;
-					state->visible = true;
-					state->lastVisible = e2::timeNow();
-
-					// if this chunk isnt currently streaming, set it as visible 
-					if (!state->task)
-					{
-						ensureChunkVisible(state);
-						m_numVisibleChunks++;
-					}
-					debugColor = glm::vec3(0.0f, 1.0f, 1.0f);
-				}
 				else
-					debugColor = glm::vec3(1.0f, 0.0f, 1.0f);
+				{
+					e2::ChunkState* state = finder->second;
+					// narrow check and visibility ensure
+					if (viewPoints.test(chunkAabb))
+					{
+						// update last seen
+						state->visible = true;
+						state->lastVisible = e2::timeNow();
+						popInChunk(state);
+						m_numVisibleChunks++;
+
+						debugColor = glm::vec3(0.0f, 1.0f, 1.0f);
+					}
+				}
+				//else
+				//	debugColor = glm::vec3(1.0f, 0.0f, 1.0f);
 			}
 			
 			if (debugRender)
 			{
-				renderer->debugLine(debugColor, chunkPoints[0], chunkPoints[1]);
-				renderer->debugLine(debugColor, chunkPoints[1], chunkPoints[2]);
-				renderer->debugLine(debugColor, chunkPoints[2], chunkPoints[3]);
-				renderer->debugLine(debugColor, chunkPoints[3], chunkPoints[0]);
+				e2::StackVector<glm::vec2, 4> p = chunkAabb.points();
+				renderer->debugLine(debugColor, p[0], p[1]);
+				renderer->debugLine(debugColor, p[1], p[2]);
+				renderer->debugLine(debugColor, p[2], p[3]);
+				renderer->debugLine(debugColor, p[3], p[0]);
 			}
+		}
+	}
+
+	for (auto [chunkIndex, chunkState] : m_chunkIndex)
+	{
+		if (m_chunkStreamQueue.size() + m_numJobsInFlight > m_numThreads)
+			break;
+
+		// we can still not have a task, in case streaming is postponed due to scheduling, so insert here if so
+		if (!chunkState->task && chunkState->wantsStreamJob)
+		{
+			// we have state, we dont have a stream job, but we also dont have mesh, so this got postponed, add it to stream queue
+			insert_sorted(m_chunkStreamQueue, chunkIndex, [&streamCenter](const glm::ivec2& a, const glm::ivec2& b) {
+				float distanceToA = glm::distance(e2::Hex(a * int32_t(e2::hexChunkResolution)).planarCoords(), streamCenter);
+				float distanceToB = glm::distance(e2::Hex(b * int32_t(e2::hexChunkResolution)).planarCoords(), streamCenter);
+				return  distanceToA < distanceToB;
+				});
 		}
 	}
 
@@ -509,7 +755,7 @@ void e2::HexGrid::assertChunksWithinRangeVisible(glm::vec2 const& streamCenter, 
 
 	// Gather all hidden chunks, sort them by lifetime, and nuke excessive
 	m_hiddenChunks.clear();
-	for (auto [chunkIndex, chunkState] : m_chunkStates)
+	for (auto [chunkIndex, chunkState] : m_chunkIndex)
 	{
 		if (chunkState->visible)
 			continue;
@@ -524,7 +770,7 @@ void e2::HexGrid::assertChunksWithinRangeVisible(glm::vec2 const& streamCenter, 
 	uint32_t i = 0;
 	for (e2::ChunkState* state : m_hiddenChunks)
 	{
-		ensureChunkHidden(state);
+		popOutChunk(state);
 
 		// excessive? NUKE!
 		if (i++ >= e2::maxNumExtraChunks)
@@ -532,7 +778,7 @@ void e2::HexGrid::assertChunksWithinRangeVisible(glm::vec2 const& streamCenter, 
 			//LogNotice("Nuking excessive chunk {}", state->chunkIndex);
 			glm::ivec2 index = state->chunkIndex;
 			e2::destroy(state);
-			m_chunkStates.erase(index);
+			m_chunkIndex.erase(index);
 		}
 	}
 
@@ -540,7 +786,7 @@ void e2::HexGrid::assertChunksWithinRangeVisible(glm::vec2 const& streamCenter, 
 	// debug render only!
 	if (debugRender)
 	{
-		for (auto stateIt : m_chunkStates)
+		for (auto stateIt : m_chunkIndex)
 		{
 			auto chunkIndex = stateIt.first;
 			auto chunkState = stateIt.second;
@@ -571,6 +817,13 @@ void e2::HexGrid::assertChunksWithinRangeVisible(glm::vec2 const& streamCenter, 
 				renderer->debugLine(glm::vec3(0.0, 1.0, 0.0), chunkPointsSmall[2], chunkPointsSmall[3]);
 				renderer->debugLine(glm::vec3(0.0, 1.0, 0.0), chunkPointsSmall[3], chunkPointsSmall[0]);
 			}
+			else if(chunkState->wantsStreamJob)
+			{
+				renderer->debugLine(glm::vec3(1.0, 1.0, 0.0), chunkPointsSmall[0], chunkPointsSmall[1]);
+				renderer->debugLine(glm::vec3(1.0, 1.0, 0.0), chunkPointsSmall[1], chunkPointsSmall[2]);
+				renderer->debugLine(glm::vec3(1.0, 1.0, 0.0), chunkPointsSmall[2], chunkPointsSmall[3]);
+				renderer->debugLine(glm::vec3(1.0, 1.0, 0.0), chunkPointsSmall[3], chunkPointsSmall[0]);
+			}
 			else
 			{
 				renderer->debugLine(glm::vec3(1.0, 0.0, 0.0), chunkPointsSmall[0], chunkPointsSmall[1]);
@@ -580,11 +833,8 @@ void e2::HexGrid::assertChunksWithinRangeVisible(glm::vec2 const& streamCenter, 
 			}
 		}
 	}
-
-
-
-	
 }
+*/
 
 float e2::HexGrid::sampleSimplex(glm::vec2 const& position, float scale)
 {
@@ -642,9 +892,29 @@ e2::TileData e2::HexGrid::calculateTileDataForHex(Hex hex)
 
 size_t e2::HexGrid::discover(Hex hex)
 {
+	// there are no checks to see if hex is already discovered, use with care!! 
+#if defined(E2_DEVELOPMENT)
+	if (m_tileIndex.contains(hex))
+	{
+		LogError("DISCOVERING ALREADY DISCOVERED TILE, EXPECT BREAKAGE");
+	}
+#endif
 	m_tiles.push_back(calculateTileDataForHex(hex));
 	m_tileVisibility.push_back(0);
 	m_tileIndex[hex] = m_tiles.size() - 1;
+
+	glm::ivec2 chunkIndex = chunkIndexFromPlanarCoords(hex.planarCoords());
+	auto chunkFinder = m_discoveredChunks.find(chunkIndex);
+	if (chunkFinder == m_discoveredChunks.end())
+	{
+		m_discoveredChunks.insert(chunkIndex);
+		
+		e2::Aabb2D chunkAabb = getChunkAabb(chunkIndex);
+		for (glm::vec2 p : chunkAabb.points())
+			m_discoveredChunksAABB.push(p);
+	}
+	
+
 
 	return m_tiles.size() - 1;
 }
@@ -688,34 +958,27 @@ e2::TileData& e2::HexGrid::getTileFromIndex(size_t index)
 
 void e2::HexGrid::clearAllChunks()
 {
-	for (auto [chunkIndex, chunkState] : m_chunkStates)
+	for (auto [chunkIndex, chunkState] : m_chunkIndex)
 	{
-		ensureChunkHidden(chunkState);
-
-		e2::destroy(chunkState);
+		nukeChunk(chunkState);
 	}
 
-	m_chunkStates.clear();
+	m_chunkIndex.clear();
 }
 
 uint32_t e2::HexGrid::numChunks()
 {
-	return m_chunkStates.size();
+	return m_chunkIndex.size();
 }
 
 uint32_t e2::HexGrid::numVisibleChunks()
 {
-	return m_numVisibleChunks;
+	return m_visibleChunks.size();
 }
 
 uint32_t e2::HexGrid::numJobsInFlight()
 {
-	return m_numJobsInFlight;
-}
-
-uint32_t e2::HexGrid::numChunkMeshes()
-{
-	return m_numChunkMeshes;
+	return m_streamingChunks.size();
 }
 
 double e2::HexGrid::highLoadTime()
@@ -727,44 +990,52 @@ void e2::HexGrid::clearLoadTime()
 {
 	m_highLoadTime = 0.0;
 }
-
+/*
 void e2::HexGrid::prepareChunk(glm::ivec2 const& chunkIndex)
 {
-	// max num of threads to use for chunk streaming
-	uint32_t numThreads = std::thread::hardware_concurrency();
-	if (numThreads <= 4)
-		numThreads = 2;
-	else if (numThreads <= 6)
-		numThreads = 4;
-	else if (numThreads <= 8)
-		numThreads = 6;
-	else
-		numThreads -= 4;
 
-	if (m_numJobsInFlight > numThreads)
+	e2::ChunkState* streamState = nullptr;
+	auto finder = m_chunkIndex.find(chunkIndex);
+	if(finder == m_chunkIndex.end())
+	// create new state if doesnt exist, and make sure its visible (so we get fog and water early as possible at least)
+	{
+		e2::ChunkState* newState = e2::create<e2::ChunkState>();
+		newState->chunkIndex = chunkIndex;
+		newState->wantsStreamJob = true;
+		m_chunkIndex[chunkIndex] = newState;
+		// make sure its visible 		
+		streamState = newState;
+	}
+	else
+	{
+		streamState = finder->second;
+	}
+
+	streamState->visible = true;
+	streamState->lastVisible = e2::timeNow();
+	popInChunk(streamState);
+
+	// early out if we cant stream more right now 
+	if (m_numJobsInFlight > m_numThreads)
 		return;
 
-	//LogNotice("Requesting new world chunk at {}", chunkIndex);
-
-	m_numJobsInFlight++;
-	e2::ChunkState* newState = e2::create<e2::ChunkState>();
-
-	newState->chunkIndex = chunkIndex;
-	newState->task = e2::ChunkLoadTaskPtr::create(this, chunkIndex).cast<e2::AsyncTask>();
-	newState->lastVisible = e2::timeNow();
-	newState->visible = true;
-
-	m_chunkStates[chunkIndex] = newState;
-
-	asyncManager()->enqueue({ newState->task });
+	// enqueue mesh gen for this chunk if needed 
+	if (streamState->wantsStreamJob && !streamState->task)
+	{
+		streamState->task = e2::ChunkLoadTaskPtr::create(this, chunkIndex).cast<e2::AsyncTask>();
+		streamState->wantsStreamJob = false;
+		asyncManager()->enqueue({ streamState->task });
+		m_numJobsInFlight++;
+	}
 }
-
+*/
+/*
 void e2::HexGrid::notifyChunkReady(glm::ivec2 const& chunkIndex, e2::MeshPtr generatedMesh, double ms, e2::StackVector<glm::vec4, e2::maxNumTreesPerChunk>* offsets)
 {
 	m_numJobsInFlight--;
 	// no longer loading for whatever reason
-	auto finder = m_chunkStates.find(chunkIndex);
-	if (finder == m_chunkStates.end())
+	auto finder = m_chunkIndex.find(chunkIndex);
+	if (finder == m_chunkIndex.end())
 	{
 		//LogError("Hardworking task came home to find himself abandoned. {}", chunkIndex);
 		return;
@@ -775,15 +1046,15 @@ void e2::HexGrid::notifyChunkReady(glm::ivec2 const& chunkIndex, e2::MeshPtr gen
 
 	//LogNotice("New world chunk at {}", chunkIndex);
 
-	e2::ChunkState* chunk = m_chunkStates[chunkIndex];
+	e2::ChunkState* chunk = m_chunkIndex[chunkIndex];
 	chunk->mesh = generatedMesh;
 	chunk->task = nullptr;
 	chunk->treeWorldOffsets = *offsets;
 
 	if (chunk->visible)
-		ensureChunkVisible(chunk);
+		popInChunk(chunk);
 }
-
+*/
 void e2::HexGrid::initializeFogOfWar()
 {
 	e2::PipelineLayoutCreateInfo layInf{};
@@ -817,6 +1088,62 @@ void e2::HexGrid::initializeFogOfWar()
 	m_blurSet[1] = m_blurPool->createDescriptorSet(m_blurSetLayout);
 
 	invalidateFogOfWarShaders();
+
+
+
+
+
+
+
+
+
+
+	m_minimapSize = {256, 220};
+	e2::TextureCreateInfo minimapTexInf{};
+	minimapTexInf.initialLayout = e2::TextureLayout::ShaderRead;
+	minimapTexInf.format = TextureFormat::SRGB8A8;
+	minimapTexInf.resolution = { m_minimapSize, 1 };
+	m_minimapTexture = renderContext()->createTexture(minimapTexInf);
+
+	e2::RenderTargetCreateInfo minimapTargetInfo{};
+	minimapTargetInfo.areaExtent = m_minimapSize;
+
+	e2::RenderAttachment minimapAttachment{};
+	minimapAttachment.target = m_minimapTexture;
+	minimapAttachment.clearMethod = ClearMethod::ColorFloat;
+	minimapAttachment.clearValue.clearColorf32 = { 0.f, 0.f, 0.f, 1.0f };
+	minimapAttachment.loadOperation = LoadOperation::Clear;
+	minimapAttachment.storeOperation = StoreOperation::Store;
+	minimapTargetInfo.colorAttachments.push(minimapAttachment);
+	m_minimapTarget = renderContext()->createRenderTarget(minimapTargetInfo);
+
+	e2::PipelineLayoutCreateInfo minilayInf{};
+	minilayInf.pushConstantSize = sizeof(e2::MiniMapConstants);
+	m_minimapPipelineLayout = renderContext()->createPipelineLayout(minilayInf);
+
+	std::string miniSourceData;
+	if (!e2::readFileWithIncludes("shaders/minimap.fragment.glsl", miniSourceData))
+	{
+		LogError("Failed to read shader file.");
+	}
+
+	e2::ShaderCreateInfo miniShdrInf{};
+	miniShdrInf.source = miniSourceData.c_str();
+	miniShdrInf.stage = ShaderStage::Fragment;
+	m_minimapFragmentShader = renderContext()->createShader(miniShdrInf);
+
+	e2::PipelineCreateInfo miniPipeInfo{};
+	miniPipeInfo.shaders.push(renderManager()->fullscreenTriangleShader());
+	miniPipeInfo.shaders.push(m_minimapFragmentShader);
+	miniPipeInfo.colorFormats = { e2::TextureFormat::SRGB8A8 };
+	miniPipeInfo.layout = m_minimapPipelineLayout;
+	m_minimapPipeline = renderContext()->createPipeline(miniPipeInfo);
+
+
+
+
+
+
 }
 
 void e2::HexGrid::invalidateFogOfWarRenderTarget(glm::uvec2 const& newResolution)
@@ -1011,7 +1338,7 @@ void e2::HexGrid::invalidateFogOfWarShaders()
 
 void e2::HexGrid::renderFogOfWar()
 {
-	glm::uvec2 newResolution = m_viewpoints.resolution;
+	glm::uvec2 newResolution = m_streamingView.resolution;
 	if (newResolution != m_fogOfWarMaskSize || !m_fogOfWarMask)
 	{
 		invalidateFogOfWarRenderTarget(newResolution);
@@ -1022,7 +1349,7 @@ void e2::HexGrid::renderFogOfWar()
 
 	// outlines first 
 	e2::OutlineConstants outlineConstants;
-	glm::mat4 vpMatrix = m_viewpoints.view.calculateProjectionMatrix(m_viewpoints.resolution) * m_viewpoints.view.calculateViewMatrix();
+	glm::mat4 vpMatrix = m_streamingView.view.calculateProjectionMatrix(m_streamingView.resolution) * m_streamingView.view.calculateViewMatrix();
 
 	e2::ICommandBuffer* buff = m_fogOfWarCommandBuffers[renderManager()->frameIndex()];
 	e2::PipelineSettings defaultSettings;
@@ -1128,19 +1455,13 @@ void e2::HexGrid::renderFogOfWar()
 		}
 	}*/
 
-	for (auto pair : m_chunkStates)
+	for (e2::ChunkState* chunk : m_chunksInView)
 	{
-		glm::ivec2 chunkIndex = pair.first;
-		e2::ChunkState* chunk = pair.second;
-
-		if (!chunk->visible)
-		{
-			continue;
-		}
+		glm::ivec2 chunkIndex = chunk->chunkIndex;
 
 		glm::ivec2 chunkTileOffset = chunkIndex * glm::ivec2(e2::hexChunkResolution);
 
-		glm::mat4 vpMatrix = m_viewpoints.view.calculateProjectionMatrix(m_viewpoints.resolution) * m_viewpoints.view.calculateViewMatrix();
+		glm::mat4 vpMatrix = m_streamingView.view.calculateProjectionMatrix(m_streamingView.resolution) * m_streamingView.view.calculateViewMatrix();
 
 		for (int32_t y = 0; y < e2::hexChunkResolution; y++)
 		{
@@ -1270,20 +1591,10 @@ void e2::HexGrid::clearVisibility()
 
 void e2::HexGrid::flagVisible(glm::ivec2 const& v, bool onlyDiscover)
 {
-	auto finder = m_tileIndex.find(v);
-	int32_t index = 0;
-	if (finder == m_tileIndex.end())
-	{
-		index = discover(e2::Hex(v));
-
-	}
-	else
-	{
-		index = finder->second;
-	}
+	int32_t tileIndex = getTileIndexFromHex(e2::Hex(v));
 
 	if(!onlyDiscover)
-		m_tileVisibility[index] = m_tileVisibility[index]  + 1;
+		m_tileVisibility[tileIndex] = m_tileVisibility[tileIndex]  + 1;
 }
 
 void e2::HexGrid::unflagVisible(glm::ivec2 const& v)
@@ -1402,22 +1713,7 @@ bool e2::ChunkLoadTask::execute()
 
 			if ((tileData.flags & e2::TileFlags::BiomeMask) == e2::TileFlags::BiomeForest)
 			{
-				for (uint8_t i = 0; i < 4; i++)
-				{
-					glm::vec3 randomOffset;
-					randomOffset.x = glm::simplex(chunkOffset + tileOffset + i*34.2f);
-					randomOffset.z = glm::simplex(-chunkOffset + -tileOffset + i*22.34f);
-					randomOffset = glm::normalize(randomOffset);
-					randomOffset *= 0.3f;
-
-					randomOffset.y = (glm::simplex(chunkOffset + tileOffset + i * 2334.2f) * 0.5 + 0.5) * 0.1f;
-
-					float randomRotation = (glm::simplex(chunkOffset + tileOffset + i * 2334.2f) * 0.5 + 0.5) * 360.0f;
-
-					glm::vec4 off(chunkOffset + tileOffset + randomOffset, randomRotation);
-
-					treeOffsets.push(off);
-				}
+				treeOffsets.push(shaderData.hex.offsetCoords());
 			}
 
 		}
@@ -1436,14 +1732,15 @@ bool e2::ChunkLoadTask::execute()
 
 bool e2::ChunkLoadTask::finalize()
 {
-	m_grid->notifyChunkReady(m_chunkIndex, m_generatedMesh, m_ms, &treeOffsets);
+	m_grid->endStreamingChunk(m_chunkIndex, m_generatedMesh, m_ms, &treeOffsets);
 	return true;
 }
 
-void e2::HexGrid::ensureChunkVisible(e2::ChunkState* state)
+void e2::HexGrid::popInChunk(e2::ChunkState* state)
 {
-	if (state->task)
-		return;
+	state->visibilityState = true;
+	m_visibleChunks.insert(state);
+	m_hiddenChunks.erase(state);
 
 	glm::vec3 chunkOffset = chunkOffsetFromIndex(state->chunkIndex);
 
@@ -1456,35 +1753,23 @@ void e2::HexGrid::ensureChunkVisible(e2::ChunkState* state)
 		state->proxy = e2::create<e2::MeshProxy>(m_session, proxyConf);
 		state->proxy->modelMatrix = glm::translate(glm::mat4(1.0f), chunkOffset);
 		state->proxy->modelMatrixDirty = { true };
-		m_numChunkMeshes++;
 
-		
-		const float scales[16] = {
-			1.4f, 1.2f, 1.63f, 1.12f,
-			1.332f, 1.25f, 1.63f, 1.23f,
-			1.441f, 1.244f, 1.64f, 1.23f,
-			1.34f, 1.11f, 1.43f, 1.32f,
-		};
-		uint8_t j = 0;
 		uint8_t i = 0;
-		for (glm::vec4 const& offset : state->treeWorldOffsets)
+		for (glm::ivec2 const& offset : state->forestTileIndices)
 		{
 			e2::MeshProxyConfiguration treeConf;
 			treeConf.mesh = m_treeMesh[i];
 
-			e2::MeshProxy* newTree = e2::create<e2::MeshProxy>(m_session, treeConf);
-			newTree->modelMatrix = glm::translate(glm::mat4(1.0f), glm::vec3(offset.x, offset.y, offset.z));
-			newTree->modelMatrix = glm::rotate(newTree->modelMatrix, glm::radians(offset.w), e2::worldUp());
-			newTree->modelMatrix = glm::scale(newTree->modelMatrix, glm::vec3(scales[j]*0.86));
-			newTree->modelMatrixDirty = { true };
-			state->treeProxys.push(newTree);
+			glm::vec3 treeOffset = e2::Hex(offset).localCoords();
+
+			e2::MeshProxy* newForestProxy = e2::create<e2::MeshProxy>(m_session, treeConf);
+			newForestProxy->modelMatrix = glm::translate(glm::mat4(1.0f), treeOffset);
+			newForestProxy->modelMatrix = glm::rotate(newForestProxy->modelMatrix, glm::radians(0.0f), e2::worldUp());
+			newForestProxy->modelMatrixDirty = { true };
+			state->forestTileProxies.push(newForestProxy);
 
 			if (++i > 3)
 				i = 0;
-
-			if (++j > 15)
-				j = 0;
-			
 		}
 	}
 
@@ -1508,8 +1793,13 @@ void e2::HexGrid::ensureChunkVisible(e2::ChunkState* state)
 	}
 }
 
-void e2::HexGrid::ensureChunkHidden(e2::ChunkState* state)
+void e2::HexGrid::popOutChunk(e2::ChunkState* state)
 {
+	state->visibilityState = false;
+	m_visibleChunks.erase(state);
+	m_hiddenChunks.insert(state);
+
+
 	if (state->waterProxy)
 	{
 		e2::destroy(state->waterProxy);
@@ -1524,14 +1814,60 @@ void e2::HexGrid::ensureChunkHidden(e2::ChunkState* state)
 	{
 		e2::destroy(state->proxy);
 		state->proxy = nullptr;
-		m_numChunkMeshes--;
 
-		for (e2::MeshProxy* treeProxy : state->treeProxys)
+		for (e2::MeshProxy* treeProxy : state->forestTileProxies)
 		{
 			e2::destroy(treeProxy);
 		}
-		state->treeProxys.resize(0);
+		state->forestTileProxies.resize(0);
 	}
+}
+
+void e2::HexGrid::queueStreamingChunk(e2::ChunkState* state)
+{
+	if (state->streamState != StreamState::Poked)
+		return;
+
+	state->streamState = StreamState::Queued;
+	m_queuedChunks.insert(state);
+}
+
+void e2::HexGrid::startStreamingChunk(e2::ChunkState* state)
+{
+	if (state->streamState != StreamState::Queued)
+		return;
+
+	m_queuedChunks.erase(state);
+	m_streamingChunks.insert(state);
+
+	state->streamState = StreamState::Streaming;
+	state->task = e2::ChunkLoadTaskPtr::create(this, state->chunkIndex).cast<e2::AsyncTask>();
+	asyncManager()->enqueue({ state->task });
+
+}
+
+void e2::HexGrid::endStreamingChunk(glm::ivec2 const& chunkIndex, e2::MeshPtr newMesh, double timeMs, e2::StackVector<glm::ivec2, e2::maxNumTreesPerChunk>* treeIndices)
+{
+	// If the chunkstate is no longer valid, throw away the work silently
+	auto finder = m_chunkIndex.find(chunkIndex);
+	if (finder == m_chunkIndex.end())
+	{
+		return;
+	}
+	
+	// Update highest load time 
+	if (timeMs > m_highLoadTime)
+		m_highLoadTime = timeMs;
+
+	// Set new stuff on the chunk
+	e2::ChunkState* chunk = m_chunkIndex[chunkIndex];
+	chunk->mesh = newMesh;
+	chunk->task = nullptr;
+	chunk->forestTileIndices = *treeIndices;
+	chunk->streamState = StreamState::Ready;
+
+	m_streamingChunks.erase(chunk);
+	m_invalidatedChunks.insert(chunk);
 }
 
 e2::ChunkState::~ChunkState()

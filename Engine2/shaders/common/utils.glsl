@@ -175,7 +175,7 @@ vec3 undiscovered(vec3 color, vec3 position, vec3 vis, float time)
     vec3 gg = mix(vec3(0.1), vec3(0.15), f);
     gg = mix(gg, gg*tint, 0.7);
 
-    float h = 1.0 -smoothstep(0.2, 1.0, y);
+    float h = 1.0 -smoothstep(0.4, 1.5, y);
     float h2 = 1.0 - smoothstep(-0.1, 0.0, y);
     vec3 grb = color * 0.95;
     vec3 gra = mix(grb, vec3(desaturate(grb)), 0.7);
@@ -191,7 +191,7 @@ vec3 undiscovered(vec3 color, vec3 position, vec3 vis, float time)
 
     //return undis;
 
-    undis += ndotl * tint * 0.05;
+    undis += ndotl * tint * 0.06;
     
 
 
@@ -207,8 +207,8 @@ vec3 outOfSight(vec3 color, vec3 position, vec3 vis, float time)
     vec3 gg = mix(vec3(0.1), vec3(0.15), f);
     gg = mix(gg, gg*tint, 0.8);
 
-    float h = 1.0 -smoothstep(0.2, 1.0, y);
-    float h2 = 1.0 - smoothstep(-0.1, 0.0, y);
+    float h = 1.0 -smoothstep(0.4, 1.5, y);
+    float h2 = 1.0 - smoothstep(-0.1, 0.1, y);
     vec3 grb = color * 0.95;
     vec3 gra = mix(grb, vec3(desaturate(grb)), 0.7);
     
@@ -221,9 +221,9 @@ vec3 outOfSight(vec3 color, vec3 position, vec3 vis, float time)
     vec3 ndotl = vec3(clamp(pow(dot(n, l), 2.2), 0.0, 1.0));
     //return ndotl;
 
-    undis += ndotl * tint * 0.05;
+    undis += ndotl * tint * 0.06;
 
-    return mix(undis, color, vis.y*0.7);
+    return mix(undis, color, vis.y*0.5);
 }
 
 vec3 fogOfWar(vec3 color, vec3 position, vec3 vis, float time)
@@ -235,6 +235,7 @@ vec3 fogOfWar(vec3 color, vec3 position, vec3 vis, float time)
     vec3 oos = outOfSight(color, position, vis, time);
     vec3 und = undiscovered(color, position, vis, time);
     vec3 fow = mix(und, oos, vis.x);
+    //fow = mix(fow, oos, 1.0);
     return fow;
 }
 

@@ -142,10 +142,10 @@ namespace e2
 	constexpr uint32_t hexChunkResolution = 6;
 
 	constexpr uint32_t maxNumExtraChunks = 128;
-	constexpr uint32_t maxNumChunkStates = 512;
+	constexpr uint32_t maxNumChunkStates = 256;
 
 	constexpr uint32_t maxNumChunkLoadTasks = 256;
-	constexpr uint32_t maxNumTreesPerChunk = hexChunkResolution * hexChunkResolution * 4;
+	constexpr uint32_t maxNumTreesPerChunk = hexChunkResolution * hexChunkResolution;
 
 	class HexGrid;
 
@@ -169,9 +169,24 @@ namespace e2
 		e2::DynamicMesh* m_dynaHex{};
 		e2::DynamicMesh* m_dynaHexHigh{};
 
-		e2::StackVector<glm::vec4, e2::maxNumTreesPerChunk> treeOffsets;
+		e2::StackVector<glm::ivec2, e2::maxNumTreesPerChunk> treeOffsets;
 
 		float m_ms;
+	};
+
+	enum class StreamState : uint8_t
+	{
+		/** Not initialized, nor streamed in */
+		Poked,
+
+		/** This chunk is queued for streaming, and waiting patiently */
+		Queued,
+
+		/** Mesh currently streaming in */
+		Streaming,
+
+		/** Ready to be fully visible */
+		Ready
 	};
 
 	/** @tags(arena, arenaSize=e2::maxNumChunkStates)  */
@@ -186,12 +201,15 @@ namespace e2
 		// chunk index in offset coordinates 
 		glm::ivec2 chunkIndex;
 
-		// if not null, then we are loading
+		StreamState streamState{ StreamState::Poked };
+		bool visibilityState{ false };
+		
+		// task, if relevant
 		e2::AsyncTaskPtr task;
 
 		// true if visible this frame
-		bool visible{};
-		e2::Moment lastVisible;
+		bool inView{};
+		e2::Moment lastTimeInView;
 
 		// only for loaded 
 		e2::MeshPtr mesh;
@@ -201,8 +219,8 @@ namespace e2
 		e2::MeshProxy* waterProxy{};
 		e2::MeshProxy* fogProxy{};
 
-		e2::StackVector<glm::vec4, e2::maxNumTreesPerChunk> treeWorldOffsets;
-		e2::StackVector<e2::MeshProxy*, e2::maxNumTreesPerChunk> treeProxys;
+		e2::StackVector<glm::ivec2, e2::maxNumTreesPerChunk> forestTileIndices;
+		e2::StackVector<e2::MeshProxy*, e2::maxNumTreesPerChunk> forestTileProxies;
 
 	};
 
@@ -224,6 +242,15 @@ namespace e2
 		glm::vec2 direction;
 	};
 
+	struct MiniMapConstants
+	{
+		glm::vec2 worldMin;
+		glm::vec2 worldMax;
+
+		glm::uvec2 resolution;
+	};
+
+
 	/** 
 	 * Procedural hex grid
 	 * --
@@ -239,31 +266,136 @@ namespace e2
 
 		virtual e2::Engine* engine() override;
 
+		/// Chunks Begin (and World Streaming)
+
+		e2::ChunkState* getOrCreateChunk(glm::ivec2 const& index);
+		void nukeChunk(e2::ChunkState* chunk);
+
+		/** queues a chunk for streaming, will do nothing if not unstreamed */
+		void queueStreamingChunk(e2::ChunkState* state);
+
+		/** starts streaming a queued chunk, will do nothing if not queued first */
+		void startStreamingChunk(e2::ChunkState* state);
+
+		/** finalizes a streaming chunk */
+		void endStreamingChunk(glm::ivec2 const& chunkIndex, e2::MeshPtr newMesh, double timeMs, e2::StackVector<glm::ivec2, e2::maxNumTreesPerChunk>* treeIndices);
+
+		/** pops in chunk, no questions asked, self-corrective states and safe to call whenever  */
+		void popInChunk(e2::ChunkState* state);
+
+		/** pops out chunk, no questions asked, self-corrective states and safe to call whenever */
+		void popOutChunk(e2::ChunkState* state);
+
+		// owning map as well as index from chunk index -> chunk state
+		std::unordered_map<glm::ivec2, e2::ChunkState*> m_chunkIndex;
+
+		/** jsut a bunhc of utilikty sets */
+		std::unordered_set<e2::ChunkState*> m_queuedChunks;
+		std::unordered_set<e2::ChunkState*> m_streamingChunks;
+		std::unordered_set<e2::ChunkState*> m_invalidatedChunks;
+		std::unordered_set<e2::ChunkState*> m_visibleChunks;
+		std::unordered_set<e2::ChunkState*> m_hiddenChunks;
+		std::unordered_set<e2::ChunkState*> m_chunksInView;
+
+
+		void updateStreaming(glm::vec2 const& streamCenter, e2::Viewpoints2D const& newStreamingView, glm::vec2 const& viewVelocity);
+
+
+
+		glm::vec2 m_streamingCenter;
+		glm::vec2 m_streamingViewVelocity;
+		e2::Viewpoints2D m_streamingView;
+		e2::Aabb2D m_streamingViewAabb;
+
+		std::vector<e2::ChunkState*> m_streamingChunksInView;
+
+
+
+		/** Clears all chunks from world streaming */
+		void clearAllChunks();
+
+		/** Retrieves the world AABB of a chunk, given it's chunk index */
+		e2::Aabb2D getChunkAabb(glm::ivec2 const& chunkIndex);
+
+		/** Retrieves the size of a chunk in planar coords */
 		glm::vec2 chunkSize();
 
+		/** Retrieves chunk index from world planar coords */
 		glm::ivec2 chunkIndexFromPlanarCoords(glm::vec2 const& planarCoords);
 
+		/** Retrieves the chunk offset position in world coords, given a chunk index */
 		static glm::vec3 chunkOffsetFromIndex(glm::ivec2 const& index);
 
+		/** Number of chunk states */
+		uint32_t numChunks();
+
+		/** Number of chunks deemed relevant */
+		uint32_t numVisibleChunks();
+
+		/** Number of currently streaming chunks */
+		uint32_t numJobsInFlight();
+
+		/** Puts this chunk index in queue to be streamed in, if it's not already streamed in or streaming */
+		//void prepareChunk(glm::ivec2 const& chunkIndex);
+
+		/** Called by streaming thread when it finishes, this simply finalizes a chunk (if it still exists) */
+		//void notifyChunkReady(glm::ivec2 const& chunkIndex, e2::MeshPtr generatedMesh, double ms, e2::StackVector<glm::vec4, e2::maxNumTreesPerChunk>* offsets);
+
 		/** Ensures all chunks within the range are visible, given range in planar coords, updates them as visible, nukes any excessive hcunks */
-		void assertChunksWithinRangeVisible(glm::vec2 const& streamCenter, e2::Viewpoints2D const& viewPoints, glm::vec2 const& viewVelocity);
+		//void assertChunksWithinRangeVisible(glm::vec2 const& streamCenter, e2::Viewpoints2D const& viewPoints, glm::vec2 const& viewVelocity);
+
+	protected:
+
+		double m_highLoadTime{};
+
+		// temp vectors
+		//std::vector<glm::ivec2> m_chunkStreamQueue;
+		//std::vector<e2::ChunkState*> m_hiddenChunks;
+
+
+		// set of discovered chunks and its aabb, for minimap and its fog but can also be used for other stuff 
+		std::unordered_set<glm::ivec2> m_discoveredChunks;
+		e2::Aabb2D m_discoveredChunksAABB;
+
+
+
+
+		/// Chunks End
+
+
+		/// Tiles Begin
+	public:
+		/** Retrieves TileData from the given array index */
+		TileData& getTileFromIndex(size_t index);
+
+		/** Discovers the given hex, and returns its new array index (WARNING: This doesnt check if it already exists!) */
+		size_t discover(Hex hex);
+
+		/** Retrieves array index to the given tile, discovers it if necessary */
+		size_t getTileIndexFromHex(Hex hex);
+
+		/** Retrieves tile data for the given hex, if it exists. Otherwise returns null */
+		e2::TileData* getTileData(glm::ivec2 const& hex);
+
+		/// Tiles End
+
+		/// ProcGen Begin
+
+		double highLoadTime();
+		void clearLoadTime();
+
+		/** */
+		static e2::TileData calculateTileDataForHex(Hex hex);
 
 		static float sampleSimplex(glm::vec2 const& position, float scale);
 
 		static float sampleBaseHeight(glm::vec2 const& position);
+		
 
-		static e2::TileData calculateTileDataForHex(Hex hex);
 
-		size_t discover(Hex hex);
 
-		/** Retrieves reference to the given tile, creates it if necessary */
-		size_t getTileIndexFromHex(Hex hex);
+		
 
-		e2::TileData* getTileData(glm::ivec2 const & hex);
-
-		TileData &getTileFromIndex(size_t index);
-
-		void clearAllChunks();
 
 		e2::DynamicMesh& dynamicHex()
 		{
@@ -280,22 +412,6 @@ namespace e2
 			return m_terrainMaterial;
 		}
 
-		/** Number of queried chunks */
-		uint32_t numChunks();
-
-		/** Number of chunks deemed relevant */
-		uint32_t numVisibleChunks();
-
-		uint32_t numJobsInFlight();
-
-		/** Number of chunks which has a mesh attached (some are empty due to being completely submerged)  */
-		uint32_t numChunkMeshes();
-		double highLoadTime();
-		void clearLoadTime();
-
-
-		void prepareChunk(glm::ivec2 const& chunkIndex);
-		void notifyChunkReady(glm::ivec2 const& chunkIndex, e2::MeshPtr generatedMesh, double ms, e2::StackVector<glm::vec4, e2::maxNumTreesPerChunk> *offsets);
 
 		std::mutex& dynamicMutex()
 		{
@@ -326,6 +442,7 @@ namespace e2
 
 	protected:
 
+		int32_t m_numThreads{4};
 
 
 		e2::Engine* m_engine{};
@@ -333,27 +450,17 @@ namespace e2
 
 		std::mutex m_dynamicMutex;
 
-		e2::Viewpoints2D m_viewpoints;
+//		e2::Viewpoints2D m_viewpoints;
 
-		uint32_t m_numVisibleChunks{};
-		uint32_t m_numChunkMeshes{};
-		uint32_t m_numJobsInFlight{};
-		double m_highLoadTime{};
 
-		// temp vectors
-		//std::vector<glm::ivec2> m_visibleChunkIndices;
-		std::vector<glm::ivec2> m_chunkStreamQueue;
-		std::vector<e2::ChunkState*> m_hiddenChunks;
+
 		//
-
+		// list of discovered tiles 
 		std::vector<TileData> m_tiles;
 		std::vector<int32_t> m_tileVisibility;
 		std::unordered_map<Hex, size_t> m_tileIndex;
-		
-		void ensureChunkVisible(e2::ChunkState* state);
-		void ensureChunkHidden(e2::ChunkState* state);
 
-		std::unordered_map<glm::ivec2, e2::ChunkState*> m_chunkStates;
+
 
 		e2::MeshPtr m_treeMesh[4];
 
@@ -400,7 +507,19 @@ namespace e2
 		e2::IPipelineLayout* m_outlinePipelineLayout{};
 		e2::IPipeline* m_outlinePipeline{};
 
+
+
+		glm::uvec2 m_minimapSize{};
+		e2::IRenderTarget* m_minimapTarget{};
+		e2::ITexture* m_minimapTexture{};
+		e2::IShader* m_minimapFragmentShader{};
+		e2::IPipelineLayout* m_minimapPipelineLayout{};
+		e2::IPipeline* m_minimapPipeline{};
+
+
+
 		// does more than fogofwar, actually renders everything custom this hex grid needs
+		// i.e. fog of war, outlines, minimap, etc. 
 		e2::Pair<e2::ICommandBuffer*> m_fogOfWarCommandBuffers{ nullptr };
 
 	};

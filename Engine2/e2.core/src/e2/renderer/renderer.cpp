@@ -719,6 +719,31 @@ bool e2::Ray2D::edgeTest(glm::vec2 const& point) const
 	return glm::dot(perpendicular, point - position) < 0.0f;
 }
 
+e2::StackVector<glm::vec2, 4> e2::Aabb2D::points()
+{
+	e2::StackVector<glm::vec2, 4> p = {
+		min,
+		{max.x, min.y},
+		max,
+		{min.x, max.y},
+	};
+
+	return p;
+}
+
+void e2::Aabb2D::push(glm::vec2 const& point)
+{
+	if (point.x < min.x)
+		min.x = point.x;
+	if (point.y < min.y)
+		min.y = point.y;
+
+	if (point.x > max.x)
+		max.x = point.x;
+	if (point.y > max.y)
+		max.y = point.y;
+}
+
 bool e2::Aabb2D::isWithin(glm::vec2 const& point) const
 {
 	return point.x >= min.x && point.x < max.x && point.y >= min.y && point.y < max.y;
