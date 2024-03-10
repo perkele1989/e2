@@ -573,11 +573,11 @@ void e2::UIContext::drawQuad(glm::vec2 position, glm::vec2 size, e2::UIColor col
 
 	// @todo optimize this by queue'ing quads and then on submit render them. 
 	// profile first so we know its nececssary
-	buff->bindVertexLayout(ui->m_quadVertexLayout);
-	buff->bindIndexBuffer(ui->m_quadIndexBuffer);
-	buff->bindVertexBuffer(0, ui->m_quadVertexBuffer);
-	buff->bindPipeline(ui->m_quadPipeline.pipeline);
-	buff->pushConstants(ui->m_quadPipeline.layout, 0, sizeof(e2::UIQuadPushConstants), reinterpret_cast<uint8_t*>(&pushConstants));
+	buff->bindVertexLayout(ui->quadVertexLayout);
+	buff->bindIndexBuffer(ui->quadIndexBuffer);
+	buff->bindVertexBuffer(0, ui->quadVertexBuffer);
+	buff->bindPipeline(ui->quadPipeline.pipeline);
+	buff->pushConstants(ui->quadPipeline.layout, 0, sizeof(e2::UIQuadPushConstants), reinterpret_cast<uint8_t*>(&pushConstants));
 
 	buff->draw(6, 1);
 
@@ -612,9 +612,9 @@ void e2::UIContext::drawTexturedQuad(glm::vec2 position, glm::vec2 size, e2::UIC
 
 	// @todo optimize this by queue'ing quads and then on submit render them. 
 	// profile first so we know its nececssary
-	buff->bindVertexLayout(ui->m_quadVertexLayout);
-	buff->bindIndexBuffer(ui->m_quadIndexBuffer);
-	buff->bindVertexBuffer(0, ui->m_quadVertexBuffer);
+	buff->bindVertexLayout(ui->quadVertexLayout);
+	buff->bindIndexBuffer(ui->quadIndexBuffer);
+	buff->bindVertexBuffer(0, ui->quadVertexBuffer);
 	buff->bindPipeline(ui->m_texturedQuadPipeline.pipeline);
 	buff->bindDescriptorSet(ui->m_texturedQuadPipeline.layout, 0, ui->m_texturedQuadSets[frameIndex]);
 	buff->pushConstants(ui->m_texturedQuadPipeline.layout, 0, sizeof(e2::UITexturedQuadPushConstants), reinterpret_cast<uint8_t*>(&pushConstants));
@@ -658,9 +658,9 @@ void e2::UIContext::drawQuadFancy(glm::vec2 position, glm::vec2 size, e2::UIColo
 
 	// @todo optimize this by queue'ing quads and then on submit render them. 
 	// profile first so we know its nececssary
-	buff->bindVertexLayout(ui->m_quadVertexLayout);
-	buff->bindIndexBuffer(ui->m_quadIndexBuffer);
-	buff->bindVertexBuffer(0, ui->m_quadVertexBuffer);
+	buff->bindVertexLayout(ui->quadVertexLayout);
+	buff->bindIndexBuffer(ui->quadIndexBuffer);
+	buff->bindVertexBuffer(0, ui->quadVertexBuffer);
 	buff->bindPipeline(ui->m_fancyQuadPipeline.pipeline);
 	buff->pushConstants(ui->m_fancyQuadPipeline.layout, 0, sizeof(e2::UIFancyQuadPushConstants), reinterpret_cast<uint8_t*>(&pushConstants));
 
@@ -696,9 +696,9 @@ void e2::UIContext::drawQuadShadow(glm::vec2 position, glm::vec2 size, float cor
 
 	// @todo optimize this by queue'ing quads and then on submit render them. 
 	// profile first so we know its nececssary
-	buff->bindVertexLayout(ui->m_quadVertexLayout);
-	buff->bindIndexBuffer(ui->m_quadIndexBuffer);
-	buff->bindVertexBuffer(0, ui->m_quadVertexBuffer);
+	buff->bindVertexLayout(ui->quadVertexLayout);
+	buff->bindIndexBuffer(ui->quadIndexBuffer);
+	buff->bindVertexBuffer(0, ui->quadVertexBuffer);
 	buff->bindPipeline(ui->m_quadShadowPipeline.pipeline);
 	buff->pushConstants(ui->m_quadShadowPipeline.layout, 0, sizeof(e2::UIQuadShadowPushConstants), reinterpret_cast<uint8_t*>(&pushConstants));
 

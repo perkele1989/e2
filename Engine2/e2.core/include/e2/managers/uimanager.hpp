@@ -122,6 +122,12 @@ namespace e2
 
 		void queueDestroy(e2::UIWindow* wnd);
 
+		e2::IDataBuffer* quadVertexBuffer{};
+		e2::IDataBuffer* quadIndexBuffer{};
+		e2::IVertexLayout* quadVertexLayout{};
+
+		UIPipeline quadPipeline;
+
 	protected:
 
 		friend e2::UIWindow;
@@ -136,11 +142,7 @@ namespace e2
 		std::unordered_set<e2::UIContext*> m_contexts;
 
 		// Global, static vertex buffers for a quad between 0,0 and 1,1
-		e2::IDataBuffer* m_quadVertexBuffer{};
-		e2::IDataBuffer* m_quadIndexBuffer{};
-		e2::IVertexLayout* m_quadVertexLayout{};
 
-		UIPipeline m_quadPipeline;
 		UIPipeline m_texturedQuadPipeline;
 		UIPipeline m_fancyQuadPipeline;
 		UIPipeline m_quadShadowPipeline;

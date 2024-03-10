@@ -18,6 +18,10 @@ layout(push_constant) uniform ConstantData
 	uvec2 resolution;
 };
 
+layout(set = 0, binding = 0) uniform texture2D visibilityMask;
+layout(set = 0, binding = 1) uniform sampler clampSampler;
+
+
 
 float lineSegment(vec2 p, vec2 a, vec2 b)
 {
@@ -42,6 +46,7 @@ float lineSegment(vec2 p, vec2 a, vec2 b)
 
 void main()
 {
+    float vis = texture(sampler2D(visibilityMask, clampSampler), inUv).r;
     vec2 worldSize = worldMax - worldMin;
 	vec2 position = worldMin + inUv * worldSize;//* zoom;
 
@@ -91,6 +96,9 @@ void main()
     outColor.rgba = mix(outColor.rgba, vec4(1.0, 1.0, 1.0, 1.0), lineSegment(position,viewCornerTR, viewCornerBR ));
     outColor.rgba = mix(outColor.rgba, vec4(1.0, 1.0, 1.0, 1.0), lineSegment(position,viewCornerBR, viewCornerBL ));
     outColor.rgba = mix(outColor.rgba, vec4(1.0, 1.0, 1.0, 1.0), lineSegment(position,viewCornerBL, viewCornerTL ));
+
+    //outColor.a *= vis;
+    outColor.rgba = mix(outColor.rgba, vec4(0.0, 0.0, 0.0, 1.0), 1.0 - vis);
 
 	//outColor.r = h;
 

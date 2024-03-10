@@ -131,11 +131,11 @@ namespace e2
 
 		void vkCmdTransitionImage(VkCommandBuffer buffer, VkImage image, uint32_t mips, uint32_t mipOffset, uint32_t layers, VkImageAspectFlags aspectFlags, VkImageLayout from, VkImageLayout to,
 			VkPipelineStageFlags sourceStage = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VkPipelineStageFlags destinationStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-			VkAccessFlags sourceAccess = 0, VkAccessFlags destinationAccess = 0);
+			VkAccessFlags sourceAccess = VK_ACCESS_MEMORY_WRITE_BIT, VkAccessFlags destinationAccess = VK_ACCESS_MEMORY_READ_BIT);
 		
 		void vkCmdTransitionTexture(VkCommandBuffer buffer, e2::ITexture_Vk* texture, VkImageLayout from, VkImageLayout to, 
 			VkPipelineStageFlags sourceStage = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VkPipelineStageFlags destinationStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-			VkAccessFlags sourceAccess = 0, VkAccessFlags destinationAccess = 0);
+			VkAccessFlags sourceAccess = VK_ACCESS_MEMORY_WRITE_BIT, VkAccessFlags destinationAccess = VK_ACCESS_MEMORY_READ_BIT);
 
 		void vkCmdMipGenPrepareSrc(VkCommandBuffer buffer, e2::ITexture_Vk* texture);
 		void vkCmdMipGenPrepareDst(VkCommandBuffer buffer, e2::ITexture_Vk* texture, uint32_t numMips);

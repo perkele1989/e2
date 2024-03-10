@@ -223,7 +223,7 @@ vec3 outOfSight(vec3 color, vec3 position, vec3 vis, float time)
 
     undis += ndotl * tint * 0.06;
 
-    return mix(undis, color, vis.y*0.5);
+    return mix(undis, color, vis.y*0.8);
 }
 
 vec3 fogOfWar(vec3 color, vec3 position, vec3 vis, float time)

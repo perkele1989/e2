@@ -444,8 +444,8 @@ void e2::UIManager::initialize()
 	e2::DataBufferCreateInfo bufferInfo{};
 	bufferInfo.type = BufferType::VertexBuffer;
 	bufferInfo.size = 4 * sizeof(e2::UIVertex);
-	m_quadVertexBuffer = renderContext()->createDataBuffer(bufferInfo);
-	m_quadVertexBuffer->upload(reinterpret_cast<uint8_t*>(vertices), 4 * sizeof(e2::UIVertex), 0, 0);
+	quadVertexBuffer = renderContext()->createDataBuffer(bufferInfo);
+	quadVertexBuffer->upload(reinterpret_cast<uint8_t*>(vertices), 4 * sizeof(e2::UIVertex), 0, 0);
 
 
 	uint32_t indices[6] = {
@@ -455,35 +455,35 @@ void e2::UIManager::initialize()
 
 	bufferInfo.type = BufferType::IndexBuffer;
 	bufferInfo.size = 6 * sizeof(uint32_t);
-	m_quadIndexBuffer = renderContext()->createDataBuffer(bufferInfo);
-	m_quadIndexBuffer->upload(reinterpret_cast<uint8_t*>(indices), 6 * sizeof(uint32_t), 0, 0);
+	quadIndexBuffer = renderContext()->createDataBuffer(bufferInfo);
+	quadIndexBuffer->upload(reinterpret_cast<uint8_t*>(indices), 6 * sizeof(uint32_t), 0, 0);
 
 	e2::VertexLayoutCreateInfo vertexLayoutInfo{};
 	vertexLayoutInfo.attributes.push({0, e2::VertexFormat::Vec4, 0});
 	vertexLayoutInfo.bindings.push({sizeof(glm::vec4), e2::VertexRate::PerVertex });
-	m_quadVertexLayout = renderContext()->createVertexLayout(vertexLayoutInfo);
+	quadVertexLayout = renderContext()->createVertexLayout(vertexLayoutInfo);
 
 	// Quad 
 	e2::ShaderCreateInfo shaderInfo{};
 	shaderInfo.source = quad_vertexSource;
 	shaderInfo.stage = ShaderStage::Vertex;
-	m_quadPipeline.vertexShader = renderContext()->createShader(shaderInfo);
+	quadPipeline.vertexShader = renderContext()->createShader(shaderInfo);
 
 	shaderInfo.source = quad_fragSource;
 	shaderInfo.stage = ShaderStage::Fragment;
-	m_quadPipeline.fragmentShader = renderContext()->createShader(shaderInfo);
+	quadPipeline.fragmentShader = renderContext()->createShader(shaderInfo);
 
 	e2::PipelineLayoutCreateInfo layoutInfo{};
 	layoutInfo.pushConstantSize = sizeof(UIQuadPushConstants);
-	m_quadPipeline.layout = renderContext()->createPipelineLayout(layoutInfo);
+	quadPipeline.layout = renderContext()->createPipelineLayout(layoutInfo);
 
 	e2::PipelineCreateInfo pipelineInfo{};
 	pipelineInfo.colorFormats.push(e2::TextureFormat::RGBA8);
 	pipelineInfo.depthFormat = TextureFormat::D16;
-	pipelineInfo.layout = m_quadPipeline.layout;
-	pipelineInfo.shaders.push(m_quadPipeline.vertexShader);
-	pipelineInfo.shaders.push(m_quadPipeline.fragmentShader);
-	m_quadPipeline.pipeline = renderContext()->createPipeline(pipelineInfo);
+	pipelineInfo.layout = quadPipeline.layout;
+	pipelineInfo.shaders.push(quadPipeline.vertexShader);
+	pipelineInfo.shaders.push(quadPipeline.fragmentShader);
+	quadPipeline.pipeline = renderContext()->createPipeline(pipelineInfo);
 
 	// Textured Quad 
 	shaderInfo.source = texturedQuad_vertexSource;
@@ -606,13 +606,13 @@ void e2::UIManager::shutdown()
 	e2::destroy(m_fancyQuadPipeline.vertexShader);
 	e2::destroy(m_fancyQuadPipeline.layout);
 
-	e2::destroy(m_quadPipeline.pipeline);
-	e2::destroy(m_quadPipeline.fragmentShader);
-	e2::destroy(m_quadPipeline.vertexShader);
-	e2::destroy(m_quadPipeline.layout);
-	e2::destroy(m_quadVertexLayout);
-	e2::destroy(m_quadIndexBuffer);
-	e2::destroy(m_quadVertexBuffer);
+	e2::destroy(quadPipeline.pipeline);
+	e2::destroy(quadPipeline.fragmentShader);
+	e2::destroy(quadPipeline.vertexShader);
+	e2::destroy(quadPipeline.layout);
+	e2::destroy(quadVertexLayout);
+	e2::destroy(quadIndexBuffer);
+	e2::destroy(quadVertexBuffer);
 }
 
 void e2::UIManager::preUpdate(double deltaTime)

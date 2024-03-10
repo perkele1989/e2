@@ -2,6 +2,7 @@
 #include "e2/hex/hex.hpp"
 #include "e2/game/gamesession.hpp"
 #include "e2/managers/asyncmanager.hpp"
+#include "e2/managers/uimanager.hpp"
 
 #include "e2/transform.hpp"
 
@@ -470,10 +471,10 @@ void e2::HexGrid::updateStreaming(glm::vec2 const& streamCenter, e2::Viewpoints2
 		lookAheadView.calculateDerivatives();
 		gatherChunkStatesInView(lookAheadView, m_lookAheadChunks, true);
 
-		renderer->debugLine({ 1.0f, 0.0f, 1.0f }, lookAheadView.corners[0], lookAheadView.corners[1]);
-		renderer->debugLine({ 1.0f, 0.0f, 1.0f }, lookAheadView.corners[2], lookAheadView.corners[3]);
-		renderer->debugLine({ 1.0f, 0.0f, 1.0f }, lookAheadView.corners[0], lookAheadView.corners[2]);
-		renderer->debugLine({ 1.0f, 0.0f, 1.0f }, lookAheadView.corners[1], lookAheadView.corners[3]);
+		//renderer->debugLine({ 1.0f, 0.0f, 1.0f }, lookAheadView.corners[0], lookAheadView.corners[1]);
+		//renderer->debugLine({ 1.0f, 0.0f, 1.0f }, lookAheadView.corners[2], lookAheadView.corners[3]);
+		//renderer->debugLine({ 1.0f, 0.0f, 1.0f }, lookAheadView.corners[0], lookAheadView.corners[2]);
+		//renderer->debugLine({ 1.0f, 0.0f, 1.0f }, lookAheadView.corners[1], lookAheadView.corners[3]);
 
 	}
 
@@ -586,7 +587,7 @@ void e2::HexGrid::updateStreaming(glm::vec2 const& streamCenter, e2::Viewpoints2
 		}
 	}
 
-	debugDraw();
+	//debugDraw();
 
 }
 
@@ -1120,6 +1121,26 @@ void e2::HexGrid::initializeFogOfWar()
 
 
 
+
+
+
+	e2::DescriptorSetLayoutCreateInfo miniSetLayoutInf{};
+	miniSetLayoutInf.bindings = {
+		{e2::DescriptorBindingType::Texture},
+		{e2::DescriptorBindingType::Sampler},
+	};
+	m_minimapLayout = renderContext()->createDescriptorSetLayout(miniSetLayoutInf);
+
+	e2::DescriptorPoolCreateInfo miniPoolCreateInfo{};
+	miniPoolCreateInfo.maxSets = 2 * e2::maxNumSessions;
+	miniPoolCreateInfo.numSamplers = 2 * e2::maxNumSessions;
+	miniPoolCreateInfo.numTextures = 2 * e2::maxNumSessions;
+	m_minimapPool = mainThreadContext()->createDescriptorPool(miniPoolCreateInfo);
+
+	m_minimapSet = m_minimapPool->createDescriptorSet(m_minimapLayout);
+
+
+
 	m_minimapSize = {320, 220};
 	e2::TextureCreateInfo minimapTexInf{};
 	minimapTexInf.initialLayout = e2::TextureLayout::ShaderRead;
@@ -1141,7 +1162,36 @@ void e2::HexGrid::initializeFogOfWar()
 
 	e2::PipelineLayoutCreateInfo minilayInf{};
 	minilayInf.pushConstantSize = sizeof(e2::MiniMapConstants);
+	minilayInf.sets = { m_minimapLayout };
 	m_minimapPipelineLayout = renderContext()->createPipelineLayout(minilayInf);
+
+
+
+
+
+	e2::TextureCreateInfo mapvisTexInf{};
+	mapvisTexInf.initialLayout = e2::TextureLayout::ShaderRead;
+	mapvisTexInf.format = TextureFormat::RGBA8;
+	mapvisTexInf.resolution = { m_minimapSize, 1 };
+	m_mapVisTexture = renderContext()->createTexture(mapvisTexInf);
+
+	e2::RenderTargetCreateInfo mapVisTargetInfo{};
+	mapVisTargetInfo.areaExtent = m_minimapSize;
+
+	e2::RenderAttachment mapVisAttachemnt{};
+	mapVisAttachemnt.target = m_mapVisTexture;
+	mapVisAttachemnt.clearMethod = ClearMethod::ColorFloat;
+	mapVisAttachemnt.clearValue.clearColorf32 = { 0.f, 0.f, 0.f, 0.0f };
+	mapVisAttachemnt.loadOperation = LoadOperation::Clear;
+	mapVisAttachemnt.storeOperation = StoreOperation::Store;
+	mapVisTargetInfo.colorAttachments.push(mapVisAttachemnt);
+	m_mapVisTarget = renderContext()->createRenderTarget(mapVisTargetInfo);
+
+
+
+	m_minimapSet->writeTexture(0, m_mapVisTexture);
+	m_minimapSet->writeSampler(1, renderManager()->clampSampler());
+
 
 
 	invalidateFogOfWarShaders();
@@ -1398,11 +1448,11 @@ void e2::HexGrid::renderFogOfWar()
 
 		glm::mat4 transform = glm::identity<glm::mat4>();
 		transform = glm::translate(transform, worldOffset);
-		transform = glm::scale(transform, { 1.15f, 1.15f, 1.15f });
+		transform = glm::scale(transform, { 1.1f, 1.1f, 1.1f });
 
 
 		outlineConstants.mvpMatrix = vpMatrix * transform;
-		outlineConstants.color = { 0.5f, 0.00f, 0.00f, 0.5f };
+		outlineConstants.color = { 0.7f, 0.7f, 0.7f, 0.5f };
 
 		buff->pushConstants(m_outlinePipelineLayout, 0, sizeof(e2::OutlineConstants), reinterpret_cast<uint8_t*>(&outlineConstants));
 		buff->draw(hexSpec.indexCount, 1);
@@ -1504,14 +1554,6 @@ void e2::HexGrid::renderFogOfWar()
 	buff->useAsDefault(m_fogOfWarMask[0]);
 
 
-
-
-
-
-
-
-
-
 	// minimap
 
 
@@ -1536,6 +1578,47 @@ void e2::HexGrid::renderFogOfWar()
 	m_minimapViewBounds.max = worldCenter + worldSize / 2.0f;
 
 
+	glm::vec2 cs = chunkSize();
+	glm::vec2 csPixels = (cs / worldSize) * glm::vec2(m_minimapSize);
+
+
+	e2::UIQuadPushConstants visConstants;
+	visConstants.quadColor = {1.0f, 1.0f, 1.0f, 1.0f};
+	visConstants.quadSize = csPixels;
+	visConstants.surfaceSize = m_minimapSize;
+
+	
+	e2::UIManager* ui = uiManager();
+
+	
+	buff->useAsAttachment(m_mapVisTexture);
+	buff->beginRender(m_mapVisTarget);
+
+	buff->bindVertexLayout(ui->quadVertexLayout);
+	buff->bindIndexBuffer(ui->quadIndexBuffer);
+	buff->bindVertexBuffer(0, ui->quadVertexBuffer);
+	buff->bindPipeline(ui->quadPipeline.pipeline);
+
+	for (glm::ivec2 const& chunkIndex : m_discoveredChunks)
+	{
+		glm::vec3 chunkPositionWorld = chunkOffsetFromIndex(chunkIndex);
+		glm::vec2 planarChunkPosition{chunkPositionWorld.x, chunkPositionWorld.z};
+		planarChunkPosition -= cs/2.0f;
+
+		glm::vec2 chunkPosNormalized = (planarChunkPosition - worldOffset) / worldSize;
+		glm::vec2 chunkPosPixels = chunkPosNormalized * glm::vec2(m_minimapSize);
+
+		visConstants.quadPosition = chunkPosPixels;
+		buff->pushConstants(ui->quadPipeline.layout, 0, sizeof(e2::UIQuadPushConstants), reinterpret_cast<uint8_t*>(&visConstants));
+
+		buff->draw(6, 1);
+	}
+
+	buff->endRender();
+	buff->useAsDefault(m_mapVisTexture);
+
+
+
 
 
 
@@ -1547,24 +1630,6 @@ void e2::HexGrid::renderFogOfWar()
 	minimapConstants.viewCornerBL = m_streamingView.bottomLeft;
 	minimapConstants.viewCornerBR = m_streamingView.bottomRight;
 	minimapConstants.resolution = m_minimapSize;
-	/*
-	// set world min and max to discoveredAABB + margin of 1 chunk (so we have space to explore)
-	minimapConstants.worldMin = m_discoveredChunksAABB.min - glm::vec2(chunkSize());
-	minimapConstants.worldMax = m_discoveredChunksAABB.max + glm::vec2(chunkSize());
-
-	// derive size, offset and center variables for later use 
-	glm::vec2 worldSize = minimapConstants.worldMax - minimapConstants.worldMin;
-	glm::vec2 worldOffset = minimapConstants.worldMin;
-	glm::vec2 worldCenter = worldOffset + worldSize / 2.0f;
-
-	// set owrld siize to aspect ratio of minimap texture, make sure to grow it in whatever direction it needs 
-	glm::vec2 minimapSize = m_minimapSize;
-
-	if(worldSize.x < worldSize.y)
-		worldSize.x = (worldSize.x / (worldSize.x / worldSize.y)) * (minimapSize.x / minimapSize.y);
-	else 
-		worldSize.y = (worldSize.y / (worldSize.y / worldSize.x)) * (minimapSize.y / minimapSize.x);
-	*/
 	minimapConstants.worldMin = m_minimapViewBounds.min;
 	minimapConstants.worldMax = m_minimapViewBounds.max;
 
@@ -1574,14 +1639,14 @@ void e2::HexGrid::renderFogOfWar()
 
 	// Bind vertex states
 	buff->nullVertexLayout();
-
+	buff->bindDescriptorSet(m_minimapPipelineLayout, 0, m_minimapSet);
 	buff->pushConstants(m_minimapPipelineLayout, 0, sizeof(e2::MiniMapConstants), reinterpret_cast<uint8_t*>(&minimapConstants));
 	buff->drawNonIndexed(3, 1);
 
 
 	buff->endRender();
 
-	buff->useAsDefault(m_fogOfWarMask[0]);
+	buff->useAsDefault(m_minimapTexture);
 
 
 
@@ -1613,6 +1678,20 @@ void e2::HexGrid::destroyFogOfWar()
 		e2::discard(m_minimapPipeline);
 	if (m_minimapFragmentShader)
 		e2::discard(m_minimapFragmentShader);
+
+
+	if (m_minimapLayout)
+		e2::discard(m_minimapLayout);
+	if (m_minimapSet)
+		e2::discard(m_minimapSet);
+	if (m_minimapPool)
+		e2::discard(m_minimapPool);
+
+	if (m_mapVisTarget)
+		e2::discard(m_mapVisTarget);
+
+	if (m_mapVisTexture)
+		e2::discard(m_mapVisTexture);
 
 
 	if (m_blurSet[0])

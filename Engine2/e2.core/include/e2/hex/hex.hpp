@@ -529,6 +529,13 @@ namespace e2
 		e2::IPipelineLayout* m_minimapPipelineLayout{};
 		e2::IPipeline* m_minimapPipeline{};
 
+		e2::IDescriptorSetLayout* m_minimapLayout{};
+		e2::IDescriptorSet* m_minimapSet{};
+		e2::IDescriptorPool* m_minimapPool{};
+
+		e2::IRenderTarget* m_mapVisTarget{};
+		e2::ITexture* m_mapVisTexture{};
+
 	public:
 		void updateWorldBounds();
 
