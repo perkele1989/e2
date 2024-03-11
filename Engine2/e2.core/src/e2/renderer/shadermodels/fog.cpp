@@ -250,9 +250,9 @@ void e2::FogProxy::invalidate(uint8_t frameIndex)
 		model->m_proxyUniformBuffers[frameIndex]->upload(reinterpret_cast<uint8_t const*>(&uniformData.data()), sizeof(FogData), 0, proxyOffset);
 	}
 
-	if (visibilityMask.invalidate(frameIndex))
+	if (visibilityMasks[frameIndex].invalidate(frameIndex))
 	{
-		e2::ITexture* tex = visibilityMask.data();
+		e2::ITexture* tex = visibilityMasks[frameIndex].data();
 		if (tex)
 			sets[frameIndex]->writeTexture(1, tex);
 	}

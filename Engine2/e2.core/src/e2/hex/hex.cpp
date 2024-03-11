@@ -1020,80 +1020,20 @@ void e2::HexGrid::clearLoadTime()
 {
 	m_highLoadTime = 0.0;
 }
-/*
-void e2::HexGrid::prepareChunk(glm::ivec2 const& chunkIndex)
-{
 
-	e2::ChunkState* streamState = nullptr;
-	auto finder = m_chunkIndex.find(chunkIndex);
-	if(finder == m_chunkIndex.end())
-	// create new state if doesnt exist, and make sure its visible (so we get fog and water early as possible at least)
-	{
-		e2::ChunkState* newState = e2::create<e2::ChunkState>();
-		newState->chunkIndex = chunkIndex;
-		newState->wantsStreamJob = true;
-		m_chunkIndex[chunkIndex] = newState;
-		// make sure its visible 		
-		streamState = newState;
-	}
-	else
-	{
-		streamState = finder->second;
-	}
-
-	streamState->visible = true;
-	streamState->lastVisible = e2::timeNow();
-	popInChunk(streamState);
-
-	// early out if we cant stream more right now 
-	if (m_numJobsInFlight > m_numThreads)
-		return;
-
-	// enqueue mesh gen for this chunk if needed 
-	if (streamState->wantsStreamJob && !streamState->task)
-	{
-		streamState->task = e2::ChunkLoadTaskPtr::create(this, chunkIndex).cast<e2::AsyncTask>();
-		streamState->wantsStreamJob = false;
-		asyncManager()->enqueue({ streamState->task });
-		m_numJobsInFlight++;
-	}
-}
-*/
-/*
-void e2::HexGrid::notifyChunkReady(glm::ivec2 const& chunkIndex, e2::MeshPtr generatedMesh, double ms, e2::StackVector<glm::vec4, e2::maxNumTreesPerChunk>* offsets)
-{
-	m_numJobsInFlight--;
-	// no longer loading for whatever reason
-	auto finder = m_chunkIndex.find(chunkIndex);
-	if (finder == m_chunkIndex.end())
-	{
-		//LogError("Hardworking task came home to find himself abandoned. {}", chunkIndex);
-		return;
-	}
-
-	if (ms > m_highLoadTime)
-		m_highLoadTime = ms;
-
-	//LogNotice("New world chunk at {}", chunkIndex);
-
-	e2::ChunkState* chunk = m_chunkIndex[chunkIndex];
-	chunk->mesh = generatedMesh;
-	chunk->task = nullptr;
-	chunk->treeWorldOffsets = *offsets;
-
-	if (chunk->visible)
-		popInChunk(chunk);
-}
-*/
 void e2::HexGrid::initializeFogOfWar()
 {
+	// fogofwar stuff 
 	e2::PipelineLayoutCreateInfo layInf{};
 	layInf.pushConstantSize = sizeof(e2::FogOfWarConstants);
 	m_fogOfWarPipelineLayout = renderContext()->createPipelineLayout(layInf);
 
+	// outline stuff
+	layInf = e2::PipelineLayoutCreateInfo();
 	layInf.pushConstantSize = sizeof(e2::OutlineConstants);
 	m_outlinePipelineLayout = renderContext()->createPipelineLayout(layInf);
 
+	// blur stuff 
 	e2::DescriptorSetLayoutCreateInfo setLayoutInf{};
 	setLayoutInf.bindings = {
 		{e2::DescriptorBindingType::Texture},
@@ -1101,12 +1041,10 @@ void e2::HexGrid::initializeFogOfWar()
 	};
 	m_blurSetLayout = renderContext()->createDescriptorSetLayout(setLayoutInf);
 
+	layInf = e2::PipelineLayoutCreateInfo();
 	layInf.pushConstantSize = sizeof(e2::BlurConstants);
 	layInf.sets.push(m_blurSetLayout);
 	m_blurPipelineLayout = renderContext()->createPipelineLayout(layInf);
-
-	m_fogOfWarCommandBuffers[0] = renderManager()->framePool(0)->createBuffer({});
-	m_fogOfWarCommandBuffers[1] = renderManager()->framePool(1)->createBuffer({});
 
 	e2::DescriptorPoolCreateInfo poolCreateInfo{};
 	poolCreateInfo.maxSets = 2 * e2::maxNumSessions;
@@ -1114,16 +1052,7 @@ void e2::HexGrid::initializeFogOfWar()
 	poolCreateInfo.numTextures = 2 * e2::maxNumSessions;
 	m_blurPool = mainThreadContext()->createDescriptorPool(poolCreateInfo);
 
-	m_blurSet[0] = m_blurPool->createDescriptorSet(m_blurSetLayout);
-	m_blurSet[1] = m_blurPool->createDescriptorSet(m_blurSetLayout);
-
-
-
-
-
-
-
-
+	// minimap stuff
 	e2::DescriptorSetLayoutCreateInfo miniSetLayoutInf{};
 	miniSetLayoutInf.bindings = {
 		{e2::DescriptorBindingType::Texture},
@@ -1137,28 +1066,30 @@ void e2::HexGrid::initializeFogOfWar()
 	miniPoolCreateInfo.numTextures = 2 * e2::maxNumSessions;
 	m_minimapPool = mainThreadContext()->createDescriptorPool(miniPoolCreateInfo);
 
-	m_minimapSet = m_minimapPool->createDescriptorSet(m_minimapLayout);
-
-
-
 	m_minimapSize = {320, 220};
 	e2::TextureCreateInfo minimapTexInf{};
 	minimapTexInf.initialLayout = e2::TextureLayout::ShaderRead;
 	minimapTexInf.format = TextureFormat::SRGB8A8;
 	minimapTexInf.resolution = { m_minimapSize, 1 };
-	m_minimapTexture = renderContext()->createTexture(minimapTexInf);
+	m_frameData[0].minimapTexture = renderContext()->createTexture(minimapTexInf);
+	m_frameData[1].minimapTexture = renderContext()->createTexture(minimapTexInf);
 
 	e2::RenderTargetCreateInfo minimapTargetInfo{};
 	minimapTargetInfo.areaExtent = m_minimapSize;
 
 	e2::RenderAttachment minimapAttachment{};
-	minimapAttachment.target = m_minimapTexture;
 	minimapAttachment.clearMethod = ClearMethod::ColorFloat;
 	minimapAttachment.clearValue.clearColorf32 = { 0.f, 0.f, 0.f, 1.0f };
 	minimapAttachment.loadOperation = LoadOperation::Clear;
 	minimapAttachment.storeOperation = StoreOperation::Store;
-	minimapTargetInfo.colorAttachments.push(minimapAttachment);
-	m_minimapTarget = renderContext()->createRenderTarget(minimapTargetInfo);
+
+	minimapAttachment.target = m_frameData[0].minimapTexture;
+	minimapTargetInfo.colorAttachments = { minimapAttachment };
+	m_frameData[0].minimapTarget = renderContext()->createRenderTarget(minimapTargetInfo);
+
+	minimapAttachment.target = m_frameData[1].minimapTexture;
+	minimapTargetInfo.colorAttachments = { minimapAttachment };
+	m_frameData[1].minimapTarget = renderContext()->createRenderTarget(minimapTargetInfo);
 
 	e2::PipelineLayoutCreateInfo minilayInf{};
 	minilayInf.pushConstantSize = sizeof(e2::MiniMapConstants);
@@ -1166,32 +1097,86 @@ void e2::HexGrid::initializeFogOfWar()
 	m_minimapPipelineLayout = renderContext()->createPipelineLayout(minilayInf);
 
 
-
-
-
+	// mapvis stuff 
+	glm::uvec2 mapVisSize = glm::vec2(m_minimapSize) * 0.25f;
 	e2::TextureCreateInfo mapvisTexInf{};
 	mapvisTexInf.initialLayout = e2::TextureLayout::ShaderRead;
 	mapvisTexInf.format = TextureFormat::RGBA8;
-	mapvisTexInf.resolution = { m_minimapSize, 1 };
-	m_mapVisTexture = renderContext()->createTexture(mapvisTexInf);
+	mapvisTexInf.resolution = { mapVisSize, 1 };
+	m_frameData[0].mapVisTextures[0] = renderContext()->createTexture(mapvisTexInf);
+	m_frameData[0].mapVisTextures[1] = renderContext()->createTexture(mapvisTexInf);
+	m_frameData[1].mapVisTextures[0] = renderContext()->createTexture(mapvisTexInf);
+	m_frameData[1].mapVisTextures[1] = renderContext()->createTexture(mapvisTexInf);
 
 	e2::RenderTargetCreateInfo mapVisTargetInfo{};
-	mapVisTargetInfo.areaExtent = m_minimapSize;
+	mapVisTargetInfo.areaExtent = mapVisSize;
 
 	e2::RenderAttachment mapVisAttachemnt{};
-	mapVisAttachemnt.target = m_mapVisTexture;
 	mapVisAttachemnt.clearMethod = ClearMethod::ColorFloat;
 	mapVisAttachemnt.clearValue.clearColorf32 = { 0.f, 0.f, 0.f, 0.0f };
 	mapVisAttachemnt.loadOperation = LoadOperation::Clear;
 	mapVisAttachemnt.storeOperation = StoreOperation::Store;
-	mapVisTargetInfo.colorAttachments.push(mapVisAttachemnt);
-	m_mapVisTarget = renderContext()->createRenderTarget(mapVisTargetInfo);
+
+	mapVisAttachemnt.target = m_frameData[0].mapVisTextures[0];
+	mapVisTargetInfo.colorAttachments = { mapVisAttachemnt };
+	m_frameData[0].mapVisTargets[0] = renderContext()->createRenderTarget(mapVisTargetInfo);
+
+
+	mapVisAttachemnt.target = m_frameData[0].mapVisTextures[1];
+	mapVisTargetInfo.colorAttachments = { mapVisAttachemnt };
+	m_frameData[0].mapVisTargets[1] = renderContext()->createRenderTarget(mapVisTargetInfo);
+
+
+	mapVisAttachemnt.target = m_frameData[1].mapVisTextures[0];
+	mapVisTargetInfo.colorAttachments = { mapVisAttachemnt };
+	m_frameData[1].mapVisTargets[0] = renderContext()->createRenderTarget(mapVisTargetInfo);
+
+
+	mapVisAttachemnt.target = m_frameData[1].mapVisTextures[1];
+	mapVisTargetInfo.colorAttachments = { mapVisAttachemnt };
+	m_frameData[1].mapVisTargets[1] = renderContext()->createRenderTarget(mapVisTargetInfo);
 
 
 
-	m_minimapSet->writeTexture(0, m_mapVisTexture);
-	m_minimapSet->writeSampler(1, renderManager()->clampSampler());
 
+
+
+	// setup descriptor sets that binds mapvis to minimap 
+	m_frameData[0].minimapSet = m_minimapPool->createDescriptorSet(m_minimapLayout);
+	m_frameData[1].minimapSet = m_minimapPool->createDescriptorSet(m_minimapLayout);
+	m_frameData[0].minimapSet->writeTexture(0, m_frameData[0].mapVisTextures[0]); // set it to texture0 since that's the one thatll be used (render->blur->blur)
+	m_frameData[0].minimapSet->writeSampler(1, renderManager()->clampSampler());
+	m_frameData[1].minimapSet->writeTexture(0, m_frameData[1].mapVisTextures[0]);
+	m_frameData[1].minimapSet->writeSampler(1, renderManager()->clampSampler());
+
+	// setup descriptor sets that binds fogofwar masks for the blur shader 
+	m_frameData[0].fogOfWarMaskBlurSets[0] = m_blurPool->createDescriptorSet(m_blurSetLayout);
+	m_frameData[0].fogOfWarMaskBlurSets[1] = m_blurPool->createDescriptorSet(m_blurSetLayout);
+	m_frameData[1].fogOfWarMaskBlurSets[0] = m_blurPool->createDescriptorSet(m_blurSetLayout);
+	m_frameData[1].fogOfWarMaskBlurSets[1] = m_blurPool->createDescriptorSet(m_blurSetLayout);
+
+	// setup descriptor sets that binds mapvis texture for the blur shader 
+	m_frameData[0].mapVisBlurSets[0] = m_blurPool->createDescriptorSet(m_blurSetLayout);
+	m_frameData[0].mapVisBlurSets[1] = m_blurPool->createDescriptorSet(m_blurSetLayout);
+	m_frameData[1].mapVisBlurSets[0] = m_blurPool->createDescriptorSet(m_blurSetLayout);
+	m_frameData[1].mapVisBlurSets[1] = m_blurPool->createDescriptorSet(m_blurSetLayout);
+
+	// can just write to mapvis blur sets here because we never resize these textures
+	m_frameData[0].mapVisBlurSets[0]->writeTexture(0, m_frameData[0].mapVisTextures[0]);
+	m_frameData[0].mapVisBlurSets[1]->writeTexture(0, m_frameData[0].mapVisTextures[1]);
+	m_frameData[0].mapVisBlurSets[0]->writeSampler(1, renderManager()->clampSampler());
+	m_frameData[0].mapVisBlurSets[1]->writeSampler(1, renderManager()->clampSampler());
+	m_frameData[1].mapVisBlurSets[0]->writeTexture(0, m_frameData[1].mapVisTextures[0]);
+	m_frameData[1].mapVisBlurSets[1]->writeTexture(0, m_frameData[1].mapVisTextures[1]);
+	m_frameData[1].mapVisBlurSets[0]->writeSampler(1, renderManager()->clampSampler());
+	m_frameData[1].mapVisBlurSets[1]->writeSampler(1, renderManager()->clampSampler());
+
+
+
+
+	// setup command buffers
+	m_fogOfWarCommandBuffers[0] = renderManager()->framePool(0)->createBuffer({});
+	m_fogOfWarCommandBuffers[1] = renderManager()->framePool(1)->createBuffer({});
 
 
 	invalidateFogOfWarShaders();
@@ -1200,55 +1185,84 @@ void e2::HexGrid::initializeFogOfWar()
 
 void e2::HexGrid::invalidateFogOfWarRenderTarget(glm::uvec2 const& newResolution)
 {
-	if (m_outlineTarget)
-		e2::discard(m_outlineTarget);
+	if (m_frameData[0].outlineTarget)
+		e2::discard(m_frameData[0].outlineTarget);
+	if (m_frameData[1].outlineTarget)
+		e2::discard(m_frameData[1].outlineTarget);
 
-	if (m_outlineTexture)
-		e2::discard(m_outlineTexture);
+	if (m_frameData[0].outlineTexture)
+		e2::discard(m_frameData[0].outlineTexture);
 
-	if (m_fogOfWarMask[0])
-		e2::discard(m_fogOfWarMask[0]);
+	if (m_frameData[0].fogOfWarMasks[0])
+		e2::discard(m_frameData[0].fogOfWarMasks[0]);
+	if (m_frameData[0].fogOfWarMasks[1])
+		e2::discard(m_frameData[0].fogOfWarMasks[1]);
+	if (m_frameData[1].fogOfWarMasks[0])
+		e2::discard(m_frameData[1].fogOfWarMasks[0]);
+	if (m_frameData[1].fogOfWarMasks[1])
+		e2::discard(m_frameData[1].fogOfWarMasks[1]);
 
-	if (m_fogOfWarMask[1])
-		e2::discard(m_fogOfWarMask[1]);
-
-	if (m_fogOfWarTarget[0])
-		e2::discard(m_fogOfWarTarget[0]);
-
-	if (m_fogOfWarTarget[1])
-		e2::discard(m_fogOfWarTarget[1]);
+	if (m_frameData[0].fogOfWarTargets[0])
+		e2::discard(m_frameData[0].fogOfWarTargets[0]);
+	if (m_frameData[0].fogOfWarTargets[1])
+		e2::discard(m_frameData[0].fogOfWarTargets[1]);
+	if (m_frameData[1].fogOfWarTargets[0])
+		e2::discard(m_frameData[1].fogOfWarTargets[0]);
+	if (m_frameData[1].fogOfWarTargets[1])
+		e2::discard(m_frameData[1].fogOfWarTargets[1]);
 
 	e2::TextureCreateInfo texInf{};
 	texInf.initialLayout = e2::TextureLayout::ShaderRead;
 	texInf.format = TextureFormat::RGBA8;
 	texInf.resolution = { glm::vec2(newResolution) / 16.0f, 1 };
 	texInf.mips = 1;
-	m_fogOfWarMask[0] = renderContext()->createTexture(texInf);
-	m_fogOfWarMask[1] = renderContext()->createTexture(texInf);
+	m_frameData[0].fogOfWarMasks[0] = renderContext()->createTexture(texInf);
+	m_frameData[0].fogOfWarMasks[1] = renderContext()->createTexture(texInf);
+	m_frameData[1].fogOfWarMasks[0] = renderContext()->createTexture(texInf);
+	m_frameData[1].fogOfWarMasks[1] = renderContext()->createTexture(texInf);
+
 
 	e2::RenderTargetCreateInfo renderTargetInfo{};
 	renderTargetInfo.areaExtent = glm::vec2(newResolution) / 16.0f;
 
 	e2::RenderAttachment colorAttachment{};
-	colorAttachment.target = m_fogOfWarMask[0];
 	colorAttachment.clearMethod = ClearMethod::ColorFloat;
 	colorAttachment.clearValue.clearColorf32 = { 0.f, 0.f, 0.f, 0.0f };
 	colorAttachment.loadOperation = LoadOperation::Clear;
 	colorAttachment.storeOperation = StoreOperation::Store;
-	renderTargetInfo.colorAttachments.push(colorAttachment);
-	m_fogOfWarTarget[0] = renderContext()->createRenderTarget(renderTargetInfo);
 
-	renderTargetInfo.colorAttachments[0].target = m_fogOfWarMask[1];
-	m_fogOfWarTarget[1] = renderContext()->createRenderTarget(renderTargetInfo);
+	colorAttachment.target = m_frameData[0].fogOfWarMasks[0];
+	renderTargetInfo.colorAttachments = { colorAttachment };
+	m_frameData[0].fogOfWarTargets[0] = renderContext()->createRenderTarget(renderTargetInfo);
 
-	m_fogProxy->visibilityMask.set(m_fogOfWarMask[0]);
+	colorAttachment.target = m_frameData[0].fogOfWarMasks[1];
+	renderTargetInfo.colorAttachments = { colorAttachment };
+	m_frameData[0].fogOfWarTargets[1] = renderContext()->createRenderTarget(renderTargetInfo);
+
+	colorAttachment.target = m_frameData[1].fogOfWarMasks[0];
+	renderTargetInfo.colorAttachments = { colorAttachment };
+	m_frameData[1].fogOfWarTargets[0] = renderContext()->createRenderTarget(renderTargetInfo);
+
+	colorAttachment.target = m_frameData[1].fogOfWarMasks[1];
+	renderTargetInfo.colorAttachments = { colorAttachment };
+	m_frameData[1].fogOfWarTargets[1] = renderContext()->createRenderTarget(renderTargetInfo);
+
+
+
+	m_fogProxy->visibilityMasks[0].set(m_frameData[0].fogOfWarMasks[0]);
+	m_fogProxy->visibilityMasks[1].set(m_frameData[1].fogOfWarMasks[0]);
 	//m_waterProxy->visibilityMask.set(m_fogOfWarMask[0]);
 	//m_terrainProxy->visibilityMask.set(m_fogOfWarMask[0]);
 
-	m_blurSet[0]->writeTexture(0, m_fogOfWarMask[0]);
-	m_blurSet[1]->writeTexture(0, m_fogOfWarMask[1]);
-	m_blurSet[0]->writeSampler(1, renderManager()->clampSampler());
-	m_blurSet[1]->writeSampler(1, renderManager()->clampSampler());
+	
+	m_frameData[0].fogOfWarMaskBlurSets[0]->writeTexture(0, m_frameData[0].fogOfWarMasks[0]);
+	m_frameData[0].fogOfWarMaskBlurSets[1]->writeTexture(0, m_frameData[0].fogOfWarMasks[1]);
+	m_frameData[0].fogOfWarMaskBlurSets[0]->writeSampler(1, renderManager()->clampSampler());
+	m_frameData[0].fogOfWarMaskBlurSets[1]->writeSampler(1, renderManager()->clampSampler());
+	m_frameData[1].fogOfWarMaskBlurSets[0]->writeTexture(0, m_frameData[1].fogOfWarMasks[0]);
+	m_frameData[1].fogOfWarMaskBlurSets[1]->writeTexture(0, m_frameData[1].fogOfWarMasks[1]);
+	m_frameData[1].fogOfWarMaskBlurSets[0]->writeSampler(1, renderManager()->clampSampler());
+	m_frameData[1].fogOfWarMaskBlurSets[1]->writeSampler(1, renderManager()->clampSampler());
 
 
 	// outline target
@@ -1256,16 +1270,22 @@ void e2::HexGrid::invalidateFogOfWarRenderTarget(glm::uvec2 const& newResolution
 	texInf.format = TextureFormat::RGBA8;
 	texInf.resolution = { newResolution, 1 };
 	texInf.mips = 1;
-	m_outlineTexture = renderContext()->createTexture(texInf);
+	m_frameData[0].outlineTexture = renderContext()->createTexture(texInf);
+	m_frameData[1].outlineTexture = renderContext()->createTexture(texInf);
 
 	renderTargetInfo.areaExtent = newResolution;
-	colorAttachment.target = m_outlineTexture;
 	colorAttachment.clearMethod = ClearMethod::ColorFloat;
 	colorAttachment.clearValue.clearColorf32 = { 0.f, 0.f, 0.f, 0.0f };
 	colorAttachment.loadOperation = LoadOperation::Clear;
 	colorAttachment.storeOperation = StoreOperation::Store;
+
+	colorAttachment.target = m_frameData[0].outlineTexture;
 	renderTargetInfo.colorAttachments = { colorAttachment };
-	m_outlineTarget = renderContext()->createRenderTarget(renderTargetInfo);
+	m_frameData[0].outlineTarget = renderContext()->createRenderTarget(renderTargetInfo);
+
+	colorAttachment.target = m_frameData[1].outlineTexture;
+	renderTargetInfo.colorAttachments = { colorAttachment };
+	m_frameData[1].outlineTarget = renderContext()->createRenderTarget(renderTargetInfo);
 }
 
 void e2::HexGrid::invalidateFogOfWarShaders()
@@ -1416,8 +1436,11 @@ void e2::HexGrid::invalidateFogOfWarShaders()
 
 void e2::HexGrid::renderFogOfWar()
 {
+	uint8_t frameIndex = renderManager()->frameIndex();
+	FrameData& frameData = m_frameData[frameIndex];
+
 	glm::uvec2 newResolution = m_streamingView.resolution;
-	if (newResolution != m_fogOfWarMaskSize || !m_fogOfWarMask)
+	if (newResolution != m_fogOfWarMaskSize || !m_frameData[0].fogOfWarMasks[0])
 	{
 		invalidateFogOfWarRenderTarget(newResolution);
 		m_fogOfWarMaskSize = newResolution;
@@ -1429,12 +1452,12 @@ void e2::HexGrid::renderFogOfWar()
 	e2::OutlineConstants outlineConstants;
 	glm::mat4 vpMatrix = m_streamingView.view.calculateProjectionMatrix(m_streamingView.resolution) * m_streamingView.view.calculateViewMatrix();
 
-	e2::ICommandBuffer* buff = m_fogOfWarCommandBuffers[renderManager()->frameIndex()];
+	e2::ICommandBuffer* buff = m_fogOfWarCommandBuffers[frameIndex];
 	e2::PipelineSettings defaultSettings;
 	defaultSettings.frontFace = e2::FrontFace::CCW;
 	buff->beginRecord(true, defaultSettings);
-	buff->useAsAttachment(m_outlineTexture);
-	buff->beginRender(m_outlineTarget);
+	buff->useAsAttachment(frameData.outlineTexture);
+	buff->beginRender(frameData.outlineTarget);
 	buff->bindPipeline(m_outlinePipeline);
 	buff->bindVertexLayout(hexSpec.vertexLayout);
 	buff->bindIndexBuffer(hexSpec.indexBuffer);
@@ -1472,13 +1495,19 @@ void e2::HexGrid::renderFogOfWar()
 		buff->draw(hexSpec.indexCount, 1);
 	}
 	buff->endRender();
-	buff->useAsDefault(m_outlineTexture);
+	buff->useAsDefault(frameData.outlineTexture);
+
+
+
+
+
+
 
 	//fog of war
 	e2::FogOfWarConstants fogOfWarConstants;
 
-	buff->useAsAttachment(m_fogOfWarMask[0]);
-	buff->beginRender(m_fogOfWarTarget[0]);
+	buff->useAsAttachment(frameData.fogOfWarMasks[0]);
+	buff->beginRender(frameData.fogOfWarTargets[0]);
 	buff->bindPipeline(m_fogOfWarPipeline);
 
 	// Bind vertex states
@@ -1524,34 +1553,35 @@ void e2::HexGrid::renderFogOfWar()
 
 
 	}
+	buff->endRender();	
+	buff->useAsDefault(frameData.fogOfWarMasks[0]);
 
-	buff->endRender();
-	
-	buff->useAsDefault(m_fogOfWarMask[0]);
 
 	buff->setFrontFace(e2::FrontFace::CW);
+	
+	// blur 
 	BlurConstants bc;
 	bc.direction = { 1.0f, 0.0f };
-	buff->useAsAttachment(m_fogOfWarMask[1]);
-	buff->beginRender(m_fogOfWarTarget[1]);
+	buff->useAsAttachment(frameData.fogOfWarMasks[1]);
+	buff->beginRender(frameData.fogOfWarTargets[1]);
 	buff->bindPipeline(m_blurPipeline);
 	buff->nullVertexLayout();
-	buff->bindDescriptorSet(m_blurPipelineLayout, 0, m_blurSet[0]);
+	buff->bindDescriptorSet(m_blurPipelineLayout, 0, frameData.fogOfWarMaskBlurSets[0]);
 	buff->pushConstants(m_blurPipelineLayout, 0, sizeof(e2::BlurConstants), reinterpret_cast<uint8_t*>(&bc));
 	buff->drawNonIndexed(3, 1);
 	buff->endRender();
-	buff->useAsDefault(m_fogOfWarMask[1]);
+	buff->useAsDefault(frameData.fogOfWarMasks[1]);
 
 	bc.direction = { 0.0f, 1.0f };
-	buff->useAsAttachment(m_fogOfWarMask[0]);
-	buff->beginRender(m_fogOfWarTarget[0]);
+	buff->useAsAttachment(frameData.fogOfWarMasks[0]);
+	buff->beginRender(frameData.fogOfWarTargets[0]);
 	buff->bindPipeline(m_blurPipeline);
 	buff->nullVertexLayout();
-	buff->bindDescriptorSet(m_blurPipelineLayout, 0, m_blurSet[1]);
+	buff->bindDescriptorSet(m_blurPipelineLayout, 0, frameData.fogOfWarMaskBlurSets[1]);
 	buff->pushConstants(m_blurPipelineLayout, 0, sizeof(e2::BlurConstants), reinterpret_cast<uint8_t*>(&bc));
 	buff->drawNonIndexed(3, 1);
 	buff->endRender();
-	buff->useAsDefault(m_fogOfWarMask[0]);
+	buff->useAsDefault(frameData.fogOfWarMasks[0]);
 
 
 	// minimap
@@ -1566,17 +1596,22 @@ void e2::HexGrid::renderFogOfWar()
 	glm::vec2 worldOffset = m_minimapViewBounds.min;
 	glm::vec2 worldCenter = worldOffset + worldSize / 2.0f;
 
+	// rescale and then recenter
 	if (worldSize.x < worldSize.y)
 		worldSize.x = (worldSize.x / (worldSize.x / worldSize.y)) * (m_minimapSize.x / m_minimapSize.y);
 	else
 		worldSize.y = (worldSize.y / (worldSize.y / worldSize.x)) * (m_minimapSize.x / m_minimapSize.y);
 
-	worldCenter = worldCenter + m_minimapViewOffset;
-	worldSize = worldSize * m_minimapViewZoom;
+	//worldCenter = worldCenter + m_minimapViewOffset;
+	//worldSize = worldSize * m_minimapViewZoom;
 
 	m_minimapViewBounds.min = worldCenter - worldSize / 2.0f;
 	m_minimapViewBounds.max = worldCenter + worldSize / 2.0f;
 
+	// refresh these variables as we use them fuirther down 
+	worldSize = m_minimapViewBounds.max - m_minimapViewBounds.min;
+	worldOffset = m_minimapViewBounds.min;
+	worldCenter = worldOffset + worldSize / 2.0f;
 
 	glm::vec2 cs = chunkSize();
 	glm::vec2 csPixels = (cs / worldSize) * glm::vec2(m_minimapSize);
@@ -1586,13 +1621,14 @@ void e2::HexGrid::renderFogOfWar()
 	visConstants.quadColor = {1.0f, 1.0f, 1.0f, 1.0f};
 	visConstants.quadSize = csPixels;
 	visConstants.surfaceSize = m_minimapSize;
+	visConstants.quadZ = 0.0f;
 
 	
 	e2::UIManager* ui = uiManager();
 
-	
-	buff->useAsAttachment(m_mapVisTexture);
-	buff->beginRender(m_mapVisTarget);
+	// map vis 
+	buff->useAsAttachment(frameData.mapVisTextures[0]);
+	buff->beginRender(frameData.mapVisTargets[0]);
 
 	buff->bindVertexLayout(ui->quadVertexLayout);
 	buff->bindIndexBuffer(ui->quadIndexBuffer);
@@ -1615,9 +1651,32 @@ void e2::HexGrid::renderFogOfWar()
 	}
 
 	buff->endRender();
-	buff->useAsDefault(m_mapVisTexture);
+	buff->useAsDefault(frameData.mapVisTextures[0]);
 
 
+
+	// map vis blur 
+	bc.direction = { 1.0f, 0.0f };
+	buff->useAsAttachment(frameData.mapVisTextures[1]);
+	buff->beginRender(frameData.mapVisTargets[1]);
+	buff->bindPipeline(m_blurPipeline);
+	buff->nullVertexLayout();
+	buff->bindDescriptorSet(m_blurPipelineLayout, 0, frameData.mapVisBlurSets[0]);
+	buff->pushConstants(m_blurPipelineLayout, 0, sizeof(e2::BlurConstants), reinterpret_cast<uint8_t*>(&bc));
+	buff->drawNonIndexed(3, 1);
+	buff->endRender();
+	buff->useAsDefault(frameData.mapVisTextures[1]);
+
+	bc.direction = { 0.0f, 1.0f };
+	buff->useAsAttachment(frameData.mapVisTextures[0]);
+	buff->beginRender(frameData.mapVisTargets[0]);
+	buff->bindPipeline(m_blurPipeline);
+	buff->nullVertexLayout();
+	buff->bindDescriptorSet(m_blurPipelineLayout, 0, frameData.mapVisBlurSets[1]);
+	buff->pushConstants(m_blurPipelineLayout, 0, sizeof(e2::BlurConstants), reinterpret_cast<uint8_t*>(&bc));
+	buff->drawNonIndexed(3, 1);
+	buff->endRender();
+	buff->useAsDefault(frameData.mapVisTextures[0]);
 
 
 
@@ -1633,20 +1692,20 @@ void e2::HexGrid::renderFogOfWar()
 	minimapConstants.worldMin = m_minimapViewBounds.min;
 	minimapConstants.worldMax = m_minimapViewBounds.max;
 
-	buff->useAsAttachment(m_minimapTexture);
-	buff->beginRender(m_minimapTarget);
+	buff->useAsAttachment(frameData.minimapTexture);
+	buff->beginRender(frameData.minimapTarget);
 	buff->bindPipeline(m_minimapPipeline);
 
 	// Bind vertex states
 	buff->nullVertexLayout();
-	buff->bindDescriptorSet(m_minimapPipelineLayout, 0, m_minimapSet);
+	buff->bindDescriptorSet(m_minimapPipelineLayout, 0, frameData.minimapSet);
 	buff->pushConstants(m_minimapPipelineLayout, 0, sizeof(e2::MiniMapConstants), reinterpret_cast<uint8_t*>(&minimapConstants));
 	buff->drawNonIndexed(3, 1);
 
 
 	buff->endRender();
 
-	buff->useAsDefault(m_minimapTexture);
+	buff->useAsDefault(frameData.minimapTexture);
 
 
 
@@ -1668,10 +1727,14 @@ void e2::HexGrid::updateWorldBounds()
 
 void e2::HexGrid::destroyFogOfWar()
 {
-	if (m_minimapTexture)
-		e2::discard(m_minimapTexture);
-	if (m_minimapTarget)
-		e2::discard(m_minimapTarget);
+	if (m_frameData[0].minimapTexture)
+		e2::discard(m_frameData[0].minimapTexture);
+	if (m_frameData[1].minimapTexture)
+		e2::discard(m_frameData[1].minimapTexture);
+	if (m_frameData[0].minimapTarget)
+		e2::discard(m_frameData[0].minimapTarget);
+	if (m_frameData[1].minimapTarget)
+		e2::discard(m_frameData[1].minimapTarget);
 	if (m_minimapPipelineLayout)
 		e2::discard(m_minimapPipelineLayout);
 	if (m_minimapPipeline)
@@ -1682,23 +1745,49 @@ void e2::HexGrid::destroyFogOfWar()
 
 	if (m_minimapLayout)
 		e2::discard(m_minimapLayout);
-	if (m_minimapSet)
-		e2::discard(m_minimapSet);
+	if (m_frameData[0].minimapSet)
+		e2::discard(m_frameData[0].minimapSet);
+	if (m_frameData[1].minimapSet)
+		e2::discard(m_frameData[1].minimapSet);
 	if (m_minimapPool)
 		e2::discard(m_minimapPool);
 
-	if (m_mapVisTarget)
-		e2::discard(m_mapVisTarget);
+	if (m_frameData[0].mapVisTargets[0])
+		e2::discard(m_frameData[0].mapVisTargets[0]);
+	if (m_frameData[0].mapVisTargets[1])
+		e2::discard(m_frameData[0].mapVisTargets[1]);
+	if (m_frameData[1].mapVisTargets[0])
+		e2::discard(m_frameData[1].mapVisTargets[0]);
+	if (m_frameData[1].mapVisTargets[1])
+		e2::discard(m_frameData[1].mapVisTargets[1]);
 
-	if (m_mapVisTexture)
-		e2::discard(m_mapVisTexture);
+	if (m_frameData[0].mapVisTextures[0])
+		e2::discard(m_frameData[0].mapVisTextures[0]);
+	if (m_frameData[0].mapVisTextures[1])
+		e2::discard(m_frameData[0].mapVisTextures[1]);
+	if (m_frameData[1].mapVisTextures[0])
+		e2::discard(m_frameData[1].mapVisTextures[0]);
+	if (m_frameData[1].mapVisTextures[1])
+		e2::discard(m_frameData[1].mapVisTextures[1]);
 
 
-	if (m_blurSet[0])
-		e2::discard(m_blurSet[0]);
+	if (m_frameData[0].fogOfWarMaskBlurSets[0])
+		e2::discard(m_frameData[0].fogOfWarMaskBlurSets[0]);
+	if (m_frameData[0].fogOfWarMaskBlurSets[1])
+		e2::discard(m_frameData[0].fogOfWarMaskBlurSets[1]);
+	if (m_frameData[1].fogOfWarMaskBlurSets[0])
+		e2::discard(m_frameData[1].fogOfWarMaskBlurSets[0]);
+	if (m_frameData[1].fogOfWarMaskBlurSets[1])
+		e2::discard(m_frameData[1].fogOfWarMaskBlurSets[1]);
 
-	if (m_blurSet[1])
-		e2::discard(m_blurSet[1]);
+	if (m_frameData[0].mapVisBlurSets[0])
+		e2::discard(m_frameData[0].mapVisBlurSets[0]);
+	if (m_frameData[0].mapVisBlurSets[1])
+		e2::discard(m_frameData[0].mapVisBlurSets[1]);
+	if (m_frameData[1].mapVisBlurSets[0])
+		e2::discard(m_frameData[1].mapVisBlurSets[0]);
+	if (m_frameData[1].mapVisBlurSets[1])
+		e2::discard(m_frameData[1].mapVisBlurSets[1]);
 
 	if (m_blurPool)
 		e2::discard(m_blurPool);
@@ -1718,18 +1807,21 @@ void e2::HexGrid::destroyFogOfWar()
 	if (m_fogOfWarPipelineLayout)
 		e2::discard(m_fogOfWarPipelineLayout);
 
-	if (m_fogOfWarMask[0])
-		e2::discard(m_fogOfWarMask[0]);
+	if (m_frameData[0].fogOfWarMasks[0])
+		e2::discard(m_frameData[0].fogOfWarMasks[0]);
+	if (m_frameData[0].fogOfWarMasks[1])
+		e2::discard(m_frameData[0].fogOfWarMasks[1]);
+
+	if (m_frameData[1].fogOfWarMasks[0])
+		e2::discard(m_frameData[1].fogOfWarMasks[0]);
+	if (m_frameData[1].fogOfWarMasks[1])
+		e2::discard(m_frameData[1].fogOfWarMasks[1]);
 
 
-	if (m_fogOfWarMask[1])
-		e2::discard(m_fogOfWarMask[1]);
-
-	if (m_fogOfWarTarget[0])
-		e2::discard(m_fogOfWarTarget[0]);
-
-	if (m_fogOfWarTarget[1])
-		e2::discard(m_fogOfWarTarget[1]);
+	if (m_frameData[1].fogOfWarTargets[0])
+		e2::discard(m_frameData[1].fogOfWarTargets[0]);
+	if (m_frameData[1].fogOfWarTargets[1])
+		e2::discard(m_frameData[1].fogOfWarTargets[1]);
 
 	if (m_fogOfWarVertexShader)
 		e2::discard(m_fogOfWarVertexShader);
@@ -1797,14 +1889,14 @@ void e2::HexGrid::pushOutline(glm::ivec2 const& tile)
 	m_outlineTiles.push_back(tile);
 }
 
-e2::ITexture* e2::HexGrid::outlineTexture()
+e2::ITexture* e2::HexGrid::outlineTexture(uint8_t frameIndex)
 {
-	return m_outlineTexture;
+	return m_frameData[frameIndex].outlineTexture;
 }
 
-e2::ITexture* e2::HexGrid::minimapTexture()
+e2::ITexture* e2::HexGrid::minimapTexture(uint8_t frameIndex)
 {
-	return m_minimapTexture;
+	return m_frameData[frameIndex].minimapTexture;
 }
 
 

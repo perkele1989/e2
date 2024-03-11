@@ -81,8 +81,8 @@ void main()
 
 	vec4 m_C = vec4(0.6, 0.6, 0.6, 0.9);
 	vec4 g_C = vec4(0.2, 0.2, 0.2, 0.9);
-	vec4 s_C = vec4(0.2, 0.2, 0.2, 0.1);
-	vec4 o_C = vec4(0.0, 0.0, 0.0, 0.0);
+	vec4 s_C = vec4(0.03, 0.03, 0.03, 0.5);
+	vec4 o_C = vec4(0.0, 0.0, 0.0, 0.5);
 	vec4 f_C = vec4(0.4, 0.4, 0.4, 0.9);
 
 	outColor.rgba = o_C;
@@ -91,16 +91,17 @@ void main()
 	outColor.rgba = mix(outColor.rgba, m_C, m);
 	outColor.rgba = mix(outColor.rgba, f_C, f);
 
-    //outColor.rgb = vec3(lineSegment(position, viewCornerTL, viewCornerTR ));
-    outColor.rgba = mix(outColor.rgba, vec4(1.0, 1.0, 1.0, 1.0), lineSegment(position,viewCornerTL, viewCornerTR ));
+    outColor.rgba = mix(outColor.rgba, vec4(0.0, 0.0, 0.0, 0.0), 1.0 - vis);
+
+	float outlineWidth = 0.1;
+	float outlineSoftness = 0.04;
+	float outlineCenter = 0.3;
+	float outlineCoeff = smoothstep(outlineCenter - (outlineWidth / 2.0),  outlineCenter - (outlineWidth / 2.0) + outlineSoftness, vis);
+	outlineCoeff = outlineCoeff - smoothstep( outlineCenter + (outlineWidth / 2.0) - outlineSoftness , outlineCenter + (outlineWidth / 2.0), vis);
+	outColor.rgba = mix(outColor.rgba, vec4(1.0, 1.0, 1.0, 0.4), outlineCoeff * 0.2);
+
+	outColor.rgba = mix(outColor.rgba, vec4(1.0, 1.0, 1.0, 1.0), lineSegment(position,viewCornerTL, viewCornerTR ));
     outColor.rgba = mix(outColor.rgba, vec4(1.0, 1.0, 1.0, 1.0), lineSegment(position,viewCornerTR, viewCornerBR ));
     outColor.rgba = mix(outColor.rgba, vec4(1.0, 1.0, 1.0, 1.0), lineSegment(position,viewCornerBR, viewCornerBL ));
     outColor.rgba = mix(outColor.rgba, vec4(1.0, 1.0, 1.0, 1.0), lineSegment(position,viewCornerBL, viewCornerTL ));
-
-    //outColor.a *= vis;
-    outColor.rgba = mix(outColor.rgba, vec4(0.0, 0.0, 0.0, 1.0), 1.0 - vis);
-
-	//outColor.r = h;
-
-	//outColor.a = 1.0;
 }

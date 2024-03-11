@@ -74,7 +74,7 @@ namespace e2
 		e2::Pair<e2::IDescriptorSet*> sets{ nullptr };
 
 		e2::DirtyParameter<FogData> uniformData{};
-		e2::DirtyParameter<e2::ITexture*> visibilityMask{};
+		e2::DirtyParameter<e2::ITexture*> visibilityMasks[2];
 
 	};
 

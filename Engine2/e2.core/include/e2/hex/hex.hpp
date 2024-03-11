@@ -424,10 +424,6 @@ namespace e2
 			return m_dynamicMutex;
 		}
 
-		e2::ITexture* fogOfWarMask()
-		{
-			return m_fogOfWarMask[0];
-		}
 
 		// fog of war in this function actually means fog of war, outlines and blur 
 		void initializeFogOfWar();
@@ -444,9 +440,9 @@ namespace e2
 		void clearOutline();
 		void pushOutline(glm::ivec2 const& tile);
 
-		e2::ITexture* outlineTexture();
+		e2::ITexture* outlineTexture(uint8_t frameIndex);
 
-		e2::ITexture* minimapTexture();
+		e2::ITexture* minimapTexture(uint8_t frameIndex);
 
 	protected:
 
@@ -493,23 +489,43 @@ namespace e2
 		std::vector<glm::ivec2> m_outlineTiles;
 
 
-		e2::IRenderTarget* m_fogOfWarTarget[2] = {nullptr, nullptr};
-		e2::ITexture* m_fogOfWarMask[2] = {nullptr, nullptr};
+		struct FrameData
+		{
+			// two masks and targets per frame ,since we want to use these for blur too 
+			e2::IRenderTarget* fogOfWarTargets[2] = { nullptr, nullptr };
+			e2::ITexture* fogOfWarMasks[2] = { nullptr, nullptr };
+			e2::IDescriptorSet* fogOfWarMaskBlurSets[2] = { nullptr, nullptr };
+
+			e2::IRenderTarget* outlineTarget{ nullptr };
+			e2::ITexture* outlineTexture{ nullptr };
+
+			e2::IRenderTarget* minimapTarget{};
+			e2::ITexture* minimapTexture{};
+			e2::IDescriptorSet* minimapSet{};
+
+			// two per frame since blur yo 
+			e2::IRenderTarget* mapVisTargets[2] = {nullptr, nullptr};
+			e2::ITexture* mapVisTextures[2] = {nullptr, nullptr};
+			e2::IDescriptorSet* mapVisBlurSets[2] = { nullptr, nullptr };
+
+		};
+
+		FrameData m_frameData[2];
+
+		e2::IShader* m_blurFragmentShader{};
+		e2::IPipelineLayout* m_blurPipelineLayout{};
+		e2::IPipeline* m_blurPipeline{};
+		e2::IDescriptorSetLayout* m_blurSetLayout{};
+		e2::IDescriptorPool* m_blurPool{};
+
+
 		glm::uvec2 m_fogOfWarMaskSize{};
 		e2::IShader* m_fogOfWarVertexShader{};
 		e2::IShader* m_fogOfWarFragmentShader{};
 		e2::IPipelineLayout* m_fogOfWarPipelineLayout{};
 		e2::IPipeline* m_fogOfWarPipeline{};
 
-		e2::IShader* m_blurFragmentShader{};
-		e2::IPipelineLayout* m_blurPipelineLayout{};
-		e2::IPipeline* m_blurPipeline{};
-		e2::IDescriptorSetLayout* m_blurSetLayout{};
-		e2::IDescriptorSet* m_blurSet[2] = {nullptr, nullptr};
-		e2::IDescriptorPool* m_blurPool{};
 
-		e2::IRenderTarget* m_outlineTarget { nullptr };
-		e2::ITexture* m_outlineTexture { nullptr };
 		e2::IShader* m_outlineVertexShader{};
 		e2::IShader* m_outlineFragmentShader{};
 		e2::IPipelineLayout* m_outlinePipelineLayout{};
@@ -523,18 +539,15 @@ namespace e2
 		}
 	protected:
 		glm::uvec2 m_minimapSize{};
-		e2::IRenderTarget* m_minimapTarget{};
-		e2::ITexture* m_minimapTexture{};
+
 		e2::IShader* m_minimapFragmentShader{};
 		e2::IPipelineLayout* m_minimapPipelineLayout{};
 		e2::IPipeline* m_minimapPipeline{};
 
 		e2::IDescriptorSetLayout* m_minimapLayout{};
-		e2::IDescriptorSet* m_minimapSet{};
 		e2::IDescriptorPool* m_minimapPool{};
 
-		e2::IRenderTarget* m_mapVisTarget{};
-		e2::ITexture* m_mapVisTexture{};
+
 
 	public:
 		void updateWorldBounds();
