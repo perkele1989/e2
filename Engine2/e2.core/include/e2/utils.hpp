@@ -1176,7 +1176,7 @@ namespace e2
 	E2_API ThreadInfo const& threadInfo(e2::Name newName = e2::Name());
 
 	/** unsigned 8 bit floating point type, 0.0f - 1.0f */
-	class ufloat8
+	class E2_API ufloat8
 	{
 	public:
 		ufloat8()=default;

@@ -336,6 +336,7 @@ void e2::ICommandBuffer_Vk::beginRender(e2::IRenderTarget* renderTarget)
 	vkCmdSetScissor(m_vkHandle, 0, 1, &scissor);
 
 	vkCmdBeginRendering(m_vkHandle, &vkTarget->m_vkRenderInfo);
+	// @todo should we maybe automatically transfer rendertarget attachments to attachment write here? and then back to shader read in endrender? Would be lit 
 }
 
 void e2::ICommandBuffer_Vk::endRender()

@@ -33,13 +33,13 @@ namespace e2
 
 	};
 
-	struct PushConstantData
+	struct E2_API PushConstantData
 	{
 		glm::mat4 normalMatrix;
 		glm::uvec2 resolution;
 	};
 
-	struct RendererData
+	struct E2_API RendererData
 	{
 		alignas(16) glm::mat4 viewMatrix;
 		alignas(16) glm::mat4 projectionMatrix;
@@ -48,7 +48,7 @@ namespace e2
 
 	E2_API bool isCounterClockwise(glm::vec2 const& a, glm::vec2 const& b, glm::vec2 const& c);
 
-	struct Line2D
+	struct E2_API Line2D
 	{
 		glm::vec2 start;
 		glm::vec2 end;
@@ -56,7 +56,7 @@ namespace e2
 		bool intersects(Line2D const& other);
 	};
 
-	struct Aabb2D
+	struct E2_API Aabb2D
 	{
 		glm::vec2 min{};
 		glm::vec2 max{};
@@ -68,7 +68,7 @@ namespace e2
 		bool isWithin(glm::vec2 const& point) const;
 	};
 
-	struct Ray2D
+	struct E2_API Ray2D
 	{
 		bool edgeTest(glm::vec2 const& point) const;
 

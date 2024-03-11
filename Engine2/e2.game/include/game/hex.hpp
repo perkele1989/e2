@@ -17,6 +17,8 @@
 namespace e2
 {
 
+	class GameUnit;
+
 	enum class TileFlags : uint16_t
 	{
 		None					= 0b0000'0000'0000'0000,
@@ -123,7 +125,7 @@ namespace e2
 	EnumFlagsDeclaration(ImprovementFlags);
 
 	/** */
-	struct E2_API TileData
+	struct TileData
 	{
 		// flags control biome, resource, improvements
 		TileFlags flags{ TileFlags::None }; // 16 bits
@@ -150,7 +152,7 @@ namespace e2
 	class HexGrid;
 
 	/** @tags(arena, arenaSize=e2::maxNumChunkLoadTasks)  */
-	class E2_API ChunkLoadTask : public e2::AsyncTask
+	class ChunkLoadTask : public e2::AsyncTask
 	{
 		ObjectDeclaration()
 	public:
@@ -190,7 +192,7 @@ namespace e2
 	};
 
 	/** @tags(arena, arenaSize=e2::maxNumChunkStates)  */
-	class E2_API ChunkState : public e2::Object
+	class ChunkState : public e2::Object
 	{
 		ObjectDeclaration()
 	public:
@@ -262,7 +264,7 @@ namespace e2
 	 * Can grow arbitrarily and without limits
 	 * 
 	 */
-	class E2_API HexGrid : public e2::Context
+	class HexGrid : public e2::Context
 	{
 	public:
 
@@ -429,7 +431,7 @@ namespace e2
 		void initializeFogOfWar();
 		void invalidateFogOfWarRenderTarget(glm::uvec2 const& newResolution);
 		void invalidateFogOfWarShaders();
-		void renderFogOfWar();
+		void renderFogOfWar(std::unordered_map<glm::ivec2, e2::GameUnit*> const& unitsMap);
 		void destroyFogOfWar();
 
 		void clearVisibility();
@@ -502,6 +504,9 @@ namespace e2
 			e2::IRenderTarget* minimapTarget{};
 			e2::ITexture* minimapTexture{};
 			e2::IDescriptorSet* minimapSet{};
+
+			e2::IRenderTarget* mapUnitsTarget{};
+			e2::ITexture* mapUnitsTexture{};
 
 			// two per frame since blur yo 
 			e2::IRenderTarget* mapVisTargets[2] = {nullptr, nullptr};

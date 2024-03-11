@@ -19,7 +19,8 @@ layout(push_constant) uniform ConstantData
 };
 
 layout(set = 0, binding = 0) uniform texture2D visibilityMask;
-layout(set = 0, binding = 1) uniform sampler clampSampler;
+layout(set = 0, binding = 1) uniform texture2D unitsTexture;
+layout(set = 0, binding = 2) uniform sampler clampSampler;
 
 
 
@@ -47,6 +48,7 @@ float lineSegment(vec2 p, vec2 a, vec2 b)
 void main()
 {
     float vis = texture(sampler2D(visibilityMask, clampSampler), inUv).r;
+	vec4 units = texture(sampler2D(unitsTexture, clampSampler), inUv).rgba;
     vec2 worldSize = worldMax - worldMin;
 	vec2 position = worldMin + inUv * worldSize;//* zoom;
 
@@ -85,14 +87,20 @@ void main()
 	vec4 o_C = vec4(0.0, 0.0, 0.0, 0.5);
 	vec4 f_C = vec4(0.4, 0.4, 0.4, 0.9);
 
+	// terrain color
 	outColor.rgba = o_C;
 	outColor.rgba = mix(outColor.rgba, s_C, s);
 	outColor.rgba = mix(outColor.rgba, g_C, g);
 	outColor.rgba = mix(outColor.rgba, m_C, m);
 	outColor.rgba = mix(outColor.rgba, f_C, f);
 
+	// units
+	outColor.rgba = mix(outColor.rgba, units.rgba, units.a);
+
+	// cull visibility 
     outColor.rgba = mix(outColor.rgba, vec4(0.0, 0.0, 0.0, 0.0), 1.0 - vis);
 
+	// visibility outline
 	float outlineWidth = 0.1;
 	float outlineSoftness = 0.04;
 	float outlineCenter = 0.3;
@@ -100,8 +108,10 @@ void main()
 	outlineCoeff = outlineCoeff - smoothstep( outlineCenter + (outlineWidth / 2.0) - outlineSoftness , outlineCenter + (outlineWidth / 2.0), vis);
 	outColor.rgba = mix(outColor.rgba, vec4(1.0, 1.0, 1.0, 0.4), outlineCoeff * 0.2);
 
-	outColor.rgba = mix(outColor.rgba, vec4(1.0, 1.0, 1.0, 1.0), lineSegment(position,viewCornerTL, viewCornerTR ));
-    outColor.rgba = mix(outColor.rgba, vec4(1.0, 1.0, 1.0, 1.0), lineSegment(position,viewCornerTR, viewCornerBR ));
-    outColor.rgba = mix(outColor.rgba, vec4(1.0, 1.0, 1.0, 1.0), lineSegment(position,viewCornerBR, viewCornerBL ));
-    outColor.rgba = mix(outColor.rgba, vec4(1.0, 1.0, 1.0, 1.0), lineSegment(position,viewCornerBL, viewCornerTL ));
+	// frustum
+	float lineStrength = 0.15 + smoothstep(0.5, 0.51, vis) * 0.85;
+	outColor.rgba = mix(outColor.rgba, vec4(1.0, 1.0, 1.0, lineStrength), lineSegment(position,viewCornerTL, viewCornerTR ));
+    outColor.rgba = mix(outColor.rgba, vec4(1.0, 1.0, 1.0, lineStrength), lineSegment(position,viewCornerTR, viewCornerBR ));
+    outColor.rgba = mix(outColor.rgba, vec4(1.0, 1.0, 1.0, lineStrength), lineSegment(position,viewCornerBR, viewCornerBL ));
+    outColor.rgba = mix(outColor.rgba, vec4(1.0, 1.0, 1.0, lineStrength), lineSegment(position,viewCornerBL, viewCornerTL ));
 }

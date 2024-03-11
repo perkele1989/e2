@@ -2,7 +2,7 @@
 #pragma once 
 
 #include <e2/application.hpp>
-#include <e2/hex/hex.hpp>
+#include "game/hex.hpp"
 #include "game/gamecontext.hpp"
 #include "game/resources.hpp"
 

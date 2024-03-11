@@ -1,5 +1,5 @@
 
-#include "e2/hex/hex.hpp"
+#include "game/hex.hpp"
 #include "e2/game/gamesession.hpp"
 #include "e2/managers/asyncmanager.hpp"
 #include "e2/managers/uimanager.hpp"
@@ -1056,6 +1056,7 @@ void e2::HexGrid::initializeFogOfWar()
 	e2::DescriptorSetLayoutCreateInfo miniSetLayoutInf{};
 	miniSetLayoutInf.bindings = {
 		{e2::DescriptorBindingType::Texture},
+		{e2::DescriptorBindingType::Texture},
 		{e2::DescriptorBindingType::Sampler},
 	};
 	m_minimapLayout = renderContext()->createDescriptorSetLayout(miniSetLayoutInf);
@@ -1063,7 +1064,7 @@ void e2::HexGrid::initializeFogOfWar()
 	e2::DescriptorPoolCreateInfo miniPoolCreateInfo{};
 	miniPoolCreateInfo.maxSets = 2 * e2::maxNumSessions;
 	miniPoolCreateInfo.numSamplers = 2 * e2::maxNumSessions;
-	miniPoolCreateInfo.numTextures = 2 * e2::maxNumSessions;
+	miniPoolCreateInfo.numTextures = 2 * e2::maxNumSessions * 2;
 	m_minimapPool = mainThreadContext()->createDescriptorPool(miniPoolCreateInfo);
 
 	m_minimapSize = {320, 220};
@@ -1138,6 +1139,31 @@ void e2::HexGrid::initializeFogOfWar()
 
 
 
+	// Map units 
+	e2::TextureCreateInfo unitTexInf{};
+	unitTexInf.initialLayout = e2::TextureLayout::ShaderRead;
+	unitTexInf.format = TextureFormat::SRGB8A8;
+	unitTexInf.resolution = { m_minimapSize, 1 };
+	m_frameData[0].mapUnitsTexture = renderContext()->createTexture(unitTexInf);
+	m_frameData[1].mapUnitsTexture = renderContext()->createTexture(unitTexInf);
+
+	e2::RenderTargetCreateInfo unitTargetInfo{};
+	unitTargetInfo.areaExtent = m_minimapSize;
+
+	e2::RenderAttachment unitAttachment{};
+	unitAttachment.clearMethod = ClearMethod::ColorFloat;
+	unitAttachment.clearValue.clearColorf32 = { 0.f, 0.f, 0.f, 0.0f };
+	unitAttachment.loadOperation = LoadOperation::Clear;
+	unitAttachment.storeOperation = StoreOperation::Store;
+
+	unitAttachment.target = m_frameData[0].mapUnitsTexture;
+	unitTargetInfo.colorAttachments = { unitAttachment };
+	m_frameData[0].mapUnitsTarget = renderContext()->createRenderTarget(unitTargetInfo);
+
+	unitAttachment.target = m_frameData[1].mapUnitsTexture;
+	unitTargetInfo.colorAttachments = { unitAttachment };
+	m_frameData[1].mapUnitsTarget = renderContext()->createRenderTarget(unitTargetInfo);
+
 
 
 
@@ -1145,9 +1171,11 @@ void e2::HexGrid::initializeFogOfWar()
 	m_frameData[0].minimapSet = m_minimapPool->createDescriptorSet(m_minimapLayout);
 	m_frameData[1].minimapSet = m_minimapPool->createDescriptorSet(m_minimapLayout);
 	m_frameData[0].minimapSet->writeTexture(0, m_frameData[0].mapVisTextures[0]); // set it to texture0 since that's the one thatll be used (render->blur->blur)
-	m_frameData[0].minimapSet->writeSampler(1, renderManager()->clampSampler());
+	m_frameData[0].minimapSet->writeTexture(1, m_frameData[0].mapUnitsTexture);
+	m_frameData[0].minimapSet->writeSampler(2, renderManager()->clampSampler());
 	m_frameData[1].minimapSet->writeTexture(0, m_frameData[1].mapVisTextures[0]);
-	m_frameData[1].minimapSet->writeSampler(1, renderManager()->clampSampler());
+	m_frameData[1].minimapSet->writeTexture(1, m_frameData[1].mapUnitsTexture);
+	m_frameData[1].minimapSet->writeSampler(2, renderManager()->clampSampler());
 
 	// setup descriptor sets that binds fogofwar masks for the blur shader 
 	m_frameData[0].fogOfWarMaskBlurSets[0] = m_blurPool->createDescriptorSet(m_blurSetLayout);
@@ -1434,7 +1462,7 @@ void e2::HexGrid::invalidateFogOfWarShaders()
 
 }
 
-void e2::HexGrid::renderFogOfWar()
+void e2::HexGrid::renderFogOfWar(std::unordered_map<glm::ivec2, GameUnit*> const& unitMap)
 {
 	uint8_t frameIndex = renderManager()->frameIndex();
 	FrameData& frameData = m_frameData[frameIndex];
@@ -1679,10 +1707,40 @@ void e2::HexGrid::renderFogOfWar()
 	buff->useAsDefault(frameData.mapVisTextures[0]);
 
 
+	// map units 
+	e2::UIQuadPushConstants unitConstants;
+	unitConstants.quadColor = { 0.0f, 1.0f, 0.0f, 1.0f };
+	unitConstants.quadSize = {3.0f, 3.0f};
+	unitConstants.surfaceSize = m_minimapSize;
+	unitConstants.quadZ = 0.0f;
+
+	buff->useAsAttachment(frameData.mapUnitsTexture);
+	buff->beginRender(frameData.mapUnitsTarget);
+
+	buff->bindVertexLayout(ui->quadVertexLayout);
+	buff->bindIndexBuffer(ui->quadIndexBuffer);
+	buff->bindVertexBuffer(0, ui->quadVertexBuffer);
+	buff->bindPipeline(ui->quadPipeline.pipeline);
+
+	for (auto const& [unitIndex, unit] : unitMap)
+	{
+		glm::vec2 planarUnitPosition = e2::Hex(unitIndex).planarCoords();
+
+		glm::vec2 unitPosNormalized = (planarUnitPosition - worldOffset) / worldSize;
+		glm::vec2 unitPosPixels = unitPosNormalized * glm::vec2(m_minimapSize);
+
+		unitConstants.quadPosition = unitPosPixels - glm::vec2(1.5f, 1.5f);
+		buff->pushConstants(ui->quadPipeline.layout, 0, sizeof(e2::UIQuadPushConstants), reinterpret_cast<uint8_t*>(&unitConstants));
+
+		buff->draw(6, 1);
+	}
+
+	buff->endRender();
+	buff->useAsDefault(frameData.mapUnitsTexture);
 
 
 
-
+	// actual minimap
 	e2::MiniMapConstants minimapConstants;
 	minimapConstants.viewCornerTL = m_streamingView.topLeft;
 	minimapConstants.viewCornerTR = m_streamingView.topRight;
@@ -1742,6 +1800,14 @@ void e2::HexGrid::destroyFogOfWar()
 	if (m_minimapFragmentShader)
 		e2::discard(m_minimapFragmentShader);
 
+	if (m_frameData[0].mapUnitsTexture)
+		e2::discard(m_frameData[0].mapUnitsTexture);
+	if (m_frameData[1].mapUnitsTexture)
+		e2::discard(m_frameData[1].mapUnitsTexture);
+	if (m_frameData[0].mapUnitsTarget)
+		e2::discard(m_frameData[0].mapUnitsTarget);
+	if (m_frameData[1].mapUnitsTarget)
+		e2::discard(m_frameData[1].mapUnitsTarget);
 
 	if (m_minimapLayout)
 		e2::discard(m_minimapLayout);

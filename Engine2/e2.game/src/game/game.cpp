@@ -141,7 +141,7 @@ void e2::Game::update(double seconds)
 	//m_hexGrid->assertChunksWithinRangeVisible(m_viewOrigin, m_viewPoints, m_viewVelocity);
 	m_hexGrid->updateStreaming(m_viewOrigin, m_viewPoints, m_viewVelocity);
 	m_hexGrid->updateWorldBounds();
-	m_hexGrid->renderFogOfWar();
+	m_hexGrid->renderFogOfWar(m_unitIndex);
 
 	// ticking session renders renderer too, and blits it to the UI, so we need to do it precisely here (after rendering fog of war and before rendering UI)
 	m_session->tick(seconds);
