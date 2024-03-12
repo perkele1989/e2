@@ -107,6 +107,17 @@ namespace e2
 
 	};
 
+	class Mine : public e2::GameStructure
+	{
+		ObjectDeclaration();
+	public:
+		Mine(e2::GameContext* ctx, glm::ivec2 const& tile, uint8_t empireId);
+		virtual ~Mine();
+
+		virtual void onTurnEnd() override;
+		virtual void onTurnStart() override;
+	};
+
 
 
 

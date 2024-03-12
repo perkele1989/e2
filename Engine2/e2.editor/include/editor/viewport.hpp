@@ -54,11 +54,11 @@ namespace e2
 		bool m_orbiting{};
 		bool m_offsetting{};
 
-		glm::vec3 m_origin{};
+		glm::dvec3 m_origin{};
 
-		float m_pitch{};
-		float m_yaw{};
-		float m_zoom{};
+		double m_pitch{};
+		double m_yaw{};
+		double m_zoom{};
 	};
 
 }

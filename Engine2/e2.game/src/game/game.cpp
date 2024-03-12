@@ -116,6 +116,15 @@ void e2::Game::initialize()
 
 void e2::Game::shutdown()
 {
+	std::unordered_set<e2::GameUnit*> unitsCopy = m_units;
+	for (e2::GameUnit* unit : unitsCopy)
+		destroyUnit(unit->tileIndex);
+
+	std::unordered_set<e2::GameStructure*> structuresCopy = m_structures;
+	for (e2::GameStructure* structure : structuresCopy)
+		destroyStructure(structure->tileIndex);
+
+
 	if (m_unitAS)
 		e2::destroy(m_unitAS);
 	e2::destroy(m_cursorProxy);
@@ -548,6 +557,9 @@ void e2::Game::updateUnitMove()
 void e2::Game::drawUI()
 {
 	m_uiHovered = false;
+
+	drawResourceIcons();
+
 	drawStatusUI();
 
 	drawUnitUI();
@@ -557,6 +569,103 @@ void e2::Game::drawUI()
 	drawFinalUI();
 
 	drawDebugUI();
+}
+
+void e2::Game::drawResourceIcons()
+{
+	e2::GameSession* session = gameSession();
+	e2::Renderer* renderer = session->renderer();
+	e2::UIContext* ui = session->uiContext();
+
+
+	glm::dvec2 resolution = renderer->resolution();
+	glm::dmat4 vpMatrix = m_view.calculateProjectionMatrix(resolution) * m_view.calculateViewMatrix();
+
+
+
+	for (e2::ChunkState* chunk : m_hexGrid->m_chunksInView)
+	{
+		glm::ivec2 chunkIndex = chunk->chunkIndex;
+		glm::ivec2 chunkTileOffset = chunkIndex * glm::ivec2(e2::hexChunkResolution);
+		
+		for (int32_t y = 0; y < e2::hexChunkResolution; y++)
+		{
+			for (int32_t x = 0; x < e2::hexChunkResolution; x++)
+			{
+				glm::ivec2 worldIndex = chunkTileOffset + glm::ivec2(x, y);
+				
+				e2::TileData* tileData = m_hexGrid->getTileData(worldIndex);
+				if (!tileData)
+					continue;
+
+				e2::TileFlags resource = tileData->getResource();
+				e2::TileFlags abundance = tileData->getAbundance();
+
+				glm::vec4 viewPos = vpMatrix* glm::dvec4( glm::dvec3(e2::Hex(worldIndex).localCoords()) + e2::worldUp() * 0.1, 1.0);
+				viewPos = viewPos / viewPos.z;
+
+				glm::vec2 offset = (glm::vec2(viewPos.x, viewPos.y) * 0.5f + 0.5f) * glm::vec2(resolution);
+
+				
+
+
+
+				auto drawIcon = [abundance, offset, ui, this](glm::vec2 const& uvOffset)	{
+					glm::vec2 uvScale = { 1.0f / 7.0f, 1.0f };
+					if (abundance == TileFlags::Abundance1)
+					{
+						glm::vec2 size(32.0f, 32.0f);
+						glm::vec2 iconOffset = offset - (size / 2.0f);
+						ui->drawTexturedQuad(iconOffset, size, 0xFFFFFFFF, m_uiTextureResources->handle(), uvOffset, uvScale);
+					}
+					else if (abundance == TileFlags::Abundance2)
+					{
+						glm::vec2 size(24.0f, 24.0f);
+						glm::vec2 iconOffset = offset - (size / 2.0f);
+						ui->drawTexturedQuad(iconOffset + glm::vec2(-8.0f, 0.0f), size, 0xFFFFFFFF, m_uiTextureResources->handle(), uvOffset, uvScale);
+						ui->drawTexturedQuad(iconOffset + glm::vec2(8.0f, 0.0f), size, 0xFFFFFFFF, m_uiTextureResources->handle(), uvOffset, uvScale);
+					}
+					else if (abundance == TileFlags::Abundance3)
+					{
+						glm::vec2 size(24.0f, 24.0f);
+						glm::vec2 iconOffset = offset - (size / 2.0f);
+						ui->drawTexturedQuad(iconOffset + glm::vec2(-6.0f, 0.0f), size, 0xFFFFFFFF, m_uiTextureResources->handle(), uvOffset, uvScale);
+						ui->drawTexturedQuad(iconOffset + glm::vec2(2.0f, -8.0f), size, 0xFFFFFFFF, m_uiTextureResources->handle(), uvOffset, uvScale);
+						ui->drawTexturedQuad(iconOffset + glm::vec2(8.0f, 0.0f), size, 0xFFFFFFFF, m_uiTextureResources->handle(), uvOffset, uvScale);
+					}
+					else if (abundance == TileFlags::Abundance4)
+					{
+						glm::vec2 size(24.0f, 24.0f);
+						glm::vec2 iconOffset = offset - (size / 2.0f);
+						ui->drawTexturedQuad(iconOffset + glm::vec2(-8.0f, -8.0f), size, 0xFFFFFFFF, m_uiTextureResources->handle(), uvOffset, uvScale);
+						ui->drawTexturedQuad(iconOffset + glm::vec2(8.0f, -8.0f), size, 0xFFFFFFFF, m_uiTextureResources->handle(), uvOffset, uvScale);
+						ui->drawTexturedQuad(iconOffset + glm::vec2(-8.0f, 8.0f), size, 0xFFFFFFFF, m_uiTextureResources->handle(), uvOffset, uvScale);
+						ui->drawTexturedQuad(iconOffset + glm::vec2(8.0f, 8.0f), size, 0xFFFFFFFF, m_uiTextureResources->handle(), uvOffset, uvScale);
+					}
+				};
+
+				// gold 
+				if(resource == e2::TileFlags::ResourceGold)
+					drawIcon({ (1.0f / 7.0f) * 0.0f, 0.0f });
+				// wood
+				else if (resource == e2::TileFlags::ResourceForest && tileData->improvedResource)
+					drawIcon({ (1.0f / 7.0f) * 1.0f, 0.0f });
+				// stone 
+				else if (resource == e2::TileFlags::ResourceStone && tileData->improvedResource)
+					drawIcon({ (1.0f / 7.0f) * 2.0f, 0.0f });
+				// metal
+				else if (resource == e2::TileFlags::ResourceOre)
+					drawIcon({ (1.0f / 7.0f) * 3.0f, 0.0f });
+				// oil
+				else if (resource == e2::TileFlags::ResourceOil)
+					drawIcon({ (1.0f / 7.0f) * 4.0f, 0.0f });
+				// uranium
+				else if (resource == e2::TileFlags::ResourceUranium)
+					drawIcon({ (1.0f / 7.0f) * 5.0f, 0.0f });
+			}
+		}
+	}
+
 }
 
 void e2::Game::drawStatusUI()
@@ -1089,6 +1198,8 @@ void e2::Game::destroyStructure(e2::Hex const& location)
 
 	e2::destroy(structure);
 }
+
+
 
 e2::GameUnit* e2::Game::unitAtHex(glm::ivec2 const& hex)
 {

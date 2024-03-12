@@ -67,6 +67,7 @@ namespace e2
 		// flags control biome, resources, abundance
 		TileFlags flags{ TileFlags::None }; // 8 bits
 		uint8_t empireId{255}; // 255 means no empire claim this, 254 empire ids that are recycled (max 254 concurrent empires)
+		bool improvedResource{};
 
 	};
 
@@ -325,7 +326,7 @@ namespace e2
 		/** */
 		static e2::TileData calculateTileDataForHex(Hex hex);
 
-		static float sampleSimplex(glm::vec2 const& position, float scale);
+		static float sampleSimplex(glm::vec2 const& position);
 
 		static float sampleBaseHeight(glm::vec2 const& position);
 		

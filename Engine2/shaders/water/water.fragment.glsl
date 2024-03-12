@@ -32,6 +32,10 @@ void main()
 	vec3 v = normalize(fragmentPosition.xyz - (inverse(renderer.viewMatrix) * vec4(0.0, 0.0, 0.0, 1.0)).xyz);
 
 
+	float shadowSimplex = (simplex((fragmentPosition.xz * 0.1) - vec2(0.4, 0.6) * renderer.time.x * 0.05 ) * 0.5 + 0.5);
+	float shadowCoeff = pow(shadowSimplex, 0.62);
+	shadowCoeff = smoothstep(0.4, 0.7, shadowCoeff) * 0.60 + 0.4;
+
 	vec3 darkWater = vec3(0.0, 80.0, 107.0) / 255.0;
 	vec3 lightWater = vec3(28.0, 255.0, 255.0) / 255.0;
 	vec3 superLightWater = vec3(1.0, 1.0 ,1.0);//pow(lightWater, vec3(110.1));
@@ -65,6 +69,8 @@ void main()
 	float viewDepthCoeffFoam = 1.0 - smoothstep(0.0,  (0.33 + timeSin2 * 0.4 ) * pow((simplex(fragmentPosition.xz * 4.0 + vec2(cos(time * 0.25), sin(time*0.2))) * 0.5 + 0.5), 1.0), viewDistanceToDepth);
 
 	vec3 baseColor = mix(finalDark, finalLight,  pow(h, 1.4) * (ndotl * 0.5 + 0.5) );
+	baseColor = mix(baseColor, oceanDark, 1.0 -shadowCoeff);
+
 	vec3 dimBaseColor = mix(baseColor * frontBuffer, frontBuffer, 0.05);
 	baseColor = mix(baseColor, dimBaseColor, viewDepthCoeff2);
 	//baseColor = mix(baseColor, frontBuffer, viewDepthCoeff);
@@ -74,21 +80,26 @@ void main()
 	vec3 foamColor = vec3(0.867, 0.89, 0.9);
 	baseColor = mix(baseColor, foamColor, (pow(viewDepthCoeffFoam, 0.25)*0.75));
 
+
+
+
+
+
+
 	outColor.rgb =vec3(0.0, 0.0, 0.0);
 
 	// basecolor
-	outColor.rgb +=  baseColor;
+	outColor.rgb +=  baseColor ;
 
 	float vdotn = pow(clamp(-dot(v, n), 0.0, 1.0), 4.0);
 
     float reflCoeff = smoothstep(0.0, 0.35, h);
 
 	// fresnel reflection
-	outColor.rgb += hdr * vdotn * 0.15 * reflCoeff;
+	outColor.rgb += hdr * vdotn * 0.15 * reflCoeff ;
 
 	// reflection 
 	outColor.rgb += hdr * 0.02* reflCoeff;
-
 
 
     //vec3 visibility = textureLod(sampler2D(visibilityMask, clampSampler), gl_FragCoord.xy / vec2(resolution.x, resolution.y), 0).xyz;
@@ -99,6 +110,8 @@ void main()
 	//outColor.rgb = clamp(vec3(n.x, n.z, -n.y) * 0.5 + 0.5, vec3(0.0), vec3(1.0));
 
 	//outColor.rgb = vec3(viewDepthCoeff);
+
+	//outColor.rgb = baseColor;
 
 	outColor.rgb = clamp(outColor.rgb, vec3(0.0), vec3(1.0));
 	outColor.a = 1.0; //clamp(pow( smoothstep(0.4, 0.5, d), 16.0), 0.0, 1.0);// * 0.2 + 0.8;

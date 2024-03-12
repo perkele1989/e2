@@ -108,6 +108,7 @@ namespace e2
 		void onTurnEndingEnd();
 
 		void drawUI();
+		void drawResourceIcons();
 		void drawStatusUI();
 		void drawUnitUI();
 		void drawMinimapUI();
@@ -298,6 +299,8 @@ namespace e2
 		float m_altViewYaw = 0.0f;
 		float m_altViewPitch = 0.0f;
 		// end camera stuff
+private:
+
 	};
 }
 

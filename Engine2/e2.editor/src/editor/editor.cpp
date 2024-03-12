@@ -18,7 +18,6 @@
 #include "e2/ui/uicontext.hpp"
 
 #include "e2/dmesh/dmesh.hpp"
-#include "e2/hex/hex.hpp"
 
 #include "e2/e2.hpp"
 #include "e2/managers/rendermanager.hpp"

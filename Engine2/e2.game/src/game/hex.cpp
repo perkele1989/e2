@@ -189,6 +189,26 @@ namespace
 	{
 		e2::Hex hex;
 		glm::vec2 chunkOffset;
+		e2::TileData tileData;
+
+		e2::TileData getTileData(glm::ivec2 const& offsetCoords)
+		{
+			if (offsetCoords == hex.offsetCoords())
+				return tileData;
+
+			auto finder = tileCache.find(offsetCoords);
+			if (finder == tileCache.end())
+			{
+				e2::TileData newTileData = e2::HexGrid::calculateTileDataForHex(e2::Hex(offsetCoords));
+				tileCache[offsetCoords] = newTileData;
+				return newTileData;
+			}
+
+			return finder->second;
+
+		}
+		std::unordered_map<glm::ivec2, e2::TileData> tileCache;
+
 	};
 
 
@@ -225,15 +245,16 @@ namespace
 		return sum;
 	}
 
-	float sampleHeight(glm::vec2 const& worldPosition)
+	float sampleHeight(glm::vec2 const& worldPosition, ::HexShaderData* shaderData)
 	{
 		float outHeight = 0.0f;
 
-		e2::Hex hex(worldPosition);
+		e2::Hex& hex = shaderData->hex;
 		glm::vec2 hexCenter = hex.planarCoords();
-		
 
-		e2::TileData tile = e2::HexGrid::calculateTileDataForHex(hex);
+		e2::TileData &tile = shaderData->tileData;
+
+
 		bool currIsMountain = (tile.flags & e2::TileFlags::BiomeMask) == e2::TileFlags::BiomeMountain;
 		bool currIsShallow = (tile.flags & e2::TileFlags::BiomeMask) == e2::TileFlags::BiomeShallow;
 		bool currIsOcean = (tile.flags & e2::TileFlags::BiomeMask) == e2::TileFlags::BiomeOcean;
@@ -259,11 +280,11 @@ namespace
 					nextNi = 0;
 
 				e2::Hex &neighbourHex = neighbours[ni];
-				e2::TileData neighbourTile = e2::HexGrid::calculateTileDataForHex(neighbourHex);
+				e2::TileData neighbourTile = shaderData->getTileData(neighbourHex.offsetCoords());
 				glm::vec2 neighbourWorldPosition = neighbourHex.planarCoords();
 
 				e2::Hex& nextHex = neighbours[nextNi];
-				e2::TileData nextTile = e2::HexGrid::calculateTileDataForHex(nextHex);
+				e2::TileData nextTile = shaderData->getTileData(nextHex.offsetCoords());
 				glm::vec2 nextWorldPosition = nextHex.planarCoords();
 
 				bool neighbourIsMountain = (neighbourTile.flags & e2::TileFlags::BiomeMask) == e2::TileFlags::BiomeMountain;
@@ -305,7 +326,7 @@ namespace
 
 	}
 
-	glm::vec3 sampleNormal(glm::vec2 const& worldPosition)
+	glm::vec3 sampleNormal(glm::vec2 const& worldPosition, ::HexShaderData* shaderData)
 	{
 		/*
 			vec3 sampleNormal(vec2 position)
@@ -325,11 +346,11 @@ namespace
 		float eps = 0.1f;
 		float eps2 = eps * 2.0f;
 
-		float hL = sampleHeight(worldPosition - glm::vec2(1.0f, 0.0f) * eps);
-		float hR = sampleHeight(worldPosition + glm::vec2(1.0f, 0.0f) * eps);
+		float hL = sampleHeight(worldPosition - glm::vec2(1.0f, 0.0f) * eps, shaderData);
+		float hR = sampleHeight(worldPosition + glm::vec2(1.0f, 0.0f) * eps, shaderData);
 		
-		float hU = sampleHeight(worldPosition - glm::vec2(0.0f, 1.0f) * eps);
-		float hD = sampleHeight(worldPosition + glm::vec2(0.0f, 1.0f) * eps);
+		float hU = sampleHeight(worldPosition - glm::vec2(0.0f, 1.0f) * eps, shaderData);
+		float hD = sampleHeight(worldPosition + glm::vec2(0.0f, 1.0f) * eps, shaderData);
 
 		return glm::normalize(glm::vec3(hR - hL, -eps2, hD - hU));
 
@@ -351,14 +372,14 @@ namespace
 		*/
 
 
-		e2::TileData curr = e2::HexGrid::calculateTileDataForHex(data->hex);
+		e2::TileData curr = data->tileData;
 
 		glm::vec2 localVertexPosition = glm::vec2(vertex->position.x, vertex->position.z);
 		glm::vec2 worldVertexPosition = data->chunkOffset + localVertexPosition;
 
 		vertex->uv01 = { worldVertexPosition, 0.0f, 0.0f };
-		vertex->position.y = sampleHeight(worldVertexPosition);
-		vertex->normal = sampleNormal(worldVertexPosition);
+		vertex->position.y = sampleHeight(worldVertexPosition, data);
+		vertex->normal = sampleNormal(worldVertexPosition, data);
 
 		//vertex->tangent = glm::rotate(glm::quat(1.0f, 0.0f, 0.0f, 0.0f), glm::radians(90.0f), glm::vec3(0.0f, 0.0f, -1.0f)) * vertex->normal;
 		
@@ -876,26 +897,26 @@ void e2::HexGrid::assertChunksWithinRangeVisible(glm::vec2 const& streamCenter, 
 }
 */
 
-float e2::HexGrid::sampleSimplex(glm::vec2 const& position, float scale)
+float e2::HexGrid::sampleSimplex(glm::vec2 const& position)
 {
-	return glm::simplex(position * scale) * 0.5 + 0.5;
+	return glm::simplex(position) * 0.5 + 0.5;
 }
 // @notice this function needs to stay in sync with procgen.fragment.glsl !!
 float e2::HexGrid::sampleBaseHeight(glm::vec2 const& position)
 {
 	float h1p = 0.42;
 	float scale1 = 0.058;
-	float h1 = glm::pow(sampleSimplex(position, scale1), h1p);
+	float h1 = glm::pow(sampleSimplex(position * scale1), h1p);
 
 	float semiStart = 0.31;
 	float semiSize = 0.47;
 	float h2p = 0.013;
-	float h2 = glm::smoothstep(semiStart, semiStart + semiSize, sampleSimplex(position, h2p));
+	float h2 = glm::smoothstep(semiStart, semiStart + semiSize, sampleSimplex(position * h2p));
 
 	float semiStart2 = 0.65;
 	float semiSize2 = 0.1;
 	float h3p = (0.75 * 20) / 5000;
-	float h3 = 1.0 - glm::smoothstep(semiStart2, semiStart2 + semiSize2, sampleSimplex(position, h3p));
+	float h3 = 1.0 - glm::smoothstep(semiStart2, semiStart2 + semiSize2, sampleSimplex(position * h3p));
 
 	return h1 * h2 * h3;
 }
@@ -909,23 +930,85 @@ e2::TileData e2::HexGrid::calculateTileDataForHex(Hex hex)
 	TileData newTileData;
 
 	// @notice these constants/literals need to stay in sync with procgen.fragment.glsl !!
-	if(h > 0.81f)
+	float f = sampleSimplex((planarCoords + glm::vec2(321.4f, 2928.0f)) * 4.0f);
+	float f2 = sampleSimplex((planarCoords + glm::vec2(321.4f, 2928.0f)) * 7.0f);
+	float f3 = sampleSimplex((planarCoords + glm::vec2(5771.4f, 428.0f)) * 7.0f);
+	float f4 = sampleSimplex((planarCoords + glm::vec2(521.4f, 28.0f)) * 7.0f);
+	f2 = glm::pow(f2, 1.0f / 0.65f);
+	f3 = glm::pow(f3, 1.0f / 0.7f);
+	f4 = glm::pow(f4, 1.0f / 2.75f);
+	if (h > 0.81f)
+	{
 		newTileData.flags |= TileFlags::BiomeMountain;
+		if (f2 > 0.9)
+		{
+			newTileData.flags |= TileFlags::ResourceUranium;
+		}
+		else if (f3 > 0.85)
+		{
+			newTileData.flags |= TileFlags::ResourceGold;
+		}
+		else if (f4 > 0.93)
+		{
+			newTileData.flags |= TileFlags::ResourceOre;
+		}
+		else
+		{
+			newTileData.flags |= TileFlags::ResourceStone;
+		}
+	}
 	else if (h > 0.39f)
 	{
-		float f = sampleBaseHeight((planarCoords + glm::vec2(321.4f, 2928.0f)) * 4.0f);
 		if (f > 0.2f && h > 0.6f)
+		{
 			newTileData.flags |= TileFlags::BiomeForest;
-		else 
+
+			// forest is always resource 
+			if (f2 > 0.95)
+			{
+				newTileData.flags |= TileFlags::ResourceUranium;
+			}
+			else if (f3 > 0.85)
+			{
+				newTileData.flags |= TileFlags::ResourceGold;
+			}
+			else
+			{
+				newTileData.flags |= TileFlags::ResourceForest;
+			}
+		}
+		else
+		{
+			if (f2 > 0.95)
+			{
+				newTileData.flags |= TileFlags::ResourceUranium;
+			}
+			else if (f3 > 0.85)
+			{
+				newTileData.flags |= TileFlags::ResourceGold;
+			}
+
 			newTileData.flags |= TileFlags::BiomeGrassland;
+		}
 	}
 	else if (h > 0.03f)
+	{
 		newTileData.flags |= TileFlags::BiomeShallow;
-	else 
+	}
+	else
+	{
 		newTileData.flags |= TileFlags::BiomeOcean;
+	}
 
-	newTileData.flags |= TileFlags::ResourceGold;
-	newTileData.flags |= TileFlags::Abundance3;
+
+	if (f > 0.95)
+		newTileData.flags |= TileFlags::Abundance4;
+	else if (f > 0.76)
+		newTileData.flags |= TileFlags::Abundance3;
+	else if (f > 0.45)
+		newTileData.flags |= TileFlags::Abundance2;
+	else 
+		newTileData.flags |= TileFlags::Abundance1;
 
 	return newTileData;
 }
@@ -2121,20 +2204,8 @@ bool e2::ChunkLoadTask::execute()
 
 	glm::vec3 chunkOffset = e2::HexGrid::chunkOffsetFromIndex(m_chunkIndex);
 
-	/*
-	e2::DynamicMesh dynaHex;
-	e2::DynamicMesh dynaHexHigh;
-	{
-		std::scoped_lock lock(m_grid->dynamicMutex());
-		dynaHex = m_grid->dynamicHex();
-		dynaHexHigh = m_grid->dynamicHexHigh();
-	}*/
-
-
-
 	e2::DynamicMesh* newChunkMesh = e2::create<e2::DynamicMesh>();
-	//newChunkMesh->reserve(m_dynaHexHigh->numVertices() * HexGridChunkResolutionSquared, m_dynaHexHigh->numTriangles() * HexGridChunkResolutionSquared);
-
+	
 	HexShaderData shaderData;
 	shaderData.chunkOffset = { chunkOffset.x, chunkOffset.z };
 
@@ -2146,9 +2217,9 @@ bool e2::ChunkLoadTask::execute()
 			glm::mat4 transform = glm::translate(glm::identity<glm::mat4>(), tileOffset);
 
 			shaderData.hex = e2::Hex(m_chunkIndex * glm::ivec2(e2::hexChunkResolution) + glm::ivec2(x, y));
-			e2::TileData tileData = e2::HexGrid::calculateTileDataForHex(shaderData.hex);
+			shaderData.tileData = e2::HexGrid::calculateTileDataForHex(shaderData.hex);
 
-			if ((tileData.flags & e2::TileFlags::BiomeMask) == e2::TileFlags::BiomeMountain)
+			if ((shaderData.tileData.flags & e2::TileFlags::BiomeMask) == e2::TileFlags::BiomeMountain)
 			{
 				newChunkMesh->addMeshWithShaderFunction(m_dynaHexHigh, transform, ::hexShader, &shaderData);
 			}
@@ -2157,7 +2228,7 @@ bool e2::ChunkLoadTask::execute()
 				newChunkMesh->addMeshWithShaderFunction(m_dynaHex, transform, ::hexShader, &shaderData);
 			}
 
-			if ((tileData.flags & e2::TileFlags::BiomeMask) == e2::TileFlags::BiomeForest)
+			if ((shaderData.tileData.flags & e2::TileFlags::BiomeMask) == e2::TileFlags::BiomeForest)
 			{
 				treeOffsets.push(shaderData.hex.offsetCoords());
 			}

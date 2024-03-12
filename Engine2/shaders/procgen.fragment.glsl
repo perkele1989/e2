@@ -78,6 +78,16 @@ void main()
 	outColor.rgb = mix(outColor.rgb, m_C, m);
 	outColor.rgb = mix(outColor.rgb, f_C, f);
 
+
+	float f2 = sampleBaseHeight((position + vec2(321.4, 2928.0)) * param2 * 10.0);
+	f2 = pow(f2, 1.0/param1);
+
+	float ff = 0.0;
+	if (f2 > param3)
+		ff = 1.0;
+
+	outColor.rgb = mix(outColor.rgb, vec3(1.0, 0.0, 0.0), ff);
+
 	//outColor.r = h;
 
 	outColor.a = 1.0;

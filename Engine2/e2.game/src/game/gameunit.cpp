@@ -173,3 +173,45 @@ void e2::GameStructure::drawUI(e2::UIContext* ui)
 
 	ui->endStackV();
 }
+
+e2::Mine::Mine(e2::GameContext* ctx, glm::ivec2 const& tile, uint8_t empireId)
+	: e2::GameStructure(ctx, tile, empireId)
+{
+	e2::TileData* tileData = game()->hexGrid()->getTileData(tile);
+	if (!tileData)
+		return;
+
+	e2::TileFlags resource = tileData->getResource();
+	tileData->improvedResource = true;
+
+	if (resource != TileFlags::ResourceGold && resource != TileFlags::ResourceUranium && resource != TileFlags::ResourceOre)
+	{
+		LogError("We managed to build a mine on a non-mineable tile. What the heck?");
+		return;
+	}
+	if (resource == TileFlags::ResourceGold)
+		displayName = "Gold mine";
+	else if (resource == TileFlags::ResourceUranium)
+		displayName = "Uranium mine";
+	else if (resource == TileFlags::ResourceOre)
+		displayName = "Ore mine";
+
+	sightRange = 2;
+}
+
+e2::Mine::~Mine()
+{
+
+}
+
+void e2::Mine::onTurnEnd()
+{
+	e2::GameStructure::onTurnEnd();
+
+}
+
+void e2::Mine::onTurnStart()
+{
+	e2::GameStructure::onTurnStart();
+
+}

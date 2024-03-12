@@ -22,19 +22,6 @@ vec3 fresnelSchlickRoughness(float cosTheta, vec3 F0, float roughness)
 }
 
 
-vec3 heightblend(vec3 input1, float height1, vec3 input2, float height2)
-{
-    float height_start = max(height1, height2) - 0.05;
-    float level1 = max(height1 - height_start, 0);
-    float level2 = max(height2 - height_start, 0);
-    return ((input1 * level1) + (input2 * level2)) / (level1 + level2);
-}
-
-vec3 heightlerp(vec3 input1, float height1, vec3 input2, float height2, float t)
-{
-    t = clamp(t, 0, 1);
-    return heightblend(input1, height1 * (1 - t), input2, height2 * t);
-}
 
 void main()
 {
@@ -50,8 +37,13 @@ void main()
 
 
 	vec3 albedoSand = texture(sampler2D(sandAlbedo, repeatSampler), texUv * texScaleSand).rgb;
+	//albedoSand *= vec3(1.0, 1.0, 1.0) * 0.8;
+	
 	vec3 albedoMountains = pow(texture(sampler2D(mountainAlbedo, repeatSampler), texUv * texScaleMountains).rgb, vec3(1.1));
+	albedoMountains *= vec3(1.0, 1.0, 1.0) * 0.8;
+
 	vec3 albedoGreen = texture(sampler2D(greenAlbedo, repeatSampler), texUv * texScaleGreen).rgb;
+	albedoGreen *= vec3(1.0, 1.0, 1.0) * 0.85;
 
 	float bigSimplex = simplex(fragmentPosition.xz * 6) * 0.5 + 0.5;
 	float smallSimplex = simplex(fragmentPosition.xz * 2) * 0.5 + 0.5;
@@ -148,23 +140,25 @@ void main()
 	vec3 rad = textureLod(sampler2D(radianceCube, equirectSampler), equirectangularUv(r), lod).rgb;
 	vec2 brdf = textureLod(sampler2D(integratedBrdf, clampSampler), vec2(brdfy, 1.0 - roughness), 0.0).xy;
 	
-
+	float shadowSimplex = (simplex((fragmentPosition.xz * 0.1) - vec2(0.4, 0.6) * renderer.time.x * 0.05 ) * 0.5 + 0.5);
+	float shadowCoeff = pow(shadowSimplex, 0.62);
+	shadowCoeff = smoothstep(0.4, 0.7, shadowCoeff) * 0.5 + 0.5;
 
 	// indirect light, base
 	outColor.rgb =  vec3(0.0);
 
 	// soft base sun light, beautiful
 	//outColor.rgb += albedo * vec3(0.76, 0.8, 1.0) * softl * 1.0;
-    outColor.rgb = albedo * vec3(0.76, 0.8, 1.0) * ndotl * 1.0;
+    outColor.rgb = albedo * vec3(0.76, 0.8, 1.0) * ndotl * 1.0 * shadowCoeff;
 
 	// bravissimo!!! mountain fresnel is beaut!!
-	outColor.rgb += vec3(1.0, 0.8, 0.76) * mountainFresnel * 0.40; 
+	outColor.rgb += vec3(1.0, 0.8, 0.76) * mountainFresnel * 0.60; 
 
 	// ibl specular
-	outColor.rgb += rad * ( specularCoeff* brdf.x + brdf.y) ;	
+	outColor.rgb += rad * ( specularCoeff* brdf.x + brdf.y) * shadowCoeff ;	
     
 	// ibl diffuse 
-	outColor.rgb += diffuseCoeff * irr;
+	outColor.rgb += diffuseCoeff * irr * shadowCoeff;
 
     //outColor.rgb = ndotl;
 

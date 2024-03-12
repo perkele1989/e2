@@ -101,17 +101,17 @@ void e2::OrbitalViewport::updateRenderView(e2::UIContext* ui, e2::UIWidgetState*
 	{
 		float sign = glm::sign(mouse.scrollOffset);
 
-		if (sign <= 0.0f)
-			m_zoom *= 1.1f;
+		if (sign <= 0.0)
+			m_zoom *= 1.1;
 		else
-			m_zoom /= 1.1f;
+			m_zoom /= 1.1;
 	}
 
-	if (m_zoom < 0.1f)
-		m_zoom = 0.1f;
+	if (m_zoom < 0.1)
+		m_zoom = 0.1;
 
-	if (m_zoom > 200.0f)
-		m_zoom = 200.0f;
+	if (m_zoom > 200.0)
+		m_zoom = 200.0;
 
 
 
@@ -127,17 +127,17 @@ void e2::OrbitalViewport::updateRenderView(e2::UIContext* ui, e2::UIWidgetState*
 
 	if (m_orbiting)
 	{
-		m_yaw -= mouse.moveDelta.x * 1.0f;
-		m_pitch -= mouse.moveDelta.y * 1.0f;
+		m_yaw -= mouse.moveDelta.x * 1.0;
+		m_pitch -= mouse.moveDelta.y * 1.0;
 	}
 
-	if (m_pitch > 90.0f)
-		m_pitch = 90.0f;
+	if (m_pitch > 90.0)
+		m_pitch = 90.0;
 
-	if (m_pitch < -90.f)
-		m_pitch = -90.0f;
+	if (m_pitch < -90.)
+		m_pitch = -90.;
 
-	outView.orientation = glm::identity<glm::quat>();
+	outView.orientation = glm::identity<glm::dquat>();
 	outView.orientation = glm::rotate(outView.orientation, glm::radians(-m_yaw), e2::worldUp());
 	outView.orientation = glm::rotate(outView.orientation, glm::radians(-m_pitch), e2::worldRight());
 
@@ -160,13 +160,13 @@ void e2::OrbitalViewport::updateRenderView(e2::UIContext* ui, e2::UIWidgetState*
 
 	if (m_offsetting)
 	{
-		m_origin += outView.orientation * e2::worldRight() * mouse.moveDelta.x * -0.01f;
-		m_origin += outView.orientation * e2::worldUp() * mouse.moveDelta.y * 0.01f;
+		m_origin += outView.orientation * e2::worldRight() * double(mouse.moveDelta.x) * -0.01;
+		m_origin += outView.orientation * e2::worldUp() * double(mouse.moveDelta.y) * 0.01;
 	}
 
 	outView.origin = m_origin + (outView.orientation * -e2::worldForward() * m_zoom);
 
 
-	outView.fov = 45.0f;
-	outView.clipPlane = { 0.01f, 1000.0f };
+	outView.fov = 45.0;
+	outView.clipPlane = { 0.01, 1000.0 };
 }
