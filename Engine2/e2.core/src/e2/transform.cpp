@@ -162,17 +162,17 @@ void e2::Transform::setScale(glm::vec3 newScale, TransformSpace space /*= TS_Loc
 }
 
 
-glm::vec3 e2::worldUp()
+glm::dvec3 e2::worldUp()
 {
-	return {0.0f, -1.0f, 0.0f};
+	return {0.0, -1.0, 0.0};
 }
 
-glm::vec3 e2::worldRight()
+glm::dvec3 e2::worldRight()
 {
-	return {1.0f, 0.0f, 0.0f};
+	return {1.0, 0.0, 0.0};
 }
 
-glm::vec3 e2::worldForward()
+glm::dvec3 e2::worldForward()
 {
-	return {0.0f, 0.0f, -1.0f};
+	return {0.0, 0.0, -1.0};
 }

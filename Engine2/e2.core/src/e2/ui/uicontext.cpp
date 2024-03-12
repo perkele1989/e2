@@ -279,6 +279,38 @@ void e2::UIContext::setClientArea(glm::vec2 const& offset, glm::vec2 const& size
 }
 
 
+void e2::UIContext::gameLabel(std::string const& text, uint8_t fontSize /*= 12*/, e2::UITextAlign horizAlign /*= UITextAlign::Begin*/)
+{
+	e2::UIStyle const& style = uiManager()->workingStyle();
+	float textWidth = calculateTextWidth(FontFace::Serif, uint8_t(fontSize * style.scale), text);
+
+	static const e2::Name n = "";
+
+	glm::vec2 minSize = glm::vec2(0.0f, 20.0f * style.scale);
+	e2::UIWidgetState* widgetState = reserve(n, minSize);
+
+	if (minSize.x > widgetState->size.x || minSize.y > widgetState->size.y)
+		return;
+
+	float xOffset = 0.0f;
+	if (horizAlign == UITextAlign::Middle)
+	{
+		xOffset -= textWidth / 2.0f;
+		xOffset += widgetState->size.x / 2.0f;
+	}
+	else if (horizAlign == UITextAlign::End)
+	{
+		xOffset -= textWidth;
+		xOffset += widgetState->size.x;
+	}
+
+	// Y offset is always centered
+	//drawQuad(widgetState->position, widgetState->size, 0xFF00000F);
+	//drawRasterTextShadow(FontFace::Serif, uint8_t(fontSize * style.scale), widgetState->position + glm::vec2(xOffset, widgetState->size.y / 2.0), text);
+	drawRasterText(FontFace::Serif, uint8_t(fontSize * style.scale), 0xFFFFFFFF, widgetState->position + glm::vec2(xOffset, widgetState->size.y / 2.0), text);
+
+}
+
 void e2::UIContext::log(e2::Name id, float& scrollOffset, bool autoscroll)
 {
 	e2::UIStyle const& style = uiManager()->workingStyle();
@@ -342,7 +374,7 @@ void e2::UIContext::label(e2::Name id, std::string const& text, uint8_t fontSize
 
 	float textWidth = calculateTextWidth(FontFace::Serif, uint8_t(fontSize * style.scale), text);
 
-	glm::vec2 minSize = glm::vec2(textWidth, 20.0f * style.scale);
+	glm::vec2 minSize = glm::vec2(0.0f, 20.0f * style.scale);
 	e2::UIWidgetState* widgetState = reserve(id, minSize);
 
 	if (minSize.x > widgetState->size.x || minSize.y > widgetState->size.y)
@@ -546,6 +578,11 @@ bool e2::UIContext::sliderFloat(e2::Name id, float& value, float min, float max,
 }
 
 
+
+void e2::UIContext::clearScissor()
+{
+	setScissor({}, glm::vec2(m_renderTargetSize));
+}
 
 void e2::UIContext::setScissor(glm::vec2 position, glm::vec2 size)
 {
@@ -989,6 +1026,7 @@ e2::UIRenderState& e2::UIContext::pushRenderState(e2::Name id, glm::vec2 const& 
 
 void e2::UIContext::popRenderState()
 {
+	clearScissor();
 	popId();
 	// cant pop base state
 	if (m_renderStates.size() <= 1)
@@ -1000,8 +1038,16 @@ void e2::UIContext::popRenderState()
 
 }
 
+
+
 namespace
 {
+	void Custom_getSizeForNext(e2::UIRenderState& state, glm::vec2 const& minSize, glm::vec2& outOffset, glm::vec2& outSize)
+	{
+		outOffset = state.cursor;
+		outSize = state.size;
+	}
+
 	void FlexV_getSizeForNext(e2::UIRenderState& state, glm::vec2 const& minSize, glm::vec2& outOffset, glm::vec2& outSize)
 	{
 		outOffset = state.cursor;
@@ -1067,6 +1113,31 @@ namespace
 		if (outSize.y > state.maxParallelSize)
 			state.maxParallelSize = outSize.y;
 	}
+}
+
+void e2::UIContext::pushFixedPanel(e2::Name id, glm::vec2 const& position, glm::vec2 const& size)
+{
+	e2::UIRenderState& prevState = renderState();
+
+	//e2::UIRenderState& newState = pushRenderState(id, glm::vec2(0.f, 0.f));
+
+
+	pushId(id);
+	e2::UIRenderState newState;
+	newState.offset = position;
+	newState.size = size;
+	newState.cursor = newState.offset;
+	newState.maxParallelSize = 0.f;
+	newState.indentLevels = 0;
+	newState.getSizeForNext = &::Custom_getSizeForNext;
+	m_renderStates.push(newState);
+	e2::UIRenderState& state = renderState();
+
+}
+
+void e2::UIContext::popFixedPanel()
+{
+	popRenderState();
 }
 
 void e2::UIContext::beginFlexV(e2::Name id, float const* rowSizes, uint32_t rowSizeCount)

@@ -28,7 +28,7 @@ namespace e2
 		// revenue streams, calculated at start of each round
 		ResourceTable revenue;
 
-		// expenses, calculated at the start of each round, can
+		// expenses, calculated at the start of each round
 		ResourceTable expenditures;
 
 		// profits, calculated by (profits = revenue - expenditure)

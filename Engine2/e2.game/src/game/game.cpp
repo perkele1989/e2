@@ -8,6 +8,7 @@
 #include "e2/managers/uimanager.hpp"
 #include "e2/game/gamesession.hpp"
 #include "e2/renderer/renderer.hpp"
+#include "game/mob.hpp"
 
 #include "game/militaryunit.hpp"
 
@@ -54,7 +55,63 @@ void e2::Game::initialize()
 	proxyConf.mesh = m_cursorMesh;
 	m_cursorProxy = e2::create<e2::MeshProxy>(m_session, proxyConf);
 
-	m_hexGrid = e2::create<e2::HexGrid>(this, m_session);
+
+	for (uint8_t i = 0; i < (uint8_t)e2::GameStructureType::Count; i++)
+	{
+		m_structureMeshes[i] = m_cursorMesh;
+	}
+
+	for (uint8_t i = 0; i < (uint8_t)e2::GameUnitType::Count; i++)
+	{
+		m_unitMeshes[i] = m_cursorMesh;
+	}
+
+	m_empires.resize(e2::maxNumEmpires);
+	for (EmpireId i = 0; uint64_t(i) < e2::maxNumEmpires - 1; i++)
+	{
+		m_empires[i] = nullptr;
+	}
+
+	m_hexGrid = e2::create<e2::HexGrid>(this);
+
+	// spawn local empire
+	m_localEmpireId = spawnEmpire();
+	m_localEmpire = m_empires[m_localEmpireId];
+
+	// plop us down somehwere nice 
+	std::unordered_set<glm::ivec2> attemptedStartLocations;
+	bool foundStartLocation{};
+	while (!foundStartLocation)
+	{
+		glm::ivec2 startLocation = e2::randomIvec2({ -512, -512 }, { 512, 512 });
+		if (attemptedStartLocations.contains(startLocation))
+			continue;
+
+		attemptedStartLocations.insert(startLocation);
+
+		e2::Hex startHex(startLocation);
+		e2::TileData startTile = e2::HexGrid::calculateTileDataForHex(startHex);
+		if (!startTile.isWalkable())
+			continue;
+
+		constexpr bool ignoreVisibility = true;
+		auto as = e2::create<e2::PathFindingAccelerationStructure>(this, startHex, 64, ignoreVisibility);
+		uint64_t numWalkableHexes = as->hexIndex.size();
+		e2::destroy(as);
+
+		if (numWalkableHexes < 64)
+			continue;
+		
+		m_hexGrid->initializeWorldBounds(startHex.planarCoords());
+		m_viewOrigin = startHex.planarCoords();
+
+		spawnStructure<e2::MainOperatingBase>(startHex, m_localEmpireId);
+		
+		foundStartLocation = true;
+	}
+
+	// kick off gameloop
+	onStartOfTurn();
 }
 
 void e2::Game::shutdown()
@@ -141,7 +198,7 @@ void e2::Game::update(double seconds)
 	//m_hexGrid->assertChunksWithinRangeVisible(m_viewOrigin, m_viewPoints, m_viewVelocity);
 	m_hexGrid->updateStreaming(m_viewOrigin, m_viewPoints, m_viewVelocity);
 	m_hexGrid->updateWorldBounds();
-	m_hexGrid->renderFogOfWar(m_unitIndex);
+	m_hexGrid->renderFogOfWar();
 
 	// ticking session renders renderer too, and blits it to the UI, so we need to do it precisely here (after rendering fog of war and before rendering UI)
 	m_session->tick(seconds);
@@ -243,12 +300,36 @@ void e2::Game::updateGameState()
 			return;
 
 		onTurnEndingEnd();
+
+		// flip through to next empire to let the mhave its turn, if it doesnt exist, keep doing it until we find one or we run out
+		m_empireTurn++;
+		while (!m_empires[m_empireTurn])
+		{
+			if (m_empireTurn < e2::maxNumEmpires - 1)
+				m_empireTurn++;
+			else
+			{
+				m_empireTurn = 0;
+				m_turn++;
+				break;
+			}
+		}
+		
 		m_state = GameState::TurnPreparing;
 		onTurnPreparingBegin();
 	}
 }
 
 void e2::Game::updateTurn()
+{
+	// if local is making turn
+	if (m_empireTurn == 0)
+		updateTurnLocal();
+	else
+		updateTurnAI();
+}
+
+void e2::Game::updateTurnLocal()
 {
 	constexpr float moveSpeed = 10.0f;
 	constexpr float viewSpeed = .3f;
@@ -263,22 +344,41 @@ void e2::Game::updateTurn()
 	auto& rightMouse = mouse.buttons[uint8_t(e2::MouseButton::Right)];
 
 	// turn logic here
-	if (leftMouse.clicked && leftMouse.dragDistance <= 2.0f)
+	if (!m_uiHovered && leftMouse.clicked && leftMouse.dragDistance <= 2.0f)
 	{
 		if (kb.state(e2::Key::LeftShift))
 		{
-			spawnUnit<e2::MilitaryUnit>(m_cursorHex);
+			spawnUnit<e2::MilitaryUnit>(m_cursorHex, 0);
 			return;
 		}
+		e2::GameUnit* unitAtHex = nullptr;
+		e2::GameStructure* structureAtHex = nullptr;
 
 		auto finder = m_unitIndex.find(m_cursorHex.offsetCoords());
 		if (finder != m_unitIndex.end())
-			selectUnit(finder->second);
-		else
-			deselectUnit();
+			unitAtHex = finder->second;
+		
+		auto finder2 = m_structureIndex.find(m_cursorHex.offsetCoords());
+		if (finder2 != m_structureIndex.end())
+			structureAtHex = finder2->second;
+
+		if (unitAtHex && unitAtHex == m_selectedUnit && structureAtHex)
+			selectStructure(structureAtHex);
+		else if (unitAtHex && unitAtHex != m_selectedUnit)
+			selectUnit(unitAtHex);
+		else if (structureAtHex && structureAtHex == m_selectedStructure && unitAtHex)
+			selectUnit(unitAtHex);
+		else if (structureAtHex && structureAtHex != m_selectedStructure)
+			selectStructure(structureAtHex);
+		else if (structureAtHex)
+			selectStructure(structureAtHex);
+		else if (unitAtHex)
+			selectUnit(unitAtHex);
+		else if (!structureAtHex && !unitAtHex)
+			deselect();
 	}
 
-	if (rightMouse.clicked && rightMouse.dragDistance <= 2.0f)
+	if (!m_uiHovered && rightMouse.clicked && rightMouse.dragDistance <= 2.0f)
 	{
 		if (kb.state(e2::Key::LeftShift))
 		{
@@ -290,6 +390,86 @@ void e2::Game::updateTurn()
 		moveSelectedUnitTo(m_cursorHex);
 	}
 }
+
+void e2::Game::updateTurnAI()
+{
+
+}
+
+
+void e2::Game::endTurn()
+{
+	if (m_state != GameState::Turn || m_turnState != TurnState::Unlocked)
+		return;
+
+	onEndOfTurn();
+	m_state = GameState::TurnEnding;
+	onTurnEndingBegin();
+}
+
+void e2::Game::onTurnPreparingBegin()
+{
+
+}
+
+void e2::Game::onTurnPreparingEnd()
+{
+
+}
+
+void e2::Game::onStartOfTurn()
+{
+	// ignore visibility for AI since we dont want to see what theyre up to 
+	if (m_empireTurn == 0)
+	{
+		// clear and calculate visibility
+		m_hexGrid->clearVisibility();
+
+		for (e2::GameUnit* unit : m_units)
+		{
+			unit->spreadVisibility();
+		}
+
+		for (e2::GameStructure* structure : m_structures)
+		{
+			structure->spreadVisibility();
+		}
+	}
+
+	for (e2::GameUnit* unit : m_empires[m_empireTurn]->units)
+	{
+		unit->onTurnStart();
+	}
+
+	for (e2::GameStructure* structure : m_empires[m_empireTurn]->structures)
+	{
+		structure->onTurnStart();
+	}
+}
+
+void e2::Game::onEndOfTurn()
+{
+	for (e2::GameUnit* unit : m_empires[m_empireTurn]->units)
+	{
+		unit->onTurnEnd();
+	}
+
+	for (e2::GameStructure* structure : m_empires[m_empireTurn]->structures)
+	{
+		structure->onTurnEnd();
+	}
+}
+
+void e2::Game::onTurnEndingBegin()
+{
+
+}
+
+void e2::Game::onTurnEndingEnd()
+{
+	deselect();
+}
+
 
 void e2::Game::updateUnitAttack()
 {
@@ -373,6 +553,8 @@ void e2::Game::drawUI()
 	drawUnitUI();
 
 	drawMinimapUI();
+
+	drawFinalUI();
 
 	drawDebugUI();
 }
@@ -460,6 +642,13 @@ void e2::Game::drawStatusUI()
 	ui->drawRasterText(e2::FontFace::Serif, fontSize, 0xFFFFFFFF, { xCursor, 14.0f }, str);
 	xCursor += strWidth;
 
+
+	strWidth = ui->calculateTextWidth(e2::FontFace::Serif, fontSize, str);
+	str = std::format("Turn {}", m_turn);
+	xCursor = winSize.x - strWidth - 16.0f;
+	ui->drawRasterText(e2::FontFace::Serif, fontSize, 0xFFFFFFFF, { xCursor, 14.0f }, str);
+	
+
 	/*ui->drawRasterText(e2::FontFace::Serif, 11, 0xFFFFFFFF, { 4.0f + (160.0f * 1.0f), 14.0f }, std::format("Wood: {0:10} ({0:+})", m_resources.funds.wood, m_resources.profits.wood));
 	ui->drawRasterText(e2::FontFace::Serif, 11, 0xFFFFFFFF, { 4.0f + (160.0f * 2.0f), 14.0f }, std::format("Stone: {0:10} ({0:+})", m_resources.funds.stone, m_resources.profits.stone));
 	ui->drawRasterText(e2::FontFace::Serif, 11, 0xFFFFFFFF, { 4.0f + (160.0f * 3.0f), 14.0f }, std::format("Metal: {0:10} ({0:+})", m_resources.funds.metal, m_resources.profits.metal));
@@ -474,9 +663,9 @@ void e2::Game::drawStatusUI()
 
 void e2::Game::drawUnitUI()
 {
-	if (!m_selectedUnit)
+	if (!m_selectedUnit && !m_selectedStructure)
 		return;
-
+	
 	e2::GameSession* session = gameSession();
 	e2::Renderer* renderer = session->renderer();
 	e2::UIContext* ui = session->uiContext();
@@ -488,23 +677,28 @@ void e2::Game::drawUnitUI()
 	glm::vec2 winSize = wnd->size();
 
 	float width = 450.0f;
-	float height = 220.0f;
+	float height = 180.0f;
 
-	glm::vec2 offset = { winSize.x - width - 16.0f - 256.0f - 16.0f, winSize.y - height - 16.0f };
+	glm::vec2 offset = { winSize.x / 2.0 - width / 2.0, winSize.y - height - 16.0f };
 
-	if (mouse.position.x > offset.x && mouse.position.x < offset.x + width &&
-		mouse.position.y > offset.y && mouse.position.y < offset.y + height)
+	if (mouse.relativePosition.x > offset.x && mouse.relativePosition.x < offset.x + width &&
+		mouse.relativePosition.y > offset.y && mouse.relativePosition.y < offset.y + height)
 		m_uiHovered = true;
 
 	ui->drawQuadShadow(offset, {width, height}, 8.0f, 0.9f, 4.0f);
+	//uint8_t fontSize = 12;
+	//std::string str = m_selectedUnit->displayName;
+	//ui->drawRasterText(e2::FontFace::Serif, 14, 0xFFFFFFFF, offset + glm::vec2(8.f, 14.f), str);
 
-	
-	uint8_t fontSize = 12;
+	ui->pushFixedPanel("test", offset + glm::vec2(4.0f, 4.0f), glm::vec2(width - 8.0f, height - 8.0f));
 
-	std::string str = m_selectedUnit->displayName;
-	ui->drawRasterText(e2::FontFace::Serif, 14, 0xFFFFFFFF, offset + glm::vec2(8.f, 14.f), str);
+	if (m_selectedUnit)
+		m_selectedUnit->drawUI(ui);
+	else if (m_selectedStructure)
+		m_selectedStructure->drawUI(ui);
 
-	
+	ui->popFixedPanel();
+
 
 }
 
@@ -575,6 +769,45 @@ void e2::Game::drawDebugUI()
 
 }
 
+void e2::Game::drawFinalUI()
+{
+
+	e2::GameSession* session = gameSession();
+	e2::Renderer* renderer = session->renderer();
+	e2::UIContext* ui = session->uiContext();
+	auto& kb = ui->keyboardState();
+	auto& mouse = ui->mouseState();
+	auto& leftMouse = mouse.buttons[uint16_t(e2::MouseButton::Left)];
+
+	e2::IWindow* wnd = session->window();
+	glm::vec2 winSize = wnd->size();
+
+	float width = 180.0f;
+	float height = 180.0f;
+
+	glm::vec2 offset = { winSize.x - width - 16.0f, winSize.y - height - 16.0f };
+
+	if (mouse.relativePosition.x > offset.x && mouse.relativePosition.x < offset.x + width &&
+		mouse.relativePosition.y > offset.y && mouse.relativePosition.y < offset.y + height)
+		m_uiHovered = true;
+
+	ui->drawQuadShadow(offset, { width, height }, 8.0f, 0.9f, 4.0f);
+	//uint8_t fontSize = 12;
+	//std::string str = m_selectedUnit->displayName;
+	//ui->drawRasterText(e2::FontFace::Serif, 14, 0xFFFFFFFF, offset + glm::vec2(8.f, 14.f), str);
+
+	ui->pushFixedPanel("test", offset + glm::vec2(4.0f, 4.0f), glm::vec2(width - 8.0f, height - 8.0f));
+	ui->beginStackV("test2");
+
+	if (ui->button("te", "End turn"))
+	{
+		endTurn();
+	}
+
+	ui->endStackV();
+	ui->popFixedPanel();
+}
+
 void e2::Game::onNewCursorHex()
 {
 	if (m_selectedUnit)
@@ -588,10 +821,43 @@ void e2::Game::updateResources()
 	
 }
 
+e2::EmpireId e2::Game::spawnEmpire()
+{
+	for (e2::EmpireId i = 0; i < m_empires.size(); i++)
+	{
+		if (!m_empires[i])
+		{
+			m_empires[i] = e2::create<e2::GameEmpire>(this, i);
+			return i;
+		}
+	}
+
+	LogError("failed to spawn empire, we full rn");
+	return 0;
+}
+
+void e2::Game::destroyEmpire(EmpireId empireId)
+{
+	if (!m_empires[empireId])
+		return;
+
+	e2::destroy(m_empires[empireId]);
+	m_empires[empireId] = nullptr;
+}
+
+void e2::Game::deselect()
+{
+	deselectUnit();
+	deselectStructure();
+}
+
 void e2::Game::selectUnit(e2::GameUnit* unit)
 {
 	if (!unit || unit == m_selectedUnit)
 		return;
+
+
+	deselectStructure();
 
 	m_selectedUnit = unit;
 
@@ -605,11 +871,13 @@ void e2::Game::selectUnit(e2::GameUnit* unit)
 	{
 		m_hexGrid->pushOutline(coords);
 	}
-	
 }
 
 void e2::Game::deselectUnit()
 {
+	if (!m_selectedUnit)
+		return;
+
 	m_selectedUnit = nullptr;
 	if (m_unitAS)
 		e2::destroy(m_unitAS);
@@ -628,8 +896,12 @@ void e2::Game::moveSelectedUnitTo(e2::Hex const& to)
 	m_unitMovePath = m_unitAS->find(to);
 	if (m_unitMovePath.size() == 0)
 		return;
+	else if (m_unitMovePath.size() - 1 > m_selectedUnit->movePointsLeft )
+		return;
 
 	m_hexGrid->clearOutline();
+
+	m_selectedUnit->movePointsLeft -= m_unitMovePath.size() - 1;
 
 	m_turnState = TurnState::UnitAction_Move;
 	m_unitMoveIndex = 0;
@@ -673,6 +945,11 @@ void e2::Game::updateMainCamera(double seconds)
 	if (kb.keys[int16_t(e2::Key::Down)].state)
 	{
 		m_viewOrigin.y += moveSpeed * seconds;
+	}
+
+	if (kb.pressed(e2::Key::K))
+	{
+		m_viewOrigin = {};
 	}
 
 	if (leftMouse.pressed && !m_uiHovered)
@@ -726,8 +1003,8 @@ e2::RenderView e2::Game::calculateRenderView(glm::vec2 const &viewOrigin)
 
 	e2::RenderView newView{};
 	newView.fov = viewFov;
-	newView.clipPlane = { 0.01f, 1000.0f };
-	newView.origin = glm::vec3(viewOrigin.x, 0.0f, viewOrigin.y) + (orientation * e2::worldForward() * -viewDistance);
+	newView.clipPlane = { 0.1f, 100.0f };
+	newView.origin = glm::vec3(viewOrigin.x, 0.0f, viewOrigin.y) + (orientation * glm::vec3(e2::worldForward()) * -viewDistance);
 	newView.orientation = orientation;
 
 	return newView;
@@ -744,16 +1021,74 @@ void e2::Game::destroyUnit(e2::Hex const& location)
 	e2::GameUnit* unit = finder->second;
 	unit->rollbackVisibility();
 
-	if (m_selectedUnit == unit)
+	if (m_selectedUnit && m_selectedUnit == unit)
 		deselectUnit();
 
 	m_unitIndex.erase(unit->tileIndex);
 	m_units.erase(unit);
+
+	if (m_empires[unit->empireId])
+		m_empires[unit->empireId]->units.erase(unit);
+
 	e2::destroy(unit);
 }
 
 
+namespace
+{
+	std::vector<e2::Hex> tmpHex;
+}
 
+void e2::Game::selectStructure(e2::GameStructure* structure)
+{
+	if (!structure || structure == m_selectedStructure)
+		return;
+
+	deselect();
+
+	m_selectedStructure = structure;
+
+	m_hexGrid->clearOutline();
+
+	tmpHex.clear();
+	e2::Hex::circle(e2::Hex(m_selectedStructure->tileIndex), m_selectedStructure->sightRange, ::tmpHex);
+
+	for (e2::Hex h : ::tmpHex)
+	{
+		m_hexGrid->pushOutline(h.offsetCoords());
+	}
+}
+
+void e2::Game::deselectStructure()
+{
+	if (!m_selectedStructure)
+		return;
+
+	m_selectedStructure = nullptr;
+	m_hexGrid->clearOutline();
+
+}
+
+void e2::Game::destroyStructure(e2::Hex const& location)
+{
+	auto finder = m_structureIndex.find(location.offsetCoords());
+	if (finder == m_structureIndex.end())
+		return;
+
+	e2::GameStructure* structure = finder->second;
+	structure->rollbackVisibility();
+
+	if (m_selectedStructure && m_selectedStructure == structure)
+		deselectStructure();
+
+	m_structureIndex.erase(structure->tileIndex);
+	m_structures.erase(structure);
+
+	if (m_empires[structure->empireId])
+		m_empires[structure->empireId]->structures.erase(structure);
+
+	e2::destroy(structure);
+}
 
 e2::GameUnit* e2::Game::unitAtHex(glm::ivec2 const& hex)
 {
@@ -762,6 +1097,16 @@ e2::GameUnit* e2::Game::unitAtHex(glm::ivec2 const& hex)
 		return nullptr;
 
 	return finder->second;
+}
+
+e2::MeshPtr e2::Game::getUnitMesh(e2::GameUnitType type)
+{
+	return m_unitMeshes[uint8_t(type)];
+}
+
+e2::MeshPtr e2::Game::getStructureMesh(e2::GameStructureType type)
+{
+	return m_structureMeshes[uint8_t(type)];
 }
 
 void e2::Game::updateAltCamera(double seconds)
@@ -787,41 +1132,41 @@ void e2::Game::updateAltCamera(double seconds)
 		}
 
 		glm::quat altRotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
-		altRotation = glm::rotate(altRotation, glm::radians(m_altViewYaw), e2::worldUp());
-		altRotation = glm::rotate(altRotation, glm::radians(m_altViewPitch), e2::worldRight());
+		altRotation = glm::rotate(altRotation, glm::radians(m_altViewYaw), glm::vec3(e2::worldUp()));
+		altRotation = glm::rotate(altRotation, glm::radians(m_altViewPitch), glm::vec3(e2::worldRight()));
 
 		if (kb.keys[int16_t(e2::Key::Space)].state)
 		{
-			m_altViewOrigin -= e2::worldUp() * moveSpeed * float(seconds);
+			m_altViewOrigin -= glm::vec3(e2::worldUp()) * moveSpeed * float(seconds);
 		}
 		if (kb.keys[int16_t(e2::Key::LeftControl)].state)
 		{
-			m_altViewOrigin -= -e2::worldUp() * moveSpeed * float(seconds);
+			m_altViewOrigin -= -glm::vec3(e2::worldUp()) * moveSpeed * float(seconds);
 		}
 
 		if (kb.keys[int16_t(e2::Key::A)].state)
 		{
-			m_altViewOrigin -= altRotation * -e2::worldRight() * moveSpeed * float(seconds);
+			m_altViewOrigin -= altRotation * -glm::vec3(e2::worldRight()) * moveSpeed * float(seconds);
 		}
 		if (kb.keys[int16_t(e2::Key::D)].state)
 		{
-			m_altViewOrigin -= altRotation * e2::worldRight() * moveSpeed * float(seconds);
+			m_altViewOrigin -= altRotation * glm::vec3(e2::worldRight()) * moveSpeed * float(seconds);
 		}
 
 		if (kb.keys[int16_t(e2::Key::W)].state)
 		{
-			m_altViewOrigin -= altRotation * e2::worldForward() * moveSpeed * float(seconds);
+			m_altViewOrigin -= altRotation * glm::vec3(e2::worldForward()) * moveSpeed * float(seconds);
 		}
 		if (kb.keys[int16_t(e2::Key::S)].state)
 		{
-			m_altViewOrigin -= altRotation * -e2::worldForward() * moveSpeed * float(seconds);
+			m_altViewOrigin -= altRotation * -glm::vec3(e2::worldForward()) * moveSpeed * float(seconds);
 		}
 
-		altRotation = glm::rotate(altRotation, glm::radians(180.0f), e2::worldUp());
+		altRotation = glm::rotate(altRotation, glm::radians(180.0f), glm::vec3(e2::worldUp()));
 
 		e2::RenderView newView{};
-		newView.fov = 65.0f;
-		newView.clipPlane = { 0.01f, 1000.0f };
+		newView.fov = 65.0;
+		newView.clipPlane = { 0.1, 100.0 };
 		newView.origin = m_altViewOrigin;
 		newView.orientation = altRotation;
 		renderer->setView(newView);
@@ -836,54 +1181,6 @@ void e2::Game::updateAnimation(double seconds)
 	{
 		unit->updateAnimation(seconds);
 	}
-}
-
-void e2::Game::endTurn()
-{
-	if (m_state != GameState::Turn || m_turnState != TurnState::Unlocked)
-		return;
-
-	onEndOfTurn();
-	m_state = GameState::TurnEnding;
-	onTurnEndingBegin();
-}
-
-void e2::Game::onTurnPreparingBegin()
-{
-
-}
-
-void e2::Game::onTurnPreparingEnd()
-{
-
-}
-
-void e2::Game::onStartOfTurn()
-{
-	// clear and calculate visibility
-	m_hexGrid->clearVisibility();
-
-	for (e2::GameUnit* unit : m_units)
-	{
-		unit->spreadVisibility();
-	}
-}
-
-void e2::Game::onEndOfTurn()
-{
-
-}
-
-
-
-void e2::Game::onTurnEndingBegin()
-{
-
-}
-
-void e2::Game::onTurnEndingEnd()
-{
-
 }
 
 e2::PathFindingAccelerationStructure::PathFindingAccelerationStructure(e2::GameUnit* unit)
@@ -913,7 +1210,7 @@ e2::PathFindingAccelerationStructure::PathFindingAccelerationStructure(e2::GameU
 
 		for (e2::Hex n : curr->index.neighbours())
 		{
-			if (curr->stepsFromOrigin + 1 > unit->moveRange)
+			if (curr->stepsFromOrigin + 1 > unit->movePointsLeft)
 				continue;
 
 			if (processed.contains(n))
@@ -929,10 +1226,8 @@ e2::PathFindingAccelerationStructure::PathFindingAccelerationStructure(e2::GameU
 				continue;
 
 			// ignore hexes that are occupied by unpassable biome
-			e2::TileData* tile = grid->getTileData(coords);
-			e2::TileFlags biome = tile->getBiome();
-			bool walkable = (biome == e2::TileFlags::BiomeGrassland) || (biome == e2::TileFlags::BiomeForest) || (biome == e2::TileFlags::BiomeDesert) || (biome == e2::TileFlags::BiomeTundra);
-			if (!walkable)
+			e2::TileData tile = e2::HexGrid::calculateTileDataForHex(n);
+			if (!tile.isWalkable())
 				continue;
 
 			// ignore hexes that are occupied by units
@@ -945,6 +1240,72 @@ e2::PathFindingAccelerationStructure::PathFindingAccelerationStructure(e2::GameU
 			newHex->stepsFromOrigin = curr->stepsFromOrigin + 1;
 			hexIndex[coords] = newHex;
 			
+
+			queue.push(newHex);
+		}
+
+		processed.insert(curr->index);
+	}
+}
+
+e2::PathFindingAccelerationStructure::PathFindingAccelerationStructure(e2::GameContext* ctx, e2::Hex const& start, uint64_t range, bool ignoreVisibility)
+{
+	if (!ctx)
+		return;
+
+	e2::Game* game = ctx->game();
+	e2::HexGrid* grid = game->hexGrid();
+	glm::ivec2 tileIndex = start.offsetCoords();
+
+	e2::Hex originHex = start;
+	origin = e2::create<e2::PathFindingHex>(originHex);
+	origin->isBegin = true;
+
+	hexIndex[tileIndex] = origin;
+
+
+	std::queue<e2::PathFindingHex*> queue;
+	std::unordered_set<e2::Hex> processed;
+
+	queue.push(origin);
+
+	while (!queue.empty())
+	{
+		e2::PathFindingHex* curr = queue.front();
+		queue.pop();
+
+		for (e2::Hex n : curr->index.neighbours())
+		{
+			if (curr->stepsFromOrigin + 1 > range)
+				continue;
+
+			if (processed.contains(n))
+				continue;
+
+			glm::ivec2 coords = n.offsetCoords();
+
+			if (hexIndex.contains(coords))
+				continue;
+
+			// ignore hexes not directly visible
+			if (!ignoreVisibility && !grid->isVisible(coords))
+				continue;
+
+			// ignore hexes that are occupied by unpassable biome
+			e2::TileData tile = e2::HexGrid::calculateTileDataForHex(n);
+			if (!tile.isWalkable())
+				continue;
+
+			// ignore hexes that are occupied by units
+			e2::GameUnit* otherUnit = game->unitAtHex(coords);
+			if (otherUnit)
+				continue;
+
+			e2::PathFindingHex* newHex = e2::create<e2::PathFindingHex>(n);
+			newHex->towardsOrigin = curr;
+			newHex->stepsFromOrigin = curr->stepsFromOrigin + 1;
+			hexIndex[coords] = newHex;
+
 
 			queue.push(newHex);
 		}

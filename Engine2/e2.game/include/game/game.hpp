@@ -5,6 +5,9 @@
 #include "game/hex.hpp"
 #include "game/gamecontext.hpp"
 #include "game/resources.hpp"
+#include "game/gameunit.hpp"
+#include "game/empire.hpp"
+#include "game/shared.hpp"
 
 namespace e2
 {
@@ -32,7 +35,7 @@ namespace e2
 	};
 
 	class GameUnit;
-
+	class GameStructure;
 
 	/** @tags(arena, arenaSize=4096) */
 	class PathFindingHex : public e2::Object
@@ -55,6 +58,7 @@ namespace e2
 		ObjectDeclaration();
 	public:
 		PathFindingAccelerationStructure();
+		PathFindingAccelerationStructure(e2::GameContext* ctx, e2::Hex const& start, uint64_t range, bool ignoreVisibility = false);
 		PathFindingAccelerationStructure(e2::GameUnit* unit);
 		~PathFindingAccelerationStructure();
 
@@ -89,6 +93,9 @@ namespace e2
 		void updateGameState();
 		void updateTurn();
 
+		void updateTurnLocal();
+		void updateTurnAI();
+
 		void updateUnitAttack();
 		void updateUnitMove();
 
@@ -105,29 +112,13 @@ namespace e2
 		void drawUnitUI();
 		void drawMinimapUI();
 		void drawDebugUI();
+		void drawFinalUI();
 
 		void onNewCursorHex();
 
 		e2::RenderView calculateRenderView(glm::vec2 const& viewOrigin);
 
 
-		template<typename UnitType>
-		UnitType* spawnUnit(e2::Hex const& location)
-		{
-			glm::ivec2 coords = location.offsetCoords();
-			if (m_unitIndex.find(coords) != m_unitIndex.end())
-				return nullptr;
-
-
-			UnitType* newUnit = e2::create<UnitType>(this, coords);
-			newUnit->spreadVisibility();
-
-			m_units.insert(newUnit);
-			m_unitIndex[coords] = newUnit;
-			return newUnit;
-		}
-
-		void destroyUnit(e2::Hex const& location);
 
 		e2::MeshPtr cursorMesh()
 		{
@@ -138,9 +129,24 @@ namespace e2
 
 		GameUnit* unitAtHex(glm::ivec2 const& hex);
 
+		e2::MeshPtr getUnitMesh(e2::GameUnitType type);
+		e2::MeshPtr getStructureMesh(e2::GameStructureType type);
+
+
 
 
 	protected:
+
+		// shared resources
+		e2::StackVector<e2::MeshPtr, (uint64_t)e2::GameUnitType::Count> m_unitMeshes;
+		e2::StackVector<e2::MeshPtr, (uint64_t)e2::GameStructureType::Count> m_structureMeshes;
+
+
+		e2::Texture2DPtr m_irradianceMap;
+		e2::Texture2DPtr m_radianceMap;
+
+
+
 		friend class GameContext;
 
 		e2::GameSession* m_session{};
@@ -150,13 +156,11 @@ namespace e2
 		GameState m_state{ GameState::TurnPreparing };
 		uint64_t m_turn{};
 
+		// which empire has current turn
+		EmpireId m_empireTurn{};
+
 		TurnState m_turnState{ TurnState::Unlocked };
 
-
-		e2::Texture2DPtr m_irradianceMap;
-		e2::Texture2DPtr m_radianceMap;
-
-		
 		// main world grid
 		e2::HexGrid* m_hexGrid{};
 
@@ -179,11 +183,55 @@ namespace e2
 		bool m_uiHovered{};
 		bool m_viewDragging{};
 
+		// empirees 
+
+	public:
+		EmpireId spawnEmpire();
+		void destroyEmpire(EmpireId empireId);
+
+		e2::GameEmpire* localEmpire()
+		{
+			return m_localEmpire;
+		}
+
+	protected:
+		e2::EmpireId m_localEmpireId{};
+		e2::GameEmpire* m_localEmpire{};
+		e2::StackVector<e2::GameEmpire*, e2::maxNumEmpires> m_empires;
+
+	public:
+
+		void deselect();
+
 		// game units 
 		void selectUnit(e2::GameUnit* unit);
 		void deselectUnit();
 		void moveSelectedUnitTo(e2::Hex const& to);
 
+		template<typename UnitType>
+		UnitType* spawnUnit(e2::Hex const& location, EmpireId empire)
+		{
+			glm::ivec2 coords = location.offsetCoords();
+			if (m_unitIndex.find(coords) != m_unitIndex.end())
+				return nullptr;
+
+
+			UnitType* newUnit = e2::create<UnitType>(this, coords, empire);
+			newUnit->spreadVisibility();
+
+			m_units.insert(newUnit);
+			m_unitIndex[coords] = newUnit;
+
+			if (m_empires[empire])
+				m_empires[empire]->units.insert(newUnit);
+
+			return newUnit;
+		}
+
+		void destroyUnit(e2::Hex const& location);
+
+	protected:
+		// move this to empirecontroller (GamePlayer and GameAI)
 		e2::PathFindingAccelerationStructure *m_unitAS;
 		std::vector<e2::Hex> m_unitHoverPath;
 		std::vector<e2::Hex> m_unitMovePath;
@@ -194,6 +242,42 @@ namespace e2
 		GameUnit* m_selectedUnit{};
 		std::unordered_set<GameUnit*> m_units;
 		std::unordered_map<glm::ivec2, GameUnit*> m_unitIndex;
+
+
+	public:
+		void selectStructure(e2::GameStructure* structure);
+		void deselectStructure();
+
+		template<typename UnitType>
+		UnitType* spawnStructure(e2::Hex const& location, EmpireId empire)
+		{
+			glm::ivec2 coords = location.offsetCoords();
+			if (m_structureIndex.find(coords) != m_structureIndex.end())
+				return nullptr;
+
+
+			UnitType* newStructure = e2::create<UnitType>(this, coords, empire);
+			newStructure->spreadVisibility();
+
+			m_structures.insert(newStructure);
+			m_structureIndex[coords] = newStructure;
+
+			if (m_empires[empire])
+				m_empires[empire]->structures.insert(newStructure);
+
+			return newStructure;
+		}
+
+		void destroyStructure(e2::Hex const& location);
+
+	protected:
+		e2::GameStructure* m_selectedStructure{};
+		std::unordered_set<e2::GameStructure*> m_structures;
+		std::unordered_map<glm::ivec2, e2::GameStructure*> m_structureIndex;
+
+
+
+
 
 		// camera stuff 
 		e2::RenderView m_view;

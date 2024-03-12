@@ -9,15 +9,15 @@ namespace e2
 {
 	struct E2_API RenderView
 	{
-		glm::quat orientation{ glm::identity<glm::quat>() };
-		glm::vec3 origin;
-		glm::vec2 clipPlane{0.01f, 100.0f};
-		float fov{ 60.0f };
+		glm::dquat orientation{ glm::identity<glm::dquat>() };
+		glm::dvec3 origin;
+		glm::dvec2 clipPlane{0.1, 100.0};
+		double fov{ 60.0 };
 
-		glm::mat4 calculateViewMatrix() const;
-		glm::mat4 calculateProjectionMatrix(glm::vec2 const& resolution) const;
-		glm::vec3 findWorldspaceViewRayFromNdc(glm::vec2 const& resolution, glm::vec2 const& xyPlane) const;
-		glm::vec2 unprojectWorldPlane(glm::vec2 const& resolution, glm::vec2 const& xyCoords) const;
+		glm::dmat4 calculateViewMatrix() const;
+		glm::dmat4 calculateProjectionMatrix(glm::dvec2 const& resolution) const;
+		glm::dvec3 findWorldspaceViewRayFromNdc(glm::dvec2 const& resolution, glm::dvec2 const& xyPlane) const;
+		glm::dvec2 unprojectWorldPlane(glm::dvec2 const& resolution, glm::dvec2 const& xyCoords) const;
 	};
 
 }

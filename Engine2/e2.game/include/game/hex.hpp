@@ -11,6 +11,8 @@
 #include <e2/renderer/shadermodels/terrain.hpp>
 #include <e2/renderer/shadermodels/fog.hpp>
 
+#include "game/gamecontext.hpp"
+
 #include <vector>
 #include <unordered_map>
 
@@ -19,126 +21,53 @@ namespace e2
 
 	class GameUnit;
 
-	enum class TileFlags : uint16_t
+	enum class TileFlags : uint8_t
 	{
-		None					= 0b0000'0000'0000'0000,
+		None					= 0b0000'0000,
 
-		// Hills is a special little baby, we love it very dearly but it only applies to grasslands, desert, and tundra biomes. it's irrelevant (and 0) for the others
-		// if we find specific usecases where we need a bit for any of the other biomes, we can reuse this!
-		// @todo this is actually unused 
-		HillsMask				= 0b0000'0000'0000'0001,
+		BiomeMask				= 0b1110'0000,
+		BiomeGrassland			= 0b0000'0000,
+		BiomeForest				= 0b0010'0000,
+		BiomeDesert				= 0b0100'0000,
+		BiomeTundra				= 0b0110'0000,
+		BiomeMountain			= 0b1000'0000,
+		BiomeShallow			= 0b1010'0000,
+		BiomeOcean				= 0b1100'0000,
+		BiomeReserved0			= 0b1110'0000,
 
-
-		BiomeMask				= 0b1110'0000'0000'0000,
-		BiomeGrassland			= 0b0000'0000'0000'0000,
-		BiomeForest				= 0b0010'0000'0000'0000,
-		BiomeDesert				= 0b0100'0000'0000'0000,
-		BiomeTundra				= 0b0110'0000'0000'0000,
-		BiomeMountain			= 0b1000'0000'0000'0000,
-		BiomeShallow			= 0b1010'0000'0000'0000,
-		BiomeOcean				= 0b1100'0000'0000'0000,
-		BiomeReserved0			= 0b1110'0000'0000'0000,
-
-		ResourceMask			= 0b0001'1100'0000'0000,
-		ResourceNone			= 0b0000'0000'0000'0000, // no resource here
-		ResourceForest			= 0b0000'0100'0000'0000, // improve to saw mill, provides wood 
-		ResourceStone			= 0b0000'1000'0000'0000, // improve to quarry, provides stone 
-		ResourceOre				= 0b0000'1100'0000'0000, // improve to ore mine, provides metal
-		ResourceGold			= 0b0001'0000'0000'0000, // improve to gold mine, provides gold
-		ResourceOil				= 0b0001'0100'0000'0000, // improve to oil derrick, provides oil
-		ResourceUranium			= 0b0001'1000'0000'0000, // improve to uranium mine, provides uranium
-		ResourceReserved0		= 0b0001'1100'0000'0000,
-
-		ImprovementMask			= 0b0000'0011'1100'0000,
-		ImprovementNone			= 0b0000'0000'0000'0000,
-
-		// Resource improvement, what resource is in resource flags
-		ImprovementResource		= 0b0000'0000'0100'0000,
-		// Barracks, increases max unit count, builds infantry units 
-		ImprovementBarracks		= 0b0000'0000'1000'0000,
-		// Manufacturing plant, builds vehicle units
-		ImprovementFactory		= 0b0000'0000'1100'0000,
-		// Forward base, increases build range for other improvements, can be built anywhere in sight range
-		// units can be teleported between forward bases limitlessly and instantly
-		ImprovementForwardBase	= 0b0000'0001'0000'0000,
-		// Airbase, builds air units
-		ImprovementAirbase		= 0b0000'0001'0100'0000,
-		// Research center, unlocks improvement and unit upgrades, as well as other upgrades such as walls (wood, stone, steel)
-		ImprovementResearch		= 0b0000'0001'1000'0000,
-		// Pillbox, stealth defensive building, short sight range, short attack range, high damage
-		ImprovementPillbox		= 0b0000'0001'1100'0000,
-		// Artillery base, offensive building, short sight range, long attack range, high damage
-		ImprovementArtillery	= 0b0000'0010'0000'0000,
-		// Seaport, builds naval units 
-		ImprovementSeaport		= 0b0000'0010'0100'0000,
-		// Guard tower, defensive building, long sight range, short attack range, low damage (upgradeable)
-		ImprovementGuardTower	= 0b0000'0010'1000'0000,
-
-		// Wall defense, globally upgradeable via research center 
-		ImprovementWall			= 0b0000'0010'1100'0000,
-
-		ImprovementReserved6	= 0b0000'0011'0000'0000,
-		ImprovementReserved7	= 0b0000'0011'0100'0000,
-		ImprovementReserved8	= 0b0000'0011'1000'0000,
-		ImprovementReserved9	= 0b0000'0011'1100'0000,
-		
-		// These are special, and holds a combo of ImprovementResource and Resource*
-		ResourceImprovementMask			= ImprovementMask		| ResourceMask, // all resources provide production
-		ResourceImprovementSawMill		= ImprovementResource	| ResourceForest, // provides wood 
-		ResourceImprovementQuarry		= ImprovementResource	| ResourceStone, // provides stone 
-		ResourceImprovementOreMine		= ImprovementResource	| ResourceOre, // provides metal
-		ResourceImprovementGoldMine		= ImprovementResource	| ResourceGold, // provides gold
-		ResourceImprovementOilDerrick	= ImprovementResource	| ResourceOil, // provides oil
-		ResourceImprovementUraniumMine	= ImprovementResource	| ResourceUranium, // provides uranium
-		ResourceImprovementReserved0	= ImprovementResource	| ResourceReserved0, // provides reserved0
+		ResourceMask			= 0b0001'1100,
+		ResourceNone			= 0b0000'0000, // no resource here
+		ResourceForest			= 0b0000'0100, // improve to saw mill, provides wood 
+		ResourceStone			= 0b0000'1000, // improve to quarry, provides stone 
+		ResourceOre				= 0b0000'1100, // improve to ore mine, provides metal
+		ResourceGold			= 0b0001'0000, // improve to gold mine, provides gold
+		ResourceOil				= 0b0001'0100, // improve to oil derrick, provides oil
+		ResourceUranium			= 0b0001'1000, // improve to uranium mine, provides uranium
+		ResourceReserved0		= 0b0001'1100,
 
 		// Abundance of the given resources on this tile
-		AbundanceMask	= 0b0000'0000'0011'0000,
-		Abundance1		= 0b0000'0000'0000'0000,
-		Abundance2		= 0b0000'0000'0001'0000,
-		Abundance3		= 0b0000'0000'0010'0000,
-		Abundance4		= 0b0000'0000'0011'0000,
-
-		Reserved		= 0b0000'0000'0000'1110,
+		AbundanceMask			= 0b0000'0011,
+		Abundance1				= 0b0000'0000,
+		Abundance2				= 0b0000'0001,
+		Abundance3				= 0b0000'0010,
+		Abundance4				= 0b0000'0011,
 	};
 
 	EnumFlagsDeclaration(TileFlags);
 
-	enum class ImprovementFlags : uint8_t
-	{
-		None			= 0b0000'0000,
-		DefenseMask		= 0b0000'0011,
-		Defense0		= 0b0000'0000,
-		Defense1		= 0b0000'0001,
-		Defense2		= 0b0000'0010,
-		Defense3		= 0b0000'0011,
-
-		UpgradesMask	= 0b1111'1100,
-		Upgrade0		= 0b0000'0100,
-		Upgrade1		= 0b0000'1000,
-		Upgrade2		= 0b0001'0000,
-		Upgrade3		= 0b0010'0000,
-		Upgrade4		= 0b0100'0000,
-		Upgrade5		= 0b1000'0000,
-	};
-
-	EnumFlagsDeclaration(ImprovementFlags);
-
 	/** */
 	struct TileData
 	{
-		// flags control biome, resource, improvements
-		TileFlags flags{ TileFlags::None }; // 16 bits
+		bool isWalkable();
 
 		TileFlags getBiome();
 		TileFlags getResource();
 		TileFlags getAbundance();
-		TileFlags getImprovement();
 
+		// flags control biome, resources, abundance
+		TileFlags flags{ TileFlags::None }; // 8 bits
 		uint8_t empireId{255}; // 255 means no empire claim this, 254 empire ids that are recycled (max 254 concurrent empires)
 
-		ImprovementFlags improvementFlags{ ImprovementFlags::None };
-		e2::ufloat8 improvementHealth{ 1.0f };
 	};
 
 	constexpr uint32_t hexChunkResolution = 6;
@@ -264,14 +193,15 @@ namespace e2
 	 * Can grow arbitrarily and without limits
 	 * 
 	 */
-	class HexGrid : public e2::Context
+	class HexGrid : public e2::GameContext, public e2::Context
 	{
 	public:
 
-		HexGrid(e2::Context* ctx, e2::GameSession* session);
+		HexGrid(e2::GameContext* ctx);
 		~HexGrid();
 
 		virtual e2::Engine* engine() override;
+		virtual e2::Game* game() override;
 
 		/// Chunks Begin (and World Streaming)
 
@@ -431,7 +361,7 @@ namespace e2
 		void initializeFogOfWar();
 		void invalidateFogOfWarRenderTarget(glm::uvec2 const& newResolution);
 		void invalidateFogOfWarShaders();
-		void renderFogOfWar(std::unordered_map<glm::ivec2, e2::GameUnit*> const& unitsMap);
+		void renderFogOfWar();
 		void destroyFogOfWar();
 
 		void clearVisibility();
@@ -451,8 +381,7 @@ namespace e2
 		int32_t m_numThreads{4};
 
 
-		e2::Engine* m_engine{};
-		e2::GameSession* m_session{};
+		e2::Game* m_game{};
 
 		std::mutex m_dynamicMutex;
 
@@ -555,6 +484,8 @@ namespace e2
 
 
 	public:
+		void initializeWorldBounds(glm::vec2 const& center);
+
 		void updateWorldBounds();
 
 		e2::Aabb2D const& viewBounds()
@@ -600,6 +531,7 @@ namespace e2
 
 private:
 	void debugDraw();
+	void updateViewBounds();
 	};
 
 }

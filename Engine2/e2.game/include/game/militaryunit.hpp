@@ -29,10 +29,7 @@ namespace e2
 
 	EnumFlagsDeclaration(e2::MilitaryUnitUpgrade);
 
-	enum class MilitaryUnitType : uint8_t
-	{
-		Ranger = 0,
-	};
+
 
 
 	constexpr uint32_t militaryUnitMaxLevel = 14;
@@ -78,7 +75,7 @@ namespace e2
 			meleeDamage += modifier.offsetMeleeDamage;
 			rangedDamage += modifier.offsetRangedDamage;
 			defensiveStrength += modifier.offsetDefensiveStrength;
-			range += modifier.offsetDefensiveStrength;
+			range += modifier.offsetRange;
 
 			validate();
 		}
@@ -105,14 +102,12 @@ namespace e2
 	{
 		ObjectDeclaration();
 	public:
-		MilitaryUnit(e2::GameContext* ctx, glm::ivec2 const& tile);
+		MilitaryUnit(e2::GameContext* ctx, glm::ivec2 const& tile, uint8_t empire);
 		virtual ~MilitaryUnit();
 
 		// calculates stats for the given round 
 		void calculateStats();
 		MilitaryUnitTypeStats calculatedStats;
-
-		MilitaryUnitType unitType;
 
 		float armor{ 0.0f };
 

@@ -205,6 +205,9 @@ namespace e2
 		UIRenderState& pushRenderState(e2::Name id, glm::vec2 const& minSize, glm::vec2 offset = {});
 		void popRenderState();
 
+		void pushFixedPanel(e2::Name id, glm::vec2 const& position, glm::vec2 const& size);
+		void popFixedPanel();
+
 		void beginFlexV(e2::Name id, float const *rowSizes, uint32_t rowSizeCount);
 		void endFlexV();
 
@@ -237,6 +240,9 @@ namespace e2
 
 
 
+		void gameLabel(std::string const& text, uint8_t fontSize = 12, e2::UITextAlign horizAlign = UITextAlign::Begin);
+
+
 		// --- Begin Widgets --- //
 		void log(e2::Name id, float& scrollOffset, bool autoscroll);
 
@@ -254,6 +260,8 @@ namespace e2
 		// --- End Widgets --- //
 
 		// --- Begin Rendering --- //
+
+		void clearScissor();
 
 		void setScissor(glm::vec2 position, glm::vec2 size);
 

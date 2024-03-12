@@ -491,48 +491,53 @@ void e2::Renderer::setView(e2::RenderView const& renderView)
 
 }
 
-glm::mat4 e2::RenderView::calculateViewMatrix() const
+glm::dmat4 e2::RenderView::calculateViewMatrix() const
 {
-	glm::mat4 translateMatrix = glm::translate(glm::identity<glm::mat4>(), origin);
-	glm::mat4 rotateMatrix = glm::mat4_cast(orientation);
+	glm::dmat4 translateMatrix = glm::translate(glm::identity<glm::dmat4>(), origin);
+	glm::dmat4 rotateMatrix = glm::mat4_cast(orientation);
 	return glm::inverse(translateMatrix * rotateMatrix);
 }
 
-glm::mat4 e2::RenderView::calculateProjectionMatrix( glm::vec2 const& resolution) const
+glm::dmat4 e2::RenderView::calculateProjectionMatrix( glm::dvec2 const& resolution) const
 {
-	return glm::perspectiveFov(glm::radians(fov), float(resolution.x), float(resolution.y), clipPlane.x, clipPlane.y);
+	return glm::perspectiveFov(glm::radians(fov), resolution.x, resolution.y, clipPlane.x, clipPlane.y);
 }
 
-glm::vec3 e2::RenderView::findWorldspaceViewRayFromNdc(glm::vec2 const& resolution, glm::vec2 const& ndc) const
+glm::dvec3 e2::RenderView::findWorldspaceViewRayFromNdc(glm::dvec2 const& resolution, glm::dvec2 const& ndc) const
 {
-	glm::mat4 projectionMatrix = calculateProjectionMatrix(resolution);
-	glm::mat4 viewMatrix = calculateViewMatrix();
+	glm::dmat4 projectionMatrix = calculateProjectionMatrix(resolution);
+	glm::dmat4 viewMatrix = calculateViewMatrix();
 
-	glm::vec3 near = glm::unProject(glm::vec3(ndc.x, ndc.y, 0.0f), viewMatrix, projectionMatrix, glm::vec4(-1.0f, -1.0f, 2.0f, 2.0f));
-	glm::vec3 far = glm::unProject(glm::vec3(ndc.x, ndc.y, 1.0f), viewMatrix, projectionMatrix, glm::vec4(-1.0f, -1.0f, 2.0f, 2.0f));
-	glm::vec3 ray = glm::normalize(far - near);
+	glm::dvec3 origin = glm::dvec3(glm::inverse(viewMatrix) * glm::dvec4(0.0, 0.0, 0.0, 1.0));
+	glm::dvec3 far = glm::unProject(glm::dvec3(ndc.x, ndc.y, 1.0), viewMatrix, projectionMatrix, glm::dvec4(-1.0, -1.0, 2.0, 2.0));
+	glm::dvec3 ray = glm::normalize(far - origin);
 	return ray;
 }
 
-glm::vec2 e2::RenderView::unprojectWorldPlane(glm::vec2 const& resolution, glm::vec2 const& xyCoords) const
+glm::dvec2 e2::RenderView::unprojectWorldPlane(glm::dvec2 const& resolution, glm::dvec2 const& xyCoords) const
 {
-	glm::mat4 projectionMatrix = calculateProjectionMatrix(resolution);
-	glm::mat4 viewMatrix = calculateViewMatrix();
+	//if(glm::abs(xyCoords.x) != 1.0f && glm::abs(xyCoords.y) != 1.0f)
+	//	LogNotice("mouse {}", xyCoords);
+	glm::dmat4 projectionMatrix = calculateProjectionMatrix(resolution);
+	glm::dmat4 viewMatrix = calculateViewMatrix();
 
-	glm::vec3 near = glm::unProject(glm::vec3(xyCoords.x, xyCoords.y, 0.0f), viewMatrix, projectionMatrix, glm::vec4(-1.0f, -1.0f, 2.0f, 2.0f));
-	glm::vec3 far = glm::unProject(glm::vec3(xyCoords.x, xyCoords.y, 1.0f), viewMatrix, projectionMatrix, glm::vec4(-1.0f, -1.0f, 2.0f, 2.0f));
-	glm::vec3 viewRay = glm::normalize(far - near);
+	glm::dvec3 origin = glm::dvec3(glm::inverse(viewMatrix) * glm::dvec4(0.0, 0.0, 0.0, 1.0));
 
-	constexpr float renderDistance = 100.0f;
-	float rayDistanceToPlane = 0.0f;
-	if (!glm::intersectRayPlane(near, viewRay, { 0.0f, 0.0f, 0.0f }, e2::worldUp(), rayDistanceToPlane))
+	//glm::vec3 near = glm::unProject<float>(glm::vec3(xyCoords.x, xyCoords.y, 0.0f), viewMatrix, projectionMatrix, glm::vec4(-1.0f, -1.0f, 2.0f, 2.0f));
+	glm::dvec3 far = glm::unProject(glm::dvec3(xyCoords.x, xyCoords.y, 1.0), viewMatrix, projectionMatrix, glm::dvec4(-1.0, -1.0, 2.0, 2.0));
+	glm::dvec3 viewRay = glm::normalize(far - origin);
+
+	constexpr double renderDistance = 100.0;
+	double rayDistanceToPlane = 0.0f;
+	if (!glm::intersectRayPlane(origin, viewRay, { 0.0, 0.0, 0.0 }, e2::worldUp(), rayDistanceToPlane))
 	{
 		rayDistanceToPlane = renderDistance;
+		LogNotice("failed");
 	}
 
-	glm::vec3 offset = near + viewRay * rayDistanceToPlane;
-	glm::vec3 worldPoint = offset - e2::worldUp() * glm::dot(offset, e2::worldUp());
-	return {worldPoint.x, worldPoint.z};
+	
+	glm::dvec3 offset = origin + viewRay * (rayDistanceToPlane);
+	return { offset.x, offset.z};
 }
 
 e2::Viewpoints2D const & e2::Renderer::viewpoints() const

@@ -6,11 +6,13 @@
 
 #include "e2/transform.hpp"
 
+#include "game/game.hpp"
+
 #include <glm/gtc/noise.hpp>
 
-e2::HexGrid::HexGrid(e2::Context* ctx, e2::GameSession* session)
-	: m_engine(ctx->engine())
-	, m_session(session)
+
+e2::HexGrid::HexGrid(e2::GameContext* gameCtx)
+	: m_game(gameCtx->game())
 {
 	constexpr size_t prewarmSize = 16'384;
 	m_tiles.reserve(prewarmSize);
@@ -35,27 +37,28 @@ e2::HexGrid::HexGrid(e2::Context* ctx, e2::GameSession* session)
 	}
 
 
+	auto am = game()->assetManager();
 
 	e2::ALJDescription aljDesc;
-	assetManager()->prescribeALJ(aljDesc, "assets/SM_HexBase.e2a");
-	assetManager()->prescribeALJ(aljDesc, "assets/SM_HexBaseHigh.e2a");
-	assetManager()->prescribeALJ(aljDesc, "assets/SM_CoordinateSpace.e2a");
-	assetManager()->prescribeALJ(aljDesc, "assets/environment/trees/SM_PalmTree001.e2a");
-	if (!assetManager()->queueWaitALJ(aljDesc))
+	am->prescribeALJ(aljDesc, "assets/SM_HexBase.e2a");
+	am->prescribeALJ(aljDesc, "assets/SM_HexBaseHigh.e2a");
+	am->prescribeALJ(aljDesc, "assets/SM_CoordinateSpace.e2a");
+	am->prescribeALJ(aljDesc, "assets/environment/trees/SM_PalmTree001.e2a");
+	if (!am->queueWaitALJ(aljDesc))
 	{
 		LogError("Failed to load hex base mesh");
 		return;
 	}
 
-	m_treeMesh[0] = assetManager()->get("assets/environment/trees/SM_PalmTree001.e2a")->cast<e2::Mesh>();
-	m_treeMesh[1] = assetManager()->get("assets/environment/trees/SM_PalmTree002.e2a")->cast<e2::Mesh>();
-	m_treeMesh[2] = assetManager()->get("assets/environment/trees/SM_PalmTree003.e2a")->cast<e2::Mesh>();
-	m_treeMesh[3] = assetManager()->get("assets/environment/trees/SM_PalmTree004.e2a")->cast<e2::Mesh>();
+	m_treeMesh[0] = am->get("assets/environment/trees/SM_PalmTree001.e2a")->cast<e2::Mesh>();
+	m_treeMesh[1] = am->get("assets/environment/trees/SM_PalmTree002.e2a")->cast<e2::Mesh>();
+	m_treeMesh[2] = am->get("assets/environment/trees/SM_PalmTree003.e2a")->cast<e2::Mesh>();
+	m_treeMesh[3] = am->get("assets/environment/trees/SM_PalmTree004.e2a")->cast<e2::Mesh>();
 
-	m_baseHex = assetManager()->get("assets/SM_HexBase.e2a")->cast<e2::Mesh>();
+	m_baseHex = am->get("assets/SM_HexBase.e2a")->cast<e2::Mesh>();
 	m_dynaHex = e2::DynamicMesh(m_baseHex, 0, VertexAttributeFlags::Color);
 
-	m_baseHexHigh = assetManager()->get("assets/SM_HexBaseHigh.e2a")->cast<e2::Mesh>();
+	m_baseHexHigh = am->get("assets/SM_HexBaseHigh.e2a")->cast<e2::Mesh>();
 	m_dynaHexHigh = e2::DynamicMesh(m_baseHexHigh, 0, VertexAttributeFlags::Color);
 
 
@@ -111,23 +114,26 @@ e2::HexGrid::HexGrid(e2::Context* ctx, e2::GameSession* session)
 
 	dynaWater.mergeDuplicateVertices();
 
+	auto rm = game()->renderManager();
+	auto session = game()->gameSession();
+
 	m_waterMaterial = e2::create<e2::Material>();
-	m_waterMaterial->postConstruct(this, {});
-	m_waterMaterial->overrideModel(renderManager()->getShaderModel("e2::WaterModel"));
-	m_waterProxy = m_session->getOrCreateDefaultMaterialProxy(m_waterMaterial)->unsafeCast<e2::WaterProxy>();
+	m_waterMaterial->postConstruct(game(), {});
+	m_waterMaterial->overrideModel(rm->getShaderModel("e2::WaterModel"));
+	m_waterProxy = session->getOrCreateDefaultMaterialProxy(m_waterMaterial)->unsafeCast<e2::WaterProxy>();
 	m_waterChunk = dynaWater.bake(m_waterMaterial, VertexAttributeFlags::None);
 
 
 	m_fogMaterial = e2::create<e2::Material>();
-	m_fogMaterial->postConstruct(this, {});
-	m_fogMaterial->overrideModel(renderManager()->getShaderModel("e2::FogModel"));
-	m_fogProxy = m_session->getOrCreateDefaultMaterialProxy(m_fogMaterial)->unsafeCast<e2::FogProxy>();
+	m_fogMaterial->postConstruct(game(), {});
+	m_fogMaterial->overrideModel(rm->getShaderModel("e2::FogModel"));
+	m_fogProxy = session->getOrCreateDefaultMaterialProxy(m_fogMaterial)->unsafeCast<e2::FogProxy>();
 	m_fogChunk = dynaWater.bake(m_fogMaterial, VertexAttributeFlags::None);
 
 	m_terrainMaterial = e2::create<e2::Material>();
-	m_terrainMaterial->postConstruct(this, {});
-	m_terrainMaterial->overrideModel(renderManager()->getShaderModel("e2::TerrainModel"));
-	m_terrainProxy = m_session->getOrCreateDefaultMaterialProxy(m_terrainMaterial)->unsafeCast<e2::TerrainProxy>();
+	m_terrainMaterial->postConstruct(game(), {});
+	m_terrainMaterial->overrideModel(rm->getShaderModel("e2::TerrainModel"));
+	m_terrainProxy = session->getOrCreateDefaultMaterialProxy(m_terrainMaterial)->unsafeCast<e2::TerrainProxy>();
 
 	initializeFogOfWar();
 }
@@ -140,7 +146,12 @@ e2::HexGrid::~HexGrid()
 
 e2::Engine* e2::HexGrid::engine()
 {
-	return m_engine;
+	return game()->engine();
+}
+
+e2::Game* e2::HexGrid::game()
+{
+	return m_game;
 }
 
 
@@ -395,7 +406,7 @@ insert_sorted(std::vector<T>& vec, T const& item, Pred pred)
 
 void e2::HexGrid::updateStreaming(glm::vec2 const& streamCenter, e2::Viewpoints2D const& viewPoints, glm::vec2 const& viewVelocity)
 {
-	e2::Renderer* renderer = m_session->renderer();
+	e2::Renderer* renderer = gameSession()->renderer();
 	float viewSpeed = glm::length(viewVelocity);
 
 	m_streamingCenter = streamCenter;
@@ -1023,15 +1034,18 @@ void e2::HexGrid::clearLoadTime()
 
 void e2::HexGrid::initializeFogOfWar()
 {
+	auto renderCtx = game()->renderContext();
+	auto mainThreadCtx = game()->mainThreadContext();
+
 	// fogofwar stuff 
 	e2::PipelineLayoutCreateInfo layInf{};
 	layInf.pushConstantSize = sizeof(e2::FogOfWarConstants);
-	m_fogOfWarPipelineLayout = renderContext()->createPipelineLayout(layInf);
+	m_fogOfWarPipelineLayout = renderCtx->createPipelineLayout(layInf);
 
 	// outline stuff
 	layInf = e2::PipelineLayoutCreateInfo();
 	layInf.pushConstantSize = sizeof(e2::OutlineConstants);
-	m_outlinePipelineLayout = renderContext()->createPipelineLayout(layInf);
+	m_outlinePipelineLayout = renderCtx->createPipelineLayout(layInf);
 
 	// blur stuff 
 	e2::DescriptorSetLayoutCreateInfo setLayoutInf{};
@@ -1039,18 +1053,18 @@ void e2::HexGrid::initializeFogOfWar()
 		{e2::DescriptorBindingType::Texture},
 		{e2::DescriptorBindingType::Sampler},
 	};
-	m_blurSetLayout = renderContext()->createDescriptorSetLayout(setLayoutInf);
+	m_blurSetLayout = renderCtx->createDescriptorSetLayout(setLayoutInf);
 
 	layInf = e2::PipelineLayoutCreateInfo();
 	layInf.pushConstantSize = sizeof(e2::BlurConstants);
 	layInf.sets.push(m_blurSetLayout);
-	m_blurPipelineLayout = renderContext()->createPipelineLayout(layInf);
+	m_blurPipelineLayout = renderCtx->createPipelineLayout(layInf);
 
 	e2::DescriptorPoolCreateInfo poolCreateInfo{};
 	poolCreateInfo.maxSets = 2 * e2::maxNumSessions;
 	poolCreateInfo.numSamplers = 2 * e2::maxNumSessions;
 	poolCreateInfo.numTextures = 2 * e2::maxNumSessions;
-	m_blurPool = mainThreadContext()->createDescriptorPool(poolCreateInfo);
+	m_blurPool = mainThreadCtx->createDescriptorPool(poolCreateInfo);
 
 	// minimap stuff
 	e2::DescriptorSetLayoutCreateInfo miniSetLayoutInf{};
@@ -1059,21 +1073,21 @@ void e2::HexGrid::initializeFogOfWar()
 		{e2::DescriptorBindingType::Texture},
 		{e2::DescriptorBindingType::Sampler},
 	};
-	m_minimapLayout = renderContext()->createDescriptorSetLayout(miniSetLayoutInf);
+	m_minimapLayout = renderCtx->createDescriptorSetLayout(miniSetLayoutInf);
 
 	e2::DescriptorPoolCreateInfo miniPoolCreateInfo{};
 	miniPoolCreateInfo.maxSets = 2 * e2::maxNumSessions;
 	miniPoolCreateInfo.numSamplers = 2 * e2::maxNumSessions;
 	miniPoolCreateInfo.numTextures = 2 * e2::maxNumSessions * 2;
-	m_minimapPool = mainThreadContext()->createDescriptorPool(miniPoolCreateInfo);
+	m_minimapPool = mainThreadCtx->createDescriptorPool(miniPoolCreateInfo);
 
 	m_minimapSize = {320, 220};
 	e2::TextureCreateInfo minimapTexInf{};
 	minimapTexInf.initialLayout = e2::TextureLayout::ShaderRead;
 	minimapTexInf.format = TextureFormat::SRGB8A8;
 	minimapTexInf.resolution = { m_minimapSize, 1 };
-	m_frameData[0].minimapTexture = renderContext()->createTexture(minimapTexInf);
-	m_frameData[1].minimapTexture = renderContext()->createTexture(minimapTexInf);
+	m_frameData[0].minimapTexture = renderCtx->createTexture(minimapTexInf);
+	m_frameData[1].minimapTexture = renderCtx->createTexture(minimapTexInf);
 
 	e2::RenderTargetCreateInfo minimapTargetInfo{};
 	minimapTargetInfo.areaExtent = m_minimapSize;
@@ -1086,16 +1100,16 @@ void e2::HexGrid::initializeFogOfWar()
 
 	minimapAttachment.target = m_frameData[0].minimapTexture;
 	minimapTargetInfo.colorAttachments = { minimapAttachment };
-	m_frameData[0].minimapTarget = renderContext()->createRenderTarget(minimapTargetInfo);
+	m_frameData[0].minimapTarget = renderCtx->createRenderTarget(minimapTargetInfo);
 
 	minimapAttachment.target = m_frameData[1].minimapTexture;
 	minimapTargetInfo.colorAttachments = { minimapAttachment };
-	m_frameData[1].minimapTarget = renderContext()->createRenderTarget(minimapTargetInfo);
+	m_frameData[1].minimapTarget = renderCtx->createRenderTarget(minimapTargetInfo);
 
 	e2::PipelineLayoutCreateInfo minilayInf{};
 	minilayInf.pushConstantSize = sizeof(e2::MiniMapConstants);
 	minilayInf.sets = { m_minimapLayout };
-	m_minimapPipelineLayout = renderContext()->createPipelineLayout(minilayInf);
+	m_minimapPipelineLayout = renderCtx->createPipelineLayout(minilayInf);
 
 
 	// mapvis stuff 
@@ -1104,10 +1118,10 @@ void e2::HexGrid::initializeFogOfWar()
 	mapvisTexInf.initialLayout = e2::TextureLayout::ShaderRead;
 	mapvisTexInf.format = TextureFormat::RGBA8;
 	mapvisTexInf.resolution = { mapVisSize, 1 };
-	m_frameData[0].mapVisTextures[0] = renderContext()->createTexture(mapvisTexInf);
-	m_frameData[0].mapVisTextures[1] = renderContext()->createTexture(mapvisTexInf);
-	m_frameData[1].mapVisTextures[0] = renderContext()->createTexture(mapvisTexInf);
-	m_frameData[1].mapVisTextures[1] = renderContext()->createTexture(mapvisTexInf);
+	m_frameData[0].mapVisTextures[0] = renderCtx->createTexture(mapvisTexInf);
+	m_frameData[0].mapVisTextures[1] = renderCtx->createTexture(mapvisTexInf);
+	m_frameData[1].mapVisTextures[0] = renderCtx->createTexture(mapvisTexInf);
+	m_frameData[1].mapVisTextures[1] = renderCtx->createTexture(mapvisTexInf);
 
 	e2::RenderTargetCreateInfo mapVisTargetInfo{};
 	mapVisTargetInfo.areaExtent = mapVisSize;
@@ -1120,32 +1134,32 @@ void e2::HexGrid::initializeFogOfWar()
 
 	mapVisAttachemnt.target = m_frameData[0].mapVisTextures[0];
 	mapVisTargetInfo.colorAttachments = { mapVisAttachemnt };
-	m_frameData[0].mapVisTargets[0] = renderContext()->createRenderTarget(mapVisTargetInfo);
+	m_frameData[0].mapVisTargets[0] = renderCtx->createRenderTarget(mapVisTargetInfo);
 
 
 	mapVisAttachemnt.target = m_frameData[0].mapVisTextures[1];
 	mapVisTargetInfo.colorAttachments = { mapVisAttachemnt };
-	m_frameData[0].mapVisTargets[1] = renderContext()->createRenderTarget(mapVisTargetInfo);
+	m_frameData[0].mapVisTargets[1] = renderCtx->createRenderTarget(mapVisTargetInfo);
 
 
 	mapVisAttachemnt.target = m_frameData[1].mapVisTextures[0];
 	mapVisTargetInfo.colorAttachments = { mapVisAttachemnt };
-	m_frameData[1].mapVisTargets[0] = renderContext()->createRenderTarget(mapVisTargetInfo);
+	m_frameData[1].mapVisTargets[0] = renderCtx->createRenderTarget(mapVisTargetInfo);
 
 
 	mapVisAttachemnt.target = m_frameData[1].mapVisTextures[1];
 	mapVisTargetInfo.colorAttachments = { mapVisAttachemnt };
-	m_frameData[1].mapVisTargets[1] = renderContext()->createRenderTarget(mapVisTargetInfo);
+	m_frameData[1].mapVisTargets[1] = renderCtx->createRenderTarget(mapVisTargetInfo);
 
 
 
 	// Map units 
 	e2::TextureCreateInfo unitTexInf{};
 	unitTexInf.initialLayout = e2::TextureLayout::ShaderRead;
-	unitTexInf.format = TextureFormat::SRGB8A8;
+	unitTexInf.format = TextureFormat::RGBA8;
 	unitTexInf.resolution = { m_minimapSize, 1 };
-	m_frameData[0].mapUnitsTexture = renderContext()->createTexture(unitTexInf);
-	m_frameData[1].mapUnitsTexture = renderContext()->createTexture(unitTexInf);
+	m_frameData[0].mapUnitsTexture = renderCtx->createTexture(unitTexInf);
+	m_frameData[1].mapUnitsTexture = renderCtx->createTexture(unitTexInf);
 
 	e2::RenderTargetCreateInfo unitTargetInfo{};
 	unitTargetInfo.areaExtent = m_minimapSize;
@@ -1158,13 +1172,14 @@ void e2::HexGrid::initializeFogOfWar()
 
 	unitAttachment.target = m_frameData[0].mapUnitsTexture;
 	unitTargetInfo.colorAttachments = { unitAttachment };
-	m_frameData[0].mapUnitsTarget = renderContext()->createRenderTarget(unitTargetInfo);
+	m_frameData[0].mapUnitsTarget = renderCtx->createRenderTarget(unitTargetInfo);
 
 	unitAttachment.target = m_frameData[1].mapUnitsTexture;
 	unitTargetInfo.colorAttachments = { unitAttachment };
-	m_frameData[1].mapUnitsTarget = renderContext()->createRenderTarget(unitTargetInfo);
+	m_frameData[1].mapUnitsTarget = renderCtx->createRenderTarget(unitTargetInfo);
 
 
+	auto rm = game()->renderManager();
 
 
 	// setup descriptor sets that binds mapvis to minimap 
@@ -1172,10 +1187,10 @@ void e2::HexGrid::initializeFogOfWar()
 	m_frameData[1].minimapSet = m_minimapPool->createDescriptorSet(m_minimapLayout);
 	m_frameData[0].minimapSet->writeTexture(0, m_frameData[0].mapVisTextures[0]); // set it to texture0 since that's the one thatll be used (render->blur->blur)
 	m_frameData[0].minimapSet->writeTexture(1, m_frameData[0].mapUnitsTexture);
-	m_frameData[0].minimapSet->writeSampler(2, renderManager()->clampSampler());
+	m_frameData[0].minimapSet->writeSampler(2, rm->clampSampler());
 	m_frameData[1].minimapSet->writeTexture(0, m_frameData[1].mapVisTextures[0]);
 	m_frameData[1].minimapSet->writeTexture(1, m_frameData[1].mapUnitsTexture);
-	m_frameData[1].minimapSet->writeSampler(2, renderManager()->clampSampler());
+	m_frameData[1].minimapSet->writeSampler(2, rm->clampSampler());
 
 	// setup descriptor sets that binds fogofwar masks for the blur shader 
 	m_frameData[0].fogOfWarMaskBlurSets[0] = m_blurPool->createDescriptorSet(m_blurSetLayout);
@@ -1192,19 +1207,19 @@ void e2::HexGrid::initializeFogOfWar()
 	// can just write to mapvis blur sets here because we never resize these textures
 	m_frameData[0].mapVisBlurSets[0]->writeTexture(0, m_frameData[0].mapVisTextures[0]);
 	m_frameData[0].mapVisBlurSets[1]->writeTexture(0, m_frameData[0].mapVisTextures[1]);
-	m_frameData[0].mapVisBlurSets[0]->writeSampler(1, renderManager()->clampSampler());
-	m_frameData[0].mapVisBlurSets[1]->writeSampler(1, renderManager()->clampSampler());
+	m_frameData[0].mapVisBlurSets[0]->writeSampler(1, rm->clampSampler());
+	m_frameData[0].mapVisBlurSets[1]->writeSampler(1, rm->clampSampler());
 	m_frameData[1].mapVisBlurSets[0]->writeTexture(0, m_frameData[1].mapVisTextures[0]);
 	m_frameData[1].mapVisBlurSets[1]->writeTexture(0, m_frameData[1].mapVisTextures[1]);
-	m_frameData[1].mapVisBlurSets[0]->writeSampler(1, renderManager()->clampSampler());
-	m_frameData[1].mapVisBlurSets[1]->writeSampler(1, renderManager()->clampSampler());
+	m_frameData[1].mapVisBlurSets[0]->writeSampler(1, rm->clampSampler());
+	m_frameData[1].mapVisBlurSets[1]->writeSampler(1, rm->clampSampler());
 
 
 
 
 	// setup command buffers
-	m_fogOfWarCommandBuffers[0] = renderManager()->framePool(0)->createBuffer({});
-	m_fogOfWarCommandBuffers[1] = renderManager()->framePool(1)->createBuffer({});
+	m_fogOfWarCommandBuffers[0] = rm->framePool(0)->createBuffer({});
+	m_fogOfWarCommandBuffers[1] = rm->framePool(1)->createBuffer({});
 
 
 	invalidateFogOfWarShaders();
@@ -1239,15 +1254,17 @@ void e2::HexGrid::invalidateFogOfWarRenderTarget(glm::uvec2 const& newResolution
 	if (m_frameData[1].fogOfWarTargets[1])
 		e2::discard(m_frameData[1].fogOfWarTargets[1]);
 
+	auto renderCtx = game()->renderContext();
+
 	e2::TextureCreateInfo texInf{};
 	texInf.initialLayout = e2::TextureLayout::ShaderRead;
 	texInf.format = TextureFormat::RGBA8;
 	texInf.resolution = { glm::vec2(newResolution) / 16.0f, 1 };
 	texInf.mips = 1;
-	m_frameData[0].fogOfWarMasks[0] = renderContext()->createTexture(texInf);
-	m_frameData[0].fogOfWarMasks[1] = renderContext()->createTexture(texInf);
-	m_frameData[1].fogOfWarMasks[0] = renderContext()->createTexture(texInf);
-	m_frameData[1].fogOfWarMasks[1] = renderContext()->createTexture(texInf);
+	m_frameData[0].fogOfWarMasks[0] = renderCtx->createTexture(texInf);
+	m_frameData[0].fogOfWarMasks[1] = renderCtx->createTexture(texInf);
+	m_frameData[1].fogOfWarMasks[0] = renderCtx->createTexture(texInf);
+	m_frameData[1].fogOfWarMasks[1] = renderCtx->createTexture(texInf);
 
 
 	e2::RenderTargetCreateInfo renderTargetInfo{};
@@ -1261,19 +1278,19 @@ void e2::HexGrid::invalidateFogOfWarRenderTarget(glm::uvec2 const& newResolution
 
 	colorAttachment.target = m_frameData[0].fogOfWarMasks[0];
 	renderTargetInfo.colorAttachments = { colorAttachment };
-	m_frameData[0].fogOfWarTargets[0] = renderContext()->createRenderTarget(renderTargetInfo);
+	m_frameData[0].fogOfWarTargets[0] = renderCtx->createRenderTarget(renderTargetInfo);
 
 	colorAttachment.target = m_frameData[0].fogOfWarMasks[1];
 	renderTargetInfo.colorAttachments = { colorAttachment };
-	m_frameData[0].fogOfWarTargets[1] = renderContext()->createRenderTarget(renderTargetInfo);
+	m_frameData[0].fogOfWarTargets[1] = renderCtx->createRenderTarget(renderTargetInfo);
 
 	colorAttachment.target = m_frameData[1].fogOfWarMasks[0];
 	renderTargetInfo.colorAttachments = { colorAttachment };
-	m_frameData[1].fogOfWarTargets[0] = renderContext()->createRenderTarget(renderTargetInfo);
+	m_frameData[1].fogOfWarTargets[0] = renderCtx->createRenderTarget(renderTargetInfo);
 
 	colorAttachment.target = m_frameData[1].fogOfWarMasks[1];
 	renderTargetInfo.colorAttachments = { colorAttachment };
-	m_frameData[1].fogOfWarTargets[1] = renderContext()->createRenderTarget(renderTargetInfo);
+	m_frameData[1].fogOfWarTargets[1] = renderCtx->createRenderTarget(renderTargetInfo);
 
 
 
@@ -1282,15 +1299,16 @@ void e2::HexGrid::invalidateFogOfWarRenderTarget(glm::uvec2 const& newResolution
 	//m_waterProxy->visibilityMask.set(m_fogOfWarMask[0]);
 	//m_terrainProxy->visibilityMask.set(m_fogOfWarMask[0]);
 
+	auto rm = game()->renderManager();
 	
 	m_frameData[0].fogOfWarMaskBlurSets[0]->writeTexture(0, m_frameData[0].fogOfWarMasks[0]);
 	m_frameData[0].fogOfWarMaskBlurSets[1]->writeTexture(0, m_frameData[0].fogOfWarMasks[1]);
-	m_frameData[0].fogOfWarMaskBlurSets[0]->writeSampler(1, renderManager()->clampSampler());
-	m_frameData[0].fogOfWarMaskBlurSets[1]->writeSampler(1, renderManager()->clampSampler());
+	m_frameData[0].fogOfWarMaskBlurSets[0]->writeSampler(1, rm->clampSampler());
+	m_frameData[0].fogOfWarMaskBlurSets[1]->writeSampler(1, rm->clampSampler());
 	m_frameData[1].fogOfWarMaskBlurSets[0]->writeTexture(0, m_frameData[1].fogOfWarMasks[0]);
 	m_frameData[1].fogOfWarMaskBlurSets[1]->writeTexture(0, m_frameData[1].fogOfWarMasks[1]);
-	m_frameData[1].fogOfWarMaskBlurSets[0]->writeSampler(1, renderManager()->clampSampler());
-	m_frameData[1].fogOfWarMaskBlurSets[1]->writeSampler(1, renderManager()->clampSampler());
+	m_frameData[1].fogOfWarMaskBlurSets[0]->writeSampler(1, rm->clampSampler());
+	m_frameData[1].fogOfWarMaskBlurSets[1]->writeSampler(1, rm->clampSampler());
 
 
 	// outline target
@@ -1298,8 +1316,8 @@ void e2::HexGrid::invalidateFogOfWarRenderTarget(glm::uvec2 const& newResolution
 	texInf.format = TextureFormat::RGBA8;
 	texInf.resolution = { newResolution, 1 };
 	texInf.mips = 1;
-	m_frameData[0].outlineTexture = renderContext()->createTexture(texInf);
-	m_frameData[1].outlineTexture = renderContext()->createTexture(texInf);
+	m_frameData[0].outlineTexture = renderCtx->createTexture(texInf);
+	m_frameData[1].outlineTexture = renderCtx->createTexture(texInf);
 
 	renderTargetInfo.areaExtent = newResolution;
 	colorAttachment.clearMethod = ClearMethod::ColorFloat;
@@ -1309,16 +1327,17 @@ void e2::HexGrid::invalidateFogOfWarRenderTarget(glm::uvec2 const& newResolution
 
 	colorAttachment.target = m_frameData[0].outlineTexture;
 	renderTargetInfo.colorAttachments = { colorAttachment };
-	m_frameData[0].outlineTarget = renderContext()->createRenderTarget(renderTargetInfo);
+	m_frameData[0].outlineTarget = renderCtx->createRenderTarget(renderTargetInfo);
 
 	colorAttachment.target = m_frameData[1].outlineTexture;
 	renderTargetInfo.colorAttachments = { colorAttachment };
-	m_frameData[1].outlineTarget = renderContext()->createRenderTarget(renderTargetInfo);
+	m_frameData[1].outlineTarget = renderCtx->createRenderTarget(renderTargetInfo);
 }
 
 void e2::HexGrid::invalidateFogOfWarShaders()
 {
-
+	auto renderCtx = game()->renderContext();
+	auto rm = game()->renderManager();
 
 	if (m_fogOfWarVertexShader)
 		e2::discard(m_fogOfWarVertexShader);
@@ -1340,7 +1359,7 @@ void e2::HexGrid::invalidateFogOfWarShaders()
 
 	shdrInf.source = vertexSource.c_str();
 	shdrInf.stage = ShaderStage::Vertex;
-	m_fogOfWarVertexShader = renderContext()->createShader(shdrInf);
+	m_fogOfWarVertexShader = renderCtx->createShader(shdrInf);
 
 	std::string fragmentSource;
 	if (!e2::readFileWithIncludes("shaders/fogofwar.fragment.glsl", fragmentSource))
@@ -1350,14 +1369,14 @@ void e2::HexGrid::invalidateFogOfWarShaders()
 
 	shdrInf.source = fragmentSource.c_str();
 	shdrInf.stage = ShaderStage::Fragment;
-	m_fogOfWarFragmentShader = renderContext()->createShader(shdrInf);
+	m_fogOfWarFragmentShader = renderCtx->createShader(shdrInf);
 
 	e2::PipelineCreateInfo pipeInf{};
 	pipeInf.shaders.push(m_fogOfWarVertexShader);
 	pipeInf.shaders.push(m_fogOfWarFragmentShader);
 	pipeInf.colorFormats = { e2::TextureFormat::RGBA8 };
 	pipeInf.layout = m_fogOfWarPipelineLayout;
-	m_fogOfWarPipeline = renderContext()->createPipeline(pipeInf);
+	m_fogOfWarPipeline = renderCtx->createPipeline(pipeInf);
 
 
 
@@ -1381,15 +1400,15 @@ void e2::HexGrid::invalidateFogOfWarShaders()
 	shdrInf = e2::ShaderCreateInfo();
 	shdrInf.source = blurSource.c_str();
 	shdrInf.stage = ShaderStage::Fragment;
-	m_blurFragmentShader = renderContext()->createShader(shdrInf);
+	m_blurFragmentShader = renderCtx->createShader(shdrInf);
 
 
 	pipeInf = e2::PipelineCreateInfo();
-	pipeInf.shaders.push(renderManager()->fullscreenTriangleShader());
+	pipeInf.shaders.push(rm->fullscreenTriangleShader());
 	pipeInf.shaders.push(m_blurFragmentShader);
 	pipeInf.colorFormats = { e2::TextureFormat::RGBA8 };
 	pipeInf.layout = m_blurPipelineLayout;
-	m_blurPipeline = renderContext()->createPipeline(pipeInf);
+	m_blurPipeline = renderCtx->createPipeline(pipeInf);
 
 
 
@@ -1413,7 +1432,7 @@ void e2::HexGrid::invalidateFogOfWarShaders()
 	shdrInf = e2::ShaderCreateInfo();
 	shdrInf.source = outlineVertexSource.c_str();
 	shdrInf.stage = ShaderStage::Vertex;
-	m_outlineVertexShader = renderContext()->createShader(shdrInf);
+	m_outlineVertexShader = renderCtx->createShader(shdrInf);
 
 	std::string outlineFragmentSource;
 	if (!e2::readFileWithIncludes("shaders/outline.fragment.glsl", outlineFragmentSource))
@@ -1424,7 +1443,7 @@ void e2::HexGrid::invalidateFogOfWarShaders()
 	shdrInf = e2::ShaderCreateInfo();
 	shdrInf.source = outlineFragmentSource.c_str();
 	shdrInf.stage = ShaderStage::Fragment;
-	m_outlineFragmentShader = renderContext()->createShader(shdrInf);
+	m_outlineFragmentShader = renderCtx->createShader(shdrInf);
 
 
 	pipeInf = e2::PipelineCreateInfo();
@@ -1432,7 +1451,7 @@ void e2::HexGrid::invalidateFogOfWarShaders()
 	pipeInf.shaders.push(m_outlineFragmentShader);
 	pipeInf.colorFormats = { e2::TextureFormat::RGBA8 };
 	pipeInf.layout = m_outlinePipelineLayout;
-	m_outlinePipeline = renderContext()->createPipeline(pipeInf);
+	m_outlinePipeline = renderCtx->createPipeline(pipeInf);
 
 
 
@@ -1451,20 +1470,21 @@ void e2::HexGrid::invalidateFogOfWarShaders()
 	e2::ShaderCreateInfo miniShdrInf{};
 	miniShdrInf.source = miniSourceData.c_str();
 	miniShdrInf.stage = ShaderStage::Fragment;
-	m_minimapFragmentShader = renderContext()->createShader(miniShdrInf);
+	m_minimapFragmentShader = renderCtx->createShader(miniShdrInf);
 
 	e2::PipelineCreateInfo miniPipeInfo{};
-	miniPipeInfo.shaders.push(renderManager()->fullscreenTriangleShader());
+	miniPipeInfo.shaders.push(rm->fullscreenTriangleShader());
 	miniPipeInfo.shaders.push(m_minimapFragmentShader);
 	miniPipeInfo.colorFormats = { e2::TextureFormat::SRGB8A8 };
 	miniPipeInfo.layout = m_minimapPipelineLayout;
-	m_minimapPipeline = renderContext()->createPipeline(miniPipeInfo);
+	m_minimapPipeline = renderCtx->createPipeline(miniPipeInfo);
 
 }
 
-void e2::HexGrid::renderFogOfWar(std::unordered_map<glm::ivec2, GameUnit*> const& unitMap)
+void e2::HexGrid::renderFogOfWar()
 {
-	uint8_t frameIndex = renderManager()->frameIndex();
+	auto rm = game()->renderManager();
+	uint8_t frameIndex = rm->frameIndex();
 	FrameData& frameData = m_frameData[frameIndex];
 
 	glm::uvec2 newResolution = m_streamingView.resolution;
@@ -1618,28 +1638,12 @@ void e2::HexGrid::renderFogOfWar(std::unordered_map<glm::ivec2, GameUnit*> const
 
 
 	// update minimap view bounds 
-	m_minimapViewBounds = m_worldBounds;
+	updateViewBounds();
 
+	// refresh these variables as we use them fuirther down 
 	glm::vec2 worldSize = m_minimapViewBounds.max - m_minimapViewBounds.min;
 	glm::vec2 worldOffset = m_minimapViewBounds.min;
 	glm::vec2 worldCenter = worldOffset + worldSize / 2.0f;
-
-	// rescale and then recenter
-	if (worldSize.x < worldSize.y)
-		worldSize.x = (worldSize.x / (worldSize.x / worldSize.y)) * (m_minimapSize.x / m_minimapSize.y);
-	else
-		worldSize.y = (worldSize.y / (worldSize.y / worldSize.x)) * (m_minimapSize.x / m_minimapSize.y);
-
-	//worldCenter = worldCenter + m_minimapViewOffset;
-	//worldSize = worldSize * m_minimapViewZoom;
-
-	m_minimapViewBounds.min = worldCenter - worldSize / 2.0f;
-	m_minimapViewBounds.max = worldCenter + worldSize / 2.0f;
-
-	// refresh these variables as we use them fuirther down 
-	worldSize = m_minimapViewBounds.max - m_minimapViewBounds.min;
-	worldOffset = m_minimapViewBounds.min;
-	worldCenter = worldOffset + worldSize / 2.0f;
 
 	glm::vec2 cs = chunkSize();
 	glm::vec2 csPixels = (cs / worldSize) * glm::vec2(m_minimapSize);
@@ -1652,7 +1656,7 @@ void e2::HexGrid::renderFogOfWar(std::unordered_map<glm::ivec2, GameUnit*> const
 	visConstants.quadZ = 0.0f;
 
 	
-	e2::UIManager* ui = uiManager();
+	e2::UIManager* ui = game()->uiManager();
 
 	// map vis 
 	buff->useAsAttachment(frameData.mapVisTextures[0]);
@@ -1722,9 +1726,9 @@ void e2::HexGrid::renderFogOfWar(std::unordered_map<glm::ivec2, GameUnit*> const
 	buff->bindVertexBuffer(0, ui->quadVertexBuffer);
 	buff->bindPipeline(ui->quadPipeline.pipeline);
 
-	for (auto const& [unitIndex, unit] : unitMap)
+	for (e2::GameUnit* unit : game()->localEmpire()->units)
 	{
-		glm::vec2 planarUnitPosition = e2::Hex(unitIndex).planarCoords();
+		glm::vec2 planarUnitPosition = unit->planarCoords();
 
 		glm::vec2 unitPosNormalized = (planarUnitPosition - worldOffset) / worldSize;
 		glm::vec2 unitPosPixels = unitPosNormalized * glm::vec2(m_minimapSize);
@@ -1734,6 +1738,22 @@ void e2::HexGrid::renderFogOfWar(std::unordered_map<glm::ivec2, GameUnit*> const
 
 		buff->draw(6, 1);
 	}
+
+	unitConstants.quadSize = { 6.0f, 6.0f };
+
+	for (e2::GameStructure* structure : game()->localEmpire()->structures)
+	{
+		glm::vec2 planarUnitPosition = structure->planarCoords();
+
+		glm::vec2 unitPosNormalized = (planarUnitPosition - worldOffset) / worldSize;
+		glm::vec2 unitPosPixels = unitPosNormalized * glm::vec2(m_minimapSize);
+
+		unitConstants.quadPosition = unitPosPixels - glm::vec2(3.0f, 3.0f);
+		buff->pushConstants(ui->quadPipeline.layout, 0, sizeof(e2::UIQuadPushConstants), reinterpret_cast<uint8_t*>(&unitConstants));
+
+		buff->draw(6, 1);
+	}
+
 
 	buff->endRender();
 	buff->useAsDefault(frameData.mapUnitsTexture);
@@ -1770,7 +1790,15 @@ void e2::HexGrid::renderFogOfWar(std::unordered_map<glm::ivec2, GameUnit*> const
 
 	buff->endRecord();
 
-	renderManager()->queue(buff, nullptr, nullptr);
+	game()->renderManager()->queue(buff, nullptr, nullptr);
+}
+
+void e2::HexGrid::initializeWorldBounds(glm::vec2 const& center)
+{
+	m_discoveredChunksAABB.min = center;
+	m_discoveredChunksAABB.max = center;
+
+	updateWorldBounds();
 }
 
 void e2::HexGrid::updateWorldBounds()
@@ -1780,6 +1808,8 @@ void e2::HexGrid::updateWorldBounds()
 	m_worldBounds = m_discoveredChunksAABB;
 	m_worldBounds.min -= cs;
 	m_worldBounds.max += cs;
+
+	updateViewBounds();
 }
 
 
@@ -1979,7 +2009,7 @@ void e2::HexGrid::debugDraw()
 	glm::vec2 streamStateSize = _chunkSize * 0.125f;
 	glm::vec2 visibilitySize = _chunkSize * 0.4895f;
 
-	e2::Renderer* renderer = m_session->renderer();
+	e2::Renderer* renderer = gameSession()->renderer();
 
 	for (auto& [chunkIndex, chunk] : m_chunkIndex)
 	{
@@ -2032,13 +2062,34 @@ void e2::HexGrid::debugDraw()
 
 }
 
+void e2::HexGrid::updateViewBounds()
+{
+	m_minimapViewBounds = m_worldBounds;
+
+	glm::vec2 worldSize = m_minimapViewBounds.max - m_minimapViewBounds.min;
+	glm::vec2 worldOffset = m_minimapViewBounds.min;
+	glm::vec2 worldCenter = worldOffset + worldSize / 2.0f;
+
+	// rescale and then recenter
+	if (worldSize.x < worldSize.y)
+		worldSize.x = (worldSize.x / (worldSize.x / worldSize.y)) * (m_minimapSize.x / m_minimapSize.y);
+	else
+		worldSize.y = (worldSize.y / (worldSize.y / worldSize.x)) * (m_minimapSize.x / m_minimapSize.y);
+
+	//worldCenter = worldCenter + m_minimapViewOffset;
+	//worldSize = worldSize * m_minimapViewZoom;
+
+	m_minimapViewBounds.min = worldCenter - worldSize / 2.0f;
+	m_minimapViewBounds.max = worldCenter + worldSize / 2.0f;
+}
+
 namespace
 {
 	//uint64_t numChunkLoadTasks = 0;
 }
 
 e2::ChunkLoadTask::ChunkLoadTask(e2::HexGrid* grid, glm::ivec2 const& chunkIndex)
-	: e2::AsyncTask(grid)
+	: e2::AsyncTask(grid->game())
 	, m_grid(grid)
 	, m_chunkIndex(chunkIndex)
 {
@@ -2145,7 +2196,7 @@ void e2::HexGrid::popInChunk(e2::ChunkState* state)
 		e2::MeshProxyConfiguration proxyConf;
 		proxyConf.mesh = state->mesh;
 
-		state->proxy = e2::create<e2::MeshProxy>(m_session, proxyConf);
+		state->proxy = e2::create<e2::MeshProxy>(gameSession(), proxyConf);
 		state->proxy->modelMatrix = glm::translate(glm::mat4(1.0f), chunkOffset);
 		state->proxy->modelMatrixDirty = { true };
 
@@ -2157,9 +2208,9 @@ void e2::HexGrid::popInChunk(e2::ChunkState* state)
 
 			glm::vec3 treeOffset = e2::Hex(offset).localCoords();
 
-			e2::MeshProxy* newForestProxy = e2::create<e2::MeshProxy>(m_session, treeConf);
+			e2::MeshProxy* newForestProxy = e2::create<e2::MeshProxy>(gameSession(), treeConf);
 			newForestProxy->modelMatrix = glm::translate(glm::mat4(1.0f), treeOffset);
-			newForestProxy->modelMatrix = glm::rotate(newForestProxy->modelMatrix, glm::radians(0.0f), e2::worldUp());
+			newForestProxy->modelMatrix = glm::rotate(newForestProxy->modelMatrix, glm::radians(0.0f),  glm::vec3(e2::worldUp()));
 			newForestProxy->modelMatrixDirty = { true };
 			state->forestTileProxies.push(newForestProxy);
 
@@ -2173,7 +2224,7 @@ void e2::HexGrid::popInChunk(e2::ChunkState* state)
 		e2::MeshProxyConfiguration waterConf;
 		waterConf.mesh = m_waterChunk;
 
-		state->waterProxy = e2::create<e2::MeshProxy>(m_session, waterConf);
+		state->waterProxy = e2::create<e2::MeshProxy>(gameSession(), waterConf);
 		state->waterProxy->modelMatrix = glm::translate(glm::mat4(1.0f), chunkOffset + glm::vec3(0.0f, 0.1f, 0.0f));
 		state->waterProxy->modelMatrixDirty = { true };
 	}
@@ -2182,7 +2233,7 @@ void e2::HexGrid::popInChunk(e2::ChunkState* state)
 		e2::MeshProxyConfiguration fogConf;
 		fogConf.mesh = m_fogChunk;
 
-		state->fogProxy = e2::create<e2::MeshProxy>(m_session, fogConf);
+		state->fogProxy = e2::create<e2::MeshProxy>(gameSession(), fogConf);
 		state->fogProxy->modelMatrix = glm::translate(glm::mat4(1.0f), chunkOffset + glm::vec3(0.0f, -1.0f, 0.0f));
 		state->fogProxy->modelMatrixDirty = { true };
 	}
@@ -2270,6 +2321,12 @@ e2::ChunkState::~ChunkState()
 
 }
 
+bool e2::TileData::isWalkable()
+{
+	e2::TileFlags biome = getBiome();
+	return (biome == e2::TileFlags::BiomeGrassland) || (biome == e2::TileFlags::BiomeForest) || (biome == e2::TileFlags::BiomeDesert) || (biome == e2::TileFlags::BiomeTundra);
+}
+
 e2::TileFlags e2::TileData::getBiome()
 {
 	return (flags & e2::TileFlags::BiomeMask);
@@ -2283,9 +2340,4 @@ e2::TileFlags e2::TileData::getResource()
 e2::TileFlags e2::TileData::getAbundance()
 {
 	return (flags & e2::TileFlags::AbundanceMask);
-}
-
-e2::TileFlags e2::TileData::getImprovement()
-{
-	return (flags & e2::TileFlags::ImprovementMask);
 }

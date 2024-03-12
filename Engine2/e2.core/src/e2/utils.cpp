@@ -114,6 +114,80 @@ bool e2::intersect(glm::vec2 p, glm::vec2 boxOffset, glm::vec2 boxSize)
 		&& p.y >= boxOffset.y && p.y <= boxOffset.y + boxSize.y;
 }
 
+namespace
+{
+	bool initialized = false;
+	std::random_device rd;
+	std::mt19937 gen;
+
+	void assertInitialized()
+	{
+		if (initialized)
+			return;
+
+		initialized = true;
+		gen = std::mt19937(rd());
+	}
+
+
+
+}
+
+bool e2::randomBool()
+{
+	return (bool)std::uniform_int_distribution<>(0, 1)(::gen);
+}
+
+int64_t e2::randomInt(int64_t min, int64_t max)
+{
+	return std::uniform_int_distribution<int64_t>(min, max)(::gen);
+}
+
+float e2::randomFloat(float min, float max)
+{
+	return std::uniform_real_distribution<float>(min, max)(::gen);
+}
+
+double e2::randomDouble(double min, double max)
+{
+	return std::uniform_real_distribution<double>(min, max)(::gen);
+}
+
+glm::ivec2 e2::randomIvec2(glm::ivec2 min, glm::ivec2 max)
+{
+	return glm::ivec2(randomFloat(min.x, max.x), randomFloat(min.y, max.y));
+}
+
+glm::vec2 e2::randomVec2(glm::vec2 min, glm::vec2 max)
+{
+	return glm::vec2(randomFloat(min.x, max.x), randomFloat(min.y, max.y));
+}
+
+glm::vec3 e2::randomVec3(glm::vec3 min, glm::vec3 max)
+{
+	return glm::vec3(randomFloat(min.x, max.x), randomFloat(min.y, max.y), randomFloat(min.z, max.z));
+}
+
+glm::vec2 e2::randomOnUnitCircle()
+{
+	return glm::normalize(randomVec2({ -1.0f, -1.0f }, { 1.0f, 1.0f }));
+}
+
+glm::vec2 e2::randomInUnitCircle()
+{
+	return randomOnUnitCircle() * randomFloat(0.0f, 1.f);
+}
+
+glm::vec3 e2::randomOnUnitSphere()
+{
+	return glm::normalize(randomVec3({ -1.0f, -1.0f, -1.0f }, { 1.0f, 1.0f , 1.0f}));
+}
+
+glm::vec3 e2::randomInUnitSphere()
+{
+	return randomOnUnitSphere() * randomFloat(0.0f, 1.0f);
+}
+
 std::string e2::replace(std::string const& needle, std::string const& replacement, std::string const& haystack)
 {
 	std::string newString = haystack;

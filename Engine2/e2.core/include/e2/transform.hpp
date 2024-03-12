@@ -16,9 +16,9 @@ namespace e2
 		World
 	};
 
-	E2_API glm::vec3 worldUp();
-	E2_API glm::vec3 worldRight();
-	E2_API glm::vec3 worldForward();
+	E2_API glm::dvec3 worldUp();
+	E2_API glm::dvec3 worldRight();
+	E2_API glm::dvec3 worldForward();
 
 	/** @tags(arena, arenaSize=16384) */
 	class E2_API Transform : public e2::Object

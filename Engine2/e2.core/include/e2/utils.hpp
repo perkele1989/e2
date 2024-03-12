@@ -160,6 +160,20 @@ namespace e2
 	E2_API bool nearlyEqual(float x, float y, float tresh);
 	E2_API bool intersect(glm::vec2 p, glm::vec2 boxOffset, glm::vec2 boxSize);
 
+	E2_API bool randomBool();
+	E2_API int64_t randomInt(int64_t min, int64_t max);
+	E2_API float randomFloat(float min, float max);
+	E2_API double randomDouble(double min, double max);
+	E2_API glm::ivec2 randomIvec2(glm::ivec2 min, glm::ivec2 max);
+	E2_API glm::vec2 randomVec2(glm::vec2 min, glm::vec2 max);
+	E2_API glm::vec3 randomVec3(glm::vec3 min, glm::vec3 max);
+	E2_API glm::vec2 randomOnUnitCircle();
+	E2_API glm::vec2 randomInUnitCircle();
+	E2_API glm::vec3 randomOnUnitSphere();
+	E2_API glm::vec3 randomInUnitSphere();
+
+
+
 	E2_API std::string replace(std::string const& needle, std::string const& replacement, std::string const& haystack);
 
 	E2_API std::string trim(std::string const& input);
