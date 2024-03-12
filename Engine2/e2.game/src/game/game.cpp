@@ -598,6 +598,9 @@ void e2::Game::drawResourceIcons()
 				if (!tileData)
 					continue;
 
+				if (!m_hexGrid->isVisible(worldIndex))
+					continue;
+
 				e2::TileFlags resource = tileData->getResource();
 				e2::TileFlags abundance = tileData->getAbundance();
 
@@ -801,9 +804,9 @@ void e2::Game::drawUnitUI()
 
 	ui->pushFixedPanel("test", offset + glm::vec2(4.0f, 4.0f), glm::vec2(width - 8.0f, height - 8.0f));
 
-	if (m_selectedUnit)
+	if (m_selectedUnit && m_turnState == TurnState::Unlocked)
 		m_selectedUnit->drawUI(ui);
-	else if (m_selectedStructure)
+	else if (m_selectedStructure && m_turnState == TurnState::Unlocked)
 		m_selectedStructure->drawUI(ui);
 
 	ui->popFixedPanel();
@@ -1205,6 +1208,15 @@ e2::GameUnit* e2::Game::unitAtHex(glm::ivec2 const& hex)
 {
 	auto finder = m_unitIndex.find(hex);
 	if (finder == m_unitIndex.end())
+		return nullptr;
+
+	return finder->second;
+}
+
+e2::GameStructure* e2::Game::structureAtHex(glm::ivec2 const& hex)
+{
+	auto finder = m_structureIndex.find(hex);
+	if (finder == m_structureIndex.end())
 		return nullptr;
 
 	return finder->second;

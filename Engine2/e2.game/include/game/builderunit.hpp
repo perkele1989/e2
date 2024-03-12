@@ -16,7 +16,7 @@ namespace e2
 		Engineer(e2::GameContext* ctx, glm::ivec2 const& tile, uint8_t empire);
 		virtual ~Engineer();
 
-
+		virtual void drawUI(e2::UIContext* ctx) override;
 	};
 }
 

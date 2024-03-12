@@ -34,8 +34,7 @@ void e2::MainOperatingBase::drawUI(e2::UIContext* ui)
 	{
 		ui->gameLabel(std::format("Building {}, {} turns left", m_currentlyBuilding->displayName, m_currentlyBuilding->buildTurnsLeft), 12);
 	}
-
-	if (m_buildMessage.size() > 0)
+	else if (m_buildMessage.size() > 0)
 	{
 		ui->gameLabel(m_buildMessage, 12);
 	}

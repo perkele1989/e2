@@ -129,6 +129,7 @@ namespace e2
 
 
 		GameUnit* unitAtHex(glm::ivec2 const& hex);
+		GameStructure* structureAtHex(glm::ivec2 const& hex);
 
 		e2::MeshPtr getUnitMesh(e2::GameUnitType type);
 		e2::MeshPtr getStructureMesh(e2::GameStructureType type);

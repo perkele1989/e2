@@ -2021,7 +2021,7 @@ void e2::HexGrid::destroyFogOfWar()
 
 void e2::HexGrid::clearVisibility()
 {
-	for (bool vis : m_tileVisibility)
+	for (int32_t &vis : m_tileVisibility)
 		vis = 0;
 }
 

@@ -184,17 +184,16 @@ e2::Mine::Mine(e2::GameContext* ctx, glm::ivec2 const& tile, uint8_t empireId)
 	e2::TileFlags resource = tileData->getResource();
 	tileData->improvedResource = true;
 
-	if (resource != TileFlags::ResourceGold && resource != TileFlags::ResourceUranium && resource != TileFlags::ResourceOre)
-	{
-		LogError("We managed to build a mine on a non-mineable tile. What the heck?");
-		return;
-	}
 	if (resource == TileFlags::ResourceGold)
 		displayName = "Gold mine";
 	else if (resource == TileFlags::ResourceUranium)
 		displayName = "Uranium mine";
 	else if (resource == TileFlags::ResourceOre)
 		displayName = "Ore mine";
+	else if (resource == TileFlags::ResourceForest)
+		displayName = "Saw Mill";
+	else if (resource == TileFlags::ResourceStone)
+		displayName = "Quarry";
 
 	sightRange = 2;
 }

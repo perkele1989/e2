@@ -107,6 +107,7 @@ namespace e2
 
 	};
 
+	// we say mine but really a sawmill, mine or quarry. generic resource improevment
 	class Mine : public e2::GameStructure
 	{
 		ObjectDeclaration();
