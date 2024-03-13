@@ -29,6 +29,9 @@ namespace e2
 		virtual void wantsClose(bool newValue) override;
 		virtual bool wantsClose() const override;
 
+		virtual void setFullscreen(bool newFullscreen) override;
+		virtual bool isFullscreen() override;
+
 		virtual void present() override;
 
 		virtual glm::uvec2 size() override;

@@ -58,10 +58,6 @@ void e2::Game::initialize()
 
 	m_session->renderer()->setEnvironment(m_irradianceMap->handle(), m_radianceMap->handle());
 
-	e2::MeshProxyConfiguration proxyConf;
-	proxyConf.mesh = m_cursorMesh;
-	m_cursorProxy = e2::create<e2::MeshProxy>(m_session, proxyConf);
-
 
 	for (uint8_t i = 0; i < (uint8_t)e2::GameStructureType::Count; i++)
 	{
@@ -94,8 +90,8 @@ void e2::Game::initialize()
 
 	m_hexGrid = e2::create<e2::HexGrid>(this);
 
-
-	m_viewOrigin = glm::vec2(528.97f, 587.02f);
+	m_startViewOrigin = glm::vec2(528.97f, 587.02f);
+	m_viewOrigin = m_startViewOrigin;
 	m_hexGrid->initializeWorldBounds(m_viewOrigin);
 
 }
@@ -113,13 +109,25 @@ void e2::Game::shutdown()
 
 	if (m_unitAS)
 		e2::destroy(m_unitAS);
-	e2::destroy(m_cursorProxy);
 	e2::destroy(m_hexGrid);
 	e2::destroy(m_session);
 }
 
 void e2::Game::update(double seconds)
 {
+
+	e2::GameSession* session = gameSession();
+	e2::Renderer* renderer = session->renderer();
+	e2::UIContext* ui = session->uiContext();
+
+	auto& kb = ui->keyboardState();
+	
+	if (kb.pressed(Key::Enter) && kb.state(Key::LeftAlt))
+	{
+		session->window()->setFullscreen(!session->window()->isFullscreen());
+	}
+
+
 	m_timeDelta = seconds;
 	if (m_globalState == GlobalState::Menu)
 		updateMenu(seconds);
@@ -152,10 +160,6 @@ void e2::Game::updateGame(double seconds)
 	bool hexChanged = newHex != m_prevCursorHex;
 	m_prevCursorHex = m_cursorHex;
 	m_cursorHex = newHex;
-
-	m_cursorProxy->modelMatrix = glm::translate(glm::mat4(1.0f), m_cursorHex.localCoords());
-	m_cursorProxy->modelMatrix = glm::scale(m_cursorProxy->modelMatrix, glm::vec3(2.0f));
-	m_cursorProxy->modelMatrixDirty = true;
 
 	constexpr float invisibleChunkLifetime = 3.0f;
 
@@ -265,6 +269,11 @@ void e2::Game::updateGame(double seconds)
 
 void e2::Game::updateMenu(double seconds)
 {
+	static double timer = 0.0;
+	static int64_t frames = 0;
+	frames++;
+	if(frames> 5)
+		timer += seconds;
 
 	e2::GameSession* session = gameSession();
 	e2::Renderer* renderer = session->renderer();
@@ -275,12 +284,11 @@ void e2::Game::updateMenu(double seconds)
 
 	m_session->renderer()->setEnvironment(m_irradianceMap->handle(), m_radianceMap->handle());
 
+	if (!m_haveBegunStart && kb.pressed(Key::Escape))
+		timer = 20.0;
 
 	m_viewZoom = 0.5f;
 
-	e2::Aabb2D viewBounds = m_hexGrid->viewBounds();
-	m_viewOrigin.x = glm::clamp(m_viewOrigin.x, viewBounds.min.x, viewBounds.max.x);
-	m_viewOrigin.y = glm::clamp(m_viewOrigin.y, viewBounds.min.y, viewBounds.max.y);
 
 	m_view = calculateRenderView(m_viewOrigin);
 	m_viewPoints = e2::Viewpoints2D(renderer->resolution(), m_view);
@@ -298,6 +306,31 @@ void e2::Game::updateMenu(double seconds)
 	ui->drawTexturedQuad({}, resolution, 0xFFFFFFFF, m_hexGrid->outlineTexture(renderManager()->frameIndex()));
 
 
+	float globalMenuFade = m_haveBegunStart ? 1.0 - glm::smoothstep(0.0, 2.0, m_beginStartTime.durationSince().seconds()) : 1.0f;
+
+	// tinted block
+	float blockTimer1 = glm::smoothstep(12.0f, 15.0f, float(timer));
+	float blockAlpha = 0.9f - blockTimer1 * 0.9;
+	ui->drawQuad({}, resolution, e2::UIColor(102, 88, 66, uint8_t(blockAlpha * 255.0f)));
+
+	// black screen
+	float blockAlpha2 = 1.0f - glm::smoothstep(8.0, 10.0, timer);
+	ui->drawQuad({}, resolution, e2::UIColor(0, 0, 0, uint8_t(blockAlpha2 * 255.0f)));
+
+
+	float authorWidth = ui->calculateSDFTextWidth(FontFace::Serif, 36.0f, "Fredrik Haikarainen");
+	float authorWidth2 = ui->calculateSDFTextWidth(FontFace::Serif, 24.0f, "A game by");
+	float authorAlpha = glm::smoothstep(3.0, 4.0, timer);
+	float authorAlpha2 = glm::smoothstep(2.0, 3.0, timer);
+
+	float authorFadeOut = 1.0 - glm::smoothstep(6.0, 7.0, timer);
+	authorAlpha *= authorFadeOut;
+	authorAlpha2 *= authorFadeOut;
+
+	e2::UIColor authorColor(255, 255, 255, uint8_t(authorAlpha * 255.0f));
+	e2::UIColor authorColor2(255, 255, 255, uint8_t(authorAlpha2 * 255.0f));
+	ui->drawSDFText(FontFace::Serif, 36.0f, authorColor, glm::vec2(resolution.x / 2.0f - authorWidth / 2.0f, resolution.y / 2.0f), "Fredrik Haikarainen");
+	ui->drawSDFText(FontFace::Serif, 14.0f, authorColor2, glm::vec2(resolution.x / 2.0f - authorWidth2 / 2.0f, (resolution.y / 2.0f) - 36.0f), "A game by");
 
 	float width = ui->calculateSDFTextWidth(FontFace::Serif, 42.0f, "Reveal & Annihilate");
 
@@ -308,8 +341,11 @@ void e2::Game::updateMenu(double seconds)
 	float xOffset = resolution.x / 2.0f - width / 2.0f;
 
 
+	float blockAlpha3 = glm::smoothstep(10.0, 12.0, timer);
 
-	ui->drawSDFText(FontFace::Serif, 42.0f, 0x000000AA, glm::vec2(xOffset, cursorY), "Reveal & Annihilate");
+	e2::UIColor textColor(0, 0, 0, uint8_t(blockAlpha3 * 255.0f * globalMenuFade));
+	e2::UIColor textColor2(0, 0, 0, uint8_t(blockTimer1 * 170.0f * globalMenuFade));
+	ui->drawSDFText(FontFace::Serif, 42.0f, textColor, glm::vec2(xOffset, cursorY), "Reveal & Annihilate");
 
 	static float a = 0.0f;
 	a += seconds;
@@ -336,37 +372,116 @@ void e2::Game::updateMenu(double seconds)
 
 
 
-	ui->drawSDFText(FontFace::Serif, 42.0f, 0x000000AA, glm::vec2(xOffset, cursorY) + offset1, "Reveal & Annihilate");
-	ui->drawSDFText(FontFace::Serif, 42.0f, 0x000000AA, glm::vec2(xOffset, cursorY) + offset2, "Reveal & Annihilate");
+	ui->drawSDFText(FontFace::Serif, 42.0f, textColor2, glm::vec2(xOffset, cursorY) + offset1, "Reveal & Annihilate");
+	ui->drawSDFText(FontFace::Serif, 42.0f, textColor2, glm::vec2(xOffset, cursorY) + offset2, "Reveal & Annihilate");
 
 	cursorY += 64.0f;
 
+	float blockAlphaNewGame = glm::smoothstep(15.0, 15.25, timer);
+	e2::UIColor textColorNewGame(0, 0, 0, uint8_t(blockAlphaNewGame * 170.0f * globalMenuFade));
 	float newGameWidth = ui->calculateSDFTextWidth(FontFace::Serif, 24.0f, "New Game");
-	bool newGameHovered = mouse.relativePosition.x > xOffset & mouse.relativePosition.x < xOffset + newGameWidth 
+	bool newGameHovered = !m_haveBegunStart && timer > 15.25&& mouse.relativePosition.x > xOffset & mouse.relativePosition.x < xOffset + newGameWidth
 		&& mouse.relativePosition.y > cursorY + 20.0f && mouse.relativePosition.y < cursorY + 60.0f;
-	ui->drawSDFText(FontFace::Serif, 24.0f, newGameHovered ? 0x000000FF : 0x000000D0, glm::vec2(xOffset, cursorY + 40.0f), "New Game");
-	if (newGameHovered && leftMouse.clicked)
+	ui->drawSDFText(FontFace::Serif, 24.0f, newGameHovered ? 0x000000FF : textColorNewGame, glm::vec2(xOffset, cursorY + 40.0f), "New Game");
+	if (!m_haveBegunStart && newGameHovered && leftMouse.clicked)
 	{
-		startGame();
+		beginStartGame();
 	}
 
-	ui->drawSDFText(FontFace::Serif, 24.0f, 0x000000D0, glm::vec2(xOffset, cursorY + 40.0f * 2), "Load Game");
-	ui->drawSDFText(FontFace::Serif, 24.0f, 0x000000D0, glm::vec2(xOffset, cursorY + 40.0f * 3), "Options");
-	ui->drawSDFText(FontFace::Serif, 24.0f, 0x000000D0, glm::vec2(xOffset, cursorY + 40.0f * 4), "Quit");
+	float blockAlphaLoadGame = glm::smoothstep(15.25, 15.5, timer);
+	e2::UIColor textColorLoadGame(0, 0, 0, uint8_t(blockAlphaLoadGame * 170.0f * globalMenuFade));
+	float loadGameWidth = ui->calculateSDFTextWidth(FontFace::Serif, 24.0f, "Load Game");
+	bool loadGameHovered = !m_haveBegunStart && timer > 15.5 && mouse.relativePosition.x > xOffset & mouse.relativePosition.x < xOffset + loadGameWidth
+		&& mouse.relativePosition.y > cursorY + 60.0f && mouse.relativePosition.y < cursorY + 100.0f;
+	ui->drawSDFText(FontFace::Serif, 24.0f, loadGameHovered ? 0x000000FF : textColorLoadGame, glm::vec2(xOffset, cursorY + 40.0f * 2), "Load Game");
+
+	float blockAlphaOptions = glm::smoothstep(15.5, 15.75, timer);
+	e2::UIColor textColorOptions(0, 0, 0, uint8_t(blockAlphaOptions * 170.0f * globalMenuFade));
+	float optionsWidth = ui->calculateSDFTextWidth(FontFace::Serif, 24.0f, "Options");
+	bool optionsHovered = !m_haveBegunStart && timer > 15.75 && mouse.relativePosition.x > xOffset & mouse.relativePosition.x < xOffset + optionsWidth
+		&& mouse.relativePosition.y > cursorY + 100.0f && mouse.relativePosition.y < cursorY + 140.0f;
+	ui->drawSDFText(FontFace::Serif, 24.0f, optionsHovered ? 0x000000FF : textColorOptions, glm::vec2(xOffset, cursorY + 40.0f * 3), "Options");
+
+	float blockAlphaQuit = glm::smoothstep(15.75, 16.0, timer);
+	e2::UIColor textColorQuit(0, 0, 0, uint8_t(blockAlphaQuit * 170.0f * globalMenuFade));
+	float quitWidth = ui->calculateSDFTextWidth(FontFace::Serif, 24.0f, "Quit");
+	bool quitHovered = !m_haveBegunStart && timer > 16.0 && mouse.relativePosition.x > xOffset & mouse.relativePosition.x < xOffset + optionsWidth
+		&& mouse.relativePosition.y > cursorY + 140.0f && mouse.relativePosition.y < cursorY + 180.0f;
+	ui->drawSDFText(FontFace::Serif, 24.0f, quitHovered ? 0x000000FF : textColorQuit, glm::vec2(xOffset, cursorY + 40.0f * 4), "Quit");
+	if (quitHovered && leftMouse.clicked)
+	{
+		engine()->shutdown();
+	}
+
+	if (m_haveBegunStart && !m_haveStreamedStart && m_hexGrid->numJobsInFlight() == 0 && m_beginStartTime.durationSince().seconds() > 2.1f)
+	{
+		m_haveStreamedStart = true;
+		m_beginStreamTime = e2::timeNow();
+
+		glm::vec2 startCoords = e2::Hex(m_startLocation).planarCoords();
+		m_hexGrid->initializeWorldBounds(startCoords);
+
+		// spawn local empire
+		m_localEmpireId = spawnEmpire();
+		m_localEmpire = m_empires[m_localEmpireId];
+		spawnStructure<e2::MainOperatingBase>(m_startLocation, m_localEmpireId);
+
+	}
+	if (m_haveStreamedStart)
+	{
+		float sec = m_beginStreamTime.durationSince().seconds();
+		float a = glm::smoothstep(0.0f, 1.0f, sec);
+		m_viewOrigin = glm::mix(m_startViewOrigin, e2::Hex(m_startLocation).planarCoords(), a);
+	}
+
+	if (m_haveStreamedStart && m_beginStreamTime.durationSince().seconds() > 1.1f)
+	{
+		
+		resumeWorldStreaming();
+		startGame();
+		m_haveBegunStart = false;
+	}
+
+}
+
+void e2::Game::pauseWorldStreaming()
+{
+	m_hexGrid->m_streamingPaused = true;
+}
+
+void e2::Game::resumeWorldStreaming()
+{
+	m_hexGrid->m_streamingPaused = false;
+}
+
+void e2::Game::forceStreamLocation(glm::vec2 const& planarCoords)
+{
+	glm::vec2 offset = planarCoords - m_viewOrigin;
+	e2::Viewpoints2D forceView = m_viewPoints;
+	forceView.bottomLeft += offset;
+	forceView.bottomRight += offset;
+	forceView.topLeft += offset;
+	forceView.topRight += offset;
+	forceView.view.origin.x += offset.x;
+	forceView.view.origin.z += offset.y;
+	forceView.calculateDerivatives();
+
+	m_hexGrid->forceStreamView(forceView);
+}
+
+void e2::Game::beginStartGame()
+{
+	m_haveBegunStart = true;
+	m_beginStartTime = e2::timeNow();
+	findStartLocation();
+	pauseWorldStreaming();
+	forceStreamLocation(e2::Hex(m_startLocation).planarCoords());
 
 
 }
 
-void e2::Game::startGame()
+void e2::Game::findStartLocation()
 {
-	if (m_globalState != GlobalState::Menu)
-		return;
-	m_globalState = GlobalState::Game;
-
-	// spawn local empire
-	m_localEmpireId = spawnEmpire();
-	m_localEmpire = m_empires[m_localEmpireId];
-
 	// plop us down somehwere nice 
 	std::unordered_set<glm::ivec2> attemptedStartLocations;
 	bool foundStartLocation{};
@@ -391,13 +506,18 @@ void e2::Game::startGame()
 		if (numWalkableHexes < 64)
 			continue;
 
-		m_hexGrid->initializeWorldBounds(startHex.planarCoords());
-		m_viewOrigin = startHex.planarCoords();
 
-		spawnStructure<e2::MainOperatingBase>(startHex, m_localEmpireId);
-
+		m_startLocation = startLocation;
 		foundStartLocation = true;
 	}
+
+}
+
+void e2::Game::startGame()
+{
+	if (m_globalState != GlobalState::Menu)
+		return;
+	m_globalState = GlobalState::Game;
 
 	// kick off gameloop
 	onStartOfTurn();

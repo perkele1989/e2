@@ -72,6 +72,9 @@ namespace e2
 
 		virtual void present() = 0;
 
+		virtual bool isFullscreen() = 0;
+		virtual void setFullscreen(bool newFullscreen) = 0;
+
 		virtual glm::vec2 position() = 0;
 		virtual void position(glm::vec2 const& newPosition) = 0;
 

@@ -480,6 +480,7 @@ void e2::UIManager::initialize()
 
 	e2::PipelineCreateInfo pipelineInfo{};
 	pipelineInfo.colorFormats.push(e2::TextureFormat::RGBA8);
+	pipelineInfo.alphaBlending = true;
 	pipelineInfo.depthFormat = TextureFormat::D16;
 	pipelineInfo.layout = quadPipeline.layout;
 	pipelineInfo.shaders.push(quadPipeline.vertexShader);

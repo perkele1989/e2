@@ -247,10 +247,14 @@ namespace e2
 		std::unordered_set<e2::ChunkState*> m_lookAheadChunks;
 
 
+		void forceStreamView(e2::Viewpoints2D const& view);
+		std::vector<e2::Viewpoints2D> m_forceStreamQueue;
+
+
 		void updateStreaming(glm::vec2 const& streamCenter, e2::Viewpoints2D const& newStreamingView, glm::vec2 const& viewVelocity);
 
 
-
+		bool m_streamingPaused{};
 		glm::vec2 m_streamingCenter;
 		glm::vec2 m_streamingViewVelocity;
 		e2::Viewpoints2D m_streamingView;

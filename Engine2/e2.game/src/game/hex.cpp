@@ -432,6 +432,11 @@ insert_sorted(std::vector<T>& vec, T const& item, Pred pred)
 	);
 }
 
+void e2::HexGrid::forceStreamView(e2::Viewpoints2D const& view)
+{
+	m_forceStreamQueue.push_back(view);
+}
+
 void e2::HexGrid::updateStreaming(glm::vec2 const& streamCenter, e2::Viewpoints2D const& viewPoints, glm::vec2 const& viewVelocity)
 {
 	e2::Renderer* renderer = gameSession()->renderer();
@@ -441,11 +446,6 @@ void e2::HexGrid::updateStreaming(glm::vec2 const& streamCenter, e2::Viewpoints2
 	m_streamingView = viewPoints;
 	m_streamingViewVelocity= viewVelocity;
 	m_streamingViewAabb = m_streamingView.toAabb();
-
-	for (auto& [chunkIndex, chunk] : m_chunkIndex)
-	{
-		chunk->inView = false;
-	}
 
 	auto gatherChunkStatesInView = [this](e2::Viewpoints2D const& streamPoints, std::unordered_set<e2::ChunkState*> & outChunks, bool forLookAhead) {
 		e2::Aabb2D streamAabb = streamPoints.toAabb();
@@ -469,6 +469,10 @@ void e2::HexGrid::updateStreaming(glm::vec2 const& streamCenter, e2::Viewpoints2
 	};
 
 	// gather all chunks in view, and pop them in if theyre ready, or queue them for streaming
+	for (auto& [chunkIndex, chunk] : m_chunkIndex)
+	{
+		chunk->inView = false;
+	}
 	m_chunksInView.clear();
 	gatherChunkStatesInView(m_streamingView, m_chunksInView, false);
 	for (e2::ChunkState* chunk : m_chunksInView)
@@ -478,12 +482,28 @@ void e2::HexGrid::updateStreaming(glm::vec2 const& streamCenter, e2::Viewpoints2
 		if (!chunk->visibilityState)
 			popInChunk(chunk);
 
-		if (chunk->streamState == StreamState::Poked)
+		if (chunk->streamState == StreamState::Poked && !m_streamingPaused)
 		{
 			queueStreamingChunk(chunk);
 		}
 	}
 
+	// force stream requested
+	for (e2::Viewpoints2D const& vp : m_forceStreamQueue)
+	{
+		std::unordered_set<e2::ChunkState*> forceChunks;
+		gatherChunkStatesInView(vp, forceChunks, false);
+		for (e2::ChunkState* chunk : forceChunks)
+		{
+			chunk->inView = false;
+
+			if (chunk->streamState == StreamState::Poked)
+			{
+				queueStreamingChunk(chunk);
+			}
+		}
+	}
+	m_forceStreamQueue.clear();
 
 	// gather chunks via trace 
 	constexpr float lookAheadTreshold = 0.1f;
@@ -499,7 +519,7 @@ void e2::HexGrid::updateStreaming(glm::vec2 const& streamCenter, e2::Viewpoints2
 	uint32_t numLookAheads = lookSpeed / lookAheadTreshold;
 	for (uint32_t i = 0; i < numLookAheads; i++)
 	{
-		glm::vec2 lookAheadOffset = lookDir * (lookAheadLength*float(i));
+		glm::vec2 lookAheadOffset = lookDir * (lookAheadLength * float(i));
 		e2::Viewpoints2D lookAheadView = m_streamingView;
 		lookAheadView.bottomLeft += lookAheadOffset;
 		lookAheadView.bottomRight += lookAheadOffset;
@@ -518,8 +538,11 @@ void e2::HexGrid::updateStreaming(glm::vec2 const& streamCenter, e2::Viewpoints2
 	}
 
 	// queue look ahead chunks
-	for (e2::ChunkState* chunk : m_lookAheadChunks)
-		queueStreamingChunk(chunk);
+	if (!m_streamingPaused)
+	{
+		for (e2::ChunkState* chunk : m_lookAheadChunks)
+			queueStreamingChunk(chunk);
+	}
 
 	// go through all invalidated chunks(newly fresh steaming), and pop them in in case they arent 
 	for (e2::ChunkState* newChunk : m_invalidatedChunks)

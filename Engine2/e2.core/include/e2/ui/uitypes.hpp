@@ -42,7 +42,7 @@ namespace e2
 			returner.x = glm::pow(float(r) / 255.f, 2.2f);
 			returner.y = glm::pow(float(g) / 255.f, 2.2f);
 			returner.z = glm::pow(float(b) / 255.f, 2.2f);
-			returner.w = glm::pow(float(a) / 255.f, 2.2f);
+			returner.w = float(a) / 255.0f;
 
 			return returner;
 		}

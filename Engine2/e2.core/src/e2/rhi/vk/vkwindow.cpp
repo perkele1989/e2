@@ -95,6 +95,26 @@ bool e2::IWindow_Vk::wantsClose() const
 	return glfwWindowShouldClose(m_glfwHandle);
 }
 
+void e2::IWindow_Vk::setFullscreen(bool newFullscreen)
+{
+	if (newFullscreen)
+	{
+		GLFWvidmode const* vidMode = glfwGetVideoMode(glfwGetPrimaryMonitor());
+		glfwSetWindowMonitor(m_glfwHandle,  glfwGetPrimaryMonitor() , 0, 0, vidMode->width, vidMode->height, vidMode->refreshRate);
+		
+	}
+	else
+	{
+
+		glfwSetWindowMonitor(m_glfwHandle, nullptr, 64, 64, 1280, 720, GLFW_DONT_CARE);
+	}
+}
+
+bool e2::IWindow_Vk::isFullscreen()
+{
+	return glfwGetWindowMonitor(m_glfwHandle) != nullptr;
+}
+
 void e2::IWindow_Vk::wantsClose(bool newValue)
 {
 	glfwSetWindowShouldClose(m_glfwHandle, newValue);

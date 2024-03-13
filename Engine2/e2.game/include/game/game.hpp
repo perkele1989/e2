@@ -88,7 +88,11 @@ namespace e2
 		void updateGame(double seconds);
 		void updateMenu(double seconds);
 
-
+		void pauseWorldStreaming();
+		void resumeWorldStreaming();
+		void forceStreamLocation(glm::vec2 const& planarCoords);
+		void beginStartGame();
+		void findStartLocation();
 		void startGame();
 
 
@@ -180,6 +184,11 @@ namespace e2
 		// main world grid
 		e2::HexGrid* m_hexGrid{};
 
+		glm::ivec2 m_startLocation;
+		bool m_haveBegunStart{};
+		bool m_haveStreamedStart{};
+		e2::Moment m_beginStartTime;
+		e2::Moment m_beginStreamTime;
 
 		// game economy
 		void updateResources();
@@ -194,7 +203,6 @@ namespace e2
 		e2::Hex m_cursorHex; // mouse position as projected upon a hex
 		e2::Hex m_prevCursorHex;
 		e2::MeshPtr m_cursorMesh;
-		e2::MeshProxy* m_cursorProxy{};
 
 		bool m_uiHovered{};
 		bool m_viewDragging{};
@@ -304,6 +312,7 @@ namespace e2
 		e2::RenderView m_dragView;
 
 		e2::Viewpoints2D m_viewPoints;
+		glm::vec2 m_startViewOrigin{};
 		glm::vec2 m_viewOrigin{ 0.0f, 0.0f };
 		float m_viewZoom{0.0f};
 		glm::vec2 m_viewVelocity{};
