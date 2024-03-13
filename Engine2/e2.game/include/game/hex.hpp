@@ -232,6 +232,8 @@ namespace e2
 		/** pops out chunk, no questions asked, self-corrective states and safe to call whenever */
 		void popOutChunk(e2::ChunkState* state);
 
+		void refreshChunkForest(e2::ChunkState* state);
+
 		// owning map as well as index from chunk index -> chunk state
 		std::unordered_map<glm::ivec2, e2::ChunkState*> m_chunkIndex;
 
@@ -407,6 +409,7 @@ namespace e2
 
 
 		e2::MeshPtr m_treeMesh[4];
+		e2::MeshPtr m_mineTreeMesh;
 
 		e2::MeshPtr m_baseHex;
 		e2::DynamicMesh m_dynaHex;

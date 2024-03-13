@@ -50,9 +50,13 @@ out vec4 fragmentColor;
 
 void main()
 {
-	gl_Position = renderer.projectionMatrix * renderer.viewMatrix * mesh.modelMatrix * vertexPosition;
+	vec4 vertPosFixed = vertexPosition;
+	//vertPosFixed.x = -vertexPosition.x;
+	//vertPosFixed.y = -vertexPosition.z;
+	//vertPosFixed.z = vertexPosition.y;
+	gl_Position = renderer.projectionMatrix * renderer.viewMatrix * mesh.modelMatrix * vertPosFixed;
 
-	fragmentPosition = mesh.modelMatrix * vertexPosition;
+	fragmentPosition = mesh.modelMatrix * vertPosFixed;
 #if defined(Vertex_Normals)
 
 	fragmentNormal = normalize(mesh.modelMatrix * normalize(vertexNormal)).xyz;

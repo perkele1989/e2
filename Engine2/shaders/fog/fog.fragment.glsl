@@ -22,9 +22,11 @@ void main()
 
 
 	vec3 visibility = textureLod(sampler2D(visibilityMask, clampSampler), gl_FragCoord.xy / vec2(resolution.x, resolution.y), 0).xyz;
+
+	
     //vec3 visibility = textureLod(sampler2D(visibilityMask, clampSampler), gl_FragCoord.xy / vec2(resolution.x, resolution.y), 0).xyz;
     //outColor.rgb = fogOfWar(outColor.rgb, fragmentPosition.xyz, visibility, renderer.time.x);
-	outColor.rgb = fogOfWar(outColor.rgb, frontPosition, visibility, renderer.time.x);
+	outColor.rgb = fogOfWar(outColor.rgb, frontPosition, visibility, renderer.time.x) ;
 }
 
 // vec3 fogOfWar(vec3 color, vec3 position, vec3 vis, float time)

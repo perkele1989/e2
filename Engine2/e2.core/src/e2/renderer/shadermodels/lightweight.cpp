@@ -128,6 +128,7 @@ e2::MaterialProxy* e2::LightweightModel::createMaterialProxy(e2::Session* sessio
 	e2::LightweightData newData;
 	newData.albedo = material->getVec4("albedo", glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
 	newData.rmxx = material->getVec4("rmxx", glm::vec4(0.05f, 0.0f, 0.0f, 0.0f));
+	newData.emissive = material->getVec4("emissive", glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
 	newProxy->uniformData.set(newData);
 
 	return newProxy;

@@ -292,7 +292,10 @@ namespace e2
 		 * ^-This Text Is No Longer Colored
 		 */
 		void drawRasterText(e2::FontFace fontFace, uint8_t fontSize,  e2::UIColor color, glm::vec2 position, std::string const& markdownUtf8, bool enableColorChange = true, bool soft = false);
+		void drawSDFText(e2::FontFace fontFace, float fontSize, e2::UIColor color, glm::vec2 position, std::string const& markdownUtf8, bool enableColorChange = true, bool soft = false);
 		void drawRasterTextShadow(e2::FontFace fontFace, uint8_t fontSize,glm::vec2 position, std::string const& markdownUtf8);
+
+		float calculateSDFTextWidth(e2::FontFace fontFace, float fontSize, std::string const& markdownUtf8);
 
 		/** @todo build renderstate here for drawRasterText to cut CPU time for rendering text in almost half  */
 		float calculateTextWidth(e2::FontFace fontFace, uint8_t fontSize, std::string const& markdownUtf8);

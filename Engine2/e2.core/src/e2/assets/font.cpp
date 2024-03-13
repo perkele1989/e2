@@ -147,6 +147,33 @@ float e2::Font::getRasterKerningDistance(uint32_t left, uint32_t right, e2::Font
 	return stbtt_GetCodepointKernAdvance(&faceState.info, left, right) * scale;
 }
 
+float e2::Font::getSDFSpaceAdvance(e2::FontStyle preferredStyle, float size)
+{
+	e2::FontStyle actualStyle = resolveStyle(preferredStyle);
+	::FontBuildState* buildState = buildStateArena.getById(m_buildId);
+	::FaceBuildState& faceState = buildState->faces[size_t(actualStyle)];
+
+	float scale = stbtt_ScaleForMappingEmToPixels(&faceState.info, size);
+
+	int advance{};
+	stbtt_GetCodepointHMetrics(&faceState.info, 32, &advance, nullptr);
+
+	// @todo cache all these metrics somehwere!!
+	return scale * float(advance);
+}
+
+float e2::Font::getSDFKerningDistance(uint32_t left, uint32_t right, e2::FontStyle preferredStyle, float size)
+{
+	e2::FontStyle actualStyle = resolveStyle(preferredStyle);
+
+	::FontBuildState* buildState = buildStateArena.getById(m_buildId);
+	::FaceBuildState& faceState = buildState->faces[size_t(actualStyle)];
+
+	float scale = stbtt_ScaleForMappingEmToPixels(&faceState.info, size);
+
+	return stbtt_GetCodepointKernAdvance(&faceState.info, left, right) * scale;
+}
+
 e2::FontStyle e2::Font::resolveStyle(e2::FontStyle preferredStyle)
 {
 	e2::FontStyle returner = preferredStyle;

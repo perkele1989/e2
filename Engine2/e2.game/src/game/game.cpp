@@ -15,6 +15,8 @@
 #include <glm/gtx/intersect.hpp>
 #include <glm/gtx/vector_angle.hpp>
 
+#include <glm/gtc/noise.hpp>
+
 e2::Game::Game(e2::Context* ctx)
 	: e2::Application(ctx)
 {
@@ -38,6 +40,11 @@ void e2::Game::initialize()
 	am->prescribeALJ(alj, "assets/environment/trees/SM_PalmTree002.e2a");
 	am->prescribeALJ(alj, "assets/environment/trees/SM_PalmTree003.e2a");
 	am->prescribeALJ(alj, "assets/environment/trees/SM_PalmTree004.e2a");
+	am->prescribeALJ(alj, "assets/environment/SM_Mine.e2a");
+	am->prescribeALJ(alj, "assets/environment/SM_GoldMine.e2a");
+	am->prescribeALJ(alj, "assets/environment/SM_UraniumMine.e2a");
+	am->prescribeALJ(alj, "assets/environment/SM_Quarry.e2a");
+	am->prescribeALJ(alj, "assets/environment/SM_SawMill.e2a");
 
 	am->prescribeALJ(alj, "assets/kloofendal_irr.e2a");
 	am->prescribeALJ(alj, "assets/kloofendal_rad.e2a");
@@ -61,6 +68,19 @@ void e2::Game::initialize()
 		m_structureMeshes[i] = m_cursorMesh;
 	}
 
+	e2::MeshPtr sawMillMesh = am->get("assets/environment/SM_SawMill.e2a").cast<e2::Mesh>();
+	e2::MeshPtr quarryMesh = am->get("assets/environment/SM_Quarry.e2a").cast<e2::Mesh>();
+	e2::MeshPtr mineMesh = am->get("assets/environment/SM_Mine.e2a").cast<e2::Mesh>();
+	e2::MeshPtr goldMineMesh = am->get("assets/environment/SM_GoldMine.e2a").cast<e2::Mesh>();
+	e2::MeshPtr uraniumMineMesh = am->get("assets/environment/SM_UraniumMine.e2a").cast<e2::Mesh>();
+
+	m_structureMeshes[(uint8_t)e2::GameStructureType::OreMine] = mineMesh;
+	m_structureMeshes[(uint8_t)e2::GameStructureType::GoldMine] = goldMineMesh;
+	m_structureMeshes[(uint8_t)e2::GameStructureType::UraniumMine] = uraniumMineMesh;
+	m_structureMeshes[(uint8_t)e2::GameStructureType::Quarry] = quarryMesh;
+	m_structureMeshes[(uint8_t)e2::GameStructureType::SawMill] = sawMillMesh;
+
+
 	for (uint8_t i = 0; i < (uint8_t)e2::GameUnitType::Count; i++)
 	{
 		m_unitMeshes[i] = m_cursorMesh;
@@ -74,44 +94,10 @@ void e2::Game::initialize()
 
 	m_hexGrid = e2::create<e2::HexGrid>(this);
 
-	// spawn local empire
-	m_localEmpireId = spawnEmpire();
-	m_localEmpire = m_empires[m_localEmpireId];
 
-	// plop us down somehwere nice 
-	std::unordered_set<glm::ivec2> attemptedStartLocations;
-	bool foundStartLocation{};
-	while (!foundStartLocation)
-	{
-		glm::ivec2 startLocation = e2::randomIvec2({ -512, -512 }, { 512, 512 });
-		if (attemptedStartLocations.contains(startLocation))
-			continue;
+	m_viewOrigin = glm::vec2(528.97f, 587.02f);
+	m_hexGrid->initializeWorldBounds(m_viewOrigin);
 
-		attemptedStartLocations.insert(startLocation);
-
-		e2::Hex startHex(startLocation);
-		e2::TileData startTile = e2::HexGrid::calculateTileDataForHex(startHex);
-		if (!startTile.isWalkable())
-			continue;
-
-		constexpr bool ignoreVisibility = true;
-		auto as = e2::create<e2::PathFindingAccelerationStructure>(this, startHex, 64, ignoreVisibility);
-		uint64_t numWalkableHexes = as->hexIndex.size();
-		e2::destroy(as);
-
-		if (numWalkableHexes < 64)
-			continue;
-		
-		m_hexGrid->initializeWorldBounds(startHex.planarCoords());
-		m_viewOrigin = startHex.planarCoords();
-
-		spawnStructure<e2::MainOperatingBase>(startHex, m_localEmpireId);
-		
-		foundStartLocation = true;
-	}
-
-	// kick off gameloop
-	onStartOfTurn();
 }
 
 void e2::Game::shutdown()
@@ -135,7 +121,14 @@ void e2::Game::shutdown()
 void e2::Game::update(double seconds)
 {
 	m_timeDelta = seconds;
+	if (m_globalState == GlobalState::Menu)
+		updateMenu(seconds);
+	else if (m_globalState == GlobalState::Game)
+		updateGame(seconds);
+}
 
+void e2::Game::updateGame(double seconds)
+{
 	constexpr float moveSpeed = 10.0f;
 	constexpr float viewSpeed = .3f;
 
@@ -159,7 +152,7 @@ void e2::Game::update(double seconds)
 	bool hexChanged = newHex != m_prevCursorHex;
 	m_prevCursorHex = m_cursorHex;
 	m_cursorHex = newHex;
-	
+
 	m_cursorProxy->modelMatrix = glm::translate(glm::mat4(1.0f), m_cursorHex.localCoords());
 	m_cursorProxy->modelMatrix = glm::scale(m_cursorProxy->modelMatrix, glm::vec3(2.0f));
 	m_cursorProxy->modelMatrixDirty = true;
@@ -171,6 +164,12 @@ void e2::Game::update(double seconds)
 	{
 		m_altView = !m_altView;
 		gameSession()->window()->mouseLock(m_altView);
+		if (m_altView)
+		{
+			m_altViewOrigin =glm::vec3(m_viewOrigin.x, -5.0f, m_viewOrigin.y);
+		}
+			
+
 	}
 
 	if (kb.keys[int16_t(e2::Key::F1)].pressed)
@@ -262,6 +261,148 @@ void e2::Game::update(double seconds)
 	renderer->debugLine(glm::vec3(0.0f, 1.0f, 0.0f), m_viewPoints.topRay.position, m_viewPoints.topRay.position + m_viewPoints.topRay.perpendicular);
 	renderer->debugLine(glm::vec3(0.0f, 1.0f, 0.0f), m_viewPoints.rightRay.position, m_viewPoints.rightRay.position + m_viewPoints.rightRay.perpendicular);
 	renderer->debugLine(glm::vec3(0.0f, 1.0f, 0.0f), m_viewPoints.bottomRay.position, m_viewPoints.bottomRay.position + m_viewPoints.bottomRay.perpendicular);*/
+}
+
+void e2::Game::updateMenu(double seconds)
+{
+
+	e2::GameSession* session = gameSession();
+	e2::Renderer* renderer = session->renderer();
+	e2::UIContext* ui = session->uiContext();
+	auto& kb = ui->keyboardState();
+	auto& mouse = ui->mouseState();
+	auto& leftMouse = mouse.buttons[uint16_t(e2::MouseButton::Left)];
+
+	m_session->renderer()->setEnvironment(m_irradianceMap->handle(), m_radianceMap->handle());
+
+
+	m_viewZoom = 0.5f;
+
+	e2::Aabb2D viewBounds = m_hexGrid->viewBounds();
+	m_viewOrigin.x = glm::clamp(m_viewOrigin.x, viewBounds.min.x, viewBounds.max.x);
+	m_viewOrigin.y = glm::clamp(m_viewOrigin.y, viewBounds.min.y, viewBounds.max.y);
+
+	m_view = calculateRenderView(m_viewOrigin);
+	m_viewPoints = e2::Viewpoints2D(renderer->resolution(), m_view);
+	renderer->setView(m_view);
+
+
+	m_hexGrid->updateStreaming(m_viewOrigin, m_viewPoints, m_viewVelocity);
+	m_hexGrid->updateWorldBounds();
+	m_hexGrid->renderFogOfWar();
+
+	// ticking session renders renderer too, and blits it to the UI, so we need to do it precisely here (after rendering fog of war and before rendering UI)
+	m_session->tick(seconds);
+
+	glm::vec2 resolution = renderer->resolution();
+	ui->drawTexturedQuad({}, resolution, 0xFFFFFFFF, m_hexGrid->outlineTexture(renderManager()->frameIndex()));
+
+
+
+	float width = ui->calculateSDFTextWidth(FontFace::Serif, 42.0f, "Reveal & Annihilate");
+
+	float menuHeight = 280.0f;
+	float menuOffset = resolution.y / 2.0f - menuHeight / 2.0f;
+
+	float cursorY = menuOffset;
+	float xOffset = resolution.x / 2.0f - width / 2.0f;
+
+
+
+	ui->drawSDFText(FontFace::Serif, 42.0f, 0x000000AA, glm::vec2(xOffset, cursorY), "Reveal & Annihilate");
+
+	static float a = 0.0f;
+	a += seconds;
+
+	// outwards 
+	float sa = glm::simplex(glm::vec2(a*2.0f, 0.0f));
+	// rotation
+	float sb = glm::simplex(glm::vec2(a*50.0f + 21.f, 0.0f));
+
+	sa = glm::pow(sa, 4.0f);
+	sb = glm::pow(sb, 2.0f);
+
+	if (glm::abs(sa) < 0.2f)
+		sa = 0.0f;
+
+	if (glm::abs(sb) < 0.5f)
+		sb = 0.0f;
+
+	glm::vec2 ori(0.0f, -sa * 10.0f);
+	glm::vec2 offset1 = e2::rotate2d(ori, sb * 360.0f);
+
+	glm::vec2 ori2(0.0f, -sb * 5.f);
+	glm::vec2 offset2 = e2::rotate2d(ori2, sb * 360.0f);
+
+
+
+	ui->drawSDFText(FontFace::Serif, 42.0f, 0x000000AA, glm::vec2(xOffset, cursorY) + offset1, "Reveal & Annihilate");
+	ui->drawSDFText(FontFace::Serif, 42.0f, 0x000000AA, glm::vec2(xOffset, cursorY) + offset2, "Reveal & Annihilate");
+
+	cursorY += 64.0f;
+
+	float newGameWidth = ui->calculateSDFTextWidth(FontFace::Serif, 24.0f, "New Game");
+	bool newGameHovered = mouse.relativePosition.x > xOffset & mouse.relativePosition.x < xOffset + newGameWidth 
+		&& mouse.relativePosition.y > cursorY + 20.0f && mouse.relativePosition.y < cursorY + 60.0f;
+	ui->drawSDFText(FontFace::Serif, 24.0f, newGameHovered ? 0x000000FF : 0x000000D0, glm::vec2(xOffset, cursorY + 40.0f), "New Game");
+	if (newGameHovered && leftMouse.clicked)
+	{
+		startGame();
+	}
+
+	ui->drawSDFText(FontFace::Serif, 24.0f, 0x000000D0, glm::vec2(xOffset, cursorY + 40.0f * 2), "Load Game");
+	ui->drawSDFText(FontFace::Serif, 24.0f, 0x000000D0, glm::vec2(xOffset, cursorY + 40.0f * 3), "Options");
+	ui->drawSDFText(FontFace::Serif, 24.0f, 0x000000D0, glm::vec2(xOffset, cursorY + 40.0f * 4), "Quit");
+
+
+}
+
+void e2::Game::startGame()
+{
+	if (m_globalState != GlobalState::Menu)
+		return;
+	m_globalState = GlobalState::Game;
+
+	// spawn local empire
+	m_localEmpireId = spawnEmpire();
+	m_localEmpire = m_empires[m_localEmpireId];
+
+	// plop us down somehwere nice 
+	std::unordered_set<glm::ivec2> attemptedStartLocations;
+	bool foundStartLocation{};
+	while (!foundStartLocation)
+	{
+		glm::ivec2 startLocation = e2::randomIvec2({ -512, -512 }, { 512, 512 });
+		if (attemptedStartLocations.contains(startLocation))
+			continue;
+
+		attemptedStartLocations.insert(startLocation);
+
+		e2::Hex startHex(startLocation);
+		e2::TileData startTile = e2::HexGrid::calculateTileDataForHex(startHex);
+		if (!startTile.isWalkable())
+			continue;
+
+		constexpr bool ignoreVisibility = true;
+		auto as = e2::create<e2::PathFindingAccelerationStructure>(this, startHex, 64, ignoreVisibility);
+		uint64_t numWalkableHexes = as->hexIndex.size();
+		e2::destroy(as);
+
+		if (numWalkableHexes < 64)
+			continue;
+
+		m_hexGrid->initializeWorldBounds(startHex.planarCoords());
+		m_viewOrigin = startHex.planarCoords();
+
+		spawnStructure<e2::MainOperatingBase>(startHex, m_localEmpireId);
+
+		foundStartLocation = true;
+	}
+
+	// kick off gameloop
+	onStartOfTurn();
+
+
 }
 
 e2::ApplicationType e2::Game::type()
@@ -558,15 +699,18 @@ void e2::Game::drawUI()
 {
 	m_uiHovered = false;
 
-	drawResourceIcons();
+	if (!m_altView)
+	{
+		drawResourceIcons();
 
-	drawStatusUI();
+		drawStatusUI();
 
-	drawUnitUI();
+		drawUnitUI();
 
-	drawMinimapUI();
+		drawMinimapUI();
 
-	drawFinalUI();
+		drawFinalUI();
+	}
 
 	drawDebugUI();
 }
@@ -604,7 +748,7 @@ void e2::Game::drawResourceIcons()
 				e2::TileFlags resource = tileData->getResource();
 				e2::TileFlags abundance = tileData->getAbundance();
 
-				glm::vec4 viewPos = vpMatrix* glm::dvec4( glm::dvec3(e2::Hex(worldIndex).localCoords()) + e2::worldUp() * 0.1, 1.0);
+				glm::vec4 viewPos = vpMatrix* glm::dvec4( glm::dvec3(e2::Hex(worldIndex).localCoords()) + e2::worldUp() * 0.4, 1.0);
 				viewPos = viewPos / viewPos.z;
 
 				glm::vec2 offset = (glm::vec2(viewPos.x, viewPos.y) * 0.5f + 0.5f) * glm::vec2(resolution);
@@ -1107,9 +1251,9 @@ void e2::Game::updateMainCamera(double seconds)
 
 e2::RenderView e2::Game::calculateRenderView(glm::vec2 const &viewOrigin)
 {
-	float viewFov = glm::mix(55.0f, 45.0f, m_viewZoom);
-	float viewAngle = glm::mix(42.5f, 50.0f, m_viewZoom);
-	float viewDistance = glm::mix(5.0f, 25.0f, m_viewZoom);
+	float viewFov = glm::mix(55.0f, 35.0f, m_viewZoom);
+	float viewAngle = glm::mix(35.5f, 50.0f, m_viewZoom);
+	float viewDistance = glm::mix(2.5f, 30.0f, m_viewZoom);
 
 	glm::quat orientation = glm::rotate(glm::quat(1.0f, 0.0f, 0.0f, 0.0f), glm::radians(viewAngle), { 1.0f, 0.0f, 0.0f });
 

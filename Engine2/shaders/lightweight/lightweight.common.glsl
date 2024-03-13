@@ -7,6 +7,7 @@ layout(set = 2, binding = 0) uniform MaterialData
 {
     vec4 albedo; // albedo.rgb, reserved
     vec4 rmxx; // roughness, metalness, reserved, reserved
+    vec4 emissive; // emissive.rgb, emissiveStrength.a
 } material;
 
 layout(set = 2, binding = 1) uniform texture2D albedoTexture;

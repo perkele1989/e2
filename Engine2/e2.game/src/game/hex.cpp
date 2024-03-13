@@ -43,10 +43,13 @@ e2::HexGrid::HexGrid(e2::GameContext* gameCtx)
 	am->prescribeALJ(aljDesc, "assets/SM_HexBase.e2a");
 	am->prescribeALJ(aljDesc, "assets/SM_HexBaseHigh.e2a");
 	am->prescribeALJ(aljDesc, "assets/SM_CoordinateSpace.e2a");
+
 	am->prescribeALJ(aljDesc, "assets/environment/trees/SM_PineForest001.e2a");
 	am->prescribeALJ(aljDesc, "assets/environment/trees/SM_PineForest002.e2a");
 	am->prescribeALJ(aljDesc, "assets/environment/trees/SM_PineForest003.e2a");
 	am->prescribeALJ(aljDesc, "assets/environment/trees/SM_PineForest004.e2a");
+
+	am->prescribeALJ(aljDesc, "assets/environment/SM_MineTrees.e2a");
 	if (!am->queueWaitALJ(aljDesc))
 	{
 		LogError("Failed to load hex base mesh");
@@ -57,6 +60,7 @@ e2::HexGrid::HexGrid(e2::GameContext* gameCtx)
 	m_treeMesh[1] = am->get("assets/environment/trees/SM_PineForest002.e2a")->cast<e2::Mesh>();
 	m_treeMesh[2] = am->get("assets/environment/trees/SM_PineForest003.e2a")->cast<e2::Mesh>();
 	m_treeMesh[3] = am->get("assets/environment/trees/SM_PineForest004.e2a")->cast<e2::Mesh>();
+	m_mineTreeMesh = am->get("assets/environment/SM_MineTrees.e2a")->cast<e2::Mesh>();
 
 	m_baseHex = am->get("assets/SM_HexBase.e2a")->cast<e2::Mesh>();
 	m_dynaHex = e2::DynamicMesh(m_baseHex, 0, VertexAttributeFlags::Color);
@@ -166,8 +170,8 @@ e2::Aabb2D e2::HexGrid::getChunkAabb(glm::ivec2 const& chunkIndex)
 	constexpr uint32_t r = e2::hexChunkResolution;
 	glm::vec2 chunkBoundsOffset = e2::Hex(glm::ivec2(chunkIndex.x * r, chunkIndex.y * r)).planarCoords();
 	e2::Aabb2D chunkAabb;
-	chunkAabb.min = chunkBoundsOffset;
-	chunkAabb.max = chunkBoundsOffset + _chunkSize;
+	chunkAabb.min = chunkBoundsOffset - glm::vec2(2.0);
+	chunkAabb.max = chunkBoundsOffset + _chunkSize + glm::vec2(4.0);
 	return chunkAabb;
 }
 
@@ -447,9 +451,9 @@ void e2::HexGrid::updateStreaming(glm::vec2 const& streamCenter, e2::Viewpoints2
 		e2::Aabb2D streamAabb = streamPoints.toAabb();
 		glm::ivec2 lowerIndex = chunkIndexFromPlanarCoords(streamAabb.min) - glm::ivec2(1, 1);
 		glm::ivec2 upperIndex = chunkIndexFromPlanarCoords(streamAabb.max);
-		for (int32_t y = lowerIndex.y - 1; y <= upperIndex.y; y++)
+		for (int32_t y = lowerIndex.y - 1; y <= upperIndex.y + 1; y++)
 		{
-			for (int32_t x = lowerIndex.x - 1; x <= upperIndex.x; x++)
+			for (int32_t x = lowerIndex.x - 1; x <= upperIndex.x + 1; x++)
 			{
 				glm::ivec2 chunkIndex = glm::ivec2(x, y);
 				e2::Aabb2D chunkAabb = getChunkAabb(chunkIndex);
@@ -1609,7 +1613,7 @@ void e2::HexGrid::renderFogOfWar()
 
 
 		outlineConstants.mvpMatrix = vpMatrix * transform;
-		outlineConstants.color = { 0.7f, 0.7f, 0.7f, 0.5f };
+		outlineConstants.color = { 0.0f, 0.0f, 0.0f, 0.16f };
 
 		buff->pushConstants(m_outlinePipelineLayout, 0, sizeof(e2::OutlineConstants), reinterpret_cast<uint8_t*>(&outlineConstants));
 		buff->draw(hexSpec.indexCount, 1);
@@ -1673,11 +1677,30 @@ void e2::HexGrid::renderFogOfWar()
 				glm::mat4 transform = glm::identity<glm::mat4>();
 				transform = glm::translate(transform, worldOffset);
 
+				float spooky = 0.0f;
+				if (m_tiles[finder->second].getBiome() == TileFlags::BiomeForest)
+				{
+					switch (m_tiles[finder->second].getAbundance())
+					{
+					case e2::TileFlags::Abundance1:
+						spooky = 0.25f;
+						break;
+					case e2::TileFlags::Abundance2:
+						spooky = 0.5f;
+						break;
+					case e2::TileFlags::Abundance3:
+						spooky = 0.75f;
+						break;
+					case e2::TileFlags::Abundance4:
+						spooky = 1.0f;
+						break;
+					}
+				}
 
 				fogOfWarConstants.mvpMatrix = vpMatrix * transform;
 				fogOfWarConstants.visibility.x = 1.0;
 				fogOfWarConstants.visibility.y = m_tileVisibility[finder->second] > 0 ? 1.0 : 0.0;
-				fogOfWarConstants.visibility.z = 0.0f;
+				fogOfWarConstants.visibility.z =  spooky;
 
 
 				buff->pushConstants(m_fogOfWarPipelineLayout, 0, sizeof(e2::FogOfWarConstants), reinterpret_cast<uint8_t*>(&fogOfWarConstants));
@@ -1812,32 +1835,36 @@ void e2::HexGrid::renderFogOfWar()
 	buff->bindVertexBuffer(0, ui->quadVertexBuffer);
 	buff->bindPipeline(ui->quadPipeline.pipeline);
 
-	for (e2::GameUnit* unit : game()->localEmpire()->units)
+	e2::GameEmpire* localEmpire = game()->localEmpire();
+	if (localEmpire)
 	{
-		glm::vec2 planarUnitPosition = unit->planarCoords();
+		for (e2::GameUnit* unit : localEmpire->units)
+		{
+			glm::vec2 planarUnitPosition = unit->planarCoords();
 
-		glm::vec2 unitPosNormalized = (planarUnitPosition - worldOffset) / worldSize;
-		glm::vec2 unitPosPixels = unitPosNormalized * glm::vec2(m_minimapSize);
+			glm::vec2 unitPosNormalized = (planarUnitPosition - worldOffset) / worldSize;
+			glm::vec2 unitPosPixels = unitPosNormalized * glm::vec2(m_minimapSize);
 
-		unitConstants.quadPosition = unitPosPixels - glm::vec2(1.5f, 1.5f);
-		buff->pushConstants(ui->quadPipeline.layout, 0, sizeof(e2::UIQuadPushConstants), reinterpret_cast<uint8_t*>(&unitConstants));
+			unitConstants.quadPosition = unitPosPixels - glm::vec2(1.5f, 1.5f);
+			buff->pushConstants(ui->quadPipeline.layout, 0, sizeof(e2::UIQuadPushConstants), reinterpret_cast<uint8_t*>(&unitConstants));
 
-		buff->draw(6, 1);
-	}
+			buff->draw(6, 1);
+		}
 
-	unitConstants.quadSize = { 6.0f, 6.0f };
+		unitConstants.quadSize = { 6.0f, 6.0f };
 
-	for (e2::GameStructure* structure : game()->localEmpire()->structures)
-	{
-		glm::vec2 planarUnitPosition = structure->planarCoords();
+		for (e2::GameStructure* structure : game()->localEmpire()->structures)
+		{
+			glm::vec2 planarUnitPosition = structure->planarCoords();
 
-		glm::vec2 unitPosNormalized = (planarUnitPosition - worldOffset) / worldSize;
-		glm::vec2 unitPosPixels = unitPosNormalized * glm::vec2(m_minimapSize);
+			glm::vec2 unitPosNormalized = (planarUnitPosition - worldOffset) / worldSize;
+			glm::vec2 unitPosPixels = unitPosNormalized * glm::vec2(m_minimapSize);
 
-		unitConstants.quadPosition = unitPosPixels - glm::vec2(3.0f, 3.0f);
-		buff->pushConstants(ui->quadPipeline.layout, 0, sizeof(e2::UIQuadPushConstants), reinterpret_cast<uint8_t*>(&unitConstants));
+			unitConstants.quadPosition = unitPosPixels - glm::vec2(3.0f, 3.0f);
+			buff->pushConstants(ui->quadPipeline.layout, 0, sizeof(e2::UIQuadPushConstants), reinterpret_cast<uint8_t*>(&unitConstants));
 
-		buff->draw(6, 1);
+			buff->draw(6, 1);
+		}
 	}
 
 
@@ -2294,8 +2321,16 @@ void e2::HexGrid::popInChunk(e2::ChunkState* state)
 		{
 			glm::ivec2 const &offset = index.offsetCoords;
 
+			e2::TileData* tile = getTileData(offset);
+			if (tile && tile->improvedResource && tile->getResource() == TileFlags::ResourceForest)
+				continue;
+
 			e2::MeshProxyConfiguration treeConf;
-			treeConf.mesh = m_treeMesh[index.meshIndex];
+			
+			if (tile && tile->improvedResource)
+				treeConf.mesh = m_mineTreeMesh;
+			else 
+				treeConf.mesh = m_treeMesh[index.meshIndex];
 
 			glm::vec3 treeOffset = e2::Hex(offset).localCoords();
 
@@ -2355,6 +2390,44 @@ void e2::HexGrid::popOutChunk(e2::ChunkState* state)
 		}
 		state->forestTileProxies.resize(0);
 	}
+}
+
+void e2::HexGrid::refreshChunkForest(e2::ChunkState* state)
+{
+	for (e2::MeshProxy* treeProxy : state->forestTileProxies)
+	{
+		e2::destroy(treeProxy);
+	}
+	state->forestTileProxies.resize(0);
+
+	// skip refreshing if we dont have a proxy, since itll be updated once we get one (and if we dont have one do we really want trees on it?)
+	if (!state->proxy)
+		return;
+
+	for (e2::ForestIndex const& index : state->forestTileIndices)
+	{
+		glm::ivec2 const& offset = index.offsetCoords;
+
+		e2::TileData* tile = getTileData(offset);
+		if (tile && tile->improvedResource && tile->getResource() == TileFlags::ResourceForest)
+			continue;
+
+		e2::MeshProxyConfiguration treeConf;
+
+		if (tile && tile->improvedResource)
+			treeConf.mesh = m_mineTreeMesh;
+		else
+			treeConf.mesh = m_treeMesh[index.meshIndex];
+
+		glm::vec3 treeOffset = e2::Hex(offset).localCoords();
+
+		e2::MeshProxy* newForestProxy = e2::create<e2::MeshProxy>(gameSession(), treeConf);
+		newForestProxy->modelMatrix = glm::translate(glm::mat4(1.0f), treeOffset);
+		newForestProxy->modelMatrix = glm::rotate(newForestProxy->modelMatrix, glm::radians(0.0f), glm::vec3(e2::worldUp()));
+		newForestProxy->modelMatrixDirty = { true };
+		state->forestTileProxies.push(newForestProxy);
+	}
+
 }
 
 void e2::HexGrid::queueStreamingChunk(e2::ChunkState* state)

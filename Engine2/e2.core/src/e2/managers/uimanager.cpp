@@ -155,7 +155,8 @@ void main()
 		float pixelDistScale = treshValue / padding; 
 		float glyphMapSize = 512.0;
 		float smoothCoeff = (smoothPixels*pixelDistScale) / glyphMapSize;
-		outColor.a = smoothstep(treshCoeff - smoothCoeff, treshCoeff, mask);
+		outColor.rgb = quadColor.rgb;
+		outColor.a = smoothstep(treshCoeff - smoothCoeff, treshCoeff, mask) * quadColor.a;
 	}
 }
 )SRC";

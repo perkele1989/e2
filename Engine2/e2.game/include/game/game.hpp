@@ -12,6 +12,12 @@
 namespace e2
 {
 
+	enum class GlobalState : uint8_t
+	{
+		Menu,
+		Game
+	};
+
 	enum class CursorMode : uint8_t
 	{
 		Select,
@@ -79,6 +85,12 @@ namespace e2
 		virtual void initialize() override;
 		virtual void shutdown() override;
 		virtual void update(double seconds) override;
+		void updateGame(double seconds);
+		void updateMenu(double seconds);
+
+
+		void startGame();
+
 
 
 		virtual ApplicationType type() override;
@@ -147,6 +159,8 @@ namespace e2
 		e2::Texture2DPtr m_irradianceMap;
 		e2::Texture2DPtr m_radianceMap;
 
+
+		GlobalState m_globalState{ GlobalState::Menu };
 
 
 		friend class GameContext;

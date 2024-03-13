@@ -1,0 +1,4 @@
+model e2::LightweightModel
+vec4 albedo 0.294 0.429 0.002 1.0
+vec4 rmxx 0.321 0.620 0.0 0.0
+vec4 emissive 0.015 0.133 0.002 1.1

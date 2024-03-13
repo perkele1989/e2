@@ -1,0 +1,3 @@
+source SM_UraniumMine.fbx 
+material M_PineForest assets/environment/trees/M_PineForest.e2a
+material M_Uranium assets/environment/M_Uranium.e2a

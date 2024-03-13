@@ -155,6 +155,12 @@ namespace e2
 
 		float getRasterKerningDistance(uint32_t left, uint32_t right, e2::FontStyle preferredStyle, uint8_t size);
 
+
+		float getSDFSpaceAdvance(e2::FontStyle preferredStyle, float size);
+
+		float getSDFKerningDistance(uint32_t left, uint32_t right, e2::FontStyle preferredStyle, float size);
+
+
 		/** Given a preferred style, return what we can offer */
 		e2::FontStyle resolveStyle(e2::FontStyle preferredStyle);
 		

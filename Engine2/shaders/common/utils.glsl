@@ -175,12 +175,10 @@ vec3 sampleFogNormal(vec2 position, float time)
     return normalize(vec3(hR - hL, -eps2 * 0.2, hU - hD));
 }
 
-vec3 undiscovered(vec3 color, vec3 position, vec3 vis, float time)
+vec3 undiscovered(float f, vec3 color, vec3 position, vec3 vis, float time)
 {
     vec3 tint = vec3(250, 187, 107) / 255.0;
-    float f = sampleFogHeight(position.xz, time);
     float y = -position.y + f - 0.5;
-    //vec3 gg = mix(vec3(0.15), vec3(0.0), f);
     vec3 gg = mix(vec3(0.25), vec3(0.05), f);
     gg = mix(gg, gg*tint, 1.0) * 0.5;
 
@@ -207,12 +205,11 @@ vec3 undiscovered(vec3 color, vec3 position, vec3 vis, float time)
     return mix(undis, color, vis.y);
 }
 
-vec3 outOfSight(vec3 color, vec3 position, vec3 vis, float time) 
+vec3 outOfSight(float f, vec3 color, vec3 position, vec3 vis, float time) 
 {
     vec3 tint = vec3(250, 187, 107) / 255.0;
-    float f = sampleFogHeight(position.xz, time);
+
     float y = -position.y + f;
-    //vec3 gg = mix(vec3(0.15), vec3(0.0), f);
     vec3 gg = mix(vec3(0.25), vec3(0.05), f);
     gg = mix(gg, gg*tint, 1.0) * 0.5;
 
@@ -237,20 +234,12 @@ vec3 outOfSight(vec3 color, vec3 position, vec3 vis, float time)
 
 vec3 fogOfWar(vec3 color, vec3 position, vec3 vis, float time)
 {
-    //vis.xy = pow(vis.xy, vec2(1.0));
-    //vis.x = smoothstep(0.2, 0.8, vis.x);
-    //vis.y = smoothstep(0.2, 0.8, vis.y);
-    //return vec3(vis.x, vis.y,0.0);
-
-    //vis.x = smoothstep(0.0, 0.5, vis.x);
-    //vis.y = smoothstep(0.0, 0.5, vis.y);
+    float f = sampleFogHeight(position.xz, time);
 	
-
-    vec3 oos = outOfSight(color, position, vis, time);
-    vec3 und = undiscovered(color, position, vis, time);
+    vec3 oos = outOfSight(f, color, position, vis, time);
+    vec3 und = undiscovered(f, color, position, vis, time);
     vec3 fow = mix(und, oos, vis.x);
-    //vec3 fow = heightlerp(und, 0.4, oos, sampleFogHeight(position.xz, time),vis.x);
-    //fow = mix(fow, oos, 1.0);
+
     return fow;
 }
 
@@ -266,4 +255,12 @@ vec4 blur9(texture2D sourceTexture, sampler sourceSampler, vec2 uv, vec2 directi
     color += texture(sampler2D(sourceTexture, sourceSampler), uv + (off2 / resolution)) * 0.0702702703;
     color += texture(sampler2D(sourceTexture, sourceSampler), uv - (off2 / resolution)) * 0.0702702703;
     return color;
+}
+
+float getCloudShadows(vec3 pos, float time)
+{
+	float shadowSimplex = (simplex((pos.xz * 0.1) - vec2(0.4, 0.6) * time * 0.05 ) * 0.5 + 0.5);
+	float shadowCoeff = pow(shadowSimplex, 0.62);
+	shadowCoeff = smoothstep(0.4, 0.7, shadowCoeff) * 0.5 + 0.5;
+    return shadowCoeff;
 }

@@ -32,9 +32,7 @@ void main()
 	vec3 v = normalize(fragmentPosition.xyz - (inverse(renderer.viewMatrix) * vec4(0.0, 0.0, 0.0, 1.0)).xyz);
 
 
-	float shadowSimplex = (simplex((fragmentPosition.xz * 0.1) - vec2(0.4, 0.6) * renderer.time.x * 0.05 ) * 0.5 + 0.5);
-	float shadowCoeff = pow(shadowSimplex, 0.62);
-	shadowCoeff = smoothstep(0.4, 0.7, shadowCoeff) * 0.60 + 0.4;
+	float shadowCoeff = getCloudShadows(fragmentPosition.xyz, renderer.time.x);
 
 	vec3 darkWater = vec3(0.0, 80.0, 107.0) / 255.0;
 	vec3 lightWater = vec3(28.0, 255.0, 255.0) / 255.0;

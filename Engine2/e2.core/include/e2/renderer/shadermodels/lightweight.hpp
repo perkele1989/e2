@@ -57,6 +57,9 @@ namespace e2
 
 		/** roughness, metalness, ?? */
 		alignas(16) glm::vec4 rmxx; 
+
+		/** emissive.rgb, emissivestrength.a */
+		alignas(16) glm::vec4 emissive;
 	};
 
 	class LightweightModel;

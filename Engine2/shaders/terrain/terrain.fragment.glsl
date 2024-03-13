@@ -140,9 +140,9 @@ void main()
 	vec3 rad = textureLod(sampler2D(radianceCube, equirectSampler), equirectangularUv(r), lod).rgb;
 	vec2 brdf = textureLod(sampler2D(integratedBrdf, clampSampler), vec2(brdfy, 1.0 - roughness), 0.0).xy;
 	
-	float shadowSimplex = (simplex((fragmentPosition.xz * 0.1) - vec2(0.4, 0.6) * renderer.time.x * 0.05 ) * 0.5 + 0.5);
-	float shadowCoeff = pow(shadowSimplex, 0.62);
-	shadowCoeff = smoothstep(0.4, 0.7, shadowCoeff) * 0.5 + 0.5;
+
+
+	float shadowCoeff = getCloudShadows(fragmentPosition.xyz, renderer.time.x);
 
 	// indirect light, base
 	outColor.rgb =  vec3(0.0);
@@ -155,7 +155,7 @@ void main()
 	outColor.rgb += vec3(1.0, 0.8, 0.76) * mountainFresnel * 0.60; 
 
 	// ibl specular
-	outColor.rgb += rad * ( specularCoeff* brdf.x + brdf.y) * shadowCoeff ;	
+	outColor.rgb += rad * specularCoeff * (brdf.x + brdf.y) * shadowCoeff ;	
     
 	// ibl diffuse 
 	outColor.rgb += diffuseCoeff * irr * shadowCoeff;

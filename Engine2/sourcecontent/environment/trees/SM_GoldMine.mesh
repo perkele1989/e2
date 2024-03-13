@@ -1,0 +1,3 @@
+source SM_GoldMine.fbx 
+material M_PineForest assets/environment/trees/M_PineForest.e2a
+material M_Gold assets/environment/M_Gold.e2a

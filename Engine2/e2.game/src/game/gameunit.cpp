@@ -185,17 +185,42 @@ e2::Mine::Mine(e2::GameContext* ctx, glm::ivec2 const& tile, uint8_t empireId)
 	tileData->improvedResource = true;
 
 	if (resource == TileFlags::ResourceGold)
+	{
 		displayName = "Gold mine";
+		structureType = e2::GameStructureType::GoldMine;
+	}
 	else if (resource == TileFlags::ResourceUranium)
+	{
 		displayName = "Uranium mine";
+		structureType = e2::GameStructureType::UraniumMine;
+	}
 	else if (resource == TileFlags::ResourceOre)
+	{
 		displayName = "Ore mine";
+		structureType = e2::GameStructureType::OreMine;
+	}
 	else if (resource == TileFlags::ResourceForest)
+	{
 		displayName = "Saw Mill";
+		structureType = e2::GameStructureType::SawMill;
+	}
 	else if (resource == TileFlags::ResourceStone)
+	{
 		displayName = "Quarry";
+		structureType = e2::GameStructureType::Quarry;
+	}
 
 	sightRange = 2;
+
+
+	m_mesh = game()->getStructureMesh(structureType);
+	buildProxy();
+
+	tileData->improvedResource = true;
+
+	// refresh the chunk to remove forest we just ploinked
+	e2::ChunkState* chunk = hexGrid()->getOrCreateChunk(hexGrid()->chunkIndexFromPlanarCoords(e2::Hex(tileIndex).planarCoords()));
+	hexGrid()->refreshChunkForest(chunk);
 }
 
 e2::Mine::~Mine()

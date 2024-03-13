@@ -882,9 +882,266 @@ void e2::UIContext::drawRasterText(e2::FontFace fontFace, uint8_t fontSize, e2::
 
 
 
+void e2::UIContext::drawSDFText(e2::FontFace fontFace, float fontSize, e2::UIColor color, glm::vec2 position, std::string const& markdownUtf8, bool enableColorChange /*= true*/, bool soft /*= false*/)
+{
+	position.x = glm::floor(position.x);
+	position.y = glm::floor(position.y);
+
+	e2::UIStyle style = uiManager()->workingStyle();
+	e2::FontPtr font = renderManager()->defaultFont(fontFace);
+	// this is only for editor use, so it's fine that this contains an inline markdown parser executed every frame, and a shit ton of separate quad drawcalls etc.
+	// you guys have workstations for a reason right? What else are you going to with that insanely overspec'd CPU of yours?
+	// i really don't see what you're getting yourself so worked up about
+	std::u32string src = e2::utf8to32(markdownUtf8);
+
+	float midOffset = font->getMidlineOffset(e2::FontStyle::Regular, fontSize);
+
+	UIColor defaultColor = color;
+	const e2::UIColor accents[10] = {
+		style.bright1,	// 0 bright
+		style.dark1,	// 1 dark
+		style.accents[0], // 2 Yellow 
+		style.accents[1], // 3 Orange
+		style.accents[2], // 4 Red
+		style.accents[3], // 5 Magenta
+		style.accents[4], // 6 Violet
+		style.accents[5], // 7 Blue
+		style.accents[6], // 8 Cyan
+		style.accents[7], // 9 Green
+	};
+
+	glm::vec2 cursor = position + glm::vec2(0.f, midOffset);
+
+	uint32_t nextCodepoint = 0;
+	uint32_t prevCodepoint = 0;
+	uint32_t i = 0;
+	bool escape = false;
+	e2::FontStyle currentStyle = FontStyle::Regular;
+	for (uint32_t i = 0; i < src.size(); i++)
+	{
+		uint32_t codepoint = src[i];
+
+		bool peekable = i < src.size() - 1;
+		if (peekable)
+		{
+			nextCodepoint = src[i + 1];
+		}
+
+		// special characters
+		if (codepoint <= 32)
+		{
+			// we ignore 10 (\n)
+			// space, just OK?
+			// literally dont know how long a space is supposed to be.
+			// should probably be scaled to the fontsize or smth @todo
+			if (codepoint == 32)
+			{
+				cursor.x += font->getSDFSpaceAdvance(currentStyle, fontSize);
+			}
+
+			continue;
+		}
+
+		if (!escape)
+		{
+			// \ escape
+			if (codepoint == 92)
+			{
+				escape = true;
+				continue;
+			}
+			// * handle bold and italics 
+			else if (codepoint == 42)
+			{
+				// ** double means flip bold 
+				if (peekable && nextCodepoint == 42)
+				{
+					currentStyle = e2::FontStyle(uint8_t(currentStyle) ^ uint8_t(e2::FontStyle::Bold));
+					// add more to i, since we already parse the next codepoint here
+					i++;
+				}
+				// * single means we flip italic 
+				else
+				{
+					currentStyle = e2::FontStyle(uint8_t(currentStyle) ^ uint8_t(e2::FontStyle::Italic));
+				}
+
+				continue;
+			}
+			// ^ handle fontface changes 
+			else if (codepoint == 94 && peekable)
+			{
+				// s = sans 
+				if (nextCodepoint == 115)
+				{
+					font = renderManager()->defaultFont(e2::FontFace::Sans);
+				}
+				// f = serif 
+				else if (nextCodepoint == 102)
+				{
+					font = renderManager()->defaultFont(e2::FontFace::Serif);
+				}
+				// m = monospace 
+				else if (nextCodepoint == 109)
+				{
+					font = renderManager()->defaultFont(e2::FontFace::Monospace);
+				}
+				// 0-9 = accent colors (see start of function for a table)
+				else if (nextCodepoint >= 48 && nextCodepoint <= 57 && enableColorChange)
+				{
+					uint32_t colorIndex = nextCodepoint - 48;
+					color = accents[colorIndex];
+				}
+				// - = disable accent 
+				else if (nextCodepoint == 45)
+				{
+					color = defaultColor;
+				}
+				i++;
+				continue;
+			}
+		}
+
+		// normal characters start here
+		if (i != 0)
+			cursor.x += font->getSDFKerningDistance(prevCodepoint, codepoint, currentStyle, fontSize);
+
+		e2::FontGlyph const& glyph = font->getSDFGlyph(codepoint, currentStyle);
+
+		glm::vec2 glyphSize = (glyph.size / 32.0f) * fontSize;
+		float advanceX = (glyph.advanceX / 32.0f) * fontSize;
+		glm::vec2 glyphOffset = (glyph.offset / 32.0f)* fontSize;
+
+		drawTexturedQuad(cursor + glyphOffset, glyphSize, color, font->glyphTexture(glyph.textureIndex), glyph.uvOffset, glyph.uvSize, e2::UITexturedQuadType::FontSDFShadow);
+
+		cursor.x += advanceX;
+
+		prevCodepoint = codepoint;
+		escape = false;
+	}
+}
+
 void e2::UIContext::drawRasterTextShadow(e2::FontFace fontFace, uint8_t fontSize, glm::vec2 position, std::string const& markdownUtf8)
 {
 	drawRasterText(fontFace, fontSize, 0x000000FF, position + glm::vec2(1.0f, 1.0f), markdownUtf8, false, true);
+}
+
+float e2::UIContext::calculateSDFTextWidth(e2::FontFace fontFace, float fontSize, std::string const& markdownUtf8)
+{
+	e2::UIStyle style = uiManager()->workingStyle();
+	e2::FontPtr font = renderManager()->defaultFont(fontFace);
+	// this is only for editor use, so it's fine that this contains an inline markdown parser executed every frame, and a shit ton of separate quad drawcalls etc.
+	// you guys have workstations for a reason right? What else are you going to with that insanely overspec'd CPU of yours?
+	// i really don't see what you're getting yourself so worked up about
+	std::u32string src = e2::utf8to32(markdownUtf8);
+
+	float midOffset = font->getMidlineOffset(e2::FontStyle::Regular, fontSize);
+
+	glm::vec2 cursor = glm::vec2(0.f, midOffset);
+
+	uint32_t nextCodepoint = 0;
+	uint32_t prevCodepoint = 0;
+	uint32_t i = 0;
+	bool escape = false;
+	e2::FontStyle currentStyle = FontStyle::Regular;
+	for (uint32_t i = 0; i < src.size(); i++)
+	{
+		uint32_t codepoint = src[i];
+
+		bool peekable = i < src.size() - 1;
+		if (peekable)
+		{
+			nextCodepoint = src[i + 1];
+		}
+
+		// special characters
+		if (codepoint <= 32)
+		{
+			// we ignore 10 (\n)
+			// space, just OK?
+			// literally dont know how long a space is supposed to be.
+			// should probably be scaled to the fontsize or smth @todo
+			if (codepoint == 32)
+			{
+				cursor.x += font->getSDFSpaceAdvance(currentStyle, fontSize);
+			}
+
+			continue;
+		}
+
+		if (!escape)
+		{
+			// \ escape
+			if (codepoint == 92)
+			{
+				escape = true;
+				continue;
+			}
+			// * handle bold and italics 
+			else if (codepoint == 42)
+			{
+				// ** double means flip bold 
+				if (peekable && nextCodepoint == 42)
+				{
+					currentStyle = e2::FontStyle(uint8_t(currentStyle) ^ uint8_t(e2::FontStyle::Bold));
+					// add more to i, since we already parse the next codepoint here
+					i++;
+				}
+				// * single means we flip italic 
+				else
+				{
+					currentStyle = e2::FontStyle(uint8_t(currentStyle) ^ uint8_t(e2::FontStyle::Italic));
+				}
+
+				continue;
+			}
+			// ^ handle fontface changes 
+			else if (codepoint == 94 && peekable)
+			{
+				// s = sans 
+				if (nextCodepoint == 115)
+				{
+					font = renderManager()->defaultFont(e2::FontFace::Sans);
+				}
+				// f = serif 
+				else if (nextCodepoint == 102)
+				{
+					font = renderManager()->defaultFont(e2::FontFace::Serif);
+				}
+				// m = monospace 
+				else if (nextCodepoint == 109)
+				{
+					font = renderManager()->defaultFont(e2::FontFace::Monospace);
+				}
+				// 0-9 = accent colors (see start of function for a table)
+				else if (nextCodepoint >= 48 && nextCodepoint <= 57)
+				{
+					//uint32_t colorIndex = nextCodepoint - 48;
+					//color = accents[colorIndex];
+				}
+				// - = disable accent 
+				else if (nextCodepoint == 45)
+				{
+					//color = defaultColor;
+				}
+				i++;
+				continue;
+			}
+		}
+
+		// normal characters start here
+		if (i != 0)
+			cursor.x += font->getSDFKerningDistance(prevCodepoint, codepoint, currentStyle, fontSize);
+
+		e2::FontGlyph const& glyph = font->getSDFGlyph(codepoint, currentStyle);
+
+		cursor.x += (glyph.advanceX / 32.0f) * fontSize;
+
+		prevCodepoint = codepoint;
+		escape = false;
+	}
+
+	return cursor.x;
 }
 
 float e2::UIContext::calculateTextWidth(e2::FontFace fontFace, uint8_t fontSize, std::string const& markdownUtf8)

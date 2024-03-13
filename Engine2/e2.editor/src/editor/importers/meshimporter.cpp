@@ -389,9 +389,9 @@ bool e2::MeshImporter::writeAssets()
 				if (sm->mFaces[i].mNumIndices == 3)
 				{
 					im.indexCount += 3;
-					im.indexData << uint32_t(sm->mFaces[i].mIndices[0]);
-					im.indexData << uint32_t(sm->mFaces[i].mIndices[1]);
 					im.indexData << uint32_t(sm->mFaces[i].mIndices[2]);
+					im.indexData << uint32_t(sm->mFaces[i].mIndices[1]);
+					im.indexData << uint32_t(sm->mFaces[i].mIndices[0]);
 				/*
 					im.indexData << uint32_t(sm->mFaces[i].mIndices[2]);
 					im.indexData << uint32_t(sm->mFaces[i].mIndices[1]);
@@ -435,7 +435,7 @@ bool e2::MeshImporter::writeAssets()
 			attribPos.vertexData = e2::Buffer(false, sizeof(glm::vec4) * sm->mNumVertices);
 			for (uint32_t i = 0; i < sm->mNumVertices; i++)
 			{
-				attribPos.vertexData << float(sm->mVertices[i].x) << float(sm->mVertices[i].y) << float(sm->mVertices[i].z) << 1.0f;
+				attribPos.vertexData << float(-sm->mVertices[i].x) << float(-sm->mVertices[i].z) << float(sm->mVertices[i].y) << 1.0f;
 				//attribPos.vertexData << -float(sm->mVertices[i].x) << -float(sm->mVertices[i].z) << -float(sm->mVertices[i].y) << 1.0f;
 			}
 
@@ -449,7 +449,7 @@ bool e2::MeshImporter::writeAssets()
 
 				for (uint32_t i = 0; i < sm->mNumVertices; i++)
 				{
-					attribNormals.vertexData << float(sm->mNormals[i].x) << float(sm->mNormals[i].y) << float(sm->mNormals[i].z) << 0.0f;
+					attribNormals.vertexData << float(-sm->mNormals[i].x) << float(-sm->mNormals[i].z) << float(sm->mNormals[i].y) << 0.0f;
 					//attribNormals.vertexData << -float(sm->mNormals[i].x) << -float(sm->mNormals[i].z) << -float(sm->mNormals[i].y) << 0.0f;
 				}
 
@@ -460,7 +460,7 @@ bool e2::MeshImporter::writeAssets()
 
 				for (uint32_t i = 0; i < sm->mNumVertices; i++)
 				{
-					attribTangents.vertexData << float(sm->mTangents[i].x) << float(sm->mTangents[i].y) << float(sm->mTangents[i].z) << 0.0f;
+					attribTangents.vertexData << float(-sm->mTangents[i].x) << float(-sm->mTangents[i].z) << float(sm->mTangents[i].y) << 0.0f;
 					//attribTangents.vertexData << -float(sm->mTangents[i].x) << -float(sm->mTangents[i].z) << -float(sm->mTangents[i].y) << 0.0f;
 				}
 

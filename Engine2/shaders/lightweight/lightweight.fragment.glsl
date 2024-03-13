@@ -50,10 +50,10 @@ void main()
 	if(albedoTexel.a < 0.5)
 		discard;
 #endif 
-	vec3 albedo = albedoTexel.rgb;
+	vec3 albedo = albedoTexel.rgb *  pow(material.albedo.rgb, vec3(1.0));
 
 #else
-	vec3 albedo = material.albedo.rgb;
+	vec3 albedo = pow(material.albedo.rgb, vec3(1.0));
 
 	//albedo.rgb *= 0.15;
 	//albedo.rgb = vec3(0.09, 0.155, 0.01) * 0.4;
@@ -65,15 +65,11 @@ void main()
 
 #endif 
 
-#if defined(Vertex_Color)
-	albedo.rgb *= fragmentColor.rgb;
-#endif
+	vec3 emissive = pow(material.emissive.rgb, vec3(1.0)) * material.emissive.a;
 
-	vec3 hsv = rgb2hsv(albedo);
-	//hsv.x -= 0.05;
-	hsv.y =  1.0;
-	hsv.z *= 0.22;
-	albedo = hsv2rgb(hsv);
+#if defined(Vertex_Color)
+	albedo.rgb *= pow(fragmentColor.rgb, vec3(2.2));
+#endif
 
 
 #if defined(Material_RoughnessTexture)
@@ -105,12 +101,16 @@ void main()
 
 	//metalness = 0.0;
 	//roughness = 0.85;
+	//roughness = 1.0;
+	//metalness =
+
+	//roughness  = 1.0;
 
 	vec3 ndotl = vec3(clamp(dot(worldNormal, worldLight), EPSILON, 1.0));
 	vec3 worldReflect = reflect(worldView, worldNormal);
 
 	float brdfy = clamp(dot(worldNormal, -worldView), EPSILON, 1.0);
-	vec3 F0 = vec3(0.04); 
+	vec3 F0 = vec3(0.06); 
     vec3 specularCoeff = mix(F0, albedo, metalness); 
 	vec3 diffuseCoeff = albedo * (1.0 - F0) * (1.0 - metalness);
 	 //diffuseCoeff =  (1.0 - F0) * (1.0 - metalness);
@@ -120,19 +120,24 @@ void main()
 
 
 
+	float shadowCoeff = getCloudShadows(fragmentPosition.xyz, renderer.time.x);
+	//shadowCoeff =1.0;
+
 	outColor.rgb = vec3(0.0, 0.0, 0.0);
 
 	// ibl specular
-	outColor.rgb += rad * specularCoeff *  (brdf.x + brdf.y) ;	
+	outColor.rgb += rad * specularCoeff * (brdf.x + brdf.y) * shadowCoeff;	
 
 	// ibl diffuse 
-	outColor.rgb += diffuseCoeff * irr;
+	outColor.rgb += diffuseCoeff * irr * shadowCoeff;
 
 	// ndotl 
-	outColor.rgb += albedo * vec3(0.76, 0.8, 1.0) * ndotl;
+	outColor.rgb += albedo * vec3(0.76, 0.8, 1.0) * ndotl * shadowCoeff;
+
+	outColor.rgb += emissive;
 
 #else 
-	outColor.rgb = albedo;
+	outColor.rgb = albedo + emissive;
 #endif
 
 
