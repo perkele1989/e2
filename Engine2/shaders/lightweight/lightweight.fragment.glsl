@@ -54,12 +54,33 @@ void main()
 
 #else
 	vec3 albedo = material.albedo.rgb;
+
+	//albedo.rgb *= 0.15;
+	//albedo.rgb = vec3(0.09, 0.155, 0.01) * 0.4;
+	// 29460D
+	// 35460D
+	// 46410D
+
+	// top 5A641B
+
 #endif 
+
+#if defined(Vertex_Color)
+	albedo.rgb *= fragmentColor.rgb;
+#endif
+
+	vec3 hsv = rgb2hsv(albedo);
+	//hsv.x -= 0.05;
+	hsv.y =  1.0;
+	hsv.z *= 0.22;
+	albedo = hsv2rgb(hsv);
+
 
 #if defined(Material_RoughnessTexture)
 	float roughness = texture(sampler2D(roughnessTexture, repeatSampler), uv).r;
 #else
 	float roughness = material.rmxx.x;
+	//roughness = 0.5;
 #endif 
 
 #if defined(Material_MetalnessTexture)
@@ -82,8 +103,8 @@ void main()
 	vec3 worldNormal = normalize(fragmentNormal);
 #endif
 
-	metalness = 0.0;
-	roughness = 0.85;
+	//metalness = 0.0;
+	//roughness = 0.85;
 
 	vec3 ndotl = vec3(clamp(dot(worldNormal, worldLight), EPSILON, 1.0));
 	vec3 worldReflect = reflect(worldView, worldNormal);
@@ -97,6 +118,8 @@ void main()
 	vec3 rad = textureLod(sampler2D(radianceCube, equirectSampler), equirectangularUv(worldReflect), roughness * 6.0).rgb;
 	vec2 brdf = textureLod(sampler2D(integratedBrdf, clampSampler), vec2(brdfy, 1.0 - roughness), 0.0).xy;
 
+
+
 	outColor.rgb = vec3(0.0, 0.0, 0.0);
 
 	// ibl specular
@@ -107,9 +130,6 @@ void main()
 
 	// ndotl 
 	outColor.rgb += albedo * vec3(0.76, 0.8, 1.0) * ndotl;
-
-	// fresnel
-	//outColor.rgb += vec3(1.0, 0.8, 0.76) * mountainFresnel * 0.30; 
 
 #else 
 	outColor.rgb = albedo;

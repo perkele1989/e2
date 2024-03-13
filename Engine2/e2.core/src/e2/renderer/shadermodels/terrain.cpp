@@ -95,7 +95,8 @@ void e2::TerrainModel::postConstruct(e2::Context* ctx)
 	std::string sandAlbedoPath = "assets/T_SandDesert_Albedo.e2a";
 	std::string sandNormalPath = "assets/T_SandDesert_Normal.e2a";
 
-	std::string greenAlbedoPath = "assets/T_Greenlands_Albedo.e2a";
+	//std::string greenAlbedoPath = "assets/T_Greenlands_Albedo.e2a";
+	std::string greenAlbedoPath = "assets/environment/T_Greenlands_Albedo.e2a";
 	std::string greenNormalPath = "assets/T_Greenlands_Normal.e2a";
 
 	e2::ALJDescription aljDesc;

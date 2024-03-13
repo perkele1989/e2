@@ -43,7 +43,7 @@ void main()
 	albedoMountains *= vec3(1.0, 1.0, 1.0) * 0.8;
 
 	vec3 albedoGreen = texture(sampler2D(greenAlbedo, repeatSampler), texUv * texScaleGreen).rgb;
-	albedoGreen *= vec3(1.0, 1.0, 1.0) * 0.85;
+	//albedoGreen *= vec3(1.0, 1.0, 1.0) * 0.85;
 
 	float bigSimplex = simplex(fragmentPosition.xz * 6) * 0.5 + 0.5;
 	float smallSimplex = simplex(fragmentPosition.xz * 2) * 0.5 + 0.5;
@@ -81,7 +81,7 @@ void main()
     nmGreen.y = -nmGreen.y;
     nmMountains.y = -nmMountains.y;
 
-    nmGreen.z *= 2.0;
+    nmGreen.z *= 4.0;
     nmGreen = normalize(nmGreen);
 
     //nmSand.g = -nmSand.g;

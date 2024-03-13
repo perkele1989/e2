@@ -81,6 +81,12 @@ namespace e2
 
 	class HexGrid;
 
+	struct ForestIndex
+	{
+		glm::ivec2 offsetCoords;
+		uint32_t meshIndex{};
+	};
+
 	/** @tags(arena, arenaSize=e2::maxNumChunkLoadTasks)  */
 	class ChunkLoadTask : public e2::AsyncTask
 	{
@@ -101,7 +107,7 @@ namespace e2
 		e2::DynamicMesh* m_dynaHex{};
 		e2::DynamicMesh* m_dynaHexHigh{};
 
-		e2::StackVector<glm::ivec2, e2::maxNumTreesPerChunk> treeOffsets;
+		e2::StackVector<e2::ForestIndex, e2::maxNumTreesPerChunk> treeOffsets;
 
 		float m_ms;
 	};
@@ -120,6 +126,8 @@ namespace e2
 		/** Ready to be fully visible */
 		Ready
 	};
+
+
 
 	/** @tags(arena, arenaSize=e2::maxNumChunkStates)  */
 	class ChunkState : public e2::Object
@@ -151,7 +159,7 @@ namespace e2
 		e2::MeshProxy* waterProxy{};
 		e2::MeshProxy* fogProxy{};
 
-		e2::StackVector<glm::ivec2, e2::maxNumTreesPerChunk> forestTileIndices;
+		e2::StackVector<ForestIndex, e2::maxNumTreesPerChunk> forestTileIndices;
 		e2::StackVector<e2::MeshProxy*, e2::maxNumTreesPerChunk> forestTileProxies;
 
 	};
@@ -216,7 +224,7 @@ namespace e2
 		void startStreamingChunk(e2::ChunkState* state);
 
 		/** finalizes a streaming chunk */
-		void endStreamingChunk(glm::ivec2 const& chunkIndex, e2::MeshPtr newMesh, double timeMs, e2::StackVector<glm::ivec2, e2::maxNumTreesPerChunk>* treeIndices);
+		void endStreamingChunk(glm::ivec2 const& chunkIndex, e2::MeshPtr newMesh, double timeMs, e2::StackVector<e2::ForestIndex, e2::maxNumTreesPerChunk>* treeIndices);
 
 		/** pops in chunk, no questions asked, self-corrective states and safe to call whenever  */
 		void popInChunk(e2::ChunkState* state);

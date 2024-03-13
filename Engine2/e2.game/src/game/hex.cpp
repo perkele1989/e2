@@ -43,17 +43,20 @@ e2::HexGrid::HexGrid(e2::GameContext* gameCtx)
 	am->prescribeALJ(aljDesc, "assets/SM_HexBase.e2a");
 	am->prescribeALJ(aljDesc, "assets/SM_HexBaseHigh.e2a");
 	am->prescribeALJ(aljDesc, "assets/SM_CoordinateSpace.e2a");
-	am->prescribeALJ(aljDesc, "assets/environment/trees/SM_PalmTree001.e2a");
+	am->prescribeALJ(aljDesc, "assets/environment/trees/SM_PineForest001.e2a");
+	am->prescribeALJ(aljDesc, "assets/environment/trees/SM_PineForest002.e2a");
+	am->prescribeALJ(aljDesc, "assets/environment/trees/SM_PineForest003.e2a");
+	am->prescribeALJ(aljDesc, "assets/environment/trees/SM_PineForest004.e2a");
 	if (!am->queueWaitALJ(aljDesc))
 	{
 		LogError("Failed to load hex base mesh");
 		return;
 	}
 
-	m_treeMesh[0] = am->get("assets/environment/trees/SM_PalmTree001.e2a")->cast<e2::Mesh>();
-	m_treeMesh[1] = am->get("assets/environment/trees/SM_PalmTree002.e2a")->cast<e2::Mesh>();
-	m_treeMesh[2] = am->get("assets/environment/trees/SM_PalmTree003.e2a")->cast<e2::Mesh>();
-	m_treeMesh[3] = am->get("assets/environment/trees/SM_PalmTree004.e2a")->cast<e2::Mesh>();
+	m_treeMesh[0] = am->get("assets/environment/trees/SM_PineForest001.e2a")->cast<e2::Mesh>();
+	m_treeMesh[1] = am->get("assets/environment/trees/SM_PineForest002.e2a")->cast<e2::Mesh>();
+	m_treeMesh[2] = am->get("assets/environment/trees/SM_PineForest003.e2a")->cast<e2::Mesh>();
+	m_treeMesh[3] = am->get("assets/environment/trees/SM_PineForest004.e2a")->cast<e2::Mesh>();
 
 	m_baseHex = am->get("assets/SM_HexBase.e2a")->cast<e2::Mesh>();
 	m_dynaHex = e2::DynamicMesh(m_baseHex, 0, VertexAttributeFlags::Color);
@@ -2230,7 +2233,23 @@ bool e2::ChunkLoadTask::execute()
 
 			if ((shaderData.tileData.flags & e2::TileFlags::BiomeMask) == e2::TileFlags::BiomeForest)
 			{
-				treeOffsets.push(shaderData.hex.offsetCoords());
+				uint32_t i = 0;
+				switch (shaderData.tileData.getAbundance())
+				{
+				case TileFlags::Abundance1:
+					i = 0;
+					break;
+				case TileFlags::Abundance2:
+					i = 1;
+					break;
+				case TileFlags::Abundance3:
+					i = 2;
+					break;
+				case TileFlags::Abundance4:
+					i = 3;
+					break;
+				}
+				treeOffsets.push({ shaderData.hex.offsetCoords(),  i});
 			}
 
 		}
@@ -2271,11 +2290,12 @@ void e2::HexGrid::popInChunk(e2::ChunkState* state)
 		state->proxy->modelMatrix = glm::translate(glm::mat4(1.0f), chunkOffset);
 		state->proxy->modelMatrixDirty = { true };
 
-		uint8_t i = 0;
-		for (glm::ivec2 const& offset : state->forestTileIndices)
+		for (e2::ForestIndex const& index : state->forestTileIndices)
 		{
+			glm::ivec2 const &offset = index.offsetCoords;
+
 			e2::MeshProxyConfiguration treeConf;
-			treeConf.mesh = m_treeMesh[i];
+			treeConf.mesh = m_treeMesh[index.meshIndex];
 
 			glm::vec3 treeOffset = e2::Hex(offset).localCoords();
 
@@ -2284,9 +2304,6 @@ void e2::HexGrid::popInChunk(e2::ChunkState* state)
 			newForestProxy->modelMatrix = glm::rotate(newForestProxy->modelMatrix, glm::radians(0.0f),  glm::vec3(e2::worldUp()));
 			newForestProxy->modelMatrixDirty = { true };
 			state->forestTileProxies.push(newForestProxy);
-
-			if (++i > 3)
-				i = 0;
 		}
 	}
 
@@ -2363,7 +2380,7 @@ void e2::HexGrid::startStreamingChunk(e2::ChunkState* state)
 
 }
 
-void e2::HexGrid::endStreamingChunk(glm::ivec2 const& chunkIndex, e2::MeshPtr newMesh, double timeMs, e2::StackVector<glm::ivec2, e2::maxNumTreesPerChunk>* treeIndices)
+void e2::HexGrid::endStreamingChunk(glm::ivec2 const& chunkIndex, e2::MeshPtr newMesh, double timeMs, e2::StackVector<e2::ForestIndex, e2::maxNumTreesPerChunk>* treeIndices)
 {
 	// If the chunkstate is no longer valid, throw away the work silently
 	auto finder = m_chunkIndex.find(chunkIndex);
