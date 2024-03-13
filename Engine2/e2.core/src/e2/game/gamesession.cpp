@@ -11,9 +11,11 @@ e2::GameSession::GameSession(e2::Context* ctx)
 	: e2::Session(ctx)
 {
 	e2::WindowCreateInfo winCreateInfo{};
-	winCreateInfo.title = "4x";
+	winCreateInfo.title = "Reveal & Annihilate";
 	winCreateInfo.resizable = true;
+	//winCreateInfo.mode = WindowMode::Fullscreen;
 	m_window = renderManager()->mainThreadContext()->createWindow(winCreateInfo);
+	m_window->setFullscreen(true);
 
 	m_renderer = e2::create<e2::Renderer>(this, winCreateInfo.size);
 

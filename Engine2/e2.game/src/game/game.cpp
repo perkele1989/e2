@@ -17,6 +17,8 @@
 
 #include <glm/gtc/noise.hpp>
 
+#include <glm/gtx/easing.hpp>
+
 e2::Game::Game(e2::Context* ctx)
 	: e2::Application(ctx)
 {
@@ -413,7 +415,7 @@ void e2::Game::updateMenu(double seconds)
 		engine()->shutdown();
 	}
 
-	if (m_haveBegunStart && !m_haveStreamedStart && m_hexGrid->numJobsInFlight() == 0 && m_beginStartTime.durationSince().seconds() > 2.1f)
+	if (m_haveBegunStart && !m_haveStreamedStart && m_hexGrid->numJobsInFlight() == 0 && m_beginStartTime.durationSince().seconds() > 3.0f)
 	{
 		m_haveStreamedStart = true;
 		m_beginStreamTime = e2::timeNow();
@@ -430,11 +432,11 @@ void e2::Game::updateMenu(double seconds)
 	if (m_haveStreamedStart)
 	{
 		float sec = m_beginStreamTime.durationSince().seconds();
-		float a = glm::smoothstep(0.0f, 1.0f, sec);
-		m_viewOrigin = glm::mix(m_startViewOrigin, e2::Hex(m_startLocation).planarCoords(), a);
+		float a = glm::smoothstep(0.0f, 2.0f, sec);
+		m_viewOrigin = glm::mix(m_startViewOrigin, e2::Hex(m_startLocation).planarCoords(), glm::exponentialEaseInOut(a));
 	}
 
-	if (m_haveStreamedStart && m_beginStreamTime.durationSince().seconds() > 1.1f)
+	if (m_haveStreamedStart && m_beginStreamTime.durationSince().seconds() > 2.1f)
 	{
 		
 		resumeWorldStreaming();
