@@ -31,4 +31,9 @@ layout(set = 1, binding = 0) uniform MeshData
 {
     mat4 modelMatrix;
 } mesh;
+
+layout(set = 1, binding = 1) uniform SkinData 
+{
+    mat4 skinMatrices[64]; // @todo make define
+} skin;
 // End Set1

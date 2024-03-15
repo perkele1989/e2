@@ -394,10 +394,29 @@ void e2::Renderer::recordFrame(double deltaTime)
 				for (uint8_t i = 0; i < meshSpec.vertexAttributes.size(); i++)
 					buff->bindVertexBuffer(i, meshSpec.vertexAttributes[i]);
 
-				// Bind descriptor sets (0 is renderer, 1 is model, 2 is material, 3 is reserved)
-				uint32_t offset = renderManager()->paddedBufferSize(sizeof(glm::mat4)) * meshProxy->id;
 				buff->bindDescriptorSet(pipelineLayout, 0, rendererSet);
-				buff->bindDescriptorSet(pipelineLayout, 1, modelSet, 1, &offset);
+
+				//if (meshProxy->skinProxy)
+				{
+					uint32_t skinId = meshProxy->skinProxy ? meshProxy->skinProxy->id : 0;
+					// Bind descriptor sets (0 is renderer, 1 is model, 2 is material, 3 is reserved)
+					uint32_t offsets[2] = {
+						renderManager()->paddedBufferSize(sizeof(glm::mat4)) * meshProxy->id,
+						renderManager()->paddedBufferSize(sizeof(glm::mat4) * e2::maxNumSkeletonBones) * skinId
+					};
+
+					buff->bindDescriptorSet(pipelineLayout, 1, modelSet, 2, &offsets[0]);
+				}
+				/*else
+				{
+					// Bind descriptor sets (0 is renderer, 1 is model, 2 is material, 3 is reserved)
+					uint32_t offsets[1] = {
+						renderManager()->paddedBufferSize(sizeof(glm::mat4)) * meshProxy->id
+					};
+
+					buff->bindDescriptorSet(pipelineLayout, 1, modelSet, 1, &offsets[0]);
+				}
+				*/
 				meshProxy->materialProxies[submeshIndex]->bind(buff, frameIndex);
 
 				// Issue drawcall

@@ -151,9 +151,29 @@ namespace e2
 		e2::MeshPtr getStructureMesh(e2::GameStructureType type);
 
 
+		e2::MeshPtr dummyMesh()
+		{
+			return m_dummyMesh;
+		}
+
+		e2::SkeletonPtr dummySkeleton()
+		{
+			return m_dummySkeleton;
+		}
+
+		e2::AnimationPtr dummyAnimation()
+		{
+			return m_dummyAnimation;
+		}
+
 
 
 	protected:
+
+		e2::MeshPtr m_dummyMesh;
+		e2::SkeletonPtr m_dummySkeleton;
+		e2::AnimationPtr m_dummyAnimation;
+
 
 		// shared resources
 		e2::StackVector<e2::MeshPtr, (uint64_t)e2::GameUnitType::Count> m_unitMeshes;

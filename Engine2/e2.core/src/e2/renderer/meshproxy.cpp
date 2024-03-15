@@ -52,7 +52,7 @@ e2::MeshProxy::~MeshProxy()
 {
 	if (id != UINT32_MAX)
 	{
-		session->unregisterMeshProxy(id, this);
+		session->unregisterMeshProxy(this);
 	}
 }
 
@@ -60,7 +60,7 @@ void e2::MeshProxy::invalidatePipeline()
 {
 	if (id != UINT32_MAX)
 	{
-		session->unregisterMeshProxy(id, this);
+		session->unregisterMeshProxy(this);
 		id = UINT32_MAX;
 	}
 
@@ -70,7 +70,8 @@ void e2::MeshProxy::invalidatePipeline()
 	{
 		e2::ShaderModel* model = materialProxies[submeshIndex]->asset->model();
 		pipelineLayouts[submeshIndex] = model->getOrCreatePipelineLayout(this, submeshIndex);
-		pipelines[submeshIndex] = model->getOrCreatePipeline(this, submeshIndex, e2::RendererFlags::None);
+
+		pipelines[submeshIndex] = model->getOrCreatePipeline(this, submeshIndex, skinProxy ? RendererFlags::Skin : e2::RendererFlags::None);
 	}
 
 	id = session->registerMeshProxy(this);
@@ -79,4 +80,35 @@ void e2::MeshProxy::invalidatePipeline()
 e2::Engine* e2::MeshProxy::engine()
 {
 	return session->engine();
+}
+
+e2::SkinProxy::SkinProxy(e2::Session* inSession, e2::SkinProxyConfiguration const& config)
+	: session(inSession)
+	, asset(config.skeleton)
+{
+	id = session->registerSkinProxy(this);
+}
+
+e2::SkinProxy::~SkinProxy()
+{
+	if (id != UINT32_MAX)
+	{
+		session->unregisterSkinProxy(this);
+	}
+}
+
+e2::Engine* e2::SkinProxy::engine()
+{
+	return session->engine();
+}
+
+void e2::SkinProxy::applyPose(e2::Pose* pose)
+{
+	uint32_t i = 0;
+	for (glm::mat4 const& boneTransform : pose->skin())
+	{
+		skin[i++] = boneTransform;
+	}
+
+	skinDirty = true;
 }

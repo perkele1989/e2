@@ -91,6 +91,10 @@ namespace e2
 	/** The maximum number of concurrently loaded mesh assets we support. */
 	constexpr uint32_t maxNumMeshAssets = 1024;
 
+
+	/** The maximum number of concurrently loaded skeleton assets we support. */
+	constexpr uint32_t maxNumSkeletonAssets = 1024;
+
 	/** The maximum number of concurrently loaded texture assets we support. */
 	constexpr uint32_t maxNumTexture2DAssets = 1024;
 
@@ -122,9 +126,16 @@ namespace e2
 
 	/** The maximum number of active mesh proxies per session. This limits how many meshes can be rendered at once, excluding mesh instancing and submeshes. (see e2::MeshProxy, e2::Session) */
 	constexpr uint32_t maxNumMeshProxies = 16384;
+	constexpr uint32_t maxNumSkinProxies = 16384;
 
 	/** The maximum number of bones in a skeletal mesh (see e2::SkinData) */
-	constexpr uint32_t maxNumBones = 128;
+	constexpr uint64_t maxNumBoneChildren = 16;
+	constexpr uint64_t maxNumRootBones = 16;
+	constexpr uint64_t maxNumSkeletonBones = 64;
+
+	constexpr uint64_t maxNumTrackFrames = 1024; // at 24 fps, 42,66 secs worth of animation  
+	constexpr uint64_t maxNumTracksPerAnimation = 128; // needs to be at least numSkeletonBones * 2 for full skel anim support
+
 
 	/** The size of the render dispatch queue. Every renderer will use at least 1. Extra uses from other things such as quadrenderer etc. */
 	constexpr uint32_t maxNumQueuedBuffers = 32;

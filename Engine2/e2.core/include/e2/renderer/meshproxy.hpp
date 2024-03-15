@@ -47,6 +47,46 @@ namespace e2
 	};
 
 
+
+
+	struct E2_API SkinProxyConfiguration
+	{
+		e2::SkeletonPtr skeleton;
+
+	};
+
+
+
+	/**
+	 * GPU proxy of a skin instance
+	 * Contains and tracks data for skin
+	 *
+	 * Preallocate n where n = maximum number of mesh proxies per session * maximum number of sessions
+	 *
+	 * @tags(arena, arenaSize=e2::maxNumSkinProxies*e2::maxNumSessions)
+	 */
+	class E2_API SkinProxy : public e2::Context, public e2::ManagedObject
+	{
+		ObjectDeclaration()
+	public:
+		SkinProxy(e2::Session* inSession, e2::SkinProxyConfiguration const& config);
+		virtual ~SkinProxy();
+
+		virtual Engine* engine() override;
+
+		e2::Session* session{};
+
+		/** The unique identifier we got from session when registering. Used for things like modelmatrix buffer offsets etc. */
+		uint32_t id{ UINT32_MAX };
+
+		e2::SkeletonPtr asset{};
+
+		void applyPose(e2::Pose* pose);
+
+		glm::mat4 skin[e2::maxNumSkeletonBones];
+		e2::Pair<bool> skinDirty{ true };
+	};
+
 	struct E2_API MeshProxyConfiguration
 	{
 		e2::MeshPtr mesh;
@@ -56,12 +96,9 @@ namespace e2
 	};
 
 
-
 	/**
 	 * GPU proxy of a mesh instance
-	 * Contains and tracks descriptor sets, uniform buffers, etc.
-	 * 
-	 * Preallocate n where n = maximum number of mesh proxies per session * maximum number of sessions
+	 * Contains and tracks data for uniform buffers, material proxies, skin proxies etc.
 	 * 
 	 * @tags(arena, arenaSize=e2::maxNumMeshProxies*e2::maxNumSessions)
 	 */
@@ -92,12 +129,12 @@ namespace e2
 		/** Cache for the pipeline layouts to used for the given submeshes in this proxy. Cached from session. */
 		e2::StackVector<e2::IPipelineLayout*, e2::maxNumSubmeshes> pipelineLayouts;
 
+		// can be set whenever we bind it at render time if needed
+		e2::SkinProxy* skinProxy{};
 
 		// Local buffered mesh data, the data to be written to buffer next frame, if dirty
 		glm::mat4 modelMatrix{};
 		e2::Pair<bool> modelMatrixDirty{ true };
-
-
 	};
 }  
   

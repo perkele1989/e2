@@ -540,6 +540,18 @@ namespace e2
 			return true;
 		}
 
+		DataType& emplace()
+		{
+			static DataType def;
+			if (m_size >= Capacity)
+			{
+				LogError("out of bounds");
+				return def;
+			}
+			m_size++;
+			return m_data[m_size - 1];
+		}
+
 		bool pop()
 		{
 			if (empty())

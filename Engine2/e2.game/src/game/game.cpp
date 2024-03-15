@@ -51,6 +51,10 @@ void e2::Game::initialize()
 	am->prescribeALJ(alj, "assets/kloofendal_irr.e2a");
 	am->prescribeALJ(alj, "assets/kloofendal_rad.e2a");
 
+	am->prescribeALJ(alj, "assets/characters/SM_Dummy.e2a");
+	am->prescribeALJ(alj, "assets/characters/SK_Dummy.e2a");
+	am->prescribeALJ(alj, "assets/characters/A_DummyDance.e2a");
+
 	am->queueWaitALJ(alj);
 	m_uiTextureResources = am->get("assets/UI_ResourceIcons.e2a").cast<e2::Texture2D>();
 	m_cursorMesh = am->get("assets/environment/trees/SM_PalmTree001.e2a").cast<e2::Mesh>();
@@ -78,10 +82,13 @@ void e2::Game::initialize()
 	m_structureMeshes[(uint8_t)e2::GameStructureType::Quarry] = quarryMesh;
 	m_structureMeshes[(uint8_t)e2::GameStructureType::SawMill] = sawMillMesh;
 
+	m_dummyMesh = am->get("assets/characters/SM_Dummy.e2a").cast<e2::Mesh>();
+	m_dummySkeleton = am->get("assets/characters/SK_Dummy.e2a").cast<e2::Skeleton>();
+	m_dummyAnimation = am->get("assets/characters/A_DummyDance.e2a").cast<e2::Animation>();
 
 	for (uint8_t i = 0; i < (uint8_t)e2::GameUnitType::Count; i++)
 	{
-		m_unitMeshes[i] = m_cursorMesh;
+		m_unitMeshes[i] = m_dummyMesh;
 	}
 
 	m_empires.resize(e2::maxNumEmpires);
@@ -382,7 +389,7 @@ void e2::Game::updateMenu(double seconds)
 	float blockAlphaNewGame = glm::smoothstep(15.0, 15.25, timer);
 	e2::UIColor textColorNewGame(0, 0, 0, uint8_t(blockAlphaNewGame * 170.0f * globalMenuFade));
 	float newGameWidth = ui->calculateSDFTextWidth(FontFace::Serif, 24.0f, "New Game");
-	bool newGameHovered = !m_haveBegunStart && timer > 15.25&& mouse.relativePosition.x > xOffset & mouse.relativePosition.x < xOffset + newGameWidth
+	bool newGameHovered = !m_haveBegunStart && timer > 15.25&& mouse.relativePosition.x > xOffset && mouse.relativePosition.x < xOffset + newGameWidth
 		&& mouse.relativePosition.y > cursorY + 20.0f && mouse.relativePosition.y < cursorY + 60.0f;
 	ui->drawSDFText(FontFace::Serif, 24.0f, newGameHovered ? 0x000000FF : textColorNewGame, glm::vec2(xOffset, cursorY + 40.0f), "New Game");
 	if (!m_haveBegunStart && newGameHovered && leftMouse.clicked)
@@ -393,21 +400,21 @@ void e2::Game::updateMenu(double seconds)
 	float blockAlphaLoadGame = glm::smoothstep(15.25, 15.5, timer);
 	e2::UIColor textColorLoadGame(0, 0, 0, uint8_t(blockAlphaLoadGame * 170.0f * globalMenuFade));
 	float loadGameWidth = ui->calculateSDFTextWidth(FontFace::Serif, 24.0f, "Load Game");
-	bool loadGameHovered = !m_haveBegunStart && timer > 15.5 && mouse.relativePosition.x > xOffset & mouse.relativePosition.x < xOffset + loadGameWidth
+	bool loadGameHovered = !m_haveBegunStart && timer > 15.5 && mouse.relativePosition.x > xOffset && mouse.relativePosition.x < xOffset + loadGameWidth
 		&& mouse.relativePosition.y > cursorY + 60.0f && mouse.relativePosition.y < cursorY + 100.0f;
 	ui->drawSDFText(FontFace::Serif, 24.0f, loadGameHovered ? 0x000000FF : textColorLoadGame, glm::vec2(xOffset, cursorY + 40.0f * 2), "Load Game");
 
 	float blockAlphaOptions = glm::smoothstep(15.5, 15.75, timer);
 	e2::UIColor textColorOptions(0, 0, 0, uint8_t(blockAlphaOptions * 170.0f * globalMenuFade));
 	float optionsWidth = ui->calculateSDFTextWidth(FontFace::Serif, 24.0f, "Options");
-	bool optionsHovered = !m_haveBegunStart && timer > 15.75 && mouse.relativePosition.x > xOffset & mouse.relativePosition.x < xOffset + optionsWidth
+	bool optionsHovered = !m_haveBegunStart && timer > 15.75 && mouse.relativePosition.x > xOffset && mouse.relativePosition.x < xOffset + optionsWidth
 		&& mouse.relativePosition.y > cursorY + 100.0f && mouse.relativePosition.y < cursorY + 140.0f;
 	ui->drawSDFText(FontFace::Serif, 24.0f, optionsHovered ? 0x000000FF : textColorOptions, glm::vec2(xOffset, cursorY + 40.0f * 3), "Options");
 
 	float blockAlphaQuit = glm::smoothstep(15.75, 16.0, timer);
 	e2::UIColor textColorQuit(0, 0, 0, uint8_t(blockAlphaQuit * 170.0f * globalMenuFade));
 	float quitWidth = ui->calculateSDFTextWidth(FontFace::Serif, 24.0f, "Quit");
-	bool quitHovered = !m_haveBegunStart && timer > 16.0 && mouse.relativePosition.x > xOffset & mouse.relativePosition.x < xOffset + optionsWidth
+	bool quitHovered = !m_haveBegunStart && timer > 16.0 && mouse.relativePosition.x > xOffset && mouse.relativePosition.x < xOffset + optionsWidth
 		&& mouse.relativePosition.y > cursorY + 140.0f && mouse.relativePosition.y < cursorY + 180.0f;
 	ui->drawSDFText(FontFace::Serif, 24.0f, quitHovered ? 0x000000FF : textColorQuit, glm::vec2(xOffset, cursorY + 40.0f * 4), "Quit");
 	if (quitHovered && leftMouse.clicked)
@@ -478,8 +485,6 @@ void e2::Game::beginStartGame()
 	findStartLocation();
 	pauseWorldStreaming();
 	forceStreamLocation(e2::Hex(m_startLocation).planarCoords());
-
-
 }
 
 void e2::Game::findStartLocation()

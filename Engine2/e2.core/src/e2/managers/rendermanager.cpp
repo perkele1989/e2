@@ -222,6 +222,7 @@ void e2::RenderManager::initialize()
 
 	e2::DescriptorSetLayoutCreateInfo modelSetLayoutInfo{};
 	modelSetLayoutInfo.bindings.push({ e2::DescriptorBindingType::DynamicBuffer, 1 });
+	modelSetLayoutInfo.bindings.push({ e2::DescriptorBindingType::DynamicBuffer, 1 });
 	m_modelSetLayout = renderContext()->createDescriptorSetLayout(modelSetLayoutInfo);
 
 	e2::DescriptorPoolCreateInfo rendererPoolCreateInfo{};

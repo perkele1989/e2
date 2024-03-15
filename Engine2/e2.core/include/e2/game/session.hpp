@@ -18,6 +18,7 @@ namespace e2
 {
 	class World;
 
+	class SkinProxy;
 	class MeshProxy;
 	class ShaderModel;
 	class Renderer;
@@ -28,11 +29,6 @@ namespace e2
 	class IDescriptorPool;
 
 	class AssetEntry;
-
-	struct SkinData
-	{
-		alignas(16) glm::mat4 skin[e2::maxNumBones];
-	};
 
 	struct E2_API MeshProxySubmesh
 	{
@@ -60,15 +56,13 @@ namespace e2
 		virtual void destroyWorld(e2::World* world);
 
 		uint32_t registerMeshProxy(e2::MeshProxy* proxy);
-		void unregisterMeshProxy(uint32_t id, e2::MeshProxy* proxy);
+		void unregisterMeshProxy(e2::MeshProxy* proxy);
 
 		void registerMaterialProxy(e2::MaterialProxy* proxy);
 		void unregisterMaterialProxy(e2::MaterialProxy* proxy);
 
-		uint32_t registerSkinId();
-		void unregisterSkinId(uint32_t skinId);
-
-		SkinData* skinData(uint32_t skinId);
+		uint32_t registerSkinProxy(e2::SkinProxy* proxy);
+		void unregisterSkinProxy(e2::SkinProxy* proxy);
 
 		std::map<e2::RenderLayer, std::unordered_set<MeshProxySubmesh>> const& submeshIndex() const;
 
@@ -91,6 +85,7 @@ namespace e2
 
 		/** Identifiers for models (meshproxies) */
 		e2::IdArena<uint32_t, e2::maxNumMeshProxies> m_modelIds;
+		e2::IdArena<uint32_t, e2::maxNumSkinProxies> m_skinIds;
 
 		/** Set of all the worlds */
 		std::unordered_set<e2::World*> m_worlds{};
@@ -104,8 +99,13 @@ namespace e2
 		/** Buffers for model matrices (one per frame index) */
 		e2::Pair<e2::IDataBuffer*> m_modelBuffers{nullptr};
 
+		/** Buffers for skin matrices (one per frame index) */
+		e2::Pair<e2::IDataBuffer*> m_skinBuffers{ nullptr };
+
 		/** All the registered mesh proxies */
 		std::unordered_set<e2::MeshProxy*> m_meshProxies;
+
+		std::unordered_set<e2::SkinProxy*> m_skinProxies;
 
 		/** Submeshes ordered by render layer */
 		std::map<e2::RenderLayer, std::unordered_set<MeshProxySubmesh>> m_submeshIndex;

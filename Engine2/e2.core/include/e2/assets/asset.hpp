@@ -29,6 +29,9 @@ namespace e2
 		// Add params to materiasl
 		AddMaterialParameters,
 
+		// Add skeletons 
+		AddSkeletons,
+
 		// New versions above this line 
 		End,
 		Latest = End - 1

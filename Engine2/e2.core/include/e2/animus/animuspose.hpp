@@ -16,7 +16,7 @@ namespace e2
 		AnimusPose();
 		virtual ~AnimusPose();
 
-		e2::StackVector<glm::mat4, e2::maxNumBones> bones;
+		e2::StackVector<glm::mat4, e2::maxNumSkeletonBones> bones;
 
 	};
 

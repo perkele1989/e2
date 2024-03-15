@@ -15,7 +15,7 @@ e2::GameSession::GameSession(e2::Context* ctx)
 	winCreateInfo.resizable = true;
 	//winCreateInfo.mode = WindowMode::Fullscreen;
 	m_window = renderManager()->mainThreadContext()->createWindow(winCreateInfo);
-	m_window->setFullscreen(true);
+	//m_window->setFullscreen(true);
 
 	m_renderer = e2::create<e2::Renderer>(this, winCreateInfo.size);
 

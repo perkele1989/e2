@@ -1,6 +1,7 @@
 
 #include "game/builderunit.hpp"
 #include "game/game.hpp"
+#include <e2/game/gamesession.hpp>
 
 
 e2::Engineer::Engineer(e2::GameContext* ctx, glm::ivec2 const& tile, uint8_t empire)
@@ -15,11 +16,40 @@ e2::Engineer::Engineer(e2::GameContext* ctx, glm::ivec2 const& tile, uint8_t emp
 	unitType = e2::GameUnitType::Engineer;
 	m_mesh = game()->getUnitMesh(unitType);
 	buildProxy();
+
+	m_testAnim = game()->dummyAnimation();
+
+	e2::SkinProxyConfiguration conf;
+	conf.skeleton = game()->dummySkeleton();
+	m_skinProxy = e2::create<e2::SkinProxy>(game()->gameSession(), conf);
+	m_proxy->skinProxy = m_skinProxy;
+
+	m_testPose = e2::create<e2::Pose>(game()->dummySkeleton());
+	m_proxy->invalidatePipeline();
+	
 }
 
 e2::Engineer::~Engineer()
 {
+	e2::destroy(m_testPose);
+	e2::destroy(m_skinProxy);
+}
 
+void e2::Engineer::updateAnimation(double seconds)
+{
+	e2::GameUnit::updateAnimation(seconds);
+
+	m_testAnimTime += float(seconds);
+	while (m_testAnimTime > m_testAnim->timeSeconds())
+	{
+		m_testAnimTime -= m_testAnim->timeSeconds();
+	}
+
+	m_testPose->applyBindPose();
+	m_testPose->applyAnimation(m_testAnim, m_testAnimTime);
+	m_testPose->updateSkin();
+
+	m_skinProxy->applyPose(m_testPose);
 }
 
 void e2::Engineer::drawUI(e2::UIContext* ui)

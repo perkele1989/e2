@@ -894,7 +894,7 @@ void e2::UIContext::drawSDFText(e2::FontFace fontFace, float fontSize, e2::UICol
 	// i really don't see what you're getting yourself so worked up about
 	std::u32string src = e2::utf8to32(markdownUtf8);
 
-	float midOffset = font->getMidlineOffset(e2::FontStyle::Regular, fontSize);
+	float midOffset = font->getSDFMidlineOffset(e2::FontStyle::Regular, fontSize);
 
 	UIColor defaultColor = color;
 	const e2::UIColor accents[10] = {
@@ -1035,7 +1035,7 @@ float e2::UIContext::calculateSDFTextWidth(e2::FontFace fontFace, float fontSize
 	// i really don't see what you're getting yourself so worked up about
 	std::u32string src = e2::utf8to32(markdownUtf8);
 
-	float midOffset = font->getMidlineOffset(e2::FontStyle::Regular, fontSize);
+	float midOffset = font->getSDFMidlineOffset(e2::FontStyle::Regular, fontSize);
 
 	glm::vec2 cursor = glm::vec2(0.f, midOffset);
 

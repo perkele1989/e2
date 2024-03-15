@@ -50,13 +50,21 @@ out vec4 fragmentColor;
 
 void main()
 {
-	vec4 vertPosFixed = vertexPosition;
-	//vertPosFixed.x = -vertexPosition.x;
-	//vertPosFixed.y = -vertexPosition.z;
-	//vertPosFixed.z = vertexPosition.y;
-	gl_Position = renderer.projectionMatrix * renderer.viewMatrix * mesh.modelMatrix * vertPosFixed;
+	vec4 animatedVertexPosition = vertexPosition;
 
-	fragmentPosition = mesh.modelMatrix * vertPosFixed;
+#if defined(Renderer_Skin) && defined(Vertex_Bones)
+
+	mat4 animationTransform = skin.skinMatrices[vertexIds.x] * vertexWeights.x; 
+	animationTransform += skin.skinMatrices[vertexIds.y] * vertexWeights.y; 
+	animationTransform += skin.skinMatrices[vertexIds.z] * vertexWeights.z; 
+	animationTransform += skin.skinMatrices[vertexIds.w] * vertexWeights.w; 
+
+	animatedVertexPosition =  animationTransform * animatedVertexPosition;
+#endif 
+
+	gl_Position = renderer.projectionMatrix * renderer.viewMatrix * mesh.modelMatrix * animatedVertexPosition;
+
+	fragmentPosition = mesh.modelMatrix * animatedVertexPosition;
 #if defined(Vertex_Normals)
 
 	fragmentNormal = normalize(mesh.modelMatrix * normalize(vertexNormal)).xyz;

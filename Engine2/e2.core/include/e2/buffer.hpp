@@ -67,8 +67,6 @@ namespace e2
 		uint8_t const * read(uint64_t numBytes);
 		void write(uint8_t const* data, uint64_t size);
 
-
-
 		Buffer& operator<<(std::string const& value);
 		Buffer& operator>>(std::string& value);
 

@@ -19,7 +19,67 @@
 #include <format>
 #include <thread>
 
+#include <glm/gtx/matrix_decompose.hpp>
+#include <glm/gtx/quaternion.hpp>
+#include <glm/gtx/transform.hpp>
+
 namespace fs = std::filesystem;
+
+
+namespace
+{
+	glm::vec3 glmVec3(aiVector3D const& from)
+	{
+		return { -from.x, -from.z, from.y };
+	}
+
+	glm::vec3 blenderToE2(glm::vec3 const& from)
+	{
+		return { -from.x, -from.z, from.y };
+	}
+
+	glm::quat blenderToE2(glm::quat const& from)
+	{
+		return glm::quat(from.w, -from.x, -from.z, from.y);
+	}
+
+	glm::mat4 glmMat4(const aiMatrix4x4& from)
+	{
+		glm::mat4 to;
+		to[0][0] = from.a1;
+		to[1][0] = from.a2;
+		to[2][0] = from.a3;
+		to[3][0] = from.a4;
+
+		to[0][1] = from.b1;
+		to[1][1] = from.b2;
+		to[2][1] = from.b3;
+		to[3][1] = from.b4;
+
+		to[0][2] = from.c1;
+		to[1][2] = from.c2;
+		to[2][2] = from.c3;
+		to[3][2] = from.c4;
+
+		to[0][3] = from.d1;
+		to[1][3] = from.d2;
+		to[2][3] = from.d3;
+		to[3][3] = from.d4;
+
+		/*
+		glm::vec3 scale, translation, skew;
+		glm::vec4 perspective;
+		glm::quat rotation;
+		glm::decompose(to, scale, rotation, translation, skew, perspective);
+
+
+		to = glm::toMat4(::blenderToE2(rotation)) * glm::translate(::blenderToE2(translation));
+		*/
+
+		return to;
+	}
+
+}
 
 e2::MeshImporter::MeshImporter(e2::Editor* editor, MeshImportConfig const& config)
 	: e2::Importer(editor)
@@ -103,7 +163,7 @@ void e2::MeshImporter::update(double seconds)
 	{
 		if (m_mesh.hasSkeleton)
 		{
-			ui->checkbox(id_ChkSkeleton, m_mesh.importSkeleton, std::format("Import skeleton ({})", m_mesh.skeletonName));
+			ui->checkbox(id_ChkSkeleton, m_mesh.importSkeleton, std::format("**Skeleton:** {}", m_mesh.skeletonName));
 		}
 		else
 		{
@@ -112,7 +172,7 @@ void e2::MeshImporter::update(double seconds)
 
 		if (m_mesh.hasMesh)
 		{
-			ui->checkbox(id_ChkMesh, m_mesh.importMesh, std::format("Import mesh ({})", m_mesh.meshName));
+			ui->checkbox(id_ChkMesh, m_mesh.importMesh, std::format("**Mesh:** ({})", m_mesh.meshName));
 
 			uint32_t i = 0;
 			for (ImportSubmesh& submesh : m_mesh.submeshes)
@@ -134,9 +194,9 @@ void e2::MeshImporter::update(double seconds)
 
 				ui->pushId(std::format("submesh{}", i++));
 
-				ui->label(smName, std::format("Submesh {}:", submesh.materialName));
+				ui->label(smName, std::format("**Submesh** *{}*:", submesh.materialName));
 
-				ui->label(normals, "Normals:");
+				ui->label(normals, "**Normals:**");
 				ui->beginStackH(stackH, 20.0f);
 				ui->radio(modeIgnore, IAM_Ignore, submesh.normalsMode, "Ignore");
 				ui->radio(modeGenerate, IAM_Generate, submesh.normalsMode, "Generate");
@@ -170,7 +230,7 @@ void e2::MeshImporter::update(double seconds)
 
 				if (submesh.hasWeights)
 				{
-					ui->checkbox(impw, submesh.importWeights, "Import weights");
+					ui->checkbox(impw, submesh.importWeights, "Import Weights");
 				}
 
 				ui->popId();
@@ -182,6 +242,17 @@ void e2::MeshImporter::update(double seconds)
 			ui->label(id_NoMesh, "No mesh.");
 		}
 
+		if (m_animations.size() > 0)
+		{
+			for (ImportAnimation& anim : m_animations)
+			{
+				ui->checkbox(std::format("animation_{}", anim.name), anim.import, std::format("**Animation:** {} ({} fps, {} frames, {} channels)", anim.name, anim.framesPerSecond, anim.duration, anim.channels.size()));
+			}
+		}
+		else
+		{
+			ui->label(id_NoSkeleton, "No animations.");
+		}
 
 
 
@@ -201,38 +272,6 @@ void e2::MeshImporter::update(double seconds)
 
 	ui->endStackV();
 
-	//if(ImGui::Begin(m_title.c_str(), nullptr, ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoDocking))
-	//{
-	//	if (m_status == MIS_Writing)
-	//	{
-	//		ImGui::Text("Writing...");
-	//		ImGui::Spinner("##spinner", 15, 6, ImGui::GetColorU32(ImGuiCol_ButtonHovered));
-	//	}
-	//	else if (m_status == MIS_Analyzing)
-	//	{
-	//		std::string inputName = std::filesystem::path(m_config.input).filename().string();
-	//		ImGui::Text("Analyzing %s", inputName.c_str());
-	//		ImGui::Spinner("##spinner", 15, 6, ImGui::GetColorU32(ImGuiCol_ButtonHovered));
-	//	}
-	//	else if(m_status == MIS_Ready)
-	//	{
-	//		displayContent();
-	//		if (ImGui::Button("Import"))
-	//		{
-	//			startProcessing();
-	//		}
-	//	}
-	//	else if (m_status == MIS_Success)
-	//	{
-	//		ImGui::Text("Successfully imported");
-	//	}
-	//	else if (m_status == MIS_Failed)
-	//	{
-	//		ImGui::Text("Failed: %s", m_failReason.c_str());
-	//	}
-
-	//}
-	//ImGui::End();
 }
 
 bool e2::MeshImporter::analyze()
@@ -260,8 +299,7 @@ bool e2::MeshImporter::analyze()
 		return false;
 	}
 
-	m_mesh.hasSkeleton = m_mesh.assScene->hasSkeletons();
-	m_mesh.importSkeleton = m_mesh.hasSkeleton;
+
 
 	m_mesh.hasMesh = m_mesh.assScene->HasMeshes();
 	m_mesh.importMesh = m_mesh.hasMesh;
@@ -284,14 +322,24 @@ bool e2::MeshImporter::analyze()
 	}
 
 	std::string prefix = "SM_";
-	if (m_mesh.isMeshSkinned())
-		prefix = "SK_";
 
 	if (m_mesh.meshName.size() < prefix.size() || m_mesh.meshName.substr(0, prefix.size()) != prefix)
 		m_mesh.meshName = prefix + m_mesh.meshName;
 
+	if (m_mesh.skeletonName.size() == 0)
+	{
+		m_mesh.skeletonName = "SK_" + m_mesh.meshName.substr(3);
+	}
+
 	if (m_mesh.hasMesh)
 	{
+
+
+		
+		uint32_t boneIdMaker{};
+		m_mesh.skeleton.globalInverseTransform = glm::inverse(glmMat4(m_mesh.assScene->mRootNode->mTransformation));
+		
+
 		for (uint64_t i = 0; i < m_mesh.assScene->mNumMeshes; i++)
 		{
 			e2::ImportSubmesh submesh;
@@ -310,9 +358,6 @@ bool e2::MeshImporter::analyze()
 			submesh.hasNormals = mesh->HasNormals() && mesh->HasTangentsAndBitangents();
 			submesh.normalsMode = submesh.hasNormals ? IAM_Import : IAM_Generate;
 
-			submesh.hasWeights = mesh->HasBones();
-			submesh.importWeights = submesh.hasWeights;
-
 			submesh.hasColors = mesh->HasVertexColors(0);
 			submesh.importColors = submesh.hasColors;
 			
@@ -328,24 +373,190 @@ bool e2::MeshImporter::analyze()
 			submesh.hasUv3 = mesh->HasTextureCoords(3);
 			submesh.importUv3 = submesh.hasUv3;
 
-			if(submesh.hasWeights)
-				for (uint32_t j = 0; j < mesh->mNumBones; j++)
+			submesh.hasWeights = mesh->HasBones();
+			submesh.importWeights = submesh.hasWeights;
+
+			if(mesh->HasBones())
+				submesh.weightData.resize(submesh.assMesh->mNumVertices);
+
+			
+
+			std::unordered_map<uint32_t, uint32_t> weightCounts;
+			for (uint32_t i = 0; i < submesh.assMesh->mNumVertices; i++)
+			{
+				weightCounts[i] = 0;
+			}
+
+			for (uint32_t i = 0; i < submesh.assMesh->mNumBones; i++)
+			{
+				aiBone* assBone = submesh.assMesh->mBones[i];
+				aiNode* assNode = m_mesh.assScene->mRootNode->FindNode(assBone->mName.C_Str());
+
+				if (assNode)
 				{
-					submesh.boneMap[mesh->mBones[j]->mName.C_Str()] = j;
+					if (m_mesh.skeleton.boneIndex.find(assBone->mName.C_Str()) == m_mesh.skeleton.boneIndex.end())
+					{
+						ImportBone newBone;
+						newBone.id = boneIdMaker++;
+						newBone.name = assNode->mName.C_Str();
+						newBone.parentId = -1;
+						newBone.parentName = assNode->mParent ? assNode->mParent->mName.C_Str() : "none";
+						newBone.inverseBindPose = glmMat4(assBone->mOffsetMatrix);
+						newBone.localTransform = glmMat4(assNode->mTransformation);
+
+						m_mesh.skeleton.boneIndex[newBone.name] = newBone.id;
+						m_mesh.skeleton.bones.push_back(newBone);
+					}
+
+					uint32_t currId = m_mesh.skeleton.boneIndex[assBone->mName.C_Str()];
+					
+					for (uint32_t j = 0; j < assBone->mNumWeights; j++)
+					{
+						aiVertexWeight* weight = &assBone->mWeights[j];
+						WeightData* weightData = &submesh.weightData[weight->mVertexId];
+						switch (weightCounts.at(weight->mVertexId))
+						{
+						case 0:
+							weightData->ids.x = currId;
+							weightData->weights.x = weight->mWeight;
+							weightCounts.at(weight->mVertexId)++;
+							break;
+
+						case 1:
+							weightData->ids.y = currId;
+							weightData->weights.y = weight->mWeight;
+							weightCounts.at(weight->mVertexId)++;
+							break;
+
+						case 2:
+							weightData->ids.z = currId;
+							weightData->weights.z = weight->mWeight;
+							weightCounts.at(weight->mVertexId)++;
+							break;
+
+						case 3:
+							weightData->ids.w = currId;
+							weightData->weights.w = weight->mWeight;
+							weightCounts.at(weight->mVertexId)++;
+							break;
+
+						}
+					}
 				}
+
+			}
+
 
 			m_mesh.submeshes.push_back(submesh);
 		}
+	
+		for (e2::ImportBone& bone : m_mesh.skeleton.bones)
+		{
+			aiNode* boneNode = m_mesh.assScene->mRootNode->FindNode(bone.name.c_str());
+			if (!boneNode)
+			{
+				LogWarning("Bone no longer finds its scene node, this shouldn't happen!");
+				continue;
+			}
+
+			if (!boneNode->mParent)
+			{
+				if (m_mesh.skeletonName.size() == 0)
+				{
+					m_mesh.skeletonName = boneNode->mName.C_Str();
+				}
+				bone.isRoot = true;
+				bone.parentId = -1;
+			}
+			else
+			{
+				bool found = false;
+				for (e2::ImportBone& subBone : m_mesh.skeleton.bones)
+				{
+					if (subBone.name == std::string(boneNode->mParent->mName.C_Str()))
+					{
+						bone.parentId = m_mesh.skeleton.boneIndex.at(std::string(boneNode->mParent->mName.C_Str()));
+						found = true;
+					}
+				}
+				if (!found)
+				{
+					bone.isRoot = true;
+					bone.parentId = -1;
+				}
+			}
+		}
+
+		m_mesh.hasSkeleton = m_mesh.skeleton.bones.size();
+		if(m_mesh.hasSkeleton)
+			m_mesh.importSkeleton = true;
+
+		// anims
+		for (uint32_t i = 0; i < m_mesh.assScene->mNumAnimations; i++)
+		{
+			aiAnimation* anim = m_mesh.assScene->mAnimations[i];
+			std::string animName = anim->mName.C_Str();
+			if (animName.substr(0, 11) == std::string("AnimStack::"))
+			{
+				animName = animName.substr(11);
+			}
+
+			std::vector<std::string> nameParts = e2::split(animName, '|');
+			if (nameParts.size() > 1)
+			{
+				animName = nameParts[1];
+			}
+
+			ImportAnimation newAnim;
+			newAnim.import = true;
+			newAnim.name = animName;
+			newAnim.framesPerSecond = (float)anim->mTicksPerSecond;
+			newAnim.duration = (uint32_t)anim->mDuration;
+
+			LogNotice("anim{}: {}", i, newAnim.name);
+
+			for (uint32_t c = 0; c < anim->mNumChannels; c++)
+			{
+				aiNodeAnim* channel = anim->mChannels[c];
+				std::string channelName = channel->mNodeName.C_Str();
+				LogNotice("channel{}: {}", c, channelName);
+
+				ImportChannel newChannel;
+
+				for (uint32_t t = 0; t < channel->mNumPositionKeys; t++)
+				{
+					aiVectorKey k = channel->mPositionKeys[t];
+					Vec3Key newKey;
+					newKey.vector = ::blenderToE2(glm::vec3(k.mValue.x, k.mValue.y, k.mValue.z));
+					newKey.time = (float)k.mTime;
+					newChannel.positionKeys.push_back(newKey);
+				}
+
+				for (uint32_t t = 0; t < channel->mNumRotationKeys; t++)
+				{
+					aiQuatKey k = channel->mRotationKeys[t];
+					QuatKey newKey;
+					newKey.quat = ::blenderToE2(glm::quat(k.mValue.w, k.mValue.x, k.mValue.y, k.mValue.z));
+					newKey.time = (float)k.mTime;
+					newChannel.rotationKeys.push_back(newKey);
+				}
+
+				newAnim.channels[channelName] = newChannel;
+			}
+
+			m_animations.push_back(newAnim);
+
+		}
+
+
 	}
 
-	if (m_mesh.hasSkeleton)
-	{
-
-	}
 
 
 	return true;
 }
+
+
 
 bool e2::MeshImporter::writeAssets()
 {
@@ -415,8 +626,8 @@ bool e2::MeshImporter::writeAssets()
 			bool useUv01 = numUvs >= 1;
 			bool useUv23 = numUvs >= 3;
 			bool useColors = submesh.hasColors && submesh.importColors;
-			//bool useWeights = submesh.hasWeights && submesh.importWeights;
-			bool useWeights = false;// @todo switch back when implemented
+			bool useWeights = submesh.hasWeights && submesh.importWeights;
+			//bool useWeights = false;// @todo switch back when implemented
 
 			if (useNormals)
 				im.attributeFlags = im.attributeFlags | VertexAttributeFlags::Normal;
@@ -435,8 +646,9 @@ bool e2::MeshImporter::writeAssets()
 			attribPos.vertexData = e2::Buffer(false, sizeof(glm::vec4) * sm->mNumVertices);
 			for (uint32_t i = 0; i < sm->mNumVertices; i++)
 			{
-				attribPos.vertexData << float(-sm->mVertices[i].x) << float(-sm->mVertices[i].z) << float(sm->mVertices[i].y) << 1.0f;
-				//attribPos.vertexData << -float(sm->mVertices[i].x) << -float(sm->mVertices[i].z) << -float(sm->mVertices[i].y) << 1.0f;
+				//attribPos.vertexData << float(-sm->mVertices[i].x) << float(-sm->mVertices[i].z) << float(sm->mVertices[i].y) << 1.0f;
+
+				attribPos.vertexData << ::glmVec3(sm->mVertices[i]) << 1.0f;
 			}
 
 			im.attributes.push_back(attribPos);
@@ -449,8 +661,8 @@ bool e2::MeshImporter::writeAssets()
 
 				for (uint32_t i = 0; i < sm->mNumVertices; i++)
 				{
-					attribNormals.vertexData << float(-sm->mNormals[i].x) << float(-sm->mNormals[i].z) << float(sm->mNormals[i].y) << 0.0f;
-					//attribNormals.vertexData << -float(sm->mNormals[i].x) << -float(sm->mNormals[i].z) << -float(sm->mNormals[i].y) << 0.0f;
+					//attribNormals.vertexData << float(-sm->mNormals[i].x) << float(-sm->mNormals[i].z) << float(sm->mNormals[i].y) << 0.0f;
+					attribNormals.vertexData << ::glmVec3(sm->mNormals[i]) << 0.0f;
 				}
 
 				im.attributes.push_back(attribNormals);
@@ -460,8 +672,8 @@ bool e2::MeshImporter::writeAssets()
 
 				for (uint32_t i = 0; i < sm->mNumVertices; i++)
 				{
-					attribTangents.vertexData << float(-sm->mTangents[i].x) << float(-sm->mTangents[i].z) << float(sm->mTangents[i].y) << 0.0f;
-					//attribTangents.vertexData << -float(sm->mTangents[i].x) << -float(sm->mTangents[i].z) << -float(sm->mTangents[i].y) << 0.0f;
+					//attribTangents.vertexData << float(-sm->mTangents[i].x) << float(-sm->mTangents[i].z) << float(sm->mTangents[i].y) << 0.0f;
+					attribTangents.vertexData << ::glmVec3(sm->mTangents[i]) << 0.0f;
 				}
 
 				im.attributes.push_back(attribTangents);
@@ -543,10 +755,42 @@ bool e2::MeshImporter::writeAssets()
 			}
 
 			
+			// handle weights
+			if (useWeights)
+			{
+				ImportAttribute attribWeights;
+				attribWeights.vertexData = e2::Buffer(false, sizeof(glm::vec4) * sm->mNumVertices);
+
+				for (uint32_t i = 0; i < sm->mNumVertices; i++)
+				{
+					attribWeights.vertexData << submesh.weightData[i].weights;
+				}
+
+				im.attributes.push_back(attribWeights);
+
+				ImportAttribute attribIds;
+				attribIds.vertexData = e2::Buffer(false, sizeof(glm::uvec4) * sm->mNumVertices);
+				for (uint32_t i = 0; i < sm->mNumVertices; i++)
+				{
+					attribIds.vertexData << submesh.weightData[i].ids;
+				}
+
+				im.attributes.push_back(attribIds);
+			}
+
+
 		}
 
 		// write the data 
-		e2::Buffer meshData; // @todo reserve here based on qualified guesses
+		e2::Buffer meshData; 
+
+		meshData << uint32_t(m_mesh.skeleton.boneIndex.size());
+		for (auto& pair : m_mesh.skeleton.boneIndex)
+		{
+			meshData << std::string(pair.first);
+			meshData << uint32_t(pair.second);
+		}
+
 		meshData << uint32_t(m_mesh.submeshes.size());
 		for (e2::ImportSubmesh &submesh : m_mesh.submeshes)
 		{
@@ -582,6 +826,121 @@ bool e2::MeshImporter::writeAssets()
 		}
 	}
 
+	if (m_mesh.hasSkeleton && m_mesh.importSkeleton)
+	{
+		e2::AssetHeader skeletonHeader;
+		skeletonHeader.version = e2::AssetVersion::Latest;
+		skeletonHeader.assetType = "e2::Skeleton";
+
+		// write the data 
+		e2::Buffer skeletonData;
+
+		skeletonData << m_mesh.skeleton.globalInverseTransform;
+		skeletonData << uint32_t(m_mesh.skeleton.bones.size());
+		for (uint32_t i = 0; i < m_mesh.skeleton.bones.size(); i++)
+		{
+			e2::ImportBone& b = m_mesh.skeleton.bones[i];
+			skeletonData << b.name;
+			skeletonData << b.localTransform;
+			skeletonData << b.inverseBindPose;
+
+			skeletonData << b.parentId;
+		}
+
+		skeletonHeader.size = skeletonData.size();
+
+		e2::Buffer fileBuffer(true, 1024 + skeletonData.size());
+		fileBuffer << skeletonHeader;
+		fileBuffer.write(skeletonData.begin(), skeletonData.size());
+
+		std::string outFile = (fs::path(m_config.outputDirectory) / (m_mesh.skeletonName + ".e2a")).string();
+		if (fileBuffer.writeToFile(outFile))
+		{
+			auto newRef = assetManager()->database().invalidateAsset(outFile);
+			assetManager()->database().validate(true);
+		}
+		else
+		{
+			LogError("Failed to write file ./Assets/{}", outFile);
+		}
+	}
+
+	for (ImportAnimation& anim : m_animations)
+	{
+		if (!anim.import)
+			continue;
+
+		e2::AssetHeader animHeader;
+		animHeader.version = e2::AssetVersion::Latest;
+		animHeader.assetType = "e2::Animation";
+
+		// write the data 
+		e2::Buffer animData;
+
+
+		animData << uint32_t(anim.duration);
+		animData << float(anim.framesPerSecond);
+		animData << uint32_t(anim.channels.size() * 2);
+
+		for (auto& pair : anim.channels)
+		{
+			std::string channelName = pair.first + ".position";
+			ImportChannel& channel = pair.second;
+
+			animData << channelName;
+
+			animData << uint8_t(2);//vec3
+
+			for (uint32_t frameIndex = 0; frameIndex < anim.duration; frameIndex++)
+			{
+				float time = (float(frameIndex) / float(anim.duration)) * (float(anim.duration) / anim.framesPerSecond);
+				glm::vec3 pos = channel.samplePosition(time);
+				animData << pos.x;
+				animData << pos.y;
+				animData << pos.z;
+				animData << 0.0f;
+			}
+		}
+
+		for (auto& pair : anim.channels)
+		{
+			std::string channelName = pair.first + ".rotation";
+			ImportChannel& channel = pair.second;
+
+			animData << channelName;
+
+			animData << uint8_t(3);//quat
+
+			for (uint32_t frameIndex = 0; frameIndex < anim.duration; frameIndex++)
+			{
+				float time = (float(frameIndex) / float(anim.duration)) * (float(anim.duration) / anim.framesPerSecond);
+				glm::quat rot = channel.sampleRotation(time);
+				animData << rot.x;
+				animData << rot.y;
+				animData << rot.z;
+				animData << rot.w;
+			}
+		}
+
+
+		animHeader.size = animData.size();
+
+		e2::Buffer fileBuffer(true, 1024 + animData.size());
+		fileBuffer << animHeader;
+		fileBuffer.write(animData.begin(), animData.size());
+
+		std::string outFile = (fs::path(m_config.outputDirectory) / (anim.name + ".e2a")).string();
+		if (fileBuffer.writeToFile(outFile))
+		{
+			auto newRef = assetManager()->database().invalidateAsset(outFile);
+			assetManager()->database().validate(true);
+		}
+		else
+		{
+			LogError("Failed to write file ./Assets/{}", outFile);
+		}
+	}
+
 	return true;
 }
 
@@ -595,7 +954,7 @@ e2::UUID e2::MeshImporter::createMaterial(std::string const& outName)
 
 	e2::Buffer materialData;
 	e2::Name shaderModel = "e2::LightweightModel";
-	materialData << shaderModel;
+	materialData << shaderModel.string();
 
 	// numdefines
 	materialData << uint8_t(0);
@@ -619,81 +978,6 @@ e2::UUID e2::MeshImporter::createMaterial(std::string const& outName)
 		LogError("Failed to create material, could not write to file: {}", outFile);
 		return e2::UUID();
 	}
-}
-
-void e2::MeshImporter::displayContent()
-{
-
-
-	//ImGui::ShowDemoWindow();
-	//if (ImGui::CollapsingHeader("Skeleton"))
-	//{
-	//	if (m_mesh.hasSkeleton)
-	//	{
-	//		ImGui::Checkbox("Import Skeleton##importskeleton", &m_mesh.importSkeleton);
-	//		ImGui::InputText("Skeleton Name##skeletonname", &m_mesh.skeletonName);
-	//	}
-	//	else
-	//	{
-	//		ImGui::Text("No skeleton.");
-	//	}
-
-	//}
-
-	//if (ImGui::CollapsingHeader("Mesh"))
-	//{
-	//	if (m_mesh.hasMesh)
-	//	{
-	//		ImGui::Checkbox("Import Mesh##importmesh", &m_mesh.importMesh);
-	//		ImGui::InputText("Mesh Name##meshname", &m_mesh.meshName);
-
-	//		uint32_t i = 0;
-	//		for (ImportSubmesh& submesh : m_mesh.submeshes)
-	//		{
-	//			ImGui::PushID(i++);
-
-	//			if (ImGui::TreeNode("submesh", "Submesh #%u", i))
-	//			{
-	//				ImGui::Combo("Normals##normalsmode", &submesh.normalsMode, e2::attributeItems, 3);
-	//				ImGui::Combo("Tangents##tangentsmode", &submesh.tangentsMode, e2::attributeItems, 3);
-
-	//				if (submesh.hasUv0)
-	//				{
-	//					ImGui::Checkbox("Import Uv0##importuv0", &submesh.importUv0);
-	//				}
-
-	//				if (submesh.hasUv1)
-	//				{
-	//					ImGui::Checkbox("Import Uv1##importuv1", &submesh.importUv1);
-	//				}
-
-	//				if (submesh.hasUv2)
-	//				{
-	//					ImGui::Checkbox("Import Uv2##importuv2", &submesh.importUv2);
-	//				}
-
-	//				if (submesh.hasUv3)
-	//				{
-	//					ImGui::Checkbox("Import Uv3##importuv3", &submesh.importUv3);
-	//				}
-
-	//				if (submesh.hasWeights)
-	//				{
-	//					ImGui::Checkbox("Import Weights##importweights", &submesh.importWeights);
-	//				}
-
-	//				ImGui::TreePop();
-	//			}
-
-	//			ImGui::PopID();
-	//		}
-	//	}
-	//	else
-	//	{
-	//		ImGui::Text("No mesh.");
-	//	}
-	//}
-
 }
 
 void e2::MeshImporter::startAnalyzing()

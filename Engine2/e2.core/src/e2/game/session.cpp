@@ -31,17 +31,25 @@ e2::Session::Session(e2::Context* ctx)
 	m_modelBuffers[0] = renderContext()->createDataBuffer(bufferCreateInfo);
 	m_modelBuffers[1] = renderContext()->createDataBuffer(bufferCreateInfo);
 
+	uint64_t skinDataSize = sizeof(glm::mat4) * e2::maxNumSkeletonBones;
+
+	bufferCreateInfo.size = renderManager()->paddedBufferSize(skinDataSize * e2::maxNumSkinProxies);
+	m_skinBuffers[0] = renderContext()->createDataBuffer(bufferCreateInfo);
+	m_skinBuffers[1] = renderContext()->createDataBuffer(bufferCreateInfo);
+
 	// @todo maybe default initialize the model buffers if neccessary (make sure we aren't rendering single frames with invalid data, as this can have severe performance implications)
-
-
-	uint32_t dynamicSize = renderManager()->paddedBufferSize(sizeof(glm::mat4));
-	//uint32_t dynamicSize = bufferCreateInfo.size;
 
 
 	m_modelSets[0] = renderManager()->modelPool()->createDescriptorSet(renderManager()->modelSetLayout());
 	m_modelSets[1] = renderManager()->modelPool()->createDescriptorSet(renderManager()->modelSetLayout());
+
+	uint32_t dynamicSize = renderManager()->paddedBufferSize(sizeof(glm::mat4));
 	m_modelSets[0]->writeDynamicBuffer(0, m_modelBuffers[0], dynamicSize, 0);
 	m_modelSets[1]->writeDynamicBuffer(0, m_modelBuffers[1], dynamicSize, 0);
+
+	dynamicSize = renderManager()->paddedBufferSize(skinDataSize);
+	m_modelSets[0]->writeDynamicBuffer(1, m_skinBuffers[0], dynamicSize, 0);
+	m_modelSets[1]->writeDynamicBuffer(1, m_skinBuffers[1], dynamicSize, 0);
 
 	gameManager()->registerSession(this);
 }
@@ -63,6 +71,9 @@ e2::Session::~Session()
 
 	e2::destroy(m_modelBuffers[0]);
 	e2::destroy(m_modelBuffers[1]);
+
+	e2::destroy(m_skinBuffers[0]);
+	e2::destroy(m_skinBuffers[1]);
 
 	e2::destroy(m_modelSets[0]);
 	e2::destroy(m_modelSets[1]);
@@ -94,7 +105,19 @@ void e2::Session::tick(double seconds)
 			uint32_t proxyOffset = renderManager()->paddedBufferSize(sizeof(glm::mat4)) * proxy->id;
 			m_modelBuffers[frameIndex]->upload(reinterpret_cast<uint8_t const*>(&proxy->modelMatrix), sizeof(glm::mat4), 0, proxyOffset);
 		}
+	}
 
+	for (e2::SkinProxy* proxy : m_skinProxies)
+	{
+		if (proxy->skinDirty[frameIndex])
+		{
+			proxy->skinDirty[frameIndex] = false;
+
+			// @todo if we ever change model buffers from being dynamic, we need to optimize these uploads
+			// right now it's fine as theyre just mapped memcpys
+			uint32_t proxyOffset = renderManager()->paddedBufferSize(sizeof(glm::mat4) * e2::maxNumSkeletonBones) * proxy->id;
+			m_skinBuffers[frameIndex]->upload(reinterpret_cast<uint8_t const*>(&proxy->skin[0]), sizeof(glm::mat4) * e2::maxNumSkeletonBones, 0, proxyOffset);
+		}
 	}
 
 	for (e2::MaterialProxy* proxy : m_materialProxies)
@@ -144,7 +167,7 @@ uint32_t e2::Session::registerMeshProxy(e2::MeshProxy* proxy)
 	return m_modelIds.create();
 }
 
-void e2::Session::unregisterMeshProxy(uint32_t id, e2::MeshProxy* proxy)
+void e2::Session::unregisterMeshProxy(e2::MeshProxy* proxy)
 {
 	m_modelIds.destroy(proxy->id);
 
@@ -169,6 +192,26 @@ void e2::Session::registerMaterialProxy(e2::MaterialProxy* proxy)
 void e2::Session::unregisterMaterialProxy(e2::MaterialProxy* proxy)
 {
 	m_materialProxies.erase(proxy);
+}
+
+uint32_t e2::Session::registerSkinProxy(e2::SkinProxy* proxy)
+{
+	if (m_skinProxies.size() >= e2::maxNumSkinProxies)
+	{
+		LogError("maxNumSkinProxies reached");
+		return UINT32_MAX;
+	}
+
+	m_skinProxies.insert(proxy);
+
+	return m_skinIds.create();
+}
+
+void e2::Session::unregisterSkinProxy(e2::SkinProxy* proxy)
+{
+	m_skinIds.destroy(proxy->id);
+
+	m_skinProxies.erase(proxy);
 }
 
 std::map<e2::RenderLayer, std::unordered_set<e2::MeshProxySubmesh>> const& e2::Session::submeshIndex() const

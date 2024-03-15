@@ -52,12 +52,17 @@ namespace e2
 		e2::Buffer vertexData;
 	};
 
+	struct WeightData
+	{
+		glm::vec4 weights;
+		glm::uvec4 ids;
+	};
+
+
 	struct ImportSubmesh
 	{
 		aiMesh* assMesh{};
 		aiMaterial* assMaterial{};
-
-		std::map<std::string, uint32_t> boneMap;
 
 		std::string materialName;
 		e2::UUID existingMaterialUUID;
@@ -84,6 +89,8 @@ namespace e2
 		bool hasWeights{};
 		bool importWeights{};
 
+		std::vector<WeightData> weightData;
+
 		// intermediate data here 
 
 		struct IntermediateData
@@ -99,27 +106,121 @@ namespace e2
 
 	};
 
+	struct Vec3Key
+	{
+		float time;
+		glm::vec3 vector;
+	};
+
+	struct QuatKey
+	{
+		float time;
+		glm::quat quat;
+	};
+
+	struct ImportChannel
+	{
+		glm::vec3 samplePosition(float time)
+		{
+			for (int32_t ki = 0; ki < positionKeys.size(); ki++)
+			{
+				if (positionKeys[ki].time == time)
+					return positionKeys[ki].vector;
+			}
+
+			int32_t frameA = 0;
+			int32_t frameB = 0;
+
+			for (int32_t ki = 0; ki < positionKeys.size(); ki++)
+			{
+				if (positionKeys[ki].time > time)
+				{
+					frameB = ki;
+					break;
+				}
+			}
+
+			frameA = frameB - 1;
+			if (frameA < 0)
+			{
+				return positionKeys[frameB].vector;
+			}
+			float timeA = positionKeys[frameA].time;
+			float timeB = positionKeys[frameB].time;
+
+			float frameDelta = (time - timeA) / (timeB - timeA);
+
+			return glm::mix(positionKeys[frameA].vector, positionKeys[frameB].vector, frameDelta);
+		}
+
+		glm::quat sampleRotation(float time)
+		{
+			for (int32_t ki = 0; ki < rotationKeys.size(); ki++)
+			{
+				if (rotationKeys[ki].time == time)
+					return rotationKeys[ki].quat;
+			}
+
+			int32_t frameA = 0;
+			int32_t frameB = 0;
+
+			for (int32_t ki = 0; ki < rotationKeys.size(); ki++)
+			{
+				if (rotationKeys[ki].time > time)
+				{
+					frameB = ki;
+					break;
+				}
+			}
+
+			frameA = frameB - 1;
+			if (frameA < 0)
+			{
+				return rotationKeys[frameB].quat;
+			}
+			float timeA = rotationKeys[frameA].time;
+			float timeB = rotationKeys[frameB].time;
+
+			float frameDelta = (time - timeA) / (timeB - timeA);
+
+			return glm::slerp(rotationKeys[frameA].quat, rotationKeys[frameB].quat, frameDelta);
+		}
+
+		std::vector<Vec3Key> positionKeys;
+		std::vector<QuatKey> rotationKeys;
+	};
+
 	struct ImportAnimation
 	{
+		bool import{};
+		std::string name;
+		uint32_t duration{};
+		float framesPerSecond{24.0f};
+		std::unordered_map<std::string, ImportChannel> channels;
+	};
 
-		float framesPerSecond{60.0f};
+	struct ImportBone
+	{
+		bool isRoot{};
+		uint32_t id{};
+		int32_t parentId{};
+		std::string name;
+		std::string parentName;
+		glm::mat4 inverseBindPose;
+		glm::mat4 localTransform;
+
 	};
 
 	struct ImportSkeleton
 	{
+		glm::mat4 globalInverseTransform;
 
+		std::unordered_map<std::string, uint32_t> boneIndex;
+		std::vector<ImportBone> bones;
 	};
 
 	struct ImportMesh
 	{
-		bool isMeshSkinned()
-		{
-			for (ImportSubmesh const& submesh : submeshes)
-				if (submesh.hasWeights)
-					return true;
-			
-			return false;
-		}
 
 		Assimp::Importer* assImporter{};
 		aiScene const *assScene{};
@@ -160,7 +261,6 @@ namespace e2
 
 		e2::UUID createMaterial(std::string const& outName);
 
-		void displayContent();
 		void startAnalyzing();
 		void startProcessing();
 		std::string m_failReason;
@@ -169,6 +269,8 @@ namespace e2
 		MeshImportConfig m_config;
 
 		ImportMesh m_mesh;
+
+		std::vector<ImportAnimation> m_animations;
 
 		std::string m_title;
 	};
