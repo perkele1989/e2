@@ -52,7 +52,7 @@ namespace e2
 	struct E2_API SkinProxyConfiguration
 	{
 		e2::SkeletonPtr skeleton;
-
+		e2::MeshPtr mesh;
 	};
 
 
@@ -79,7 +79,8 @@ namespace e2
 		/** The unique identifier we got from session when registering. Used for things like modelmatrix buffer offsets etc. */
 		uint32_t id{ UINT32_MAX };
 
-		e2::SkeletonPtr asset{};
+		e2::SkeletonPtr skeletonAsset{};
+		e2::MeshPtr meshAsset{};
 
 		void applyPose(e2::Pose* pose);
 

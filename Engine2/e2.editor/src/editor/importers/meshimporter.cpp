@@ -28,56 +28,26 @@ namespace fs = std::filesystem;
 
 namespace
 {
+	glm::quat glmQuat(aiQuaternion const& from)
+	{
+		return glm::quat(from.w, from.x, from.z, from.y);
+	}
+
 	glm::vec3 glmVec3(aiVector3D const& from)
 	{
-		return { -from.x, -from.z, from.y };
+		return { from.x, from.z, from.y };
 	}
 
 	glm::vec3 blenderToE2(glm::vec3 const& from)
 	{
-		return { -from.x, -from.z, from.y };
+		return { from.x, from.z, from.y };
 	}
 
 	glm::quat blenderToE2(glm::quat const& from)
 	{
-		return glm::quat(from.w, -from.x, -from.z, from.y);
+		return glm::quat(from.w,from.x, from.z, from.y);
 	}
 
-	glm::mat4 glmMat4(const aiMatrix4x4& from)
-	{
-		glm::mat4 to;
-		to[0][0] = from.a1;
-		to[1][0] = from.a2;
-		to[2][0] = from.a3;
-		to[3][0] = from.a4;
-
-		to[0][1] = from.b1;
-		to[1][1] = from.b2;
-		to[2][1] = from.b3;
-		to[3][1] = from.b4;
-
-		to[0][2] = from.c1;
-		to[1][2] = from.c2;
-		to[2][2] = from.c3;
-		to[3][2] = from.c4;
-
-		to[0][3] = from.d1;
-		to[1][3] = from.d2;
-		to[2][3] = from.d3;
-		to[3][3] = from.d4;
-
-		/*
-		glm::vec3 scale, translation, skew;
-		glm::vec4 perspective;
-		glm::quat rotation;
-		glm::decompose(to, scale, rotation, translation, skew, perspective);
-
-
-		to = glm::toMat4(::blenderToE2(rotation)) * glm::translate(::blenderToE2(translation));
-		*/
-
-		return to;
-	}
 
 }
 
@@ -284,10 +254,9 @@ bool e2::MeshImporter::analyze()
 		aiProcess_SortByPType |
 		aiProcess_LimitBoneWeights |
 		aiProcess_ImproveCacheLocality |
-		aiProcess_PopulateArmatureData |
+		//aiProcess_PopulateArmatureData |
 		aiProcess_FixInfacingNormals |
 		aiProcess_OptimizeMeshes |
-		aiProcess_OptimizeGraph |
 		aiProcess_GenBoundingBoxes | 
 		aiProcess_CalcTangentSpace | 
 		aiProcess_FlipWindingOrder /* |
@@ -337,8 +306,7 @@ bool e2::MeshImporter::analyze()
 
 		
 		uint32_t boneIdMaker{};
-		m_mesh.skeleton.globalInverseTransform = glm::inverse(glmMat4(m_mesh.assScene->mRootNode->mTransformation));
-		
+
 
 		for (uint64_t i = 0; i < m_mesh.assScene->mNumMeshes; i++)
 		{
@@ -401,8 +369,14 @@ bool e2::MeshImporter::analyze()
 						newBone.name = assNode->mName.C_Str();
 						newBone.parentId = -1;
 						newBone.parentName = assNode->mParent ? assNode->mParent->mName.C_Str() : "none";
-						newBone.inverseBindPose = glmMat4(assBone->mOffsetMatrix);
-						newBone.localTransform = glmMat4(assNode->mTransformation);
+
+						aiVector3D assTranslation;
+						aiQuaternion assRotation;
+						aiVector3D assScale;
+						assNode->mTransformation.Decompose(assScale, assRotation, assTranslation);
+
+						newBone.localTranslation = ::glmVec3(assTranslation);
+						newBone.localRotation = ::glmQuat(assRotation);
 
 						m_mesh.skeleton.boneIndex[newBone.name] = newBone.id;
 						m_mesh.skeleton.bones.push_back(newBone);
@@ -528,7 +502,7 @@ bool e2::MeshImporter::analyze()
 					aiVectorKey k = channel->mPositionKeys[t];
 					Vec3Key newKey;
 					newKey.vector = ::blenderToE2(glm::vec3(k.mValue.x, k.mValue.y, k.mValue.z));
-					newKey.time = (float)k.mTime;
+					newKey.time = (float)k.mTime / newAnim.framesPerSecond;
 					newChannel.positionKeys.push_back(newKey);
 				}
 
@@ -537,7 +511,7 @@ bool e2::MeshImporter::analyze()
 					aiQuatKey k = channel->mRotationKeys[t];
 					QuatKey newKey;
 					newKey.quat = ::blenderToE2(glm::quat(k.mValue.w, k.mValue.x, k.mValue.y, k.mValue.z));
-					newKey.time = (float)k.mTime;
+					newKey.time = (float)k.mTime / newAnim.framesPerSecond;
 					newChannel.rotationKeys.push_back(newKey);
 				}
 
@@ -648,7 +622,10 @@ bool e2::MeshImporter::writeAssets()
 			{
 				//attribPos.vertexData << float(-sm->mVertices[i].x) << float(-sm->mVertices[i].z) << float(sm->mVertices[i].y) << 1.0f;
 
-				attribPos.vertexData << ::glmVec3(sm->mVertices[i]) << 1.0f;
+				glm::vec3 pos = ::glmVec3(sm->mVertices[i]);
+				pos.x = -pos.x;
+				pos.y = -pos.y;
+				attribPos.vertexData << pos << 1.0f;
 			}
 
 			im.attributes.push_back(attribPos);
@@ -661,8 +638,10 @@ bool e2::MeshImporter::writeAssets()
 
 				for (uint32_t i = 0; i < sm->mNumVertices; i++)
 				{
-					//attribNormals.vertexData << float(-sm->mNormals[i].x) << float(-sm->mNormals[i].z) << float(sm->mNormals[i].y) << 0.0f;
-					attribNormals.vertexData << ::glmVec3(sm->mNormals[i]) << 0.0f;
+					glm::vec3 nrm = ::glmVec3(sm->mNormals[i]);
+					nrm.x = -nrm.x;
+					nrm.y = -nrm.y;
+					attribNormals.vertexData << nrm << 0.0f;
 				}
 
 				im.attributes.push_back(attribNormals);
@@ -672,8 +651,10 @@ bool e2::MeshImporter::writeAssets()
 
 				for (uint32_t i = 0; i < sm->mNumVertices; i++)
 				{
-					//attribTangents.vertexData << float(-sm->mTangents[i].x) << float(-sm->mTangents[i].z) << float(sm->mTangents[i].y) << 0.0f;
-					attribTangents.vertexData << ::glmVec3(sm->mTangents[i]) << 0.0f;
+					glm::vec3 tan = ::glmVec3(sm->mTangents[i]);
+					tan.x = -tan.x;
+					tan.y = -tan.y;
+					attribTangents.vertexData << tan << 0.0f;
 				}
 
 				im.attributes.push_back(attribTangents);
@@ -835,16 +816,17 @@ bool e2::MeshImporter::writeAssets()
 		// write the data 
 		e2::Buffer skeletonData;
 
-		skeletonData << m_mesh.skeleton.globalInverseTransform;
 		skeletonData << uint32_t(m_mesh.skeleton.bones.size());
 		for (uint32_t i = 0; i < m_mesh.skeleton.bones.size(); i++)
 		{
 			e2::ImportBone& b = m_mesh.skeleton.bones[i];
-			skeletonData << b.name;
-			skeletonData << b.localTransform;
-			skeletonData << b.inverseBindPose;
+			LogNotice("Writing bone {} {} with parent {}", i, b.name, b.parentId);
 
-			skeletonData << b.parentId;
+
+			skeletonData << std::string(b.name);
+			skeletonData << glm::vec3(b.localTranslation);
+			skeletonData << glm::quat(b.localRotation);
+			skeletonData << int32_t(b.parentId);
 		}
 
 		skeletonHeader.size = skeletonData.size();
@@ -1031,4 +1013,70 @@ std::string e2::attributeString(ImportAttributeMode mode)
 	}
 
 	return "";
+}
+
+glm::vec3 e2::ImportChannel::samplePosition(float time)
+{
+	for (int32_t ki = 0; ki < positionKeys.size(); ki++)
+	{
+		if (positionKeys[ki].time == time)
+			return positionKeys[ki].vector;
+	}
+
+	int32_t frameA = 0;
+	int32_t frameB = 0;
+
+	for (int32_t ki = 0; ki < positionKeys.size(); ki++)
+	{
+		if (positionKeys[ki].time > time)
+		{
+			frameB = ki;
+			break;
+		}
+	}
+
+	frameA = frameB - 1;
+	if (frameA < 0)
+	{
+		return positionKeys[frameB].vector;
+	}
+	float timeA = positionKeys[frameA].time;
+	float timeB = positionKeys[frameB].time;
+
+	float frameDelta = (time - timeA) / (timeB - timeA);
+
+	return glm::mix(positionKeys[frameA].vector, positionKeys[frameB].vector, frameDelta);
+}
+
+glm::quat e2::ImportChannel::sampleRotation(float time)
+{
+	for (int32_t ki = 0; ki < rotationKeys.size(); ki++)
+	{
+		if (rotationKeys[ki].time == time)
+			return rotationKeys[ki].quat;
+	}
+
+	int32_t frameA = 0;
+	int32_t frameB = 0;
+
+	for (int32_t ki = 0; ki < rotationKeys.size(); ki++)
+	{
+		if (rotationKeys[ki].time > time)
+		{
+			frameB = ki;
+			break;
+		}
+	}
+
+	frameA = frameB - 1;
+	if (frameA < 0)
+	{
+		return rotationKeys[frameB].quat;
+	}
+	float timeA = rotationKeys[frameA].time;
+	float timeB = rotationKeys[frameB].time;
+
+	float frameDelta = (time - timeA) / (timeB - timeA);
+
+	return glm::slerp(rotationKeys[frameA].quat, rotationKeys[frameB].quat, frameDelta);
 }

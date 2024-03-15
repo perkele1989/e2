@@ -314,6 +314,11 @@ namespace e2
 
 		void destroyStructure(e2::Hex const& location);
 
+		e2::RenderView const& view()
+		{
+			return m_view;
+		}
+
 	protected:
 		e2::GameStructure* m_selectedStructure{};
 		std::unordered_set<e2::GameStructure*> m_structures;

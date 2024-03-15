@@ -227,7 +227,7 @@ e2::Buffer& e2::Buffer::operator>>(glm::vec4& value)
 
 e2::Buffer& e2::Buffer::operator>>(glm::vec3& value)
 {
-	*this << value.x >> value.y >> value.z;
+	*this >> value.x >> value.y >> value.z;
 	return*this;
 }
 

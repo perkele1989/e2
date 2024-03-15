@@ -84,7 +84,8 @@ e2::Engine* e2::MeshProxy::engine()
 
 e2::SkinProxy::SkinProxy(e2::Session* inSession, e2::SkinProxyConfiguration const& config)
 	: session(inSession)
-	, asset(config.skeleton)
+	, skeletonAsset(config.skeleton)
+	, meshAsset(config.mesh)
 {
 	id = session->registerSkinProxy(this);
 }
@@ -107,7 +108,12 @@ void e2::SkinProxy::applyPose(e2::Pose* pose)
 	uint32_t i = 0;
 	for (glm::mat4 const& boneTransform : pose->skin())
 	{
-		skin[i++] = boneTransform;
+		uint32_t skeletonId = i++;
+		e2::Bone* bone = skeletonAsset->boneById(skeletonId);
+		int32_t meshId = meshAsset->boneIndexByName(bone->name);
+
+		if(meshId >= 0)
+			skin[meshId] = boneTransform;
 	}
 
 	skinDirty = true;

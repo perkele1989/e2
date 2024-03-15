@@ -551,7 +551,7 @@ glm::dvec2 e2::RenderView::unprojectWorldPlane(glm::dvec2 const& resolution, glm
 	if (!glm::intersectRayPlane(origin, viewRay, { 0.0, 0.0, 0.0 }, e2::worldUp(), rayDistanceToPlane))
 	{
 		rayDistanceToPlane = renderDistance;
-		LogNotice("failed");
+		//LogNotice("failed");
 	}
 
 	

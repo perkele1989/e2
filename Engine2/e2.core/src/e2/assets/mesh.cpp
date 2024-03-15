@@ -306,8 +306,6 @@ void e2::Skeleton::write(Buffer& destination) const
 
 bool e2::Skeleton::read(Buffer& source)
 {
-
-	source >> m_inverseTransform;
 	uint32_t numBones{};
 	source >> numBones;
 
@@ -317,12 +315,20 @@ bool e2::Skeleton::read(Buffer& source)
 	{
 		e2::Bone newBone;
 		newBone.index = i;
-		source >> newBone.name;
-		source >> newBone.transform;
-		source >> newBone.inverseBindTransform;
+
+		std::string name; 
+		source >> name; 
+		newBone.name = name;
+
+		source >> newBone.localTranslation;
+		source >> newBone.localRotation;
 
 		int32_t parentId{ -1 };
 		source >> parentId;
+
+		newBone.localTransform = glm::toMat4(newBone.localRotation) * glm::translate(newBone.localTranslation);
+
+
 		parentIds.push(parentId);
 
 		m_bones.push(newBone);
@@ -343,6 +349,34 @@ bool e2::Skeleton::read(Buffer& source)
 			m_bones[parentId].children.push(&m_bones[i]);
 		}
 	}
+
+	// resolve derived transforms 
+	struct WorkUnit
+	{
+		e2::Bone* bone{};
+		glm::mat4 transform;
+	};
+
+	glm::mat4 ident = glm::identity<glm::mat4>();
+
+	std::queue<WorkUnit> queue;
+	for (e2::Bone* r : m_roots)
+		queue.push({r, ident });
+
+	while (!queue.empty())
+	{
+		WorkUnit unit = queue.front();
+		queue.pop();
+
+		glm::mat4 oldTransform = unit.transform;
+		glm::mat4 newTransform = oldTransform * unit.bone->localTransform;
+		unit.bone->globalTransform = newTransform;
+		unit.bone->inverseGlobalTransform = glm::inverse(unit.bone->globalTransform);
+
+		for (e2::Bone* c : unit.bone->children)
+			queue.push({ c, newTransform });
+	}
+
 	return true;
 }
 
@@ -580,16 +614,11 @@ e2::Pose::Pose(e2::Ptr<e2::Skeleton> skeleton)
 	{
 		e2::Bone* bone = m_skeleton->boneById(i);
 
-		glm::vec3 scale, translation, skew;
-		glm::vec4 perspective;
-		glm::quat rotation;
-		glm::decompose(bone->transform, scale, rotation, translation, skew, perspective);
-
 		e2::PoseBone poseBone;
-		poseBone.bindTranslation = translation;
-		poseBone.bindRotation = rotation;
-		poseBone.localRotation = poseBone.bindRotation;
-		poseBone.localTranslation = poseBone.bindTranslation;
+		poseBone.id = i;
+		poseBone.localRotation = poseBone.localRotation;
+		poseBone.localTranslation = poseBone.localTranslation;
+		poseBone.assetBone = bone;
 
 		m_poseBones.push(poseBone);
 	}
@@ -625,6 +654,16 @@ glm::mat4 e2::Pose::localBoneTransform(uint32_t boneIndex)
 	return m_poseBones[boneIndex].localTransform();
 }
 
+
+glm::mat4 e2::Pose::globalBoneTransform(uint32_t boneIndex)
+{
+	static glm::mat4 def = glm::identity<glm::mat4>();
+	if (boneIndex >= m_poseBones.size())
+		return def;
+
+	return m_poseBones[boneIndex].cachedGlobalTransform;
+}
+
 void e2::Pose::updateSkin()
 {
 	struct WorkChunk
@@ -647,7 +686,9 @@ void e2::Pose::updateSkin()
 		chunks.pop();
 
 		e2::PoseBone* poseBone = &m_poseBones[chunk.bone->index];
-		poseBone->updateSkin(chunk.parentTransform, m_skeleton->inverseTransform(), chunk.bone->inverseBindTransform);
+
+		poseBone->cachedGlobalTransform = chunk.parentTransform * poseBone->localTransform();
+		poseBone->cachedSkinTransform = poseBone->cachedGlobalTransform * chunk.bone->inverseGlobalTransform;
 
 		m_skin[chunk.bone->index] = poseBone->cachedSkinTransform;
 
@@ -662,8 +703,19 @@ void e2::Pose::applyBindPose()
 {
 	for (e2::PoseBone& bone : m_poseBones)
 	{
-		bone.localTranslation = bone.bindTranslation;
-		bone.localRotation = bone.bindRotation;
+
+		bone.localTranslation = bone.assetBone->localTranslation;
+		bone.localRotation = bone.assetBone->localRotation;
+
+		/*
+		bone.localTranslation.x = -bone.localTranslation.x;
+		bone.localTranslation.y = -bone.localTranslation.y;
+		bone.localTranslation.z = bone.localTranslation.z;
+		
+		bone.localRotation.x = -bone.localRotation.x;
+		bone.localRotation.y = -bone.localRotation.y;
+		bone.localRotation.z = bone.localRotation.z;*/
+
 	}
 }
 
@@ -730,5 +782,5 @@ e2::Ptr<e2::Skeleton> e2::Pose::skeleton()
 
 glm::mat4 e2::PoseBone::localTransform()
 {
-	return glm::toMat4(localRotation)* glm::translate(localTranslation);
+	return glm::toMat4(localRotation) * glm::translate(localTranslation);
 }

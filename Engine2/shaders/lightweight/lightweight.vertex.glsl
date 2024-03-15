@@ -51,15 +51,22 @@ out vec4 fragmentColor;
 void main()
 {
 	vec4 animatedVertexPosition = vertexPosition;
+	vec4 animatedVertexNormal = vertexNormal;
+	vec4 animatedVertexTangent = vertexTangent;
 
 #if defined(Renderer_Skin) && defined(Vertex_Bones)
 
-	mat4 animationTransform = skin.skinMatrices[vertexIds.x] * vertexWeights.x; 
-	animationTransform += skin.skinMatrices[vertexIds.y] * vertexWeights.y; 
-	animationTransform += skin.skinMatrices[vertexIds.z] * vertexWeights.z; 
-	animationTransform += skin.skinMatrices[vertexIds.w] * vertexWeights.w; 
+	vec4 weights = normalize(vertexWeights);
+	weights = vertexWeights;
+
+	mat4 animationTransform = skin.skinMatrices[vertexIds.x] * weights.x; 
+	animationTransform += skin.skinMatrices[vertexIds.y] * weights.y; 
+	animationTransform += skin.skinMatrices[vertexIds.z] * weights.z; 
+	animationTransform += skin.skinMatrices[vertexIds.w] * weights.w; 
 
 	animatedVertexPosition =  animationTransform * animatedVertexPosition;
+	//animatedVertexNormal = animationTransform * animatedVertexNormal;
+	//animatedVertexTangent.xyz = (animationTransform * vec4(animatedVertexTangent.xyz, 0.0)).xyz;
 #endif 
 
 	gl_Position = renderer.projectionMatrix * renderer.viewMatrix * mesh.modelMatrix * animatedVertexPosition;
@@ -67,9 +74,9 @@ void main()
 	fragmentPosition = mesh.modelMatrix * animatedVertexPosition;
 #if defined(Vertex_Normals)
 
-	fragmentNormal = normalize(mesh.modelMatrix * normalize(vertexNormal)).xyz;
-	fragmentTangent.xyz =  normalize(mesh.modelMatrix * normalize(vec4(vertexTangent.xyz, 0.0))).xyz;
-    fragmentTangent.w = vertexTangent.w;
+	fragmentNormal = normalize(mesh.modelMatrix * normalize(animatedVertexNormal)).xyz;
+	fragmentTangent.xyz =  normalize(mesh.modelMatrix * normalize(vec4(animatedVertexTangent.xyz, 0.0))).xyz;
+    fragmentTangent.w = animatedVertexTangent.w;
 	//fragmentBitangent = normalize(cross(fragmentNormal.xyz, fragmentTangent.xyz));
 #endif
 

@@ -144,6 +144,7 @@ void main()
 	// debug refl
 	//outColor.rgb = F;
 
+	//outColor.rgb = fragmentPosition.xyz *0.5 + 0.5;
 	// debug norm
 	//outColor.rgb = clamp(vec3(worldNormal.x, worldNormal.z, -worldNormal.y) * 0.5 + 0.5, vec3(EPSILON), vec3(1.0));
     //outColor.rgb = clamp(vec3(fragmentNormal.x, fragmentNormal.z, -fragmentNormal.y) * 0.5 + 0.5, vec3(EPSILON), vec3(1.0));

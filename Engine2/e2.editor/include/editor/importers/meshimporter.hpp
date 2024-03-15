@@ -120,71 +120,9 @@ namespace e2
 
 	struct ImportChannel
 	{
-		glm::vec3 samplePosition(float time)
-		{
-			for (int32_t ki = 0; ki < positionKeys.size(); ki++)
-			{
-				if (positionKeys[ki].time == time)
-					return positionKeys[ki].vector;
-			}
+		glm::vec3 samplePosition(float time);
 
-			int32_t frameA = 0;
-			int32_t frameB = 0;
-
-			for (int32_t ki = 0; ki < positionKeys.size(); ki++)
-			{
-				if (positionKeys[ki].time > time)
-				{
-					frameB = ki;
-					break;
-				}
-			}
-
-			frameA = frameB - 1;
-			if (frameA < 0)
-			{
-				return positionKeys[frameB].vector;
-			}
-			float timeA = positionKeys[frameA].time;
-			float timeB = positionKeys[frameB].time;
-
-			float frameDelta = (time - timeA) / (timeB - timeA);
-
-			return glm::mix(positionKeys[frameA].vector, positionKeys[frameB].vector, frameDelta);
-		}
-
-		glm::quat sampleRotation(float time)
-		{
-			for (int32_t ki = 0; ki < rotationKeys.size(); ki++)
-			{
-				if (rotationKeys[ki].time == time)
-					return rotationKeys[ki].quat;
-			}
-
-			int32_t frameA = 0;
-			int32_t frameB = 0;
-
-			for (int32_t ki = 0; ki < rotationKeys.size(); ki++)
-			{
-				if (rotationKeys[ki].time > time)
-				{
-					frameB = ki;
-					break;
-				}
-			}
-
-			frameA = frameB - 1;
-			if (frameA < 0)
-			{
-				return rotationKeys[frameB].quat;
-			}
-			float timeA = rotationKeys[frameA].time;
-			float timeB = rotationKeys[frameB].time;
-
-			float frameDelta = (time - timeA) / (timeB - timeA);
-
-			return glm::slerp(rotationKeys[frameA].quat, rotationKeys[frameB].quat, frameDelta);
-		}
+		glm::quat sampleRotation(float time);
 
 		std::vector<Vec3Key> positionKeys;
 		std::vector<QuatKey> rotationKeys;
@@ -206,15 +144,17 @@ namespace e2
 		int32_t parentId{};
 		std::string name;
 		std::string parentName;
-		glm::mat4 inverseBindPose;
-		glm::mat4 localTransform;
+
+		// local bind pose translation
+		glm::vec3 localTranslation;
+
+		// local bind pose rotation 
+		glm::quat localRotation;
 
 	};
 
 	struct ImportSkeleton
 	{
-		glm::mat4 globalInverseTransform;
-
 		std::unordered_map<std::string, uint32_t> boneIndex;
 		std::vector<ImportBone> bones;
 	};

@@ -18,8 +18,19 @@ namespace e2
 		uint32_t index{};
 		e2::Name name;
 
-		glm::mat4 transform;
-		glm::mat4 inverseBindTransform;
+
+		// local bind pose translation
+		glm::vec3 localTranslation;
+
+		// local bind pose rotation 
+		glm::quat localRotation;
+
+		// local bind transform, jsut a combination of the above 
+		glm::mat4 localTransform;
+
+		// extra derived
+		glm::mat4 globalTransform;
+		glm::mat4 inverseGlobalTransform; // the "ivnerse bind pose"/"offset matrix"!! 
 
 		e2::Bone* parent{};
 		e2::StackVector<e2::Bone*, maxNumBoneChildren> children;
@@ -125,9 +136,9 @@ namespace e2
 
 	struct PoseBone
 	{
-		glm::vec3 bindTranslation{ 0.0f, 0.0f, 0.0f };
-		glm::quat bindRotation{ 1.0f, 0.0f, 0.0f, 0.0f };
+		e2::Bone* assetBone{};
 
+		uint32_t id{};
 		glm::vec3 localTranslation{ 0.0f, 0.0f, 0.0f };
 		glm::quat localRotation{ 1.0f, 0.0f, 0.0f, 0.0f };
 
@@ -135,12 +146,6 @@ namespace e2
 
 		glm::mat4 cachedGlobalTransform;
 		glm::mat4 cachedSkinTransform;
-
-		void updateSkin(glm::mat4 const& parentTransform, glm::mat4 const& globalInverseTransform, glm::mat4 const& inverseBindPose)
-		{
-			cachedGlobalTransform = parentTransform * localTransform();
-			cachedSkinTransform = globalInverseTransform * cachedGlobalTransform * inverseBindPose;
-		}
 
 	};
 
@@ -166,6 +171,8 @@ namespace e2
 		glm::quat const& localBoneRotation(uint32_t boneIndex);
 		glm::vec3 const& localBoneTranslation(uint32_t boneIndex);
 		glm::mat4 localBoneTransform(uint32_t boneIndex);
+
+		glm::mat4 globalBoneTransform(uint32_t boneIndex);
 
 		void updateSkin();
 
@@ -248,6 +255,17 @@ namespace e2
 		inline bool isDone() const
 		{
 			return m_done;
+		}
+
+		int32_t boneIndexByName(e2::Name name)
+		{
+			auto finder = m_boneIndex.find(name);
+			if (finder == m_boneIndex.end())
+			{
+				return -1;
+			}
+
+			return finder->second;
 		}
 
 	protected:

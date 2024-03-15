@@ -13,6 +13,19 @@ int main(int argc, char** argv)
 {
 	::registerGeneratedTypes();
 
+
+	int32_t i = -1;
+	e2::Buffer buff;
+	buff << i;
+
+	int32_t j = 0;
+	buff >> j;
+
+	if (i == j)
+		LogNotice("PASS");
+	else
+		LogNotice("FAIL");
+
 	 
 	/** Test e2::Ptr (passing) */
 	if (true)
