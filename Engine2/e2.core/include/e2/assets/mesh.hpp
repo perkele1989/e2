@@ -18,19 +18,11 @@ namespace e2
 		uint32_t index{};
 		e2::Name name;
 
+		// geometry-to-bone (is this inverse bind pose?)
+		glm::mat4 bindMatrix;
 
-		// local bind pose translation
-		glm::vec3 localTranslation;
-
-		// local bind pose rotation 
-		glm::quat localRotation;
-
-		// local bind transform, jsut a combination of the above 
+		// node-to-parent 
 		glm::mat4 localTransform;
-
-		// extra derived
-		glm::mat4 globalTransform;
-		glm::mat4 inverseGlobalTransform; // the "ivnerse bind pose"/"offset matrix"!! 
 
 		e2::Bone* parent{};
 		e2::StackVector<e2::Bone*, maxNumBoneChildren> children;
@@ -139,10 +131,7 @@ namespace e2
 		e2::Bone* assetBone{};
 
 		uint32_t id{};
-		glm::vec3 localTranslation{ 0.0f, 0.0f, 0.0f };
-		glm::quat localRotation{ 1.0f, 0.0f, 0.0f, 0.0f };
-
-		glm::mat4 localTransform();
+		glm::mat4 localTransform;
 
 		glm::mat4 cachedGlobalTransform;
 		glm::mat4 cachedSkinTransform;
@@ -167,12 +156,6 @@ namespace e2
 		/** initialize pose from skeleton */
 		Pose(e2::Ptr<e2::Skeleton> skeleton);
 		virtual ~Pose();
-
-		glm::quat const& localBoneRotation(uint32_t boneIndex);
-		glm::vec3 const& localBoneTranslation(uint32_t boneIndex);
-		glm::mat4 localBoneTransform(uint32_t boneIndex);
-
-		glm::mat4 globalBoneTransform(uint32_t boneIndex);
 
 		void updateSkin();
 

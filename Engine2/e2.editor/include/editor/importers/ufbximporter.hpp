@@ -124,12 +124,11 @@ namespace e2
 		std::string name;
 		std::string parentName;
 
-		// local bind pose translation
-		glm::vec3 localTranslation;
+		// geometry-to-bone (is this inverse bind pose?)
+		glm::mat4 bindMatrix;
 
-		// local bind pose rotation 
-		glm::quat localRotation;
-
+		// node-to-parent
+		glm::mat4 localTransform;
 	};
 
 	struct UfbxImportSkeleton

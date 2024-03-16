@@ -32,6 +32,16 @@ namespace
 		return { from.x, from.y, from.z };
 	}
 
+	glm::mat4 glmMat4(ufbx_matrix const& from)
+	{
+		return glm::mat4x3(
+			glmVec3(from.cols[0]),
+			glmVec3(from.cols[1]),
+			glmVec3(from.cols[2]),
+			glmVec3(from.cols[3])
+		);
+	}
+
 }
 
 
@@ -353,10 +363,9 @@ bool e2::UfbxImporter::analyze()
 			newBone.id = currIndex;
 			newBone.name = n->name.data;
 
-			newBone.localTranslation =  ::glmVec3(n->local_transform.translation);
+			newBone.bindMatrix = ::glmMat4(bone_cluster->geometry_to_bone);
 
-			newBone.localRotation = ::glmQuat(n->local_transform.rotation);
-
+			newBone.localTransform = ::glmMat4(n->node_to_parent);
 			m_mesh.skeleton.bones.push_back(newBone);
 
 			for (ufbx_node* c : n->children)
@@ -778,8 +787,8 @@ bool e2::UfbxImporter::writeAssets()
 			LogNotice("Writing bone {} {} with parent {}", i, b.name, b.parentId);
 
 			skeletonData << std::string(b.name);
-			skeletonData << glm::vec3(b.localTranslation);
-			skeletonData << glm::quat(b.localRotation);
+			skeletonData << glm::mat4(b.bindMatrix);
+			skeletonData << glm::mat4(b.localTransform);
 			skeletonData << int32_t(b.parentId);
 		}
 

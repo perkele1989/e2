@@ -320,14 +320,12 @@ bool e2::Skeleton::read(Buffer& source)
 		source >> name; 
 		newBone.name = name;
 
-		source >> newBone.localTranslation;
-		source >> newBone.localRotation;
+		source >> newBone.bindMatrix;
+
+		source >> newBone.localTransform;
 
 		int32_t parentId{ -1 };
 		source >> parentId;
-
-		newBone.localTransform = glm::toMat4(newBone.localRotation) * glm::translate(newBone.localTranslation);
-
 
 		parentIds.push(parentId);
 
@@ -348,33 +346,6 @@ bool e2::Skeleton::read(Buffer& source)
 			m_bones[i].parent = &m_bones[parentId];
 			m_bones[parentId].children.push(&m_bones[i]);
 		}
-	}
-
-	// resolve derived transforms 
-	struct WorkUnit
-	{
-		e2::Bone* bone{};
-		glm::mat4 transform;
-	};
-
-	glm::mat4 ident = glm::identity<glm::mat4>();
-
-	std::queue<WorkUnit> queue;
-	for (e2::Bone* r : m_roots)
-		queue.push({r, ident });
-
-	while (!queue.empty())
-	{
-		WorkUnit unit = queue.front();
-		queue.pop();
-
-		glm::mat4 oldTransform = unit.transform;
-		glm::mat4 newTransform = oldTransform * unit.bone->localTransform;
-		unit.bone->globalTransform = newTransform;
-		unit.bone->inverseGlobalTransform = glm::inverse(unit.bone->globalTransform);
-
-		for (e2::Bone* c : unit.bone->children)
-			queue.push({ c, newTransform });
 	}
 
 	return true;
@@ -616,8 +587,7 @@ e2::Pose::Pose(e2::Ptr<e2::Skeleton> skeleton)
 
 		e2::PoseBone poseBone;
 		poseBone.id = i;
-		poseBone.localRotation = poseBone.localRotation;
-		poseBone.localTranslation = poseBone.localTranslation;
+		poseBone.localTransform = poseBone.localTransform;
 		poseBone.assetBone = bone;
 
 		m_poseBones.push(poseBone);
@@ -629,39 +599,6 @@ e2::Pose::Pose(e2::Ptr<e2::Skeleton> skeleton)
 e2::Pose::~Pose()
 {
 
-}
-
-glm::quat const& e2::Pose::localBoneRotation(uint32_t boneIndex)
-{
-	static glm::quat def(1.0f, 0.0f, 0.0f, 0.0f);
-	if (boneIndex >= m_poseBones.size())
-		return def;
-
-	return m_poseBones[boneIndex].localRotation;
-}
-
-glm::vec3 const& e2::Pose::localBoneTranslation(uint32_t boneIndex)
-{
-	static glm::vec3 def{};
-	if (boneIndex >= m_poseBones.size())
-		return def;
-
-	return m_poseBones[boneIndex].localTranslation;
-}
-
-glm::mat4 e2::Pose::localBoneTransform(uint32_t boneIndex)
-{
-	return m_poseBones[boneIndex].localTransform();
-}
-
-
-glm::mat4 e2::Pose::globalBoneTransform(uint32_t boneIndex)
-{
-	static glm::mat4 def = glm::identity<glm::mat4>();
-	if (boneIndex >= m_poseBones.size())
-		return def;
-
-	return m_poseBones[boneIndex].cachedGlobalTransform;
 }
 
 void e2::Pose::updateSkin()
@@ -687,8 +624,8 @@ void e2::Pose::updateSkin()
 
 		e2::PoseBone* poseBone = &m_poseBones[chunk.bone->index];
 
-		poseBone->cachedGlobalTransform = chunk.parentTransform * poseBone->localTransform();
-		poseBone->cachedSkinTransform = poseBone->cachedGlobalTransform * chunk.bone->inverseGlobalTransform;
+		poseBone->cachedGlobalTransform = chunk.parentTransform * poseBone->localTransform;
+		poseBone->cachedSkinTransform = poseBone->cachedGlobalTransform * chunk.bone->bindMatrix;
 
 		m_skin[chunk.bone->index] = poseBone->cachedSkinTransform;
 
@@ -704,9 +641,7 @@ void e2::Pose::applyBindPose()
 	for (e2::PoseBone& bone : m_poseBones)
 	{
 
-		bone.localTranslation = bone.assetBone->localTranslation;
-		bone.localRotation = bone.assetBone->localRotation;
-
+		bone.localTransform = bone.assetBone->localTransform;
 		/*
 		bone.localTranslation.x = -bone.localTranslation.x;
 		bone.localTranslation.y = -bone.localTranslation.y;
@@ -725,13 +660,13 @@ void e2::Pose::applyBlend(Pose* a, Pose* b, float alpha)
 	{
 		LogError("incompatible poses (skeleton mismatch)");
 	}
-
+	/*
 	for (uint32_t boneId = 0; boneId < m_poseBones.size(); boneId++)
 	{
 		e2::PoseBone* poseBone = &m_poseBones[boneId];
 		poseBone->localRotation = glm::slerp(a->localBoneRotation(boneId), b->localBoneRotation(boneId), alpha);
 		poseBone->localTranslation = glm::mix(a->localBoneTranslation(boneId), b->localBoneTranslation(boneId), alpha);
-	}
+	}*/
 }
 
 void e2::Pose::blendWith(Pose* b, float alpha)
@@ -740,13 +675,13 @@ void e2::Pose::blendWith(Pose* b, float alpha)
 	{
 		LogError("incompatible poses (skeleton mismatch)");
 	}
-
+	/*
 	for (uint32_t boneId = 0; boneId < m_poseBones.size(); boneId++)
 	{
 		e2::PoseBone* poseBone = &m_poseBones[boneId];
 		poseBone->localRotation = glm::slerp(poseBone->localRotation, b->localBoneRotation(boneId), alpha);
 		poseBone->localTranslation = glm::mix(poseBone->localTranslation, b->localBoneTranslation(boneId), alpha);
-	}
+	}*/
 }
 
 void e2::Pose::applyAnimation(e2::Ptr<e2::Animation> anim, float time)
@@ -762,11 +697,19 @@ void e2::Pose::applyAnimation(e2::Ptr<e2::Animation> anim, float time)
 		e2::Name trackName_rot = std::format("{}.rotation", bone->name.cstring());
 		e2::AnimationTrack* track_rot = anim->trackByName(trackName_rot, e2::AnimationType::Quat);
 
+
+		glm::vec3 translation, scale, skew;
+		glm::vec4 perspective;
+		glm::quat rotation;
+		glm::decompose(poseBone->localTransform, scale, rotation, translation, skew, perspective);
+
 		if (track_pos)
-			poseBone->localTranslation = track_pos->getVec3(time, anim->frameRate());
+			translation = track_pos->getVec3(time, anim->frameRate());
 
 		if (track_rot)
-			poseBone->localRotation = track_rot->getQuat(time, anim->frameRate());
+			rotation = track_rot->getQuat(time, anim->frameRate());
+
+		poseBone->localTransform = glm::toMat4(rotation) * glm::translate(translation);
 	}
 }
 
@@ -786,9 +729,4 @@ e2::PoseBone* e2::Pose::poseBoneById(uint32_t id)
 		return nullptr;
 
 	return &m_poseBones[id];
-}
-
-glm::mat4 e2::PoseBone::localTransform()
-{
-	return glm::toMat4(localRotation) * glm::translate(localTranslation);
 }
