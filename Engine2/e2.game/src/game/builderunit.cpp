@@ -18,6 +18,7 @@ e2::Engineer::Engineer(e2::GameContext* ctx, glm::ivec2 const& tile, uint8_t emp
 	m_mesh = game()->getUnitMesh(unitType);
 	buildProxy();
 
+	
 	m_testAnim = game()->dummyAnimation();
 
 	e2::SkinProxyConfiguration conf;
@@ -41,6 +42,8 @@ void e2::Engineer::updateAnimation(double seconds)
 {
 	e2::GameUnit::updateAnimation(seconds);
 
+
+
 	if(m_play)
 		m_testAnimTime += float(seconds) * m_playRate;
 
@@ -56,59 +59,46 @@ void e2::Engineer::updateAnimation(double seconds)
 
 	m_testPose->updateSkin();
 
-
-	glm::vec3 colors[3] = {
+	glm::vec3 colors[4] = {
 	{1.0, 0.0, 0.0},
 	{0.0, 1.0, 0.0},
-	{0.0, 0.0, 1.0}
+	{0.0, 0.0, 1.0},
+	{1.0, 1.0, 1.0},
 	};
 
 	auto renderer = game()->gameSession()->renderer();
 	auto skeleton = m_skinProxy->skeletonAsset;
 
-	struct WorkUnit
+	glm::mat4 modelMatrix = m_proxy->modelMatrix;
+
+	for (uint32_t b = 0; b < m_skinProxy->skeletonAsset->numBones(); b++)
 	{
-		WorkUnit(e2::Bone* a, glm::mat4 const& b)
-			: bone(a)
-			, transform(b)
-		{}
-		e2::Bone* bone{};
-		glm::mat4 transform;
-	};
+		e2::Bone* bone = m_skinProxy->skeletonAsset->boneById(b);
+		e2::PoseBone* poseBone = m_testPose->poseBoneById(b);
+		e2::Bone* parentBone = bone->parent;
+		e2::PoseBone* parentPoseBone = parentBone ? m_testPose->poseBoneById(parentBone->index) : nullptr;
 
-	std::queue<WorkUnit> queue;
 
-	glm::mat4 transform = m_proxy->modelMatrix;
+		glm::mat4 boneTransform = modelMatrix * poseBone->cachedGlobalTransform;
+		glm::vec3 boneOrigin = boneTransform * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
+		
+		glm::vec3 boneRight = boneTransform * glm::vec4(e2::worldRight(), 0.0f);
+		glm::vec3 boneUp = boneTransform * glm::vec4(e2::worldUp(), 0.0f);
+		glm::vec3 boneForward = boneTransform * glm::vec4(e2::worldForward(), 0.0f);
 
-	for (uint32_t rootIndex = 0; rootIndex < skeleton->numRootBones(); rootIndex++)
-	{
-		e2::Bone* rootBone = skeleton->rootBoneById(rootIndex);
-		queue.push(WorkUnit(rootBone, transform));
-	}
-	uint32_t i = 0;
-	while (!queue.empty())
-	{
-		WorkUnit unit = queue.front();
-		queue.pop();
+		
+		renderer->debugLine(colors[0], boneOrigin, boneOrigin + boneRight * 0.05f);
+		renderer->debugLine(colors[1], boneOrigin, boneOrigin + boneUp * 0.05f);
+		renderer->debugLine(colors[2], boneOrigin, boneOrigin + boneForward * 0.05f);
 
-		glm::mat4 newTransform = unit.transform * m_testPose->localBoneTransform(unit.bone->index);// unit.bone->transform;
 
-		glm::vec3 newOrigin = newTransform * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
+		if (parentBone)
+		{
+			glm::mat4 parentTransform = modelMatrix * parentPoseBone->cachedGlobalTransform;
+			glm::vec3 parentOrigin = parentTransform * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
+			renderer->debugLine(colors[3], parentOrigin, boneOrigin);
+		}
 
-		glm::vec3 newDirForward = newTransform * glm::vec4(0.0f, 0.0f, -1.0f, 0.0f);
-		glm::vec3 tailForward = newOrigin + newDirForward * 0.1f;
-		renderer->debugLine(colors[2], newOrigin, tailForward);
-
-		glm::vec3 newDirRight = newTransform * glm::vec4(1.0f, 0.0f, 0.0f, 0.0f);
-		glm::vec3 tailRight = newOrigin + newDirRight * 0.05f;
-		renderer->debugLine(colors[0], newOrigin, tailRight);
-
-		glm::vec3 newDirUp = newTransform * glm::vec4(0.0f, -1.0f, 0.0f, 0.0f);
-		glm::vec3 tailUp = newOrigin + newDirUp * 0.05f;
-		renderer->debugLine(colors[1], newOrigin, tailUp);
-
-		for (e2::Bone* child : unit.bone->children)
-			queue.push(WorkUnit(child, newTransform));
 	}
 
 
@@ -179,67 +169,36 @@ void e2::Engineer::drawUI(e2::UIContext* ui)
 	ui->endStackV();
 
 
-
-
-	glm::vec3 colors[5] = {
-	{1.0, 0.0, 0.0},
-	{1.0, 1.0, 0.0},
-	{0.0, 1.0, 0.0},
-	{0.0, 1.0, 1.0},
-	{0.0, 0.0, 1.0},
-	};
-
 	auto renderer = game()->gameSession()->renderer();
 	auto skeleton = m_skinProxy->skeletonAsset;
 
-	struct WorkUnit
-	{
-		WorkUnit(e2::Bone* a, glm::mat4 const& b)
-			: bone(a)
-			, transform(b)
-		{}
-		e2::Bone* bone{};
-		glm::mat4 transform;
-	};
 
-	std::queue<WorkUnit> queue;
-
-	glm::mat4 transform = m_proxy->modelMatrix;
-
-	for (uint32_t rootIndex = 0; rootIndex < skeleton->numRootBones(); rootIndex++)
-	{
-		e2::Bone* rootBone = skeleton->rootBoneById(rootIndex);
-		queue.push(WorkUnit(rootBone, transform));
-	}
-	uint32_t i = 0;
+	glm::mat4 modelMatrix = m_proxy->modelMatrix;
 
 	glm::dmat4 vpMatrix = game()->view().calculateProjectionMatrix(renderer->resolution()) * game()->view().calculateViewMatrix();
 
-	while (!queue.empty())
+	for(uint32_t b = 0; b < m_skinProxy->skeletonAsset->numBones(); b++)
 	{
-		WorkUnit unit = queue.front();
-		queue.pop();
-
-		glm::mat4 oldTransform = unit.transform;
-		glm::vec3 oldOrigin = oldTransform * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
-
-		glm::mat4 newTransform = oldTransform * m_testPose->localBoneTransform(unit.bone->index);// unit.bone->transform;
-		glm::vec3 newOrigin = newTransform * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
+		e2::Bone* bone = m_skinProxy->skeletonAsset->boneById(b);
+		e2::PoseBone* poseBone = m_testPose->poseBoneById(b);
+		e2::Bone* parentBone = bone->parent;
+		e2::PoseBone* parentPoseBone = parentBone? m_testPose->poseBoneById(parentBone->index) : nullptr;
 
 
+		glm::mat4 boneTransform = modelMatrix * poseBone->cachedGlobalTransform;
 
-		glm::vec4 viewPos = vpMatrix * glm::dvec4(newOrigin, 1.0);
+		glm::vec3 boneOrigin = boneTransform * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
+		glm::vec3 boneDirection = boneTransform * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
+
+		glm::vec4 viewPos = vpMatrix * glm::dvec4(boneOrigin, 1.0);
 		viewPos = viewPos / viewPos.z;
 
 		glm::vec2 offset = (glm::vec2(viewPos.x, viewPos.y) * 0.5f + 0.5f) * glm::vec2(renderer->resolution());
-		std::string str = std::format("[{}]", unit.bone->name.cstring());
+		std::string str = std::format("[{}]", bone->name.cstring());
 		float wid = ui->calculateTextWidth(FontFace::Monospace, 9, str);
 
 		ui->drawQuad(offset + glm::vec2(-wid / 2.0f, -6.0f), glm::vec2(wid, 12.0f), 0x000000AA);
 		ui->drawRasterText(FontFace::Monospace, 9, 0xFFFFFFFF, offset + glm::vec2(-wid / 2.0f, 0.0f), str);
-
-		for (e2::Bone* child : unit.bone->children)
-			queue.push(WorkUnit(child, newTransform));
 	}
 
 

@@ -780,6 +780,14 @@ e2::Ptr<e2::Skeleton> e2::Pose::skeleton()
 	return m_skeleton;
 }
 
+e2::PoseBone* e2::Pose::poseBoneById(uint32_t id)
+{
+	if (id >= m_poseBones.size())
+		return nullptr;
+
+	return &m_poseBones[id];
+}
+
 glm::mat4 e2::PoseBone::localTransform()
 {
 	return glm::toMat4(localRotation) * glm::translate(localTranslation);

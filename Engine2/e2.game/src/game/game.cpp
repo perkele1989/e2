@@ -51,9 +51,9 @@ void e2::Game::initialize()
 	am->prescribeALJ(alj, "assets/kloofendal_irr.e2a");
 	am->prescribeALJ(alj, "assets/kloofendal_rad.e2a");
 
-	am->prescribeALJ(alj, "assets/characters/SM_Dummy.e2a");
-	am->prescribeALJ(alj, "assets/characters/SK_Dummy.e2a");
-	am->prescribeALJ(alj, "assets/characters/A_DummyDance.e2a");
+	am->prescribeALJ(alj, "assets/characters/SM_Gus.e2a");
+	am->prescribeALJ(alj, "assets/characters/SK_Gus.e2a");
+	am->prescribeALJ(alj, "assets/characters/A_GusWave.e2a");
 
 	am->queueWaitALJ(alj);
 	m_uiTextureResources = am->get("assets/UI_ResourceIcons.e2a").cast<e2::Texture2D>();
@@ -82,9 +82,9 @@ void e2::Game::initialize()
 	m_structureMeshes[(uint8_t)e2::GameStructureType::Quarry] = quarryMesh;
 	m_structureMeshes[(uint8_t)e2::GameStructureType::SawMill] = sawMillMesh;
 
-	m_dummyMesh = am->get("assets/characters/SM_Dummy.e2a").cast<e2::Mesh>();
-	m_dummySkeleton = am->get("assets/characters/SK_Dummy.e2a").cast<e2::Skeleton>();
-	m_dummyAnimation = am->get("assets/characters/A_DummyDance.e2a").cast<e2::Animation>();
+	m_dummyMesh = am->get("assets/characters/SM_Gus.e2a").cast<e2::Mesh>();
+	m_dummySkeleton = am->get("assets/characters/SK_Gus.e2a").cast<e2::Skeleton>();
+	m_dummyAnimation = am->get("assets/characters/A_GusWave.e2a").cast<e2::Animation>();
 
 	for (uint8_t i = 0; i < (uint8_t)e2::GameUnitType::Count; i++)
 	{

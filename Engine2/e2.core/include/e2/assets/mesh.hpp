@@ -194,6 +194,8 @@ namespace e2
 		e2::StackVector<glm::mat4, e2::maxNumSkeletonBones> const& skin();
 		e2::Ptr<e2::Skeleton> skeleton();
 
+		e2::PoseBone* poseBoneById(uint32_t id);
+
 	protected:
 		e2::Ptr<e2::Skeleton> m_skeleton;
 		e2::StackVector<e2::PoseBone, e2::maxNumSkeletonBones> m_poseBones;

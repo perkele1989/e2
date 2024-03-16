@@ -5,6 +5,7 @@
 
 #include "e2/ui/uicontext.hpp"
 
+#include "editor/importers/ufbximporter.hpp"
 #include "editor/importers/meshimporter.hpp"
 #include "editor/importers/textureimporter.hpp"
 #include "editor/importers/materialimporter.hpp"
@@ -46,12 +47,12 @@ void e2::AssetBrowser::update(e2::UIContext* ui, double seconds)
 		{
 			std::string ext = e2::toLower(std::filesystem::path(file).extension().string());
 
-			if (ext == ".mesh" || ext == ".fbx" || ext == ".lods")
+			if (ext == ".mesh" || ext == ".fbx" || ext == ".lods" || ext == ".dae")
 			{
-				e2::MeshImportConfig cfg;
+				e2::UfbxImportConfig cfg;
 				cfg.input = file;
 				cfg.outputDirectory = std::format(".{}", m_path->fullPath());
-				e2::MeshImporter* newImporter = e2::create<e2::MeshImporter>(editor(), cfg);
+				e2::UfbxImporter* newImporter = e2::create<e2::UfbxImporter>(editor(), cfg);
 				editor()->oneShotImporter(newImporter);
 			}
 			else if (ext == ".mips" || ext == ".png" || ext == ".tga" || ext == ".jpg" || ext == ".jpeg" || ext == ".hdr")

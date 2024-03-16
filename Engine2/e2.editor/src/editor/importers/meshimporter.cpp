@@ -28,25 +28,60 @@ namespace fs = std::filesystem;
 
 namespace
 {
+	
+	glm::quat glmQuatMesh(aiQuaternion const& from)
+	{
+		return glm::quat(from.w, -from.x, -from.z, from.y);
+	}
+
+	glm::vec3 glmVec3Mesh(aiVector3D const& from)
+	{
+		return { -from.x, -from.z, from.y };
+	}
+
+
+	glm::quat glmQuatBone(aiQuaternion const& from)
+	{
+		return glm::quat(from.w, -from.x, -from.z, from.y);
+	}
+
+	glm::vec3 glmVec3Bone(aiVector3D const& from)
+	{
+		return { -from.x, -from.z, from.y };
+	}
+
+
+	glm::quat glmQuatAnim(aiQuaternion const& from)
+	{
+		return glm::quat(from.w, -from.x, -from.z, from.y);
+	}
+
+	glm::vec3 glmVec3Anim(aiVector3D const& from)
+	{
+		return { -from.x, -from.z, from.y };
+	}
+
+
+	/*
 	glm::quat glmQuat(aiQuaternion const& from)
 	{
-		return glm::quat(from.w, from.x, from.z, from.y);
+		return glm::quat(from.w, from.x, from.y, from.z);
 	}
 
 	glm::vec3 glmVec3(aiVector3D const& from)
 	{
-		return { from.x, from.z, from.y };
+		return { from.x, from.y, from.z };
 	}
 
 	glm::vec3 blenderToE2(glm::vec3 const& from)
 	{
-		return { from.x, from.z, from.y };
+		return { from.x, from.y, from.z };
 	}
 
 	glm::quat blenderToE2(glm::quat const& from)
 	{
-		return glm::quat(from.w,from.x, from.z, from.y);
-	}
+		return glm::quat(from.w, from.x, from.y, from.z);
+	}*/
 
 
 }
@@ -374,9 +409,13 @@ bool e2::MeshImporter::analyze()
 						aiQuaternion assRotation;
 						aiVector3D assScale;
 						assNode->mTransformation.Decompose(assScale, assRotation, assTranslation);
+						//assBone->mOffsetMatrix.Inverse().Decompose(assScale, assRotation, assTranslation);
+						newBone.localTranslation = ::glmVec3Bone(assTranslation);
+						newBone.localRotation = ::glmQuatBone(assRotation);
 
-						newBone.localTranslation = ::glmVec3(assTranslation);
-						newBone.localRotation = ::glmQuat(assRotation);
+						glm::vec3 gsc = ::glmVec3Bone(assScale);
+
+						LogNotice("Bone \"{}\"\tpos {}\trot {}\tsca {}", newBone.name, newBone.localTranslation, newBone.localRotation, gsc);
 
 						m_mesh.skeleton.boneIndex[newBone.name] = newBone.id;
 						m_mesh.skeleton.bones.push_back(newBone);
@@ -417,7 +456,10 @@ bool e2::MeshImporter::analyze()
 						}
 					}
 				}
-
+				else
+				{
+					LogNotice("No node for bone {}", assBone->mName.C_Str());
+				}
 			}
 
 
@@ -501,7 +543,7 @@ bool e2::MeshImporter::analyze()
 				{
 					aiVectorKey k = channel->mPositionKeys[t];
 					Vec3Key newKey;
-					newKey.vector = ::blenderToE2(glm::vec3(k.mValue.x, k.mValue.y, k.mValue.z));
+					newKey.vector = ::glmVec3Anim(k.mValue);
 					newKey.time = (float)k.mTime / newAnim.framesPerSecond;
 					newChannel.positionKeys.push_back(newKey);
 				}
@@ -510,7 +552,7 @@ bool e2::MeshImporter::analyze()
 				{
 					aiQuatKey k = channel->mRotationKeys[t];
 					QuatKey newKey;
-					newKey.quat = ::blenderToE2(glm::quat(k.mValue.w, k.mValue.x, k.mValue.y, k.mValue.z));
+					newKey.quat = ::glmQuatAnim(k.mValue);
 					newKey.time = (float)k.mTime / newAnim.framesPerSecond;
 					newChannel.rotationKeys.push_back(newKey);
 				}
@@ -622,9 +664,7 @@ bool e2::MeshImporter::writeAssets()
 			{
 				//attribPos.vertexData << float(-sm->mVertices[i].x) << float(-sm->mVertices[i].z) << float(sm->mVertices[i].y) << 1.0f;
 
-				glm::vec3 pos = ::glmVec3(sm->mVertices[i]);
-				pos.x = -pos.x;
-				pos.y = -pos.y;
+				glm::vec3 pos = ::glmVec3Mesh(sm->mVertices[i]);
 				attribPos.vertexData << pos << 1.0f;
 			}
 
@@ -638,9 +678,7 @@ bool e2::MeshImporter::writeAssets()
 
 				for (uint32_t i = 0; i < sm->mNumVertices; i++)
 				{
-					glm::vec3 nrm = ::glmVec3(sm->mNormals[i]);
-					nrm.x = -nrm.x;
-					nrm.y = -nrm.y;
+					glm::vec3 nrm = ::glmVec3Mesh(sm->mNormals[i]);
 					attribNormals.vertexData << nrm << 0.0f;
 				}
 
@@ -651,9 +689,7 @@ bool e2::MeshImporter::writeAssets()
 
 				for (uint32_t i = 0; i < sm->mNumVertices; i++)
 				{
-					glm::vec3 tan = ::glmVec3(sm->mTangents[i]);
-					tan.x = -tan.x;
-					tan.y = -tan.y;
+					glm::vec3 tan = ::glmVec3Mesh(sm->mTangents[i]);
 					attribTangents.vertexData << tan << 0.0f;
 				}
 
@@ -821,7 +857,6 @@ bool e2::MeshImporter::writeAssets()
 		{
 			e2::ImportBone& b = m_mesh.skeleton.bones[i];
 			LogNotice("Writing bone {} {} with parent {}", i, b.name, b.parentId);
-
 
 			skeletonData << std::string(b.name);
 			skeletonData << glm::vec3(b.localTranslation);

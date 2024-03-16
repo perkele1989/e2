@@ -1445,6 +1445,30 @@ struct std::formatter<glm::vec2>
 };
 
 template <>
+struct std::formatter<glm::vec3>
+{
+	constexpr auto parse(std::format_parse_context& ctx) {
+		return ctx.begin();
+	}
+
+	auto format(const glm::vec3& vec, std::format_context& ctx) {
+		return std::format_to(ctx.out(), "x={:.2f},y={:.2f},z={:.2f}", vec.x, vec.y, vec.z);
+	}
+};
+
+template <>
+struct std::formatter<glm::quat>
+{
+	constexpr auto parse(std::format_parse_context& ctx) {
+		return ctx.begin();
+	}
+
+	auto format(const glm::quat& quat, std::format_context& ctx) {
+		return std::format_to(ctx.out(), "w={:.2f},x={:.2f},y={:.2f},z={:.2f}", quat.w, quat.x, quat.y, quat.z);
+	}
+};
+
+template <>
 struct std::formatter<glm::ivec2>
 {
 	constexpr auto parse(std::format_parse_context& ctx) {
