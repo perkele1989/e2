@@ -640,17 +640,7 @@ void e2::Pose::applyBindPose()
 {
 	for (e2::PoseBone& bone : m_poseBones)
 	{
-
 		bone.localTransform = bone.assetBone->localTransform;
-		/*
-		bone.localTranslation.x = -bone.localTranslation.x;
-		bone.localTranslation.y = -bone.localTranslation.y;
-		bone.localTranslation.z = bone.localTranslation.z;
-		
-		bone.localRotation.x = -bone.localRotation.x;
-		bone.localRotation.y = -bone.localRotation.y;
-		bone.localRotation.z = bone.localRotation.z;*/
-
 	}
 }
 
@@ -684,6 +674,45 @@ void e2::Pose::blendWith(Pose* b, float alpha)
 	}*/
 }
 
+
+namespace
+{
+	glm::mat4 recompose(glm::vec3 const& translation, glm::vec3 const&  scale, glm::vec3 const& skew, glm::vec4 const& perspective,	glm::quat const &rotation)
+	{
+		glm::mat4 m = glm::mat4(1.f);
+
+		m[0][3] = perspective.x;
+		m[1][3] = perspective.y;
+		m[2][3] = perspective.z;
+		m[3][3] = perspective.w;
+
+		m *= glm::translate(translation);
+		m *= glm::mat4_cast(rotation);
+
+		if (skew.x) {
+			glm::mat4 tmp{ 1.f };
+			tmp[2][1] = skew.x;
+			m *= tmp;
+		}
+
+		if (skew.y) {
+			glm::mat4 tmp{ 1.f };
+			tmp[2][0] = skew.y;
+			m *= tmp;
+		}
+
+		if (skew.z) {
+			glm::mat4 tmp{ 1.f };
+			tmp[1][0] = skew.z;
+			m *= tmp;
+		}
+
+		m *= glm::scale(scale);
+
+		return m;
+	}
+}
+
 void e2::Pose::applyAnimation(e2::Ptr<e2::Animation> anim, float time)
 {
 	for (uint32_t boneId = 0; boneId < m_poseBones.size(); boneId++)
@@ -709,7 +738,10 @@ void e2::Pose::applyAnimation(e2::Ptr<e2::Animation> anim, float time)
 		if (track_rot)
 			rotation = track_rot->getQuat(time, anim->frameRate());
 
-		poseBone->localTransform = glm::toMat4(rotation) * glm::translate(translation);
+
+
+
+		poseBone->localTransform = recompose(translation, scale, skew, perspective, rotation);
 	}
 }
 
