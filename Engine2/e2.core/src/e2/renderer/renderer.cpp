@@ -37,6 +37,10 @@ layout(set = 0, binding = 0) uniform RendererData
     mat4 viewMatrix;
     mat4 projectionMatrix;
     vec4 time; // t, sin(t), cos(t), tan(t)
+    vec4 sun1; // sun dir.xyz, ???
+    vec4 sun2; // sun color.rgb, sun strength
+    vec4 ibl1; // ibl strength, ??, ?? ,??
+    vec4 cameraPosition; // pos.xyz, ??
 } renderer;
 
 layout(set = 0, binding = 1) uniform sampler clampSampler;
@@ -281,6 +285,12 @@ void e2::Renderer::recordFrame(double deltaTime)
 	m_rendererData.time.y = glm::sin((float)m_rendererData.time.x);
 	m_rendererData.time.z = glm::cos((float)m_rendererData.time.x);
 	m_rendererData.time.w = glm::tan((float)m_rendererData.time.x);
+
+	m_rendererData.sun1 = glm::vec4(m_sunDirection, 0.0f);
+	m_rendererData.sun2 = glm::vec4(m_sunColor, m_sunStrength);
+
+	m_rendererData.ibl1 = glm::vec4(m_iblStrength, 0.0f, 0.0f, 0.0f);
+	m_rendererData.cameraPosition = glm::vec4(glm::vec3(m_view.origin), 0.0f);
 	
 	m_rendererBuffers[frameIndex]->upload(reinterpret_cast<uint8_t const*>(&m_rendererData), sizeof(RendererData), 0, 0);
 
@@ -573,6 +583,13 @@ void e2::Renderer::setEnvironment(e2::ITexture* irradiance, e2::ITexture* radian
 {
 	m_irradiance = irradiance;
 	m_radiance = radiance;
+}
+
+void e2::Renderer::setSun(glm::vec3 const& dir, glm::vec3 const& color, float strength)
+{
+	m_sunColor = color;
+	m_sunDirection = glm::normalize(dir);
+	m_sunStrength = strength;
 }
 
 void e2::Renderer::swapRenderBuffers()

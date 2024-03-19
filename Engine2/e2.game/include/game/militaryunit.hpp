@@ -97,7 +97,7 @@ namespace e2
 		int32_t range{ };
 	};
 
-	/** @tags(arena, arenaSize=256)*/
+	/** */
 	class MilitaryUnit : public e2::GameUnit
 	{
 		ObjectDeclaration();
@@ -178,6 +178,31 @@ namespace e2
 				return hasAllUpgrades(MilitaryUnitUpgrade::BalancedDefensive | MilitaryUnitUpgrade::BalancedOffensive);
 			}
 		}
+	};
+
+
+	/** @tags(arena, arenaSize=1024) */
+	class Grunt : public e2::MilitaryUnit
+	{
+		ObjectDeclaration();
+	public:
+		Grunt(e2::GameContext* ctx, glm::ivec2 const& tile, uint8_t empire);
+		virtual ~Grunt();
+		virtual void initialize() override;
+
+		virtual void updateAnimation(double seconds) override;
+		virtual void drawUI(e2::UIContext* ctx) override;
+
+		virtual void onBeginMove();
+		virtual void onEndMove();
+
+	protected:
+
+
+		e2::AnimationPose* m_idlePose{};
+		e2::AnimationPose* m_runPose{};
+		e2::AnimationPose* m_firePose{};
+
 	};
 }
 

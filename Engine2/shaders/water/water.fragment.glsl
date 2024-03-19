@@ -25,14 +25,14 @@ void main()
 
 	vec3 n = sampleWaterNormal(fragmentPosition.xz, time);
 	
-	vec3 l = normalize(vec3(-1.0, -1.0, -1.0));
+	vec3 l = normalize(vec3(1.0, -0.5, 1.0));
 	vec3 ndotl = vec3(clamp(dot(n, l), 0.0, 1.0));
 	//vec3 softl = vec3(dot(n,l) *0.5 + 0.5);
 
 	vec3 v = normalize(fragmentPosition.xyz - (inverse(renderer.viewMatrix) * vec4(0.0, 0.0, 0.0, 1.0)).xyz);
 
 
-	float shadowCoeff = getCloudShadows(fragmentPosition.xyz, renderer.time.x);
+	float shadowCoeff = getCloudShadows(fragmentPosition.xyz);
 
 	vec3 darkWater = vec3(0.0, 80.0, 107.0) / 255.0;
 	vec3 lightWater = vec3(28.0, 255.0, 255.0) / 255.0;

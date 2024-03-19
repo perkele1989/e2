@@ -9,13 +9,11 @@ e2::MainOperatingBase::MainOperatingBase(e2::GameContext* gameCtx, glm::ivec2 co
 	displayName = "Main Operating Base";
 	sightRange = 8;
 	
-	structureType = e2::GameStructureType::MainOperatingBase;
-	m_mesh = game()->getStructureMesh(structureType);
-	buildProxy();
+	entityType = e2::EntityType::Structure_MainOperatingBase;
 
 	m_buildActionEngineer.buildTurns = 3;
 	m_buildActionEngineer.buildTurnsLeft = 3;
-	m_buildActionEngineer.buildType = GameUnitType::Engineer;
+	m_buildActionEngineer.buildType = EntityType::Unit_Engineer;
 	m_buildActionEngineer.displayName = "Engineer";
 }
 
@@ -116,7 +114,7 @@ void e2::MainOperatingBase::onTurnStart()
 
 				switch (m_currentlyBuilding->buildType)
 				{
-				case GameUnitType::Engineer:
+				case e2::EntityType::Unit_Engineer:
 					game()->spawnUnit<e2::Engineer>(e2::Hex(slotToUse), empireId);
 					break;
 				}

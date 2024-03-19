@@ -1,4 +1,3 @@
-#define EPSILON 1e-5
 
 #include <shaders/common/renderersets.glsl>
 

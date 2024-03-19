@@ -50,9 +50,10 @@ out vec4 fragmentColor;
 
 void main()
 {
-	vec4 animatedVertexPosition = vertexPosition;
-	vec4 animatedVertexNormal = vertexNormal;
-	vec4 animatedVertexTangent = vertexTangent;
+	vec4 animatedVertexPosition = vec4(vertexPosition.xyz, 1.0);
+	vec4 animatedVertexNormal = vec4(vertexNormal.xyz, 0.0);
+	vec4 animatedVertexTangent = vec4(vertexTangent.xyz, 0.0);
+	float tangentSign = vertexTangent.w;
 
 #if defined(Renderer_Skin) && defined(Vertex_Bones)
 
@@ -65,8 +66,11 @@ void main()
 	animationTransform += skin.skinMatrices[vertexIds.w] * weights.w; 
 
 	animatedVertexPosition =  animationTransform * animatedVertexPosition;
-	//animatedVertexNormal = animationTransform * animatedVertexNormal;
-	//animatedVertexTangent.xyz = (animationTransform * vec4(animatedVertexTangent.xyz, 0.0)).xyz;
+	animatedVertexNormal = animationTransform * animatedVertexNormal;
+	animatedVertexTangent = animationTransform *animatedVertexTangent;
+
+	animatedVertexPosition.xyz /= animatedVertexPosition.w;
+	animatedVertexPosition.w = 1.0;
 #endif 
 
 	gl_Position = renderer.projectionMatrix * renderer.viewMatrix * mesh.modelMatrix * animatedVertexPosition;
@@ -75,8 +79,8 @@ void main()
 #if defined(Vertex_Normals)
 
 	fragmentNormal = normalize(mesh.modelMatrix * normalize(animatedVertexNormal)).xyz;
-	fragmentTangent.xyz =  normalize(mesh.modelMatrix * normalize(vec4(animatedVertexTangent.xyz, 0.0))).xyz;
-    fragmentTangent.w = animatedVertexTangent.w;
+	fragmentTangent.xyz =  normalize(mesh.modelMatrix * normalize(animatedVertexTangent)).xyz;
+    fragmentTangent.w = tangentSign;
 	//fragmentBitangent = normalize(cross(fragmentNormal.xyz, fragmentTangent.xyz));
 #endif
 

@@ -1,6 +1,8 @@
 
 #pragma once 
 
+
+
 #include <e2/application.hpp>
 #include "game/hex.hpp"
 #include "game/gamecontext.hpp"
@@ -36,12 +38,29 @@ namespace e2
 	{
 		Unlocked,
 		UnitAction_Move,
-		UnitAction_Attack,
-
+		UnitAction_Generic
 	};
 
 	class GameUnit;
 	class GameStructure;
+
+
+
+	enum class AnimationIndex : uint8_t
+	{
+		SoldierIdle = 0,
+		SoldierRun,
+		SoldierFire,
+		SoldierHit,
+		SoldierDie,
+
+		EngineerIdle,
+		EngineerRun,
+		EngineerDie,
+		EngineerBuild,
+
+		Count
+	};
 
 	/** @tags(arena, arenaSize=4096) */
 	class PathFindingHex : public e2::Object
@@ -147,8 +166,8 @@ namespace e2
 		GameUnit* unitAtHex(glm::ivec2 const& hex);
 		GameStructure* structureAtHex(glm::ivec2 const& hex);
 
-		e2::MeshPtr getUnitMesh(e2::GameUnitType type);
-		e2::MeshPtr getStructureMesh(e2::GameStructureType type);
+		e2::MeshPtr getEntityMesh(e2::EntityType type);
+		e2::SkeletonPtr getEntitySkeleton(e2::EntityType type);
 
 
 		e2::MeshPtr dummyMesh()
@@ -166,7 +185,10 @@ namespace e2
 			return m_dummyAnimation;
 		}
 
-
+		e2::AnimationPtr getAnimationByIndex(e2::AnimationIndex index)
+		{
+			return m_animationIndex[(uint64_t)index];
+		}
 
 	protected:
 
@@ -174,11 +196,12 @@ namespace e2
 		e2::SkeletonPtr m_dummySkeleton;
 		e2::AnimationPtr m_dummyAnimation;
 
+		e2::StackVector<e2::AnimationPtr, (uint64_t)e2::AnimationIndex::Count> m_animationIndex;
+
 
 		// shared resources
-		e2::StackVector<e2::MeshPtr, (uint64_t)e2::GameUnitType::Count> m_unitMeshes;
-		e2::StackVector<e2::MeshPtr, (uint64_t)e2::GameStructureType::Count> m_structureMeshes;
-
+		e2::StackVector<e2::MeshPtr, size_t(e2::EntityType::Count)> m_entityMeshes;
+		e2::StackVector<e2::SkeletonPtr, size_t(e2::EntityType::Count)> m_entitySkeletons;
 
 		e2::Texture2DPtr m_irradianceMap;
 		e2::Texture2DPtr m_radianceMap;
@@ -261,7 +284,7 @@ namespace e2
 
 
 			UnitType* newUnit = e2::create<UnitType>(this, coords, empire);
-			newUnit->spreadVisibility();
+			newUnit->initialize();
 
 			m_units.insert(newUnit);
 			m_unitIndex[coords] = newUnit;
@@ -301,7 +324,7 @@ namespace e2
 
 
 			UnitType* newStructure = e2::create<UnitType>(this, coords, empire);
-			newStructure->spreadVisibility();
+			newStructure->initialize();
 
 			m_structures.insert(newStructure);
 			m_structureIndex[coords] = newStructure;

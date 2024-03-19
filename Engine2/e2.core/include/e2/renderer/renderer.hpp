@@ -11,6 +11,7 @@
 #include <e2/rhi/threadcontext.hpp>
 #include <e2/renderer/shared.hpp>
 
+#define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/perpendicular.hpp>
 
 namespace e2
@@ -44,6 +45,11 @@ namespace e2
 		alignas(16) glm::mat4 viewMatrix;
 		alignas(16) glm::mat4 projectionMatrix;
 		alignas(16) glm::vec4 time; // t, sin(t), cos(t), tan(t)
+		alignas(16) glm::vec4 sun1; // sun direction.xyz, ???
+		alignas(16) glm::vec4 sun2; // sun color.rgb, sun strength
+		alignas(16) glm::vec4 ibl1; // ibl strength, ???, ???, ???
+		alignas(16) glm::vec4 cameraPosition;
+		
 	};
 
 	E2_API bool isCounterClockwise(glm::vec2 const& a, glm::vec2 const& b, glm::vec2 const& c);
@@ -171,6 +177,7 @@ namespace e2
 		}
 
 		void setEnvironment(e2::ITexture* irradiance, e2::ITexture* radiance);
+		void setSun(glm::vec3 const& dir, glm::vec3 const& color, float strength);
 
 	protected:
 		e2::Session* m_session{};
@@ -211,6 +218,11 @@ namespace e2
 
 		e2::ITexture* m_irradiance{};
 		e2::ITexture* m_radiance{};
+		float m_iblStrength{ 1.0f };
+
+		glm::vec3 m_sunColor;
+		glm::vec3 m_sunDirection{};
+		float m_sunStrength{ 1.0f };
 
 		// @todo set configurable or just change to dynamic because this is debug shit anyway
 		std::vector<Line> m_debugLines;

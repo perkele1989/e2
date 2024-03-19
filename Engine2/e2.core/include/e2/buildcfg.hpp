@@ -131,10 +131,10 @@ namespace e2
 	/** The maximum number of bones in a skeletal mesh (see e2::SkinData) */
 	constexpr uint64_t maxNumBoneChildren = 16;
 	constexpr uint64_t maxNumRootBones = 16;
-	constexpr uint64_t maxNumSkeletonBones = 64;
+	constexpr uint64_t maxNumSkeletonBones = 128;
 
 	constexpr uint64_t maxNumTrackFrames = 1024; // at 24 fps, 42,66 secs worth of animation  
-	constexpr uint64_t maxNumTracksPerAnimation = 128; // needs to be at least numSkeletonBones * 2 for full skel anim support
+	constexpr uint64_t maxNumTracksPerAnimation = 256; // needs to be at least numSkeletonBones * 2 for full skel anim support
 
 
 	/** The size of the render dispatch queue. Every renderer will use at least 1. Extra uses from other things such as quadrenderer etc. */

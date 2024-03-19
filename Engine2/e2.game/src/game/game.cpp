@@ -55,6 +55,25 @@ void e2::Game::initialize()
 	am->prescribeALJ(alj, "assets/characters/SK_Gus.e2a");
 	am->prescribeALJ(alj, "assets/characters/A_GusWave.e2a");
 
+	am->prescribeALJ(alj, "assets/characters/SK_Soldier.e2a");
+	am->prescribeALJ(alj, "assets/characters/SM_Soldier.e2a");
+	am->prescribeALJ(alj, "assets/characters/A_SoldierDance.e2a");
+	am->prescribeALJ(alj, "assets/characters/A_SoldierIdle.e2a");
+	am->prescribeALJ(alj, "assets/characters/A_SoldierHit.e2a");
+	am->prescribeALJ(alj, "assets/characters/A_SoldierFire.e2a");
+	am->prescribeALJ(alj, "assets/characters/A_SoldierDie.e2a");
+	am->prescribeALJ(alj, "assets/characters/A_SoldierRun.e2a");
+
+
+	am->prescribeALJ(alj, "assets/characters/SK_Engineer.e2a");
+	am->prescribeALJ(alj, "assets/characters/SM_Engineer.e2a");
+	am->prescribeALJ(alj, "assets/characters/A_EngineerIdle.e2a");
+	am->prescribeALJ(alj, "assets/characters/A_EngineerBuild.e2a");
+	am->prescribeALJ(alj, "assets/characters/A_EngineerDie.e2a");
+	am->prescribeALJ(alj, "assets/characters/A_EngineerRun.e2a");
+
+
+
 	am->queueWaitALJ(alj);
 	m_uiTextureResources = am->get("assets/UI_ResourceIcons.e2a").cast<e2::Texture2D>();
 	m_cursorMesh = am->get("assets/environment/trees/SM_PalmTree001.e2a").cast<e2::Mesh>();
@@ -64,32 +83,44 @@ void e2::Game::initialize()
 
 	m_session->renderer()->setEnvironment(m_irradianceMap->handle(), m_radianceMap->handle());
 
-
-	for (uint8_t i = 0; i < (uint8_t)e2::GameStructureType::Count; i++)
+	for (uint8_t i = 0; i < size_t(e2::EntityType::Count); i++)
 	{
-		m_structureMeshes[i] = m_cursorMesh;
+		m_entityMeshes[i] = am->get("assets/characters/SM_Soldier.e2a").cast<e2::Mesh>();
+		m_entitySkeletons[i] = am->get("assets/characters/SK_Soldier.e2a").cast<e2::Skeleton>();
+	}
+	for (uint8_t i = 0; i < (uint8_t)e2::AnimationIndex::Count; i++)
+	{
+		m_animationIndex[i] = am->get("assets/characters/A_SoldierDance.e2a").cast<e2::Animation>();
 	}
 
-	e2::MeshPtr sawMillMesh = am->get("assets/environment/SM_SawMill.e2a").cast<e2::Mesh>();
-	e2::MeshPtr quarryMesh = am->get("assets/environment/SM_Quarry.e2a").cast<e2::Mesh>();
-	e2::MeshPtr mineMesh = am->get("assets/environment/SM_Mine.e2a").cast<e2::Mesh>();
-	e2::MeshPtr goldMineMesh = am->get("assets/environment/SM_GoldMine.e2a").cast<e2::Mesh>();
-	e2::MeshPtr uraniumMineMesh = am->get("assets/environment/SM_UraniumMine.e2a").cast<e2::Mesh>();
 
-	m_structureMeshes[(uint8_t)e2::GameStructureType::OreMine] = mineMesh;
-	m_structureMeshes[(uint8_t)e2::GameStructureType::GoldMine] = goldMineMesh;
-	m_structureMeshes[(uint8_t)e2::GameStructureType::UraniumMine] = uraniumMineMesh;
-	m_structureMeshes[(uint8_t)e2::GameStructureType::Quarry] = quarryMesh;
-	m_structureMeshes[(uint8_t)e2::GameStructureType::SawMill] = sawMillMesh;
+	m_entityMeshes[size_t(e2::EntityType::Structure_OreMine)] = am->get("assets/environment/SM_Mine.e2a").cast<e2::Mesh>();
+	m_entityMeshes[size_t(e2::EntityType::Structure_GoldMine)] = am->get("assets/environment/SM_GoldMine.e2a").cast<e2::Mesh>();
+	m_entityMeshes[size_t(e2::EntityType::Structure_UraniumMine)] = am->get("assets/environment/SM_UraniumMine.e2a").cast<e2::Mesh>();
+	m_entityMeshes[size_t(e2::EntityType::Structure_Quarry)] = am->get("assets/environment/SM_Quarry.e2a").cast<e2::Mesh>();
+	m_entityMeshes[size_t(e2::EntityType::Structure_SawMill)] = am->get("assets/environment/SM_SawMill.e2a").cast<e2::Mesh>();
 
-	m_dummyMesh = am->get("assets/characters/SM_Gus.e2a").cast<e2::Mesh>();
-	m_dummySkeleton = am->get("assets/characters/SK_Gus.e2a").cast<e2::Skeleton>();
-	m_dummyAnimation = am->get("assets/characters/A_GusWave.e2a").cast<e2::Animation>();
 
-	for (uint8_t i = 0; i < (uint8_t)e2::GameUnitType::Count; i++)
-	{
-		m_unitMeshes[i] = m_dummyMesh;
-	}
+
+
+	m_entityMeshes[size_t(e2::EntityType::Unit_Grunt)] = am->get("assets/characters/SM_Soldier.e2a").cast<e2::Mesh>();
+	m_entitySkeletons[size_t(e2::EntityType::Unit_Grunt)] = am->get("assets/characters/SK_Soldier.e2a").cast<e2::Skeleton>();
+
+	m_entityMeshes[size_t(e2::EntityType::Unit_Engineer)] = am->get("assets/characters/SM_Engineer.e2a").cast<e2::Mesh>();
+	m_entitySkeletons[size_t(e2::EntityType::Unit_Engineer)] = am->get("assets/characters/SK_Engineer.e2a").cast<e2::Skeleton>();
+
+
+	m_animationIndex[(uint8_t)e2::AnimationIndex::SoldierIdle] = am->get("assets/characters/A_SoldierIdle.e2a").cast<e2::Animation>();
+	m_animationIndex[(uint8_t)e2::AnimationIndex::SoldierHit] = am->get("assets/characters/A_SoldierHit.e2a").cast<e2::Animation>();
+	m_animationIndex[(uint8_t)e2::AnimationIndex::SoldierFire] = am->get("assets/characters/A_SoldierFire.e2a").cast<e2::Animation>();
+	m_animationIndex[(uint8_t)e2::AnimationIndex::SoldierDie] = am->get("assets/characters/A_SoldierDie.e2a").cast<e2::Animation>();
+	m_animationIndex[(uint8_t)e2::AnimationIndex::SoldierRun] = am->get("assets/characters/A_SoldierRun.e2a").cast<e2::Animation>();
+
+	m_animationIndex[(uint8_t)e2::AnimationIndex::EngineerIdle] = am->get("assets/characters/A_EngineerIdle.e2a").cast<e2::Animation>();
+	//m_animationIndex[(uint8_t)e2::AnimationIndex::EngineerHit] = am->get("assets/characters/A_SoldierHit.e2a").cast<e2::Animation>();
+	m_animationIndex[(uint8_t)e2::AnimationIndex::EngineerBuild] = am->get("assets/characters/A_EngineerBuild.e2a").cast<e2::Animation>();
+	m_animationIndex[(uint8_t)e2::AnimationIndex::EngineerDie] = am->get("assets/characters/A_EngineerDie.e2a").cast<e2::Animation>();
+	m_animationIndex[(uint8_t)e2::AnimationIndex::EngineerRun] = am->get("assets/characters/A_EngineerRun.e2a").cast<e2::Animation>();
 
 	m_empires.resize(e2::maxNumEmpires);
 	for (EmpireId i = 0; uint64_t(i) < e2::maxNumEmpires - 1; i++)
@@ -567,8 +598,8 @@ void e2::Game::updateGameState()
 			updateTurn();
 		else if (m_turnState == TurnState::UnitAction_Move)
 			updateUnitMove();
-		else if (m_turnState == TurnState::UnitAction_Attack)
-			updateUnitAttack();
+		else if (m_turnState == TurnState::UnitAction_Generic)
+			m_selectedUnit->updateUnitAction(m_timeDelta);
 	}
 	else if (m_state == GameState::TurnEnding)
 	{
@@ -625,7 +656,7 @@ void e2::Game::updateTurnLocal()
 	{
 		if (kb.state(e2::Key::LeftShift))
 		{
-			spawnUnit<e2::MilitaryUnit>(m_cursorHex, 0);
+			spawnUnit<e2::Grunt>(m_cursorHex, 0);
 			return;
 		}
 		e2::GameUnit* unitAtHex = nullptr;
@@ -747,12 +778,6 @@ void e2::Game::onTurnEndingEnd()
 	deselect();
 }
 
-
-void e2::Game::updateUnitAttack()
-{
-
-}
-
 void e2::Game::updateUnitMove()
 {
 	// how many hexes per second it moves
@@ -798,6 +823,8 @@ void e2::Game::updateUnitMove()
 			{
 				m_hexGrid->pushOutline(coords);
 			}
+
+			m_selectedUnit->onEndMove();
 
 			m_turnState = TurnState::Unlocked;
 
@@ -1286,6 +1313,8 @@ void e2::Game::moveSelectedUnitTo(e2::Hex const& to)
 
 	m_selectedUnit->movePointsLeft -= m_unitMovePath.size() - 1;
 
+	m_selectedUnit->onBeginMove();
+
 	m_turnState = TurnState::UnitAction_Move;
 	m_unitMoveIndex = 0;
 	m_unitMoveDelta = 0.0f;
@@ -1493,15 +1522,16 @@ e2::GameStructure* e2::Game::structureAtHex(glm::ivec2 const& hex)
 	return finder->second;
 }
 
-e2::MeshPtr e2::Game::getUnitMesh(e2::GameUnitType type)
+e2::MeshPtr e2::Game::getEntityMesh(e2::EntityType type)
 {
-	return m_unitMeshes[uint8_t(type)];
+	return m_entityMeshes[uint8_t(type)];
 }
 
-e2::MeshPtr e2::Game::getStructureMesh(e2::GameStructureType type)
+e2::SkeletonPtr e2::Game::getEntitySkeleton(e2::EntityType  type)
 {
-	return m_structureMeshes[uint8_t(type)];
+	return m_entitySkeletons[uint8_t(type)];
 }
+
 
 void e2::Game::updateAltCamera(double seconds)
 {

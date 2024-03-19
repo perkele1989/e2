@@ -745,6 +745,7 @@ bool e2::AssetHeader::read(Buffer& source)
 
 	source >> size;
 
+	dependencies.resize(0);
 	uint8_t numDeps{};
 	source >> numDeps;
 	for (uint8_t i = 0; i < numDeps; i++)

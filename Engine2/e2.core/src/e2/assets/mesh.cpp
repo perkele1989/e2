@@ -10,6 +10,49 @@
 #include <glm/gtx/quaternion.hpp>
 #include <glm/gtx/transform.hpp>
 #include <glm/gtx/matrix_decompose.hpp>
+#include <glm/gtx/matrix_interpolation.hpp>
+//GLM_GTX_matrix_interpolation
+
+
+
+namespace
+{
+	glm::mat4 recompose(glm::vec3 const& translation, glm::vec3 const& scale, glm::vec3 const& skew, glm::vec4 const& perspective, glm::quat const& rotation)
+	{
+		glm::mat4 m = glm::mat4(1.f);
+
+		m[0][3] = perspective.x;
+		m[1][3] = perspective.y;
+		m[2][3] = perspective.z;
+		m[3][3] = perspective.w;
+
+		m *= glm::translate(translation);
+		m *= glm::mat4_cast(rotation);
+
+		if (skew.x) {
+			glm::mat4 tmp{ 1.f };
+			tmp[2][1] = skew.x;
+			m *= tmp;
+		}
+
+		if (skew.y) {
+			glm::mat4 tmp{ 1.f };
+			tmp[2][0] = skew.y;
+			m *= tmp;
+		}
+
+		if (skew.z) {
+			glm::mat4 tmp{ 1.f };
+			tmp[1][0] = skew.z;
+			m *= tmp;
+		}
+
+		m *= glm::scale(scale);
+
+		return m;
+	}
+}
+
 
 namespace
 {
@@ -644,73 +687,72 @@ void e2::Pose::applyBindPose()
 	}
 }
 
+void e2::Pose::applyPose(Pose* otherPose)
+{
+	if (m_skeleton != otherPose->skeleton())
+	{
+		LogError("incompatible poses (skeleton mismatch)");
+		return;
+	}
+
+	for (uint32_t boneId = 0; boneId < m_poseBones.size(); boneId++)
+	{
+		e2::PoseBone* poseBone = &m_poseBones[boneId];
+
+		poseBone->localTransform = otherPose->poseBoneById(boneId)->localTransform;
+	}
+}
+
 void e2::Pose::applyBlend(Pose* a, Pose* b, float alpha)
 {
 	if (m_skeleton != a->skeleton() || m_skeleton != b->skeleton())
 	{
 		LogError("incompatible poses (skeleton mismatch)");
+		return;
 	}
-	/*
+
+	if (alpha < 0.001f)
+	{
+		applyPose(a);
+		return;
+	}
+	
+	if (alpha > 1.0f - 0.001f)
+	{
+		applyPose(b);
+		return;
+	}
+	
 	for (uint32_t boneId = 0; boneId < m_poseBones.size(); boneId++)
 	{
 		e2::PoseBone* poseBone = &m_poseBones[boneId];
-		poseBone->localRotation = glm::slerp(a->localBoneRotation(boneId), b->localBoneRotation(boneId), alpha);
-		poseBone->localTranslation = glm::mix(a->localBoneTranslation(boneId), b->localBoneTranslation(boneId), alpha);
-	}*/
+
+		glm::vec3 translationA, scaleA, skewA, translationB, scaleB, skewB, translationC, scaleC, skewC;
+		glm::vec4 perspectiveA, perspectiveB, perspectiveC;
+		glm::quat rotationA, rotationB, rotationC;
+		glm::decompose(a->poseBoneById(boneId)->localTransform, scaleA, rotationA, translationA, skewA, perspectiveA);
+		glm::decompose(b->poseBoneById(boneId)->localTransform, scaleB, rotationB, translationB, skewB, perspectiveB);
+
+		translationC = glm::mix(translationA, translationB, alpha);
+		scaleC = glm::mix(scaleA, scaleB, alpha);
+		skewC = glm::mix(skewA, skewB, alpha);
+		perspectiveC = glm::mix(perspectiveA, perspectiveB, alpha);
+		rotationC = glm::slerp(rotationA, rotationB, alpha);
+
+		poseBone->localTransform = recompose(translationC, scaleC, skewC, perspectiveC, rotationC);
+
+
+		//poseBone->localTransform = glm::interpolate(a->poseBoneById(boneId)->localTransform, b->poseBoneById(boneId)->localTransform, alpha);
+	}
 }
 
 void e2::Pose::blendWith(Pose* b, float alpha)
 {
-	if (m_skeleton != b->skeleton())
-	{
-		LogError("incompatible poses (skeleton mismatch)");
-	}
-	/*
-	for (uint32_t boneId = 0; boneId < m_poseBones.size(); boneId++)
-	{
-		e2::PoseBone* poseBone = &m_poseBones[boneId];
-		poseBone->localRotation = glm::slerp(poseBone->localRotation, b->localBoneRotation(boneId), alpha);
-		poseBone->localTranslation = glm::mix(poseBone->localTranslation, b->localBoneTranslation(boneId), alpha);
-	}*/
-}
+	if (alpha < 0.001f)
+		return;
 
-
-namespace
-{
-	glm::mat4 recompose(glm::vec3 const& translation, glm::vec3 const&  scale, glm::vec3 const& skew, glm::vec4 const& perspective,	glm::quat const &rotation)
-	{
-		glm::mat4 m = glm::mat4(1.f);
-
-		m[0][3] = perspective.x;
-		m[1][3] = perspective.y;
-		m[2][3] = perspective.z;
-		m[3][3] = perspective.w;
-
-		m *= glm::translate(translation);
-		m *= glm::mat4_cast(rotation);
-
-		if (skew.x) {
-			glm::mat4 tmp{ 1.f };
-			tmp[2][1] = skew.x;
-			m *= tmp;
-		}
-
-		if (skew.y) {
-			glm::mat4 tmp{ 1.f };
-			tmp[2][0] = skew.y;
-			m *= tmp;
-		}
-
-		if (skew.z) {
-			glm::mat4 tmp{ 1.f };
-			tmp[1][0] = skew.z;
-			m *= tmp;
-		}
-
-		m *= glm::scale(scale);
-
-		return m;
-	}
+	// gg ez
+	applyBlend(this, b, alpha);
 }
 
 void e2::Pose::applyAnimation(e2::Ptr<e2::Animation> anim, float time)
@@ -738,9 +780,6 @@ void e2::Pose::applyAnimation(e2::Ptr<e2::Animation> anim, float time)
 		if (track_rot)
 			rotation = track_rot->getQuat(time, anim->frameRate());
 
-
-
-
 		poseBone->localTransform = recompose(translation, scale, skew, perspective, rotation);
 	}
 }
@@ -761,4 +800,36 @@ e2::PoseBone* e2::Pose::poseBoneById(uint32_t id)
 		return nullptr;
 
 	return &m_poseBones[id];
+}
+
+e2::AnimationPose::AnimationPose(e2::Ptr<e2::Skeleton> skeleton, e2::Ptr<e2::Animation> animation, bool loop)
+	: e2::Pose(skeleton)
+	, m_animation(animation)
+	, m_loop(loop)
+	, m_playing(true)
+{
+
+}
+
+e2::AnimationPose::~AnimationPose()
+{
+
+}
+
+void e2::AnimationPose::updateAnimation(float timeDelta)
+{
+	m_time += timeDelta;
+	while (m_time >= m_animation->timeSeconds())
+	{
+		if (!m_loop)
+		{
+			m_playing = false;
+			m_time = m_animation->timeSeconds();
+			break;
+		}
+
+		m_time -= m_animation->timeSeconds();
+	}
+	applyBindPose();
+	applyAnimation(m_animation, m_time);
 }

@@ -1,3 +1,7 @@
+
+
+#define EPSILON 1e-5
+
 const vec2 invAtan = vec2(0.1591, 0.3183);
 vec2 equirectangularUv(vec3 direction)
 {
@@ -257,10 +261,4 @@ vec4 blur9(texture2D sourceTexture, sampler sourceSampler, vec2 uv, vec2 directi
     return color;
 }
 
-float getCloudShadows(vec3 pos, float time)
-{
-	float shadowSimplex = (simplex((pos.xz * 0.1) - vec2(0.4, 0.6) * time * 0.05 ) * 0.5 + 0.5);
-	float shadowCoeff = pow(shadowSimplex, 0.62);
-	shadowCoeff = smoothstep(0.4, 0.7, shadowCoeff) * 0.5 + 0.5;
-    return shadowCoeff;
-}
+

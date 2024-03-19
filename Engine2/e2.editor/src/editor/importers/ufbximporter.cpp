@@ -539,6 +539,7 @@ bool e2::UfbxImporter::writeAssets()
 			auto matFinder = m_config.materialMappings.find(submesh.materialName);
 			if (matFinder == m_config.materialMappings.end())
 			{
+				// will reuse if exist
 				im.materialUuid = createMaterial(submesh.materialName);
 			}
 			else
@@ -892,6 +893,10 @@ bool e2::UfbxImporter::writeAssets()
 e2::UUID e2::UfbxImporter::createMaterial(std::string const& outName)
 {
 	std::string outFile = (fs::path(m_config.outputDirectory) / (outName + ".e2a")).string();
+
+	e2::AssetEntry* existing = assetManager()->database().entryFromPath(outFile);
+	if (existing)
+		return existing->uuid;
 
 	e2::AssetHeader materialHeader;
 	materialHeader.version = e2::AssetVersion::Latest;

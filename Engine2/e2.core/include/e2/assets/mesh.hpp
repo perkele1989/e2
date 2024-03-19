@@ -148,7 +148,8 @@ namespace e2
 		e2::StackVector<uint32_t, e2::maxNumBonesInMask> boneIds;
 	};*/
 
-	/** @tags(arena, arenaSize=4096) */
+
+	/** @tags(arena, arenaSize=1024) */
 	class E2_API Pose : public e2::Object
 	{
 		ObjectDeclaration();
@@ -159,8 +160,10 @@ namespace e2
 
 		void updateSkin();
 
-		/** Applies bind pose (t-pose)*/
+		/** Applies bind pose (t-pose) */
 		void applyBindPose();
+
+		void applyPose(Pose* otherPose);
 
 		/** Applies a blend between a and b on this pose */
 		void applyBlend(Pose* a, Pose* b, float alpha);
@@ -185,6 +188,66 @@ namespace e2
 		e2::StackVector<glm::mat4, e2::maxNumSkeletonBones> m_skin;
 	};
 
+
+	/** @tags(arena, arenaSize=1024) */
+	class E2_API AnimationPose : public e2::Pose
+	{
+		ObjectDeclaration();
+	public:
+		AnimationPose(e2::Ptr<e2::Skeleton> skeleton, e2::Ptr<e2::Animation> animation, bool loop);
+		virtual ~AnimationPose();
+
+		void updateAnimation(float timeDelta);
+
+		void pause()
+		{
+			m_playing = false;
+		}
+
+		void resume()
+		{
+			m_playing = true;
+		}
+
+		void stop()
+		{
+			m_time = 0.0f;
+			m_playing = false;
+		}
+
+		void play(bool loop)
+		{
+			m_loop = loop;
+			m_time = 0.0f;
+			m_playing = true;
+		}
+
+		inline float time() const
+		{
+			return m_time;
+		}
+
+		inline bool playing() const
+		{
+			return m_playing;
+		}
+
+		inline bool loop() const
+		{
+			return m_loop;
+		}
+
+		e2::Ptr<e2::Animation> animation() const
+		{
+			return m_animation;
+		}
+
+	protected:
+		e2::Ptr<e2::Animation> m_animation;
+		bool m_loop{};
+		bool m_playing{};
+		float m_time{};
+	};
 
 
 

@@ -9,7 +9,7 @@ namespace e2
 	struct BuildAction
 	{
 		std::string displayName;
-		e2::GameUnitType buildType{};
+		e2::EntityType buildType{};
 		int32_t buildTurnsLeft{};
 		int32_t buildTurns{};
 	};

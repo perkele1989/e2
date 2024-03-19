@@ -21,13 +21,7 @@ namespace e2
 		virtual void drawUI(e2::UIContext* ctx) override;
 
 	protected:
-		e2::SkinProxy* m_skinProxy{};
-		e2::Ptr<e2::Animation> m_testAnim;
-		float m_testAnimTime{};
-		bool m_applyAnim{};
-		bool m_play{};
-		float m_playRate{ 1.0f };
-		e2::Pose* m_testPose{};
+
 	};
 }
 

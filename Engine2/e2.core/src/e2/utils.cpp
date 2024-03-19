@@ -135,21 +135,29 @@ namespace
 
 bool e2::randomBool()
 {
+	assertInitialized();
+
 	return (bool)std::uniform_int_distribution<>(0, 1)(::gen);
 }
 
 int64_t e2::randomInt(int64_t min, int64_t max)
 {
+	assertInitialized();
+
 	return std::uniform_int_distribution<int64_t>(min, max)(::gen);
 }
 
 float e2::randomFloat(float min, float max)
 {
+	assertInitialized();
+
 	return std::uniform_real_distribution<float>(min, max)(::gen);
 }
 
 double e2::randomDouble(double min, double max)
 {
+	assertInitialized();
+
 	return std::uniform_real_distribution<double>(min, max)(::gen);
 }
 

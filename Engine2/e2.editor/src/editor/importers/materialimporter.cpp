@@ -135,7 +135,7 @@ bool e2::MaterialImporter::writeAssets()
 		}
 
 		materialData << p.first;
-		materialData << entr->uuid;
+		//materialData << entr->uuid;
 
 		e2::DependencySlot newDep;
 		newDep.name = p.first;
