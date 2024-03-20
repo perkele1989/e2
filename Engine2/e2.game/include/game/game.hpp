@@ -83,7 +83,7 @@ namespace e2
 		ObjectDeclaration();
 	public:
 		PathFindingAccelerationStructure();
-		PathFindingAccelerationStructure(e2::GameContext* ctx, e2::Hex const& start, uint64_t range, bool ignoreVisibility = false);
+		PathFindingAccelerationStructure(e2::GameContext* ctx, e2::Hex const& start, uint64_t range, bool ignoreVisibility = false, e2::PassableFlags passableFlags = PassableFlags::Land);
 		PathFindingAccelerationStructure(e2::GameUnit* unit);
 		~PathFindingAccelerationStructure();
 
@@ -274,16 +274,18 @@ namespace e2
 		void selectUnit(e2::GameUnit* unit);
 		void deselectUnit();
 		void moveSelectedUnitTo(e2::Hex const& to);
+		void beginCustomUnitAction();
+		void endCustomUnitAction();
 
-		template<typename UnitType>
-		UnitType* spawnUnit(e2::Hex const& location, EmpireId empire)
+		template<typename UnitType, typename... Args>
+		UnitType* spawnUnit(e2::Hex const& location, EmpireId empire, Args... args)
 		{
 			glm::ivec2 coords = location.offsetCoords();
 			if (m_unitIndex.find(coords) != m_unitIndex.end())
 				return nullptr;
 
 
-			UnitType* newUnit = e2::create<UnitType>(this, coords, empire);
+			UnitType* newUnit = e2::create<UnitType>(this, coords, empire, std::forward<Args>(args)...);
 			newUnit->initialize();
 
 			m_units.insert(newUnit);
@@ -291,6 +293,8 @@ namespace e2
 
 			if (m_empires[empire])
 				m_empires[empire]->units.insert(newUnit);
+
+			m_resources.fiscalStreams.insert(newUnit);
 
 			return newUnit;
 		}
@@ -312,18 +316,20 @@ namespace e2
 
 
 	public:
+		void harvestWood(e2::Hex const& location, EmpireId empire);
+
+
 		void selectStructure(e2::GameStructure* structure);
 		void deselectStructure();
 
-		template<typename UnitType>
-		UnitType* spawnStructure(e2::Hex const& location, EmpireId empire)
+		template<typename UnitType, typename... Args>
+		UnitType* spawnStructure(e2::Hex const& location, EmpireId empire, Args... args)
 		{
 			glm::ivec2 coords = location.offsetCoords();
 			if (m_structureIndex.find(coords) != m_structureIndex.end())
 				return nullptr;
 
-
-			UnitType* newStructure = e2::create<UnitType>(this, coords, empire);
+			UnitType* newStructure = e2::create<UnitType>(this, coords, empire, std::forward<Args>(args)...);
 			newStructure->initialize();
 
 			m_structures.insert(newStructure);
@@ -331,6 +337,8 @@ namespace e2
 
 			if (m_empires[empire])
 				m_empires[empire]->structures.insert(newStructure);
+
+			m_resources.fiscalStreams.insert(newStructure);
 
 			return newStructure;
 		}

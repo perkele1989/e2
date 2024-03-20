@@ -109,7 +109,6 @@ void e2::Game::initialize()
 	m_entityMeshes[size_t(e2::EntityType::Unit_Engineer)] = am->get("assets/characters/SM_Engineer.e2a").cast<e2::Mesh>();
 	m_entitySkeletons[size_t(e2::EntityType::Unit_Engineer)] = am->get("assets/characters/SK_Engineer.e2a").cast<e2::Skeleton>();
 
-
 	m_animationIndex[(uint8_t)e2::AnimationIndex::SoldierIdle] = am->get("assets/characters/A_SoldierIdle.e2a").cast<e2::Animation>();
 	m_animationIndex[(uint8_t)e2::AnimationIndex::SoldierHit] = am->get("assets/characters/A_SoldierHit.e2a").cast<e2::Animation>();
 	m_animationIndex[(uint8_t)e2::AnimationIndex::SoldierFire] = am->get("assets/characters/A_SoldierFire.e2a").cast<e2::Animation>();
@@ -453,7 +452,7 @@ void e2::Game::updateMenu(double seconds)
 		engine()->shutdown();
 	}
 
-	if (m_haveBegunStart && !m_haveStreamedStart && m_hexGrid->numJobsInFlight() == 0 && m_beginStartTime.durationSince().seconds() > 3.0f)
+	if (m_haveBegunStart && !m_haveStreamedStart && m_hexGrid->numJobsInFlight() == 0 && m_beginStartTime.durationSince().seconds() > 0.25f)
 	{
 		m_haveStreamedStart = true;
 		m_beginStreamTime = e2::timeNow();
@@ -487,6 +486,7 @@ void e2::Game::updateMenu(double seconds)
 void e2::Game::pauseWorldStreaming()
 {
 	m_hexGrid->m_streamingPaused = true;
+	m_hexGrid->clearQueue();
 }
 
 void e2::Game::resumeWorldStreaming()
@@ -532,12 +532,12 @@ void e2::Game::findStartLocation()
 		attemptedStartLocations.insert(startLocation);
 
 		e2::Hex startHex(startLocation);
-		e2::TileData startTile = e2::HexGrid::calculateTileDataForHex(startHex);
-		if (!startTile.isWalkable())
+		e2::TileData startTile = m_hexGrid->calculateTileDataForHex(startHex);
+		if (!startTile.isPassable(e2::PassableFlags::Land))
 			continue;
 
 		constexpr bool ignoreVisibility = true;
-		auto as = e2::create<e2::PathFindingAccelerationStructure>(this, startHex, 64, ignoreVisibility);
+		auto as = e2::create<e2::PathFindingAccelerationStructure>(this, startHex, 64, ignoreVisibility, e2::PassableFlags::Land);
 		uint64_t numWalkableHexes = as->hexIndex.size();
 		e2::destroy(as);
 
@@ -744,6 +744,8 @@ void e2::Game::onStartOfTurn()
 		}
 	}
 
+	m_resources.onNewTurn();
+
 	for (e2::GameUnit* unit : m_empires[m_empireTurn]->units)
 	{
 		unit->onTurnStart();
@@ -871,6 +873,10 @@ void e2::Game::drawUI()
 
 void e2::Game::drawResourceIcons()
 {
+	// @todo move this to the respective structures instead 
+	return;
+
+	/*
 	e2::GameSession* session = gameSession();
 	e2::Renderer* renderer = session->renderer();
 	e2::UIContext* ui = session->uiContext();
@@ -965,7 +971,7 @@ void e2::Game::drawResourceIcons()
 					drawIcon({ (1.0f / 7.0f) * 5.0f, 0.0f });
 			}
 		}
-	}
+	}*/
 
 }
 
@@ -993,7 +999,7 @@ void e2::Game::drawStatusUI()
 	xCursor += 2.0f;
 	ui->drawTexturedQuad({ xCursor, 2.0f }, { 24.0f, 24.0f }, 0xFFFFFFFF, m_uiTextureResources->handle(), { (1.0f / 7.0f) * 0.0f, 0.0f }, { 1.0f / 7.0f, 1.0f });
 	xCursor += 26.0f;
-	str = std::format("{0:} ({0:+})", m_resources.funds.gold, m_resources.profits.gold);
+	str = std::format("{:} ({:+})", m_resources.funds.gold, m_resources.profits.gold);
 	strWidth = ui->calculateTextWidth(e2::FontFace::Serif, fontSize, str);
 	ui->drawRasterText(e2::FontFace::Serif, fontSize, 0xFFFFFFFF, { xCursor, 14.0f}, str);
 	xCursor += strWidth;
@@ -1002,7 +1008,7 @@ void e2::Game::drawStatusUI()
 	xCursor += 2.0f;
 	ui->drawTexturedQuad({ xCursor, 2.0f }, { 24.0f, 24.0f }, 0xFFFFFFFF, m_uiTextureResources->handle(), { (1.0f / 7.0f) * 1.0f, 0.0f }, { 1.0f / 7.0f, 1.0f });
 	xCursor += 26.0f;
-	str = std::format("{0:} ({0:+})", m_resources.funds.wood, m_resources.profits.wood);
+	str = std::format("{:} ({:+})", m_resources.funds.wood, m_resources.profits.wood);
 	strWidth = ui->calculateTextWidth(e2::FontFace::Serif, fontSize, str);
 	ui->drawRasterText(e2::FontFace::Serif, fontSize, 0xFFFFFFFF, { xCursor, 14.0f }, str);
 	xCursor += strWidth;
@@ -1011,7 +1017,7 @@ void e2::Game::drawStatusUI()
 	xCursor += 2.0f;
 	ui->drawTexturedQuad({ xCursor, 2.0f }, { 24.0f, 24.0f }, 0xFFFFFFFF, m_uiTextureResources->handle(), { (1.0f / 7.0f) * 2.0f, 0.0f }, { 1.0f / 7.0f, 1.0f });
 	xCursor += 26.0f;
-	str = std::format("{0:} ({0:+})", m_resources.funds.stone, m_resources.profits.stone);
+	str = std::format("{:} ({:+})", m_resources.funds.stone, m_resources.profits.stone);
 	strWidth = ui->calculateTextWidth(e2::FontFace::Serif, fontSize, str);
 	ui->drawRasterText(e2::FontFace::Serif, fontSize, 0xFFFFFFFF, { xCursor, 14.0f }, str);
 	xCursor += strWidth;
@@ -1020,7 +1026,7 @@ void e2::Game::drawStatusUI()
 	xCursor += 2.0f;
 	ui->drawTexturedQuad({ xCursor, 2.0f }, { 24.0f, 24.0f }, 0xFFFFFFFF, m_uiTextureResources->handle(), { (1.0f / 7.0f) * 3.0f, 0.0f }, { 1.0f / 7.0f, 1.0f });
 	xCursor += 26.0f;
-	str = std::format("{0:} ({0:+})", m_resources.funds.metal, m_resources.profits.metal);
+	str = std::format("{:} ({:+})", m_resources.funds.metal, m_resources.profits.metal);
 	strWidth = ui->calculateTextWidth(e2::FontFace::Serif, fontSize, str);
 	ui->drawRasterText(e2::FontFace::Serif, fontSize, 0xFFFFFFFF, { xCursor, 14.0f }, str);
 	xCursor += strWidth;
@@ -1029,7 +1035,7 @@ void e2::Game::drawStatusUI()
 	xCursor += 2.0f;
 	ui->drawTexturedQuad({ xCursor, 2.0f }, { 24.0f, 24.0f }, 0xFFFFFFFF, m_uiTextureResources->handle(), { (1.0f / 7.0f) * 4.0f, 0.0f }, { 1.0f / 7.0f, 1.0f });
 	xCursor += 26.0f;
-	str = std::format("{0:} ({0:+})", m_resources.funds.oil, m_resources.profits.oil);
+	str = std::format("{:} ({:+})", m_resources.funds.oil, m_resources.profits.oil);
 	strWidth = ui->calculateTextWidth(e2::FontFace::Serif, fontSize, str);
 	ui->drawRasterText(e2::FontFace::Serif, fontSize, 0xFFFFFFFF, { xCursor, 14.0f }, str);
 	xCursor += strWidth;
@@ -1038,7 +1044,7 @@ void e2::Game::drawStatusUI()
 	xCursor += 2.0f;
 	ui->drawTexturedQuad({ xCursor, 2.0f }, { 24.0f, 24.0f }, 0xFFFFFFFF, m_uiTextureResources->handle(), { (1.0f / 7.0f) * 5.0f, 0.0f }, { 1.0f / 7.0f, 1.0f });
 	xCursor += 26.0f;
-	str = std::format("{0:} ({0:+})", m_resources.funds.uranium, m_resources.profits.uranium);
+	str = std::format("{:} ({:+})", m_resources.funds.uranium, m_resources.profits.uranium);
 	strWidth = ui->calculateTextWidth(e2::FontFace::Serif, fontSize, str);
 	ui->drawRasterText(e2::FontFace::Serif, fontSize, 0xFFFFFFFF, { xCursor, 14.0f }, str);
 	xCursor += strWidth;
@@ -1047,14 +1053,14 @@ void e2::Game::drawStatusUI()
 	xCursor += 2.0f;
 	ui->drawTexturedQuad({ xCursor, 2.0f }, { 24.0f, 24.0f }, 0xFFFFFFFF, m_uiTextureResources->handle(), { (1.0f / 7.0f) * 6.0f, 0.0f }, { 1.0f / 7.0f, 1.0f });
 	xCursor += 26.0f;
-	str = std::format("{0:} ({0:+})", m_resources.funds.meteorite, m_resources.profits.meteorite);
+	str = std::format("{:} ({:+})", m_resources.funds.meteorite, m_resources.profits.meteorite);
 	strWidth = ui->calculateTextWidth(e2::FontFace::Serif, fontSize, str);
 	ui->drawRasterText(e2::FontFace::Serif, fontSize, 0xFFFFFFFF, { xCursor, 14.0f }, str);
 	xCursor += strWidth;
 
 
-	strWidth = ui->calculateTextWidth(e2::FontFace::Serif, fontSize, str);
 	str = std::format("Turn {}", m_turn);
+	strWidth = ui->calculateTextWidth(e2::FontFace::Serif, fontSize, str);
 	xCursor = winSize.x - strWidth - 16.0f;
 	ui->drawRasterText(e2::FontFace::Serif, fontSize, 0xFFFFFFFF, { xCursor, 14.0f }, str);
 	
@@ -1321,6 +1327,18 @@ void e2::Game::moveSelectedUnitTo(e2::Hex const& to)
 	
 }
 
+void e2::Game::endCustomUnitAction()
+{
+	if (m_turnState == TurnState::UnitAction_Generic)
+		m_turnState = TurnState::Unlocked;
+}
+
+void e2::Game::beginCustomUnitAction()
+{
+	if(m_turnState == TurnState::Unlocked)
+		m_turnState = TurnState::UnitAction_Generic;
+}
+
 void e2::Game::updateMainCamera(double seconds)
 {
 	constexpr float moveSpeed = 50.0f;
@@ -1442,6 +1460,8 @@ void e2::Game::destroyUnit(e2::Hex const& location)
 	if (m_empires[unit->empireId])
 		m_empires[unit->empireId]->units.erase(unit);
 
+	m_resources.fiscalStreams.erase(unit);
+
 	e2::destroy(unit);
 }
 
@@ -1449,6 +1469,29 @@ void e2::Game::destroyUnit(e2::Hex const& location)
 namespace
 {
 	std::vector<e2::Hex> tmpHex;
+}
+
+void e2::Game::harvestWood(e2::Hex const& location, EmpireId empire)
+{
+	e2::TileData* tileData = m_hexGrid->getTileData(location.offsetCoords());
+	if (!tileData)
+		return;
+
+	bool hasForest = (tileData->flags & e2::TileFlags::FeatureForest) != TileFlags::FeatureNone;
+	float woodProfit = tileData->getWoodAbundanceAsFloat() * 14.0f;
+
+	if (!hasForest)
+		return;
+
+	m_resources.funds.wood += woodProfit;
+	tileData->flags = e2::TileFlags(uint16_t(tileData->flags) & (~uint16_t(e2::TileFlags::FeatureForest)));
+
+	if (tileData->forestProxy)
+		e2::destroy(tileData->forestProxy);
+
+	tileData->forestProxy = nullptr;
+	tileData->forestMesh = nullptr;
+
 }
 
 void e2::Game::selectStructure(e2::GameStructure* structure)
@@ -1498,6 +1541,8 @@ void e2::Game::destroyStructure(e2::Hex const& location)
 
 	if (m_empires[structure->empireId])
 		m_empires[structure->empireId]->structures.erase(structure);
+
+	m_resources.fiscalStreams.erase(structure);
 
 	e2::destroy(structure);
 }
@@ -1650,8 +1695,8 @@ e2::PathFindingAccelerationStructure::PathFindingAccelerationStructure(e2::GameU
 				continue;
 
 			// ignore hexes that are occupied by unpassable biome
-			e2::TileData tile = e2::HexGrid::calculateTileDataForHex(n);
-			if (!tile.isWalkable())
+			e2::TileData tile = unit->game()->hexGrid()->calculateTileDataForHex(n);
+			if (!tile.isPassable(unit->getPassableFlags()))
 				continue;
 
 			// ignore hexes that are occupied by units
@@ -1672,7 +1717,7 @@ e2::PathFindingAccelerationStructure::PathFindingAccelerationStructure(e2::GameU
 	}
 }
 
-e2::PathFindingAccelerationStructure::PathFindingAccelerationStructure(e2::GameContext* ctx, e2::Hex const& start, uint64_t range, bool ignoreVisibility)
+e2::PathFindingAccelerationStructure::PathFindingAccelerationStructure(e2::GameContext* ctx, e2::Hex const& start, uint64_t range, bool ignoreVisibility, e2::PassableFlags passableFlags)
 {
 	if (!ctx)
 		return;
@@ -1716,8 +1761,8 @@ e2::PathFindingAccelerationStructure::PathFindingAccelerationStructure(e2::GameC
 				continue;
 
 			// ignore hexes that are occupied by unpassable biome
-			e2::TileData tile = e2::HexGrid::calculateTileDataForHex(n);
-			if (!tile.isWalkable())
+			e2::TileData tile = ctx->game()->hexGrid()->calculateTileDataForHex(n);
+			if (!tile.isPassable(passableFlags))
 				continue;
 
 			// ignore hexes that are occupied by units

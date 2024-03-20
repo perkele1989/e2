@@ -124,9 +124,27 @@ void e2::GameUnit::drawUI(e2::UIContext* ui)
 	ui->endStackV();
 }
 
+e2::PassableFlags e2::GameUnit::getPassableFlags()
+{
+	return e2::PassableFlags::Land;
+}
+
 e2::GameUnit::~GameUnit()
 {
 	destroyProxy();
+
+	if (m_mainPose)
+		e2::destroy(m_mainPose);
+}
+
+void e2::GameEntity::collectRevenue(ResourceTable& outRevenueTable)
+{
+
+}
+
+void e2::GameEntity::collectExpenditure(ResourceTable& outExpenditureTable)
+{
+
 }
 
 void e2::GameEntity::initialize()
@@ -137,6 +155,8 @@ void e2::GameEntity::initialize()
 	m_skeleton = game()->getEntitySkeleton(entityType);
 
 	buildProxy();
+
+	m_mainPose = e2::create<e2::Pose>(m_skeleton);
 
 }
 
@@ -312,7 +332,7 @@ void e2::GameStructure::drawUI(e2::UIContext* ui)
 	ui->endStackV();
 }
 
-e2::Mine::Mine(e2::GameContext* ctx, glm::ivec2 const& tile, uint8_t empireId)
+e2::Mine::Mine(e2::GameContext* ctx, glm::ivec2 const& tile, uint8_t empireId, e2::EntityType type)
 	: e2::GameStructure(ctx, tile, empireId)
 {
 	e2::TileData* tileData = game()->hexGrid()->getTileData(tile);
@@ -320,44 +340,74 @@ e2::Mine::Mine(e2::GameContext* ctx, glm::ivec2 const& tile, uint8_t empireId)
 		return;
 
 	e2::TileFlags resource = tileData->getResource();
-	tileData->improvedResource = true;
-
-	if (resource == TileFlags::ResourceGold)
+	
+	entityType = type;
+	if (entityType == e2::EntityType::Structure_GoldMine)
 	{
 		displayName = "Gold mine";
-		entityType = e2::EntityType::Structure_GoldMine;
+		;
 	}
-	else if (resource == TileFlags::ResourceUranium)
+	else if (entityType == e2::EntityType::Structure_UraniumMine)
 	{
 		displayName = "Uranium mine";
-		entityType = e2::EntityType::Structure_UraniumMine;
+		;
 	}
-	else if (resource == TileFlags::ResourceOre)
+	else if (entityType == e2::EntityType::Structure_OreMine)
 	{
 		displayName = "Ore mine";
-		entityType = e2::EntityType::Structure_OreMine;
+		;
 	}
-	else if (resource == TileFlags::ResourceForest)
+	else if (entityType == e2::EntityType::Structure_SawMill)
 	{
 		displayName = "Saw Mill";
-		entityType = e2::EntityType::Structure_SawMill;
+		;
 	}
-	else if (resource == TileFlags::ResourceStone)
+	else if (entityType == e2::EntityType::Structure_Quarry)
 	{
 		displayName = "Quarry";
-		entityType = e2::EntityType::Structure_Quarry;
 	}
 
 	sightRange = 2;
 
-	tileData->improvedResource = true;
-
 	// refresh the chunk to remove forest we just ploinked
 	e2::ChunkState* chunk = hexGrid()->getOrCreateChunk(hexGrid()->chunkIndexFromPlanarCoords(e2::Hex(tileIndex).planarCoords()));
-	hexGrid()->refreshChunkForest(chunk);
+	hexGrid()->refreshChunkMeshes(chunk);
 }
 
 e2::Mine::~Mine()
+{
+
+}
+
+void e2::Mine::collectRevenue(ResourceTable& outRevenueTable)
+{
+	e2::TileData* tileData = game()->hexGrid()->getTileData(tileIndex);
+	float abundance = tileData->getAbundanceAsFloat();
+
+	switch (entityType)
+	{
+	case EntityType::Structure_GoldMine:
+		outRevenueTable.gold += abundance;
+		break;
+	case EntityType::Structure_OilWell:
+		outRevenueTable.oil += abundance;
+		break;
+	case EntityType::Structure_OreMine:
+		outRevenueTable.metal += abundance;
+		break;
+	case EntityType::Structure_Quarry:
+		outRevenueTable.stone += abundance;
+		break;
+	case EntityType::Structure_UraniumMine:
+		outRevenueTable.uranium += abundance;
+		break;
+	case EntityType::Structure_SawMill:
+		outRevenueTable.wood += abundance;
+		break;
+	}
+}
+
+void e2::Mine::collectExpenditure(ResourceTable& outExpenditureTable)
 {
 
 }

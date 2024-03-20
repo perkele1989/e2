@@ -12,6 +12,7 @@
 #include <e2/renderer/shadermodels/fog.hpp>
 
 #include "game/gamecontext.hpp"
+#include "game/shared.hpp"
 
 #include <vector>
 #include <unordered_map>
@@ -21,53 +22,89 @@ namespace e2
 
 	class GameUnit;
 
-	enum class TileFlags : uint8_t
+	enum class TileFlags : uint16_t
 	{
-		None					= 0b0000'0000,
+		None					= 0b0000'0000'0000'0000,
 
-		BiomeMask				= 0b1110'0000,
-		BiomeGrassland			= 0b0000'0000,
-		BiomeForest				= 0b0010'0000,
-		BiomeDesert				= 0b0100'0000,
-		BiomeTundra				= 0b0110'0000,
-		BiomeMountain			= 0b1000'0000,
-		BiomeShallow			= 0b1010'0000,
-		BiomeOcean				= 0b1100'0000,
-		BiomeReserved0			= 0b1110'0000,
+		BiomeMask				= 0b0000'0000'0000'0011,
+		BiomeGrassland			= 0b0000'0000'0000'0000,
+		BiomeDesert				= 0b0000'0000'0000'0001,
+		BiomeTundra				= 0b0000'0000'0000'0010,
+		BiomeReserved0			= 0b0000'0000'0000'0011,
 
-		ResourceMask			= 0b0001'1100,
-		ResourceNone			= 0b0000'0000, // no resource here
-		ResourceForest			= 0b0000'0100, // improve to saw mill, provides wood 
-		ResourceStone			= 0b0000'1000, // improve to quarry, provides stone 
-		ResourceOre				= 0b0000'1100, // improve to ore mine, provides metal
-		ResourceGold			= 0b0001'0000, // improve to gold mine, provides gold
-		ResourceOil				= 0b0001'0100, // improve to oil derrick, provides oil
-		ResourceUranium			= 0b0001'1000, // improve to uranium mine, provides uranium
-		ResourceReserved0		= 0b0001'1100,
+		FeatureMask				= 0b0000'0000'0000'1100,
+		FeatureNone				= 0b0000'0000'0000'0000,
+		FeatureMountains		= 0b0000'0000'0000'0100,
+		FeatureForest			= 0b0000'0000'0000'1000,
+
+		WaterMask				= 0b0000'0000'0011'0000,
+		WaterNone				= 0b0000'0000'0000'0000,
+		WaterShallow			= 0b0000'0000'0001'0000,
+		WaterDeep				= 0b0000'0000'0010'0000,
+		WaterReserved0			= 0b0000'0000'0011'0000,
+
+		ResourceMask			= 0b0000'0001'1100'0000,
+		ResourceNone			= 0b0000'0000'0000'0000,
+		ResourceStone			= 0b0000'0000'0100'0000,
+		ResourceOre				= 0b0000'0000'1000'0000,
+		ResourceGold			= 0b0000'0000'1100'0000,
+		ResourceOil				= 0b0000'0001'0000'0000,
+		ResourceUranium			= 0b0000'0001'0100'0000,
+		ResourceReserved0		= 0b0000'0001'1000'0000,
+		ResourceReserved1		= 0b0000'0001'1100'0000,
 
 		// Abundance of the given resources on this tile
-		AbundanceMask			= 0b0000'0011,
-		Abundance1				= 0b0000'0000,
-		Abundance2				= 0b0000'0001,
-		Abundance3				= 0b0000'0010,
-		Abundance4				= 0b0000'0011,
+		AbundanceMask			= 0b0000'0110'0000'0000,
+		Abundance1				= 0b0000'0000'0000'0000,
+		Abundance2				= 0b0000'0010'0000'0000,
+		Abundance3				= 0b0000'0100'0000'0000,
+		Abundance4				= 0b0000'0110'0000'0000,
+
+		// Abundance of forest/wood on this tile
+		WoodAbundanceMask		= 0b0001'1000'0000'0000,
+		WoodAbundance1			= 0b0000'0000'0000'0000,
+		WoodAbundance2			= 0b0000'1000'0000'0000,
+		WoodAbundance3			= 0b0001'0000'0000'0000,
+		WoodAbundance4			= 0b0001'1000'0000'0000,
+
+		Reserved0				= 0b1110'0000'0000'0000
 	};
 
 	EnumFlagsDeclaration(TileFlags);
 
+
+
 	/** */
 	struct TileData
 	{
-		bool isWalkable();
+		bool isPassable(PassableFlags passableFlags);
+
+		TileFlags getWater();
+
+		TileFlags getFeature();
 
 		TileFlags getBiome();
+
 		TileFlags getResource();
+
 		TileFlags getAbundance();
 
+		TileFlags getWoodAbundance();
+
+		float getAbundanceAsFloat();
+		float getWoodAbundanceAsFloat();
+
 		// flags control biome, resources, abundance
-		TileFlags flags{ TileFlags::None }; // 8 bits
+		TileFlags flags{ TileFlags::None }; // 16 bits
 		uint8_t empireId{255}; // 255 means no empire claim this, 254 empire ids that are recycled (max 254 concurrent empires)
-		bool improvedResource{};
+
+		// optional mesh proxy, it shows: structure if built, resource mesh if unbuilt but there is a resource here to be displayed, nothing otherwise
+		e2::MeshProxy* mainProxy{};
+		e2::MeshPtr mainMesh{};
+
+		// optional forest proxy, if this tile is discovered it shows: forest abundance if unbuilt on forest, partly forest if built on forest, nothing if not on forest or if undiscovered (undiscovered tile meshes lives on chunk array)
+		e2::MeshProxy* forestProxy{};
+		e2::MeshPtr forestMesh{};
 
 	};
 
@@ -77,7 +114,7 @@ namespace e2
 	constexpr uint32_t maxNumChunkStates = 512;
 
 	constexpr uint32_t maxNumChunkLoadTasks = 256;
-	constexpr uint32_t maxNumTreesPerChunk = hexChunkResolution * hexChunkResolution;
+	constexpr uint32_t maxNumMeshesPerChunk = hexChunkResolution * hexChunkResolution;
 
 	class HexGrid;
 
@@ -107,7 +144,7 @@ namespace e2
 		e2::DynamicMesh* m_dynaHex{};
 		e2::DynamicMesh* m_dynaHexHigh{};
 
-		e2::StackVector<e2::ForestIndex, e2::maxNumTreesPerChunk> treeOffsets;
+		e2::StackVector<e2::MeshProxy*, e2::maxNumMeshesPerChunk> forestMeshes;
 
 		float m_ms;
 	};
@@ -159,8 +196,8 @@ namespace e2
 		e2::MeshProxy* waterProxy{};
 		e2::MeshProxy* fogProxy{};
 
-		e2::StackVector<ForestIndex, e2::maxNumTreesPerChunk> forestTileIndices;
-		e2::StackVector<e2::MeshProxy*, e2::maxNumTreesPerChunk> forestTileProxies;
+
+		e2::StackVector<e2::MeshProxy*, e2::maxNumMeshesPerChunk> extraMeshes;
 
 	};
 
@@ -224,7 +261,7 @@ namespace e2
 		void startStreamingChunk(e2::ChunkState* state);
 
 		/** finalizes a streaming chunk */
-		void endStreamingChunk(glm::ivec2 const& chunkIndex, e2::MeshPtr newMesh, double timeMs, e2::StackVector<e2::ForestIndex, e2::maxNumTreesPerChunk>* treeIndices);
+		void endStreamingChunk(glm::ivec2 const& chunkIndex, e2::MeshPtr newMesh, double timeMs);
 
 		/** pops in chunk, no questions asked, self-corrective states and safe to call whenever  */
 		void popInChunk(e2::ChunkState* state);
@@ -232,7 +269,7 @@ namespace e2
 		/** pops out chunk, no questions asked, self-corrective states and safe to call whenever */
 		void popOutChunk(e2::ChunkState* state);
 
-		void refreshChunkForest(e2::ChunkState* state);
+		void refreshChunkMeshes(e2::ChunkState* state);
 
 		// owning map as well as index from chunk index -> chunk state
 		std::unordered_map<glm::ivec2, e2::ChunkState*> m_chunkIndex;
@@ -246,6 +283,8 @@ namespace e2
 		std::unordered_set<e2::ChunkState*> m_chunksInView;
 		std::unordered_set<e2::ChunkState*> m_lookAheadChunks;
 
+		std::unordered_set<e2::ChunkState*> m_outdatedChunks;
+
 
 		void forceStreamView(e2::Viewpoints2D const& view);
 		std::vector<e2::Viewpoints2D> m_forceStreamQueue;
@@ -253,6 +292,7 @@ namespace e2
 
 		void updateStreaming(glm::vec2 const& streamCenter, e2::Viewpoints2D const& newStreamingView, glm::vec2 const& viewVelocity);
 
+		void clearQueue();
 
 		bool m_streamingPaused{};
 		glm::vec2 m_streamingCenter;
@@ -288,12 +328,15 @@ namespace e2
 		/** Number of currently streaming chunks */
 		uint32_t numJobsInFlight();
 
+		uint32_t numJobsInQueue();
+
 		/** Puts this chunk index in queue to be streamed in, if it's not already streamed in or streaming */
 		//void prepareChunk(glm::ivec2 const& chunkIndex);
 
 		/** Called by streaming thread when it finishes, this simply finalizes a chunk (if it still exists) */
 		//void notifyChunkReady(glm::ivec2 const& chunkIndex, e2::MeshPtr generatedMesh, double ms, e2::StackVector<glm::vec4, e2::maxNumTreesPerChunk>* offsets);
 
+		void flagChunkOutdated(glm::ivec2 const& chunkIndex);
 		/** Ensures all chunks within the range are visible, given range in planar coords, updates them as visible, nukes any excessive hcunks */
 		//void assertChunksWithinRangeVisible(glm::vec2 const& streamCenter, e2::Viewpoints2D const& viewPoints, glm::vec2 const& viewVelocity);
 
@@ -309,7 +352,6 @@ namespace e2
 		// set of discovered chunks and its aabb, for minimap and its fog but can also be used for other stuff 
 		std::unordered_set<glm::ivec2> m_discoveredChunks;
 		e2::Aabb2D m_discoveredChunksAABB;
-
 
 
 
@@ -338,8 +380,9 @@ namespace e2
 		void clearLoadTime();
 
 		/** */
-		static e2::TileData calculateTileDataForHex(Hex hex);
+		e2::TileData calculateTileDataForHex(Hex hex);
 
+		e2::MeshProxy* createForestProxyForTile(e2::TileData* tileData, e2::Hex const& hex);
 		static float sampleSimplex(glm::vec2 const& position);
 
 		static float sampleBaseHeight(glm::vec2 const& position);

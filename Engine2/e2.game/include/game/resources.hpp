@@ -2,26 +2,49 @@
 #pragma once 
 
 #include <cstdint>
+#include <unordered_set>
 
 namespace e2
 {
 
+	class IFiscalStream;
+
 	struct ResourceTable
 	{
-		int32_t wood{};
-		int32_t stone{};
-		int32_t metal{};
-		int32_t gold{};
-		int32_t oil{};
-		int32_t uranium{};
-		int32_t meteorite{};
+		float wood{};
+		float stone{};
+		float metal{};
+		float gold{};
+		float oil{};
+		float uranium{};
+		float meteorite{};
+
+		void clear();
+
+		ResourceTable operator+(ResourceTable const& other) const;
+
+		ResourceTable operator-(ResourceTable const& other) const;
+
+
+		ResourceTable& operator+=(ResourceTable const& other);
+
+		ResourceTable& operator-=(ResourceTable const& other);
 	};
+
+
 
 
 	struct GameResources
 	{
+		void collectRevenue();
+		void collectExpenditures();
+
 		void calculateProfits();
 
+		void applyProfits();
+
+		void onNewTurn();
+		
 		// funds, persistent value
 		ResourceTable funds;
 
@@ -33,6 +56,15 @@ namespace e2
 
 		// profits, calculated by (profits = revenue - expenditure)
 		ResourceTable profits;
+
+		std::unordered_set<e2::IFiscalStream*> fiscalStreams;
+	};
+
+	class IFiscalStream
+	{
+	public:
+		virtual void collectRevenue(ResourceTable& outRevenueTable) = 0;
+		virtual void collectExpenditure(ResourceTable& outExpenditureTable) = 0;
 	};
 
 }

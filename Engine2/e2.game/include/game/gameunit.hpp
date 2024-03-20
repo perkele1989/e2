@@ -9,6 +9,8 @@
 #include <game/gamecontext.hpp>
 #include "game/shared.hpp"
 
+#include "game/resources.hpp"
+
 
 
 namespace e2
@@ -89,7 +91,7 @@ namespace e2
 
 
 	/** Base for something that lives on the hex grid, and spreads visibility, and is owned by an empire */
-	class GameEntity : public e2::Object, public e2::GameContext
+	class GameEntity : public e2::Object, public e2::GameContext, public e2::IFiscalStream
 	{
 		ObjectDeclaration();
 	public:
@@ -102,7 +104,8 @@ namespace e2
 		{
 			return m_game;
 		}
-
+		virtual void collectRevenue(ResourceTable& outRevenueTable) override;
+		virtual void collectExpenditure(ResourceTable& outExpenditureTable) override;
 
 		virtual void initialize();
 
@@ -153,10 +156,10 @@ namespace e2
 
 		float m_lerpTime{};
 		e2::Moment m_lastChangePose;
-		e2::Pose* m_currentPose;
-		e2::Pose* m_oldPose;
+		e2::Pose* m_currentPose{};
+		e2::Pose* m_oldPose{};
 
-		e2::AnimationPose* m_actionPose;
+		e2::AnimationPose* m_actionPose{};
 		float m_actionBlendInTime = 0.2f;
 		float m_actionBlendOutTime = 0.2f;
 	};
@@ -180,8 +183,12 @@ namespace e2
 	{
 		ObjectDeclaration();
 	public:
-		Mine(e2::GameContext* ctx, glm::ivec2 const& tile, uint8_t empireId);
+		Mine(e2::GameContext* ctx, glm::ivec2 const& tile, uint8_t empireId, e2::EntityType type);
 		virtual ~Mine();
+
+
+		virtual void collectRevenue(ResourceTable& outRevenueTable) override;
+		virtual void collectExpenditure(ResourceTable& outExpenditureTable) override;
 
 		virtual void onTurnEnd() override;
 		virtual void onTurnStart() override;
@@ -205,6 +212,8 @@ namespace e2
 		virtual void updateUnitAction(double seconds);
 
 		virtual void drawUI(e2::UIContext* ctx);
+
+		virtual e2::PassableFlags getPassableFlags();
 
 		float health{ 100.0f };
 		int32_t moveRange{ 3 };

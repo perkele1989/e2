@@ -194,6 +194,7 @@ namespace
 {
 	struct HexShaderData
 	{
+		e2::HexGrid* grid{};
 		e2::Hex hex;
 		glm::vec2 chunkOffset;
 		e2::TileData tileData;
@@ -206,7 +207,7 @@ namespace
 			auto finder = tileCache.find(offsetCoords);
 			if (finder == tileCache.end())
 			{
-				e2::TileData newTileData = e2::HexGrid::calculateTileDataForHex(e2::Hex(offsetCoords));
+				e2::TileData newTileData = grid->calculateTileDataForHex(e2::Hex(offsetCoords));
 				tileCache[offsetCoords] = newTileData;
 				return newTileData;
 			}
@@ -262,10 +263,10 @@ namespace
 		e2::TileData &tile = shaderData->tileData;
 
 
-		bool currIsMountain = (tile.flags & e2::TileFlags::BiomeMask) == e2::TileFlags::BiomeMountain;
-		bool currIsShallow = (tile.flags & e2::TileFlags::BiomeMask) == e2::TileFlags::BiomeShallow;
-		bool currIsOcean = (tile.flags & e2::TileFlags::BiomeMask) == e2::TileFlags::BiomeOcean;
-		bool currIsWater = currIsShallow || currIsOcean;
+		bool currIsMountain = (tile.flags & e2::TileFlags::FeatureMountains) != e2::TileFlags::FeatureNone;
+		bool currIsShallow = (tile.flags & e2::TileFlags::WaterMask) == e2::TileFlags::WaterShallow;
+		bool currIsOcean = (tile.flags & e2::TileFlags::WaterMask) == e2::TileFlags::WaterDeep;
+		bool currIsWater = (tile.flags & e2::TileFlags::WaterMask) != e2::TileFlags::WaterNone;
 
 		float distanceFromVertexToTile = glm::distance(worldPosition, hexCenter);
 		float mountainDistanceCoeff = 1.0f - glm::clamp(distanceFromVertexToTile * 1.5f, 0.0f, 1.0f);
@@ -294,11 +295,11 @@ namespace
 				e2::TileData nextTile = shaderData->getTileData(nextHex.offsetCoords());
 				glm::vec2 nextWorldPosition = nextHex.planarCoords();
 
-				bool neighbourIsMountain = (neighbourTile.flags & e2::TileFlags::BiomeMask) == e2::TileFlags::BiomeMountain;
-				bool neighbourIsWater = (neighbourTile.flags & e2::TileFlags::BiomeMask) == e2::TileFlags::BiomeShallow || (neighbourTile.flags & e2::TileFlags::BiomeMask) == e2::TileFlags::BiomeOcean;
+				bool neighbourIsMountain = (neighbourTile.flags & e2::TileFlags::FeatureMountains) != e2::TileFlags::FeatureNone;
+				bool neighbourIsWater = (neighbourTile.flags & e2::TileFlags::WaterMask) != e2::TileFlags::WaterNone;
 
-				bool nextIsMountain = (nextTile.flags & e2::TileFlags::BiomeMask) == e2::TileFlags::BiomeMountain;
-				bool nextIsWater = (nextTile.flags & e2::TileFlags::BiomeMask) == e2::TileFlags::BiomeShallow || (nextTile.flags & e2::TileFlags::BiomeMask) == e2::TileFlags::BiomeOcean;
+				bool nextIsMountain = (nextTile.flags & e2::TileFlags::FeatureMountains) != e2::TileFlags::FeatureNone;
+				bool nextIsWater = (nextTile.flags & e2::TileFlags::WaterMask) != e2::TileFlags::WaterNone;
 
 				glm::vec2 midpoint = (hexCenter + neighbourWorldPosition + nextWorldPosition) / 3.0f;
 				float distanceToMidpoint = glm::distance(worldPosition, midpoint);
@@ -391,20 +392,6 @@ namespace
 		//vertex->tangent = glm::rotate(glm::quat(1.0f, 0.0f, 0.0f, 0.0f), glm::radians(90.0f), glm::vec3(0.0f, 0.0f, -1.0f)) * vertex->normal;
 		
 
-
-		bool currIsForest = (curr.flags & e2::TileFlags::BiomeMask) == e2::TileFlags::BiomeForest;
-
-		/*
-		glm::vec4 waterDry = e2::UIColor(0xD2B99BFF).toVec4();
-		glm::vec4 waterWet = e2::UIColor(0xC6A77AFF).toVec4();
-		glm::vec4 water = glm::mix(waterWet, waterDry, glm::smoothstep(1.0f, 0.0f,vertex.position.y));
-		glm::vec4 grass = e2::UIColor(0x7CA917FF).toVec4();// currIsForest ? e2::UIColor(0x7CA917FF).toVec4() : waterDry;
-		glm::vec4 hill = e2::UIColor(0x946644FF).toVec4();
-		glm::vec4 hill2 = waterDry;
-		glm::vec4 hillBlend = glm::mix(hill, hill2, glm::smoothstep(0.0f, -2.0f, vertex.position.y));
-		glm::vec4 alps = e2::UIColor(0xDFE6F7FF).toVec4();
-		*/
-
 		// save hex grid thingy
 		vertex->color.a = vertex->color.r;
 
@@ -473,18 +460,24 @@ void e2::HexGrid::updateStreaming(glm::vec2 const& streamCenter, e2::Viewpoints2
 	{
 		chunk->inView = false;
 	}
+
 	m_chunksInView.clear();
+
 	gatherChunkStatesInView(m_streamingView, m_chunksInView, false);
 	for (e2::ChunkState* chunk : m_chunksInView)
 	{
 		chunk->inView = true;
 		chunk->lastTimeInView = e2::timeNow();
+
 		if (!chunk->visibilityState)
 			popInChunk(chunk);
 
-		if (chunk->streamState == StreamState::Poked && !m_streamingPaused)
+		if (!m_streamingPaused)
 		{
-			queueStreamingChunk(chunk);
+			if (chunk->streamState == StreamState::Poked)
+			{
+				queueStreamingChunk(chunk);
+			}
 		}
 	}
 
@@ -492,15 +485,23 @@ void e2::HexGrid::updateStreaming(glm::vec2 const& streamCenter, e2::Viewpoints2
 	for (e2::Viewpoints2D const& vp : m_forceStreamQueue)
 	{
 		std::unordered_set<e2::ChunkState*> forceChunks;
-		gatherChunkStatesInView(vp, forceChunks, false);
+		gatherChunkStatesInView(vp, forceChunks, true);
 		for (e2::ChunkState* chunk : forceChunks)
 		{
-			chunk->inView = false;
+			chunk->inView = true;
+			chunk->lastTimeInView = e2::timeNow();
 
 			if (chunk->streamState == StreamState::Poked)
 			{
 				queueStreamingChunk(chunk);
 			}
+
+			if (chunk->streamState == StreamState::Queued)
+			{
+				startStreamingChunk(chunk);
+			}
+
+			
 		}
 	}
 	m_forceStreamQueue.clear();
@@ -515,33 +516,38 @@ void e2::HexGrid::updateStreaming(glm::vec2 const& streamCenter, e2::Viewpoints2
 	lookSpeed = glm::clamp(lookSpeed, 0.0f, maxLookaheads * lookAheadTreshold);
 
 
-	m_lookAheadChunks.clear();
-	uint32_t numLookAheads = lookSpeed / lookAheadTreshold;
-	for (uint32_t i = 0; i < numLookAheads; i++)
-	{
-		glm::vec2 lookAheadOffset = lookDir * (lookAheadLength * float(i));
-		e2::Viewpoints2D lookAheadView = m_streamingView;
-		lookAheadView.bottomLeft += lookAheadOffset;
-		lookAheadView.bottomRight += lookAheadOffset;
-		lookAheadView.topLeft += lookAheadOffset;
-		lookAheadView.topRight += lookAheadOffset;
-		lookAheadView.view.origin.x += lookAheadOffset.x;
-		lookAheadView.view.origin.z += lookAheadOffset.y;
-		lookAheadView.calculateDerivatives();
-		gatherChunkStatesInView(lookAheadView, m_lookAheadChunks, true);
 
-		//renderer->debugLine({ 1.0f, 0.0f, 1.0f }, lookAheadView.corners[0], lookAheadView.corners[1]);
-		//renderer->debugLine({ 1.0f, 0.0f, 1.0f }, lookAheadView.corners[2], lookAheadView.corners[3]);
-		//renderer->debugLine({ 1.0f, 0.0f, 1.0f }, lookAheadView.corners[0], lookAheadView.corners[2]);
-		//renderer->debugLine({ 1.0f, 0.0f, 1.0f }, lookAheadView.corners[1], lookAheadView.corners[3]);
 
-	}
-
-	// queue look ahead chunks
 	if (!m_streamingPaused)
 	{
-		for (e2::ChunkState* chunk : m_lookAheadChunks)
-			queueStreamingChunk(chunk);
+		m_lookAheadChunks.clear();
+		uint32_t numLookAheads = lookSpeed / lookAheadTreshold;
+		for (uint32_t i = 0; i < numLookAheads; i++)
+		{
+			glm::vec2 lookAheadOffset = lookDir * (lookAheadLength * float(i));
+			e2::Viewpoints2D lookAheadView = m_streamingView;
+			lookAheadView.bottomLeft += lookAheadOffset;
+			lookAheadView.bottomRight += lookAheadOffset;
+			lookAheadView.topLeft += lookAheadOffset;
+			lookAheadView.topRight += lookAheadOffset;
+			lookAheadView.view.origin.x += lookAheadOffset.x;
+			lookAheadView.view.origin.z += lookAheadOffset.y;
+			lookAheadView.calculateDerivatives();
+			gatherChunkStatesInView(lookAheadView, m_lookAheadChunks, true);
+
+			//renderer->debugLine({ 1.0f, 0.0f, 1.0f }, lookAheadView.corners[0], lookAheadView.corners[1]);
+			//renderer->debugLine({ 1.0f, 0.0f, 1.0f }, lookAheadView.corners[2], lookAheadView.corners[3]);
+			//renderer->debugLine({ 1.0f, 0.0f, 1.0f }, lookAheadView.corners[0], lookAheadView.corners[2]);
+			//renderer->debugLine({ 1.0f, 0.0f, 1.0f }, lookAheadView.corners[1], lookAheadView.corners[3]);
+
+		}
+
+		// queue look ahead chunks
+		if (!m_streamingPaused)
+		{
+			for (e2::ChunkState* chunk : m_lookAheadChunks)
+				queueStreamingChunk(chunk);
+		}
 	}
 
 	// go through all invalidated chunks(newly fresh steaming), and pop them in in case they arent 
@@ -552,6 +558,14 @@ void e2::HexGrid::updateStreaming(glm::vec2 const& streamCenter, e2::Viewpoints2
 	}
 	m_invalidatedChunks.clear();
 
+	// go through outdated chunks and refresh their meshes 
+	for (e2::ChunkState* newChunk : m_outdatedChunks)
+	{
+		//if (newChunk->inView)
+			//refreshChunkMeshes(newChunk);
+	}
+	m_outdatedChunks.clear();
+
 
 	// go through all chunks, check if they arent in view, but are in visible, if so pop them out
 	for (auto& [chunkIndex, chunk] : m_chunkIndex)
@@ -559,8 +573,20 @@ void e2::HexGrid::updateStreaming(glm::vec2 const& streamCenter, e2::Viewpoints2
 		if (!chunk->inView && m_visibleChunks.contains(chunk))
 			popOutChunk(chunk);
 	}
-
 	
+
+	if (m_streamingPaused)
+	{
+		auto cpy = m_chunkIndex;
+		for (auto& [chunkIndex, chunk] : cpy)
+		{
+			if (!chunk->inView && !(chunk->streamState == StreamState::Streaming || chunk->streamState == StreamState::Ready))
+				nukeChunk(chunk);
+		}
+
+		return;
+	}
+
 	// Proritize queue and then cap its size 
 	glm::vec2 halfChunkSize = chunkSize() / 2.0f;
 
@@ -653,6 +679,16 @@ void e2::HexGrid::updateStreaming(glm::vec2 const& streamCenter, e2::Viewpoints2
 
 }
 
+
+void e2::HexGrid::clearQueue()
+{
+	auto copy = m_queuedChunks;
+	for (e2::ChunkState* state : copy)
+	{
+		state->streamState = StreamState::Poked;
+		m_queuedChunks.erase(state);
+	}
+}
 
 e2::ChunkState* e2::HexGrid::getOrCreateChunk(glm::ivec2 const& index)
 {
@@ -955,92 +991,119 @@ e2::TileData e2::HexGrid::calculateTileDataForHex(Hex hex)
 {
 	glm::vec2 planarCoords = hex.planarCoords();
 
-	float h = sampleBaseHeight(planarCoords);
+	float baseHeight = sampleBaseHeight(planarCoords);
 
 	TileData newTileData;
 
 	// @notice these constants/literals need to stay in sync with procgen.fragment.glsl !!
-	float f = sampleSimplex((planarCoords + glm::vec2(321.4f, 2928.0f)) * 4.0f);
-	float f2 = sampleSimplex((planarCoords + glm::vec2(321.4f, 2928.0f)) * 7.0f);
-	float f3 = sampleSimplex((planarCoords + glm::vec2(5771.4f, 428.0f)) * 7.0f);
-	float f4 = sampleSimplex((planarCoords + glm::vec2(521.4f, 28.0f)) * 7.0f);
-	f2 = glm::pow(f2, 1.0f / 0.65f);
-	f3 = glm::pow(f3, 1.0f / 0.7f);
-	f4 = glm::pow(f4, 1.0f / 2.75f);
-	if (h > 0.81f)
-	{
-		newTileData.flags |= TileFlags::BiomeMountain;
-		if (f2 > 0.9)
-		{
-			newTileData.flags |= TileFlags::ResourceUranium;
-		}
-		else if (f3 > 0.85)
-		{
-			newTileData.flags |= TileFlags::ResourceGold;
-		}
-		else if (f4 > 0.93)
-		{
-			newTileData.flags |= TileFlags::ResourceOre;
-		}
-		else
-		{
-			newTileData.flags |= TileFlags::ResourceStone;
-		}
-	}
-	else if (h > 0.39f)
-	{
-		if (f > 0.2f && h > 0.6f)
-		{
-			newTileData.flags |= TileFlags::BiomeForest;
+	float forestCoeff = sampleSimplex((planarCoords + glm::vec2(321.4f, 2928.0f)) * 4.0f);
+	float abundanceCoeff = sampleSimplex((planarCoords + glm::vec2(4144.4f, 7328.0f)) * 2.0f);
 
-			// forest is always resource 
-			if (f2 > 0.95)
-			{
-				newTileData.flags |= TileFlags::ResourceUranium;
-			}
-			else if (f3 > 0.85)
-			{
-				newTileData.flags |= TileFlags::ResourceGold;
-			}
-			else
-			{
-				newTileData.flags |= TileFlags::ResourceForest;
-			}
-		}
-		else
-		{
-			if (f2 > 0.95)
-			{
-				newTileData.flags |= TileFlags::ResourceUranium;
-			}
-			else if (f3 > 0.85)
-			{
-				newTileData.flags |= TileFlags::ResourceGold;
-			}
+	float uraniumCoeff = sampleSimplex((planarCoords + glm::vec2(321.4f, 2928.0f)) * 7.0f);
+	uraniumCoeff = glm::pow(uraniumCoeff, 1.0f / 0.65f);
 
-			newTileData.flags |= TileFlags::BiomeGrassland;
-		}
-	}
-	else if (h > 0.03f)
+	float goldCoeff = sampleSimplex((planarCoords + glm::vec2(5771.4f, 428.0f)) * 7.0f);
+	goldCoeff = glm::pow(goldCoeff, 1.0f / 0.7f);
+
+	float oreCoeff = sampleSimplex((planarCoords + glm::vec2(521.4f, 28.0f)) * 7.0f);
+	oreCoeff = glm::pow(oreCoeff, 1.0f / 2.75f);
+
+	float stoneCoeff = sampleSimplex((planarCoords + glm::vec2(121.4f, 442.0f)) * 8.0f);
+	stoneCoeff = glm::pow(oreCoeff, 1.0f / 2.75f);
+
+
+	newTileData.flags |= TileFlags::BiomeGrassland;
+
+	if (baseHeight > 0.6f)
 	{
-		newTileData.flags |= TileFlags::BiomeShallow;
+		if (forestCoeff > 0.2)
+			newTileData.flags |= TileFlags::FeatureForest;
+
+		if (baseHeight > 0.81f)
+			newTileData.flags |= TileFlags::FeatureMountains;
+	}
+	else if (baseHeight > 0.03f)
+	{
+		newTileData.flags |= TileFlags::WaterShallow;
 	}
 	else
 	{
-		newTileData.flags |= TileFlags::BiomeOcean;
+		newTileData.flags |= TileFlags::WaterDeep;
+	}
+
+	if (uraniumCoeff > 0.9)
+		newTileData.flags |= TileFlags::ResourceUranium;
+	else if (goldCoeff > 0.85)
+		newTileData.flags |= TileFlags::ResourceGold;
+	else if (oreCoeff > 0.93)
+		newTileData.flags |= TileFlags::ResourceOre;
+	else if(stoneCoeff > 0.9)
+		newTileData.flags |= TileFlags::ResourceStone;
+
+	if (abundanceCoeff > 0.97)
+		newTileData.flags |= TileFlags::Abundance4;
+	else if (abundanceCoeff > 0.86)
+		newTileData.flags |= TileFlags::Abundance3;
+	else if (abundanceCoeff > 0.75)
+		newTileData.flags |= TileFlags::Abundance2;
+	else
+		newTileData.flags |= TileFlags::Abundance1;
+
+	if (forestCoeff > 0.95)
+		newTileData.flags |= TileFlags::WoodAbundance4;
+	else if (forestCoeff > 0.76)
+		newTileData.flags |=  TileFlags::WoodAbundance3;
+	else if (forestCoeff > 0.45)
+		newTileData.flags |=  TileFlags::WoodAbundance2;
+	else
+		newTileData.flags |= TileFlags::WoodAbundance1;
+
+
+	if ((newTileData.flags & e2::TileFlags::FeatureForest) != e2::TileFlags::FeatureNone)
+	{
+
+		switch (newTileData.getWoodAbundance())
+		{
+		case TileFlags::WoodAbundance1:
+			newTileData.forestMesh = m_treeMesh[0];
+			break;
+		case TileFlags::WoodAbundance2:
+			newTileData.forestMesh = m_treeMesh[1];
+			break;
+		case TileFlags::WoodAbundance3:
+			newTileData.forestMesh = m_treeMesh[2];
+			break;
+		case TileFlags::WoodAbundance4:
+			newTileData.forestMesh = m_treeMesh[3];
+			break;
+		}
 	}
 
 
-	if (f > 0.95)
-		newTileData.flags |= TileFlags::Abundance4;
-	else if (f > 0.76)
-		newTileData.flags |= TileFlags::Abundance3;
-	else if (f > 0.45)
-		newTileData.flags |= TileFlags::Abundance2;
-	else 
-		newTileData.flags |= TileFlags::Abundance1;
-
 	return newTileData;
+}
+
+e2::MeshProxy* e2::HexGrid::createForestProxyForTile(e2::TileData* tileData, e2::Hex const& hex)
+{
+	if (!tileData)
+		return nullptr;
+
+	e2::MeshProxyConfiguration treeConf;
+	treeConf.mesh = tileData->forestMesh;
+
+
+
+	if (!treeConf.mesh)
+		return nullptr;
+
+	glm::vec3 meshOffset = hex.localCoords();
+
+	e2::MeshProxy* newMeshProxy = e2::create<e2::MeshProxy>(gameSession(), treeConf);
+	newMeshProxy->modelMatrix = glm::translate(glm::mat4(1.0f), meshOffset);
+	newMeshProxy->modelMatrix = glm::rotate(newMeshProxy->modelMatrix, glm::radians(0.0f), glm::vec3(e2::worldUp()));
+	newMeshProxy->modelMatrixDirty = { true };
+
+	return newMeshProxy;
 }
 
 size_t e2::HexGrid::discover(Hex hex)
@@ -1067,7 +1130,12 @@ size_t e2::HexGrid::discover(Hex hex)
 			m_discoveredChunksAABB.push(p);
 	}
 	
+	
+	e2::TileData* tileData = &m_tiles[m_tiles.size() - 1];
+	tileData->forestProxy = createForestProxyForTile(tileData, hex);
 
+	flagChunkOutdated(chunkIndex);
+	
 
 	return m_tiles.size() - 1;
 }
@@ -1133,6 +1201,16 @@ uint32_t e2::HexGrid::numVisibleChunks()
 uint32_t e2::HexGrid::numJobsInFlight()
 {
 	return m_streamingChunks.size();
+}
+
+uint32_t e2::HexGrid::numJobsInQueue()
+{
+	return m_queuedChunks.size();
+}
+
+void e2::HexGrid::flagChunkOutdated(glm::ivec2 const& chunkIndex)
+{
+	m_outdatedChunks.insert(getOrCreateChunk(chunkIndex));
 }
 
 double e2::HexGrid::highLoadTime()
@@ -1636,7 +1714,7 @@ void e2::HexGrid::renderFogOfWar()
 
 
 		outlineConstants.mvpMatrix = vpMatrix * transform;
-		outlineConstants.color = { 0.0f, 0.0f, 0.0f, 0.16f };
+		outlineConstants.color = { 1.0f, 1.0f, 1.0f, 1.0f };
 
 		buff->pushConstants(m_outlinePipelineLayout, 0, sizeof(e2::OutlineConstants), reinterpret_cast<uint8_t*>(&outlineConstants));
 		buff->draw(hexSpec.indexCount, 1);
@@ -1700,26 +1778,8 @@ void e2::HexGrid::renderFogOfWar()
 				glm::mat4 transform = glm::identity<glm::mat4>();
 				transform = glm::translate(transform, worldOffset);
 
-				float spooky = 0.0f;
-				if (m_tiles[finder->second].getBiome() == TileFlags::BiomeForest)
-				{
-					switch (m_tiles[finder->second].getAbundance())
-					{
-					case e2::TileFlags::Abundance1:
-						spooky = 0.25f;
-						break;
-					case e2::TileFlags::Abundance2:
-						spooky = 0.5f;
-						break;
-					case e2::TileFlags::Abundance3:
-						spooky = 0.75f;
-						break;
-					case e2::TileFlags::Abundance4:
-						spooky = 1.0f;
-						break;
-					}
-				}
-
+				float spooky = m_tiles[finder->second].getWoodAbundanceAsFloat() / 4.0f;
+				
 				fogOfWarConstants.mvpMatrix = vpMatrix * transform;
 				fogOfWarConstants.visibility.x = 1.0;
 				fogOfWarConstants.visibility.y = m_tileVisibility[finder->second] > 0 ? 1.0 : 0.0;
@@ -2269,37 +2329,17 @@ bool e2::ChunkLoadTask::execute()
 			glm::vec3 tileOffset = e2::Hex(glm::ivec2(x, y)).localCoords();
 			glm::mat4 transform = glm::translate(glm::identity<glm::mat4>(), tileOffset);
 
+			shaderData.grid = m_grid;
 			shaderData.hex = e2::Hex(m_chunkIndex * glm::ivec2(e2::hexChunkResolution) + glm::ivec2(x, y));
-			shaderData.tileData = e2::HexGrid::calculateTileDataForHex(shaderData.hex);
+			shaderData.tileData = m_grid->calculateTileDataForHex(shaderData.hex);
 
-			if ((shaderData.tileData.flags & e2::TileFlags::BiomeMask) == e2::TileFlags::BiomeMountain)
+			if ((shaderData.tileData.flags & e2::TileFlags::FeatureMountains) != e2::TileFlags::FeatureNone)
 			{
 				newChunkMesh->addMeshWithShaderFunction(m_dynaHexHigh, transform, ::hexShader, &shaderData);
 			}
 			else
 			{
 				newChunkMesh->addMeshWithShaderFunction(m_dynaHex, transform, ::hexShader, &shaderData);
-			}
-
-			if ((shaderData.tileData.flags & e2::TileFlags::BiomeMask) == e2::TileFlags::BiomeForest)
-			{
-				uint32_t i = 0;
-				switch (shaderData.tileData.getAbundance())
-				{
-				case TileFlags::Abundance1:
-					i = 0;
-					break;
-				case TileFlags::Abundance2:
-					i = 1;
-					break;
-				case TileFlags::Abundance3:
-					i = 2;
-					break;
-				case TileFlags::Abundance4:
-					i = 3;
-					break;
-				}
-				treeOffsets.push({ shaderData.hex.offsetCoords(),  i});
 			}
 
 		}
@@ -2318,7 +2358,7 @@ bool e2::ChunkLoadTask::execute()
 
 bool e2::ChunkLoadTask::finalize()
 {
-	m_grid->endStreamingChunk(m_chunkIndex, m_generatedMesh, m_ms, &treeOffsets);
+	m_grid->endStreamingChunk(m_chunkIndex, m_generatedMesh, m_ms);
 	return true;
 }
 
@@ -2340,29 +2380,7 @@ void e2::HexGrid::popInChunk(e2::ChunkState* state)
 		state->proxy->modelMatrix = glm::translate(glm::mat4(1.0f), chunkOffset);
 		state->proxy->modelMatrixDirty = { true };
 
-		for (e2::ForestIndex const& index : state->forestTileIndices)
-		{
-			glm::ivec2 const &offset = index.offsetCoords;
-
-			e2::TileData* tile = getTileData(offset);
-			if (tile && tile->improvedResource && tile->getResource() == TileFlags::ResourceForest)
-				continue;
-
-			e2::MeshProxyConfiguration treeConf;
-			
-			if (tile && tile->improvedResource)
-				treeConf.mesh = m_mineTreeMesh;
-			else 
-				treeConf.mesh = m_treeMesh[index.meshIndex];
-
-			glm::vec3 treeOffset = e2::Hex(offset).localCoords();
-
-			e2::MeshProxy* newForestProxy = e2::create<e2::MeshProxy>(gameSession(), treeConf);
-			newForestProxy->modelMatrix = glm::translate(glm::mat4(1.0f), treeOffset);
-			newForestProxy->modelMatrix = glm::rotate(newForestProxy->modelMatrix, glm::radians(0.0f),  glm::vec3(e2::worldUp()));
-			newForestProxy->modelMatrixDirty = { true };
-			state->forestTileProxies.push(newForestProxy);
-		}
+		refreshChunkMeshes(state);
 	}
 
 	if (!state->waterProxy)
@@ -2383,6 +2401,8 @@ void e2::HexGrid::popInChunk(e2::ChunkState* state)
 		state->fogProxy->modelMatrix = glm::translate(glm::mat4(1.0f), chunkOffset + glm::vec3(0.0f, -1.0f, 0.0f));
 		state->fogProxy->modelMatrixDirty = { true };
 	}
+
+
 }
 
 void e2::HexGrid::popOutChunk(e2::ChunkState* state)
@@ -2407,48 +2427,75 @@ void e2::HexGrid::popOutChunk(e2::ChunkState* state)
 		e2::destroy(state->proxy);
 		state->proxy = nullptr;
 
-		for (e2::MeshProxy* treeProxy : state->forestTileProxies)
+		for (e2::MeshProxy* mesh : state->extraMeshes)
 		{
-			e2::destroy(treeProxy);
+			e2::destroy(mesh);
 		}
-		state->forestTileProxies.resize(0);
+		state->extraMeshes.resize(0);
+
+		for (int32_t y = 0; y < e2::hexChunkResolution; y++)
+		{
+			for (int32_t x = 0; x < e2::hexChunkResolution; x++)
+			{
+				glm::vec3 tileOffset = e2::Hex(glm::ivec2(x, y)).localCoords();
+				glm::mat4 transform = glm::translate(glm::identity<glm::mat4>(), tileOffset);
+
+				e2::Hex tileHex = e2::Hex(state->chunkIndex * glm::ivec2(e2::hexChunkResolution) + glm::ivec2(x, y));
+
+				// get real data if we have it, otherwise calculate 
+				e2::TileData* realTileData = getTileData(tileHex.offsetCoords());
+				if (realTileData)
+				{
+					if (realTileData->forestProxy)
+						e2::destroy(realTileData->forestProxy);
+
+					realTileData->forestProxy = nullptr;
+				}
+			}
+		}
 	}
+
 }
 
-void e2::HexGrid::refreshChunkForest(e2::ChunkState* state)
+void e2::HexGrid::refreshChunkMeshes(e2::ChunkState* state)
 {
-	for (e2::MeshProxy* treeProxy : state->forestTileProxies)
+	for (e2::MeshProxy* mesh : state->extraMeshes)
 	{
-		e2::destroy(treeProxy);
+		e2::destroy(mesh);
 	}
-	state->forestTileProxies.resize(0);
+	state->extraMeshes.resize(0);
 
-	// skip refreshing if we dont have a proxy, since itll be updated once we get one (and if we dont have one do we really want trees on it?)
-	if (!state->proxy)
-		return;
 
-	for (e2::ForestIndex const& index : state->forestTileIndices)
+	for (int32_t y = 0; y < e2::hexChunkResolution; y++)
 	{
-		glm::ivec2 const& offset = index.offsetCoords;
+		for (int32_t x = 0; x < e2::hexChunkResolution; x++)
+		{
+			glm::vec3 tileOffset = e2::Hex(glm::ivec2(x, y)).localCoords();
+			glm::mat4 transform = glm::translate(glm::identity<glm::mat4>(), tileOffset);
 
-		e2::TileData* tile = getTileData(offset);
-		if (tile && tile->improvedResource && tile->getResource() == TileFlags::ResourceForest)
-			continue;
+			e2::Hex tileHex = e2::Hex(state->chunkIndex * glm::ivec2(e2::hexChunkResolution) + glm::ivec2(x, y));
 
-		e2::MeshProxyConfiguration treeConf;
+			// get real data if we have it, otherwise calculate 
+			e2::TileData* realTileData = getTileData(tileHex.offsetCoords());
+			if (realTileData)
+			{
+				if (realTileData->forestProxy)
+					e2::destroy(realTileData->forestProxy);
 
-		if (tile && tile->improvedResource)
-			treeConf.mesh = m_mineTreeMesh;
-		else
-			treeConf.mesh = m_treeMesh[index.meshIndex];
+				realTileData->forestProxy = createForestProxyForTile(realTileData, tileHex);
+			}
+			else
+			{
+				e2::TileData tileData = calculateTileDataForHex(tileHex);
 
-		glm::vec3 treeOffset = e2::Hex(offset).localCoords();
+				e2::MeshProxy* newForestProxy = createForestProxyForTile(&tileData, tileHex);
+				if (newForestProxy)
+					state->extraMeshes.push(newForestProxy);
+			}
 
-		e2::MeshProxy* newForestProxy = e2::create<e2::MeshProxy>(gameSession(), treeConf);
-		newForestProxy->modelMatrix = glm::translate(glm::mat4(1.0f), treeOffset);
-		newForestProxy->modelMatrix = glm::rotate(newForestProxy->modelMatrix, glm::radians(0.0f), glm::vec3(e2::worldUp()));
-		newForestProxy->modelMatrixDirty = { true };
-		state->forestTileProxies.push(newForestProxy);
+
+
+		}
 	}
 
 }
@@ -2476,7 +2523,7 @@ void e2::HexGrid::startStreamingChunk(e2::ChunkState* state)
 
 }
 
-void e2::HexGrid::endStreamingChunk(glm::ivec2 const& chunkIndex, e2::MeshPtr newMesh, double timeMs, e2::StackVector<e2::ForestIndex, e2::maxNumTreesPerChunk>* treeIndices)
+void e2::HexGrid::endStreamingChunk(glm::ivec2 const& chunkIndex, e2::MeshPtr newMesh, double timeMs)
 {
 	// If the chunkstate is no longer valid, throw away the work silently
 	auto finder = m_chunkIndex.find(chunkIndex);
@@ -2493,7 +2540,6 @@ void e2::HexGrid::endStreamingChunk(glm::ivec2 const& chunkIndex, e2::MeshPtr ne
 	e2::ChunkState* chunk = m_chunkIndex[chunkIndex];
 	chunk->mesh = newMesh;
 	chunk->task = nullptr;
-	chunk->forestTileIndices = *treeIndices;
 	chunk->streamState = StreamState::Ready;
 
 	m_streamingChunks.erase(chunk);
@@ -2505,10 +2551,48 @@ e2::ChunkState::~ChunkState()
 
 }
 
-bool e2::TileData::isWalkable()
+bool e2::TileData::isPassable(PassableFlags passableFlags)
 {
-	e2::TileFlags biome = getBiome();
-	return (biome == e2::TileFlags::BiomeGrassland) || (biome == e2::TileFlags::BiomeForest) || (biome == e2::TileFlags::BiomeDesert) || (biome == e2::TileFlags::BiomeTundra);
+	
+	bool canPassLand = (passableFlags & PassableFlags::Land) == PassableFlags::Land;
+	bool canPassMountain = (passableFlags & PassableFlags::Mountain) == PassableFlags::Mountain;
+	bool canPassWaterShallow = (passableFlags & PassableFlags::WaterShallow) == PassableFlags::WaterShallow;
+	bool canPassWaterDeep = (passableFlags & PassableFlags::WaterDeep) == PassableFlags::WaterDeep;
+
+	bool waterLevelLand = (flags & e2::TileFlags::WaterMask) == e2::TileFlags::WaterNone;
+	bool waterLevelShallow = (flags & e2::TileFlags::WaterMask) == e2::TileFlags::WaterShallow;
+	bool waterLevelDeep = (flags & e2::TileFlags::WaterMask) == e2::TileFlags::WaterShallow;
+	bool isMountain = (flags & e2::TileFlags::FeatureMountains) != e2::TileFlags::FeatureNone;
+
+	if (waterLevelLand)
+	{
+		if (isMountain)
+		{
+			return canPassMountain && canPassLand;
+		}
+
+		return canPassLand;
+	}
+	else if (waterLevelShallow)
+	{
+		return canPassWaterShallow;
+	}
+	else if (waterLevelDeep)
+	{
+		return canPassWaterDeep;
+	}
+
+	return false;
+}
+
+e2::TileFlags e2::TileData::getWater()
+{
+	return (flags & e2::TileFlags::WaterMask);
+}
+
+e2::TileFlags e2::TileData::getFeature()
+{
+	return (flags & e2::TileFlags::FeatureMask);
 }
 
 e2::TileFlags e2::TileData::getBiome()
@@ -2524,4 +2608,43 @@ e2::TileFlags e2::TileData::getResource()
 e2::TileFlags e2::TileData::getAbundance()
 {
 	return (flags & e2::TileFlags::AbundanceMask);
+}
+
+e2::TileFlags e2::TileData::getWoodAbundance()
+{
+	return (flags & e2::TileFlags::WoodAbundanceMask);
+}
+
+float e2::TileData::getAbundanceAsFloat()
+{
+	switch (getAbundance())
+	{
+	case TileFlags::Abundance1:
+		return 1.0f;
+	case TileFlags::Abundance2:
+		return 2.0f;
+	case TileFlags::Abundance3:
+		return 3.0f;
+	case TileFlags::Abundance4:
+		return 4.0f;
+	}
+
+	return 0.0f;
+}
+
+float e2::TileData::getWoodAbundanceAsFloat()
+{
+	switch (getWoodAbundance())
+	{
+	case TileFlags::WoodAbundance1:
+		return 1.0f;
+	case TileFlags::WoodAbundance2:
+		return 2.0f;
+	case TileFlags::WoodAbundance3:
+		return 3.0f;
+	case TileFlags::WoodAbundance4:
+		return 4.0f;
+	}
+
+	return 0.0f;
 }

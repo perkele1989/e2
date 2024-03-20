@@ -13,4 +13,5 @@ layout(set = 2, binding = 3) uniform texture2D sandAlbedo;
 layout(set = 2, binding = 4) uniform texture2D sandNormal;
 layout(set = 2, binding = 5) uniform texture2D greenAlbedo;
 layout(set = 2, binding = 6) uniform texture2D greenNormal;
+//layout(set = 2, binding = 7) uniform texture2D outlineTexture;
 // End Set2

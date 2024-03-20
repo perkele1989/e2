@@ -27,27 +27,17 @@ void main()
 	
 	vec3 l = normalize(vec3(1.0, -0.5, 1.0));
 	vec3 ndotl = vec3(clamp(dot(n, l), 0.0, 1.0));
-	//vec3 softl = vec3(dot(n,l) *0.5 + 0.5);
 
 	vec3 v = normalize(fragmentPosition.xyz - (inverse(renderer.viewMatrix) * vec4(0.0, 0.0, 0.0, 1.0)).xyz);
 
 
 	float shadowCoeff = getCloudShadows(fragmentPosition.xyz);
 
-	vec3 darkWater = vec3(0.0, 80.0, 107.0) / 255.0;
-	vec3 lightWater = vec3(28.0, 255.0, 255.0) / 255.0;
-	vec3 superLightWater = vec3(1.0, 1.0 ,1.0);//pow(lightWater, vec3(110.1));
+	vec3 darkWater = vec3(0.0, 60.0, 107.0) / 255.0;
+	vec3 lightWater = vec3(28.0, 200.0, 255.0) / 255.0;
 
-	vec3 shoreDark  = pow(darkWater, vec3(1.0));
-	vec3 oceanDark  = pow(darkWater, vec3(2.4));
-
-	vec3 finalDark = mix(shoreDark, oceanDark, d);
-    //vec3 finalDark = oceanDark;
-	vec3 finalLight = mix(pow(lightWater, vec3(0.4)), lightWater, d);
-    //vec3 finalLight = lightWater;
-
-	//vec3 finalLight = lightWater;
-
+	vec3 shoreDark  = pow(darkWater, vec3(2.4));
+	
 	vec3 r = reflect(v, n);
 
 	vec3 hdr = texture(sampler2D(reflectionHdr, equirectSampler), equirectangularUv(r)).rgb;
@@ -58,22 +48,22 @@ void main()
 
 	float viewDistanceToDepth = distance(frontPosition, fragmentPosition.xyz);
 	float viewDepthCoeff = 1.0 - smoothstep(0.0, 0.2, viewDistanceToDepth);
-	float viewDepthCoeff2 = 1.0 - smoothstep(0.0, 1.0, viewDistanceToDepth);
+	float viewDepthCoeff2 = 1.0 - smoothstep(0.0, 0.5, viewDistanceToDepth);
 
     
 	float timeSin = (sin(time) * 0.5 + 0.5);
 	float timeSin2 = 1.0 - (sin( (time + timeSin * 0.3) * 1.2) * 0.5 + 0.5);
 
-	float viewDepthCoeffFoam = 1.0 - smoothstep(0.0,  (0.33 + timeSin2 * 0.4 ) * pow((simplex(fragmentPosition.xz * 4.0 + vec2(cos(time * 0.25), sin(time*0.2))) * 0.5 + 0.5), 1.0), viewDistanceToDepth);
+	float viewDepthCoeffFoam = 1.0 - smoothstep(0.0,  (0.15 + timeSin2 * 0.2 ) * pow((simplex(fragmentPosition.xz * 4.0 + vec2(cos(time * 0.25), sin(time*0.2))) * 0.5 + 0.5), 1.0), viewDistanceToDepth);
 
-	vec3 baseColor = mix(finalDark, finalLight,  pow(h, 1.4) * (ndotl * 0.5 + 0.5) );
-	baseColor = mix(baseColor, oceanDark, 1.0 -shadowCoeff);
+	vec3 baseColor = mix(shoreDark, lightWater,  pow(h, 1.4) * (ndotl * 0.5 + 0.5) );
+	baseColor = mix(baseColor, shoreDark, (1.0 -shadowCoeff)*0.5);
 
-	vec3 dimBaseColor = mix(baseColor * frontBuffer, frontBuffer, 0.05);
+	vec3 dimBaseColor = mix(baseColor * frontBuffer, frontBuffer, 0.25);
 	baseColor = mix(baseColor, dimBaseColor, viewDepthCoeff2);
-	//baseColor = mix(baseColor, frontBuffer, viewDepthCoeff);
+	baseColor = mix(baseColor, frontBuffer, viewDepthCoeff);
 	
-    baseColor = mix(baseColor, mix(baseColor, frontBuffer, 0.2), pow(1.0-d, 0.4));
+    //baseColor = mix(baseColor, mix(baseColor, frontBuffer, 0.2), pow(1.0-d, 0.4));
 
 	vec3 foamColor = vec3(0.867, 0.89, 0.9);
 	baseColor = mix(baseColor, foamColor, (pow(viewDepthCoeffFoam, 0.25)*0.75));

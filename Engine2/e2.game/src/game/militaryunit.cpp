@@ -47,9 +47,6 @@ e2::Grunt::Grunt(e2::GameContext* ctx, glm::ivec2 const& tile, uint8_t empire)
 
 e2::Grunt::~Grunt()
 {
-	if(m_mainPose)
-		e2::destroy(m_mainPose);
-
 	if(m_idlePose)
 		e2::destroy(m_idlePose);
 
@@ -65,8 +62,6 @@ void e2::Grunt::initialize()
 
 	m_currentPose = m_idlePose;
 	m_oldPose = m_idlePose;
-
-	m_mainPose = e2::create<e2::Pose>(m_skeleton);
 
 }
 

@@ -7,7 +7,7 @@ e2::MainOperatingBase::MainOperatingBase(e2::GameContext* gameCtx, glm::ivec2 co
 	: e2::GameStructure(gameCtx, tile, empire)
 {
 	displayName = "Main Operating Base";
-	sightRange = 8;
+	sightRange = 2;
 	
 	entityType = e2::EntityType::Structure_MainOperatingBase;
 
@@ -93,7 +93,7 @@ void e2::MainOperatingBase::onTurnStart()
 				for (e2::Hex& n : e2::Hex(tileIndex).neighbours())
 				{
 					slotToUse = n.offsetCoords();
-					bool extraSlotFree = game()->unitAtHex(n.offsetCoords()) == nullptr && e2::HexGrid::calculateTileDataForHex(n).isWalkable();
+					bool extraSlotFree = game()->unitAtHex(n.offsetCoords()) == nullptr && game()->hexGrid()->calculateTileDataForHex(n).isPassable(e2::PassableFlags::Land);
 
 					if (extraSlotFree)
 					{

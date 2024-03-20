@@ -82,14 +82,14 @@ void main()
 	vec3 viewVector = getViewVector(fragmentPosition.xyz);
 
 	float roughness = 0.2;
-	float metalness = (1.0 - waterLineCoeff) * 0.5;
+	float metalness = (1.0 - waterLineCoeff) * 0.1;
 
 	outColor.rgb =  vec3(0.0);
 	outColor.rgb += getSunColor(finalNormal, albedo);
 	outColor.rgb += getIblColor(fragmentPosition.xyz, albedo, finalNormal, roughness, metalness, viewVector);
 
 	float rimHeightCoeff = smoothstep(0.1, 1.0, -fragmentPosition.y);
-	outColor.rgb += getRimColor(fragNormal, viewVector, vec3(1.0, 0.8, 0.76) * 0.6) * rimHeightCoeff;
+	outColor.rgb += getRimColor(fragNormal, viewVector, vec3(1.0, 0.7, 0.5) * 0.45) * rimHeightCoeff;
 
 	outColor.rgb *= getCloudShadows(fragmentPosition.xyz);
 
@@ -99,6 +99,6 @@ void main()
 
 	float gridCoeff2 = smoothstep(0.92, 0.95, fragmentColor.a);
 	gridCoeff2 *= 0.15;
-	//outColor.rgb = mix(outColor.rgb, vec3(0.0), gridCoeff2 * visibility.y);
+	outColor.rgb = mix(outColor.rgb, vec3(0.0), gridCoeff2);
 
 }
