@@ -1,6 +1,7 @@
 #pragma once 
 
 #include <cstdint>
+#include <e2/utils.hpp>
 
 namespace e2 
 {

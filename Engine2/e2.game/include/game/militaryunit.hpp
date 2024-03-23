@@ -196,12 +196,34 @@ namespace e2
 		virtual void onBeginMove();
 		virtual void onEndMove();
 
+		virtual void onHit(e2::GameEntity* instigator, float dmg) override;
+		virtual void kill() override;
+
+		virtual void updateEntityAction(double seconds);
+		virtual void onEntityTargetChanged(e2::Hex const& location) override;
+		virtual void onEntityTargetClicked() override;
+
+		virtual void onTurnStart() override;
+		virtual void onTurnEnd() override;
+
+
+
 	protected:
 
+
+
+		uint32_t m_attackPoints{};
+		uint32_t m_attackPointsLeft{};
+
+		e2::GameUnit* m_targetUnit{};
+		e2::Moment m_fireBegin;
+		bool m_didFire{};
 
 		e2::AnimationPose* m_idlePose{};
 		e2::AnimationPose* m_runPose{};
 		e2::AnimationPose* m_firePose{};
+		e2::AnimationPose* m_hitPose{};
+		e2::AnimationPose* m_diePose{};
 
 	};
 }

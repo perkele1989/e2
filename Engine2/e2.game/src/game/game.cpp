@@ -196,7 +196,7 @@ void e2::Game::updateGame(double seconds)
 	m_cursorNdc = m_cursorUnit * 2.0f - 1.0f;
 	m_cursorPlane = renderer->view().unprojectWorldPlane(renderer->resolution(), m_cursorNdc);
 	e2::Hex newHex = e2::Hex(m_cursorPlane);
-	bool hexChanged = newHex != m_prevCursorHex;
+	m_hexChanged = newHex != m_prevCursorHex;
 	m_prevCursorHex = m_cursorHex;
 	m_cursorHex = newHex;
 
@@ -237,7 +237,7 @@ void e2::Game::updateGame(double seconds)
 
 	updateCamera(seconds);
 
-	if (hexChanged)
+	if (m_hexChanged)
 	{
 		onNewCursorHex();
 	}
@@ -304,6 +304,12 @@ void e2::Game::updateGame(double seconds)
 	renderer->debugLine(glm::vec3(0.0f, 1.0f, 0.0f), m_viewPoints.topRay.position, m_viewPoints.topRay.position + m_viewPoints.topRay.perpendicular);
 	renderer->debugLine(glm::vec3(0.0f, 1.0f, 0.0f), m_viewPoints.rightRay.position, m_viewPoints.rightRay.position + m_viewPoints.rightRay.perpendicular);
 	renderer->debugLine(glm::vec3(0.0f, 1.0f, 0.0f), m_viewPoints.bottomRay.position, m_viewPoints.bottomRay.position + m_viewPoints.bottomRay.perpendicular);*/
+
+	for (e2::GameUnit* unit : m_unitsPendingDestroy)
+	{
+		destroyUnit(unit->tileIndex);
+	}
+	m_unitsPendingDestroy.clear();
 }
 
 void e2::Game::updateMenu(double seconds)
@@ -563,6 +569,20 @@ void e2::Game::startGame()
 
 }
 
+glm::vec2 e2::Game::worldToPixels(glm::vec3 const& world)
+{
+	auto renderer = gameSession()->renderer();
+	glm::dvec2 resolution = renderer->resolution();
+	glm::dmat4 vpMatrix = game()->view().calculateProjectionMatrix(resolution) * game()->view().calculateViewMatrix();
+
+	glm::vec4 viewPos = vpMatrix * glm::dvec4(glm::dvec3(world), 1.0);
+	viewPos = viewPos / viewPos.z;
+
+	glm::vec2 offset = (glm::vec2(viewPos.x, viewPos.y) * 0.5f + 0.5f) * glm::vec2(resolution);
+	return offset;
+
+}
+
 e2::ApplicationType e2::Game::type()
 {
 	return e2::ApplicationType::Game;
@@ -598,8 +618,11 @@ void e2::Game::updateGameState()
 			updateTurn();
 		else if (m_turnState == TurnState::UnitAction_Move)
 			updateUnitMove();
-		else if (m_turnState == TurnState::UnitAction_Generic)
-			m_selectedUnit->updateUnitAction(m_timeDelta);
+		else if (m_turnState == TurnState::EntityAction_Target)
+			updateEntityTarget();
+		else if (m_turnState == TurnState::EntityAction_Generic)
+			updateEntityAction();
+			
 	}
 	else if (m_state == GameState::TurnEnding)
 	{
@@ -786,17 +809,6 @@ void e2::Game::updateUnitMove()
 	constexpr float unitMoveSpeed = 2.4f;
 	m_unitMoveDelta += m_timeDelta * unitMoveSpeed;
 
-	auto radiansBetween = [](glm::vec3 const& a, glm::vec3 const & b) -> float {
-
-		glm::vec2 a2 = { a.x, a.z };
-		glm::vec2 b2 = { b.x, b.z };
-		glm::vec2 na = glm::normalize(a2 - b2);
-
-		glm::vec2 nb = glm::normalize(glm::vec2(0.0f, -1.0f));
-
-		return glm::orientedAngle(nb, na);
-	};
-
 	while (m_unitMoveDelta > 1.0f)
 	{
 		m_unitMoveDelta -= 1.0;
@@ -815,7 +827,7 @@ void e2::Game::updateUnitMove()
 
 			
 
-			float angle = radiansBetween(finalHex.localCoords(), prevHex.localCoords());
+			float angle = e2::radiansBetween(finalHex.localCoords(), prevHex.localCoords());
 			m_selectedUnit->setMeshTransform(finalHex.localCoords(), angle);
 			if (m_unitAS)
 				e2::destroy(m_unitAS);
@@ -849,6 +861,30 @@ void e2::Game::updateUnitMove()
 	//glm::quat rotation = glm::angleAxis(angle, e2::worldUp());
 
 	m_selectedUnit->setMeshTransform(newPos, angle);
+}
+
+void e2::Game::updateEntityTarget()
+{
+	e2::GameSession* session = gameSession();
+	e2::Renderer* renderer = session->renderer();
+	e2::UIContext* ui = session->uiContext();
+	auto& kb = ui->keyboardState();
+	auto& mouse = ui->mouseState();
+	auto& leftMouse = mouse.buttons[uint16_t(e2::MouseButton::Left)];
+
+	e2::GameEntity* ent = selectedEntity();
+	if (!ent)
+		return;
+
+	if (m_hexChanged)
+	{
+		ent->onEntityTargetChanged(m_cursorHex);
+	}
+
+	if (leftMouse.clicked)
+	{
+		ent->onEntityTargetClicked();
+	}
 }
 
 void e2::Game::drawUI()
@@ -1267,6 +1303,11 @@ void e2::Game::deselect()
 	deselectStructure();
 }
 
+void e2::Game::applyDamage(e2::GameEntity* entity, e2::GameEntity* instigator, float damage)
+{
+	entity->onHit(instigator, damage);
+}
+
 void e2::Game::selectUnit(e2::GameUnit* unit)
 {
 	if (!unit || unit == m_selectedUnit)
@@ -1327,17 +1368,38 @@ void e2::Game::moveSelectedUnitTo(e2::Hex const& to)
 	
 }
 
-void e2::Game::endCustomUnitAction()
+void e2::Game::beginCustomEntityAction()
 {
-	if (m_turnState == TurnState::UnitAction_Generic)
+	if (m_turnState == TurnState::Unlocked)
+		m_turnState = TurnState::EntityAction_Generic;
+}
+
+
+void e2::Game::endCustomEntityAction()
+{
+	if (m_turnState == TurnState::EntityAction_Generic)
 		m_turnState = TurnState::Unlocked;
 }
 
-void e2::Game::beginCustomUnitAction()
+void e2::Game::updateEntityAction()
 {
-	if(m_turnState == TurnState::Unlocked)
-		m_turnState = TurnState::UnitAction_Generic;
+	e2::GameEntity* ent = selectedEntity();
+	ent->updateEntityAction(m_timeDelta);
 }
+
+void e2::Game::beginEntityTargeting()
+{
+	if (m_turnState == TurnState::Unlocked)
+		m_turnState = TurnState::EntityAction_Target;
+}
+
+void e2::Game::endEntityTargeting()
+{
+	if (m_turnState == TurnState::EntityAction_Target)
+		m_turnState = TurnState::Unlocked;
+}
+
+
 
 void e2::Game::updateMainCamera(double seconds)
 {
@@ -1471,6 +1533,22 @@ namespace
 	std::vector<e2::Hex> tmpHex;
 }
 
+void e2::Game::queueDestroyUnit(e2::GameUnit* unit)
+{
+	m_unitsPendingDestroy.insert(unit);
+}
+
+e2::GameEntity* e2::Game::selectedEntity()
+{
+	if (m_selectedUnit)
+		return m_selectedUnit;
+
+	if (m_selectedStructure)
+		return m_selectedStructure;
+
+	return nullptr;
+}
+
 void e2::Game::harvestWood(e2::Hex const& location, EmpireId empire)
 {
 	e2::TileData* tileData = m_hexGrid->getTileData(location.offsetCoords());
@@ -1492,6 +1570,25 @@ void e2::Game::harvestWood(e2::Hex const& location, EmpireId empire)
 	tileData->forestProxy = nullptr;
 	tileData->forestMesh = nullptr;
 
+}
+
+void e2::Game::removeWood(e2::Hex const& location)
+{
+	e2::TileData* tileData = m_hexGrid->getTileData(location.offsetCoords());
+	if (!tileData)
+		return;
+
+	bool hasForest = (tileData->flags & e2::TileFlags::FeatureForest) != TileFlags::FeatureNone;
+	if (!hasForest)
+		return;
+
+	tileData->flags = e2::TileFlags(uint16_t(tileData->flags) & (~uint16_t(e2::TileFlags::FeatureForest)));
+
+	if (tileData->forestProxy)
+		e2::destroy(tileData->forestProxy);
+
+	tileData->forestProxy = nullptr;
+	tileData->forestMesh = nullptr;
 }
 
 void e2::Game::selectStructure(e2::GameStructure* structure)
@@ -1696,7 +1793,7 @@ e2::PathFindingAccelerationStructure::PathFindingAccelerationStructure(e2::GameU
 
 			// ignore hexes that are occupied by unpassable biome
 			e2::TileData tile = unit->game()->hexGrid()->calculateTileDataForHex(n);
-			if (!tile.isPassable(unit->getPassableFlags()))
+			if (!tile.isPassable(unit->passableFlags))
 				continue;
 
 			// ignore hexes that are occupied by units

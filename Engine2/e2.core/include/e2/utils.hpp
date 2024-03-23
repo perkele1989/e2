@@ -148,6 +148,8 @@ namespace e2
 
 	E2_API glm::vec2 rotate2d(glm::vec2 const& vec, float angleDegrees);
 
+	E2_API float radiansBetween(glm::vec3 const& a, glm::vec3 const & b);;
+
 	E2_API size_t hash(e2::UUID const& id);
 
 	template <class T>

@@ -364,6 +364,46 @@ namespace
 
 	}
 
+	// r = desert, g = grassland, b = tundra
+	glm::vec3 sampleBiomeAtVertex(glm::vec2 const& worldPosition, ::HexShaderData* shaderData)
+	{
+		auto biomeToValues = [](e2::TileFlags biome)  -> glm::vec3 {
+			glm::vec3 returner;
+			returner.x = (biome == e2::TileFlags::BiomeDesert) ? 1.0f : 0.0f;
+			returner.y = (biome == e2::TileFlags::BiomeGrassland) ? 1.0f : 0.0f;
+			returner.z = (biome == e2::TileFlags::BiomeTundra) ? 1.0f : 0.0f;
+
+			return returner;
+		};
+
+		constexpr float hexDistBlendLen = 2.0f;
+
+		e2::Hex& hex = shaderData->hex;
+		glm::vec2 hexCenter = hex.planarCoords();
+		float hexDistance = glm::distance(worldPosition, hexCenter);
+		float hexWeight = 1.0f - glm::smoothstep(0.0f, hexDistBlendLen, hexDistance);
+		e2::TileData& hexTile = shaderData->tileData;// @todo only need biome info here! @perf
+
+		glm::vec3 finalValues = biomeToValues((hexTile.flags & e2::TileFlags::BiomeMask)) * hexWeight;
+
+		for (e2::Hex const& neighbourHex : hex.neighbours())
+		{
+			glm::vec2 neighbourCenter = neighbourHex.planarCoords();
+			float neighbourDistance = glm::distance(worldPosition, neighbourCenter);
+			float neighbourWeight = 1.0f - glm::smoothstep(0.0f, hexDistBlendLen, neighbourDistance);
+			e2::TileData neighbourTile = shaderData->getTileData(neighbourHex.offsetCoords()); // @todo only need biome info here! @perf
+
+			finalValues += biomeToValues((neighbourTile.flags & e2::TileFlags::BiomeMask)) * neighbourWeight;
+		}
+
+		finalValues = glm::normalize(finalValues);
+		
+		//finalValues.y = glm::max(finalValues.y, finalValues.z);
+
+		return finalValues;
+	}
+
+
 	void hexShader(e2::Vertex* vertex, void* shaderData)
 	{
 		::HexShaderData* data = reinterpret_cast<::HexShaderData*>(shaderData);
@@ -392,16 +432,19 @@ namespace
 		//vertex->tangent = glm::rotate(glm::quat(1.0f, 0.0f, 0.0f, 0.0f), glm::radians(90.0f), glm::vec3(0.0f, 0.0f, -1.0f)) * vertex->normal;
 		
 
+		glm::vec3 biomeValues = sampleBiomeAtVertex(worldVertexPosition, data);
+
 		// save hex grid thingy
 		vertex->color.a = vertex->color.r;
 
-		// fields
-		vertex->color.r = glm::smoothstep(0.085f, 0.0f, vertex->position.y);
+		// grasslands 
+		//float heightGrass = 1.0f - glm::smoothstep(0.0f, 0.085f, vertex->position.y);
+		vertex->color.r = biomeValues.r;
 
-		// mountains
-		vertex->color.g = glm::smoothstep(-0.0f, -0.2f, vertex->position.y);
+		// tundra
+		vertex->color.g = biomeValues.g;
 
-		vertex->color.b = 0.0f;
+		vertex->color.b = biomeValues.b;
 
 		
 	}
@@ -967,10 +1010,26 @@ float e2::HexGrid::sampleSimplex(glm::vec2 const& position)
 {
 	return glm::simplex(position) * 0.5 + 0.5;
 }
-// @notice this function needs to stay in sync with procgen.fragment.glsl !!
-float e2::HexGrid::sampleBaseHeight(glm::vec2 const& position)
+
+void e2::HexGrid::calculateBiome(glm::vec2 const& planarCoords, e2::TileFlags &outFlags)
 {
-	float h1p = 0.42;
+	float biomeCoeff = sampleSimplex((planarCoords + glm::vec2(81.44f, 93.58f)) * 0.01f);
+
+	if (biomeCoeff > 0.8f)
+		outFlags |= TileFlags::BiomeTundra;
+	else if (biomeCoeff > 0.4f)
+		outFlags |= TileFlags::BiomeGrassland;
+	else
+		outFlags |= TileFlags::BiomeDesert;
+}
+
+
+float e2::HexGrid::calculateBaseHeight(glm::vec2 const& planarCoords)
+{
+	float baseHeight = sampleSimplex((planarCoords + glm::vec2(32.16f, 64.32f)) * 0.0135f);
+	return baseHeight;
+
+	/*float h1p = 0.42;
 	float scale1 = 0.058;
 	float h1 = glm::pow(sampleSimplex(position * scale1), h1p);
 
@@ -984,101 +1043,108 @@ float e2::HexGrid::sampleBaseHeight(glm::vec2 const& position)
 	float h3p = (0.75 * 20) / 5000;
 	float h3 = 1.0 - glm::smoothstep(semiStart2, semiStart2 + semiSize2, sampleSimplex(position * h3p));
 
-	return h1 * h2 * h3;
+	return h1 * h2 * h3;*/
 }
 
-e2::TileData e2::HexGrid::calculateTileDataForHex(Hex hex)
+void e2::HexGrid::calculateResources(glm::vec2 const& planarCoords, e2::TileFlags& outFlags)
 {
-	glm::vec2 planarCoords = hex.planarCoords();
-
-	float baseHeight = sampleBaseHeight(planarCoords);
-
-	TileData newTileData;
-
-	// @notice these constants/literals need to stay in sync with procgen.fragment.glsl !!
-	float forestCoeff = sampleSimplex((planarCoords + glm::vec2(321.4f, 2928.0f)) * 4.0f);
-	float abundanceCoeff = sampleSimplex((planarCoords + glm::vec2(4144.4f, 7328.0f)) * 2.0f);
-
-	float uraniumCoeff = sampleSimplex((planarCoords + glm::vec2(321.4f, 2928.0f)) * 7.0f);
-	uraniumCoeff = glm::pow(uraniumCoeff, 1.0f / 0.65f);
-
-	float goldCoeff = sampleSimplex((planarCoords + glm::vec2(5771.4f, 428.0f)) * 7.0f);
-	goldCoeff = glm::pow(goldCoeff, 1.0f / 0.7f);
-
-	float oreCoeff = sampleSimplex((planarCoords + glm::vec2(521.4f, 28.0f)) * 7.0f);
-	oreCoeff = glm::pow(oreCoeff, 1.0f / 2.75f);
-
-	float stoneCoeff = sampleSimplex((planarCoords + glm::vec2(121.4f, 442.0f)) * 8.0f);
-	stoneCoeff = glm::pow(oreCoeff, 1.0f / 2.75f);
-
-
-	newTileData.flags |= TileFlags::BiomeGrassland;
-
-	if (baseHeight > 0.6f)
-	{
-		if (forestCoeff > 0.2)
-			newTileData.flags |= TileFlags::FeatureForest;
-
-		if (baseHeight > 0.81f)
-			newTileData.flags |= TileFlags::FeatureMountains;
-	}
-	else if (baseHeight > 0.03f)
-	{
-		newTileData.flags |= TileFlags::WaterShallow;
-	}
-	else
-	{
-		newTileData.flags |= TileFlags::WaterDeep;
-	}
-
-	if (uraniumCoeff > 0.9)
-		newTileData.flags |= TileFlags::ResourceUranium;
-	else if (goldCoeff > 0.85)
-		newTileData.flags |= TileFlags::ResourceGold;
-	else if (oreCoeff > 0.93)
-		newTileData.flags |= TileFlags::ResourceOre;
-	else if(stoneCoeff > 0.9)
-		newTileData.flags |= TileFlags::ResourceStone;
-
+	float abundanceCoeff = sampleSimplex((planarCoords + glm::vec2(41.44f, 73.28f)) * 2.0f);
 	if (abundanceCoeff > 0.97)
-		newTileData.flags |= TileFlags::Abundance4;
+		outFlags |= TileFlags::Abundance4;
 	else if (abundanceCoeff > 0.86)
-		newTileData.flags |= TileFlags::Abundance3;
+		outFlags |= TileFlags::Abundance3;
 	else if (abundanceCoeff > 0.75)
-		newTileData.flags |= TileFlags::Abundance2;
+		outFlags |= TileFlags::Abundance2;
 	else
-		newTileData.flags |= TileFlags::Abundance1;
+		outFlags |= TileFlags::Abundance1;
 
-	if (forestCoeff > 0.95)
-		newTileData.flags |= TileFlags::WoodAbundance4;
-	else if (forestCoeff > 0.76)
-		newTileData.flags |=  TileFlags::WoodAbundance3;
-	else if (forestCoeff > 0.45)
-		newTileData.flags |=  TileFlags::WoodAbundance2;
-	else
-		newTileData.flags |= TileFlags::WoodAbundance1;
+	float resourceBase = sampleSimplex((planarCoords + glm::vec2(11.44f, 53.28f)) * 8.0f);
+	if (abundanceCoeff > 0.5f)
+	{
+		if (resourceBase > 0.97)
+			outFlags |= TileFlags::ResourceUranium;
+		else if (resourceBase > 0.85)
+			outFlags |= TileFlags::ResourceGold;
+		else if (resourceBase > 0.7)
+			outFlags |= TileFlags::ResourceOre;
+		else if (resourceBase > 0.5)
+			outFlags |= TileFlags::ResourceStone;
+	}
+}
 
-
-	if ((newTileData.flags & e2::TileFlags::FeatureForest) != e2::TileFlags::FeatureNone)
+void e2::HexGrid::calculateFeaturesAndWater(glm::vec2 const& planarCoords, float baseHeight, e2::TileFlags& outFlags)
+{
+	if (baseHeight > 0.5f)
 	{
 
-		switch (newTileData.getWoodAbundance())
+		if (baseHeight > 0.6f)
+		{
+			float forestCoeff = sampleSimplex((planarCoords + glm::vec2(32.14f, 29.28f)) * 4.0f);
+
+			if (forestCoeff > 0.4f)
+				outFlags |= TileFlags::FeatureForest;
+
+			if (forestCoeff > 0.80f)
+				outFlags |= TileFlags::WoodAbundance4;
+			else if (forestCoeff > 0.60f)
+				outFlags |= TileFlags::WoodAbundance3;
+			else if (forestCoeff > 0.50f)
+				outFlags |= TileFlags::WoodAbundance2;
+			else
+				outFlags |= TileFlags::WoodAbundance1;
+
+			if (baseHeight > 0.90f)
+				outFlags |= TileFlags::FeatureMountains;
+		}
+	}
+	else if (baseHeight > 0.45f)
+	{
+		outFlags |= TileFlags::WaterShallow;
+	}
+	else
+	{
+		outFlags |= TileFlags::WaterDeep;
+	}
+}
+
+e2::MeshPtr e2::HexGrid::getForestMeshForFlags(e2::TileFlags flags)
+{
+
+	if ((flags & e2::TileFlags::FeatureForest) != e2::TileFlags::FeatureNone)
+	{
+		// @todo nested switch on biome
+		switch ((flags & e2::TileFlags::WoodAbundanceMask))
 		{
 		case TileFlags::WoodAbundance1:
-			newTileData.forestMesh = m_treeMesh[0];
+			return m_treeMesh[0];
 			break;
 		case TileFlags::WoodAbundance2:
-			newTileData.forestMesh = m_treeMesh[1];
+			return m_treeMesh[1];
 			break;
 		case TileFlags::WoodAbundance3:
-			newTileData.forestMesh = m_treeMesh[2];
+			return m_treeMesh[2];
 			break;
 		case TileFlags::WoodAbundance4:
-			newTileData.forestMesh = m_treeMesh[3];
+			return m_treeMesh[3];
 			break;
 		}
 	}
 
+	return nullptr;
+
+}
+
+e2::TileData e2::HexGrid::calculateTileDataForHex(Hex const& hex)
+{
+	TileData newTileData;
+
+	glm::vec2 planarCoords = hex.planarCoords();
+	float baseHeight = calculateBaseHeight(planarCoords);
+	calculateBiome(planarCoords, newTileData.flags);
+	calculateFeaturesAndWater(planarCoords, baseHeight, newTileData.flags);
+	calculateResources(planarCoords, newTileData.flags);
+
+	newTileData.forestMesh = getForestMeshForFlags(newTileData.flags);
 
 	return newTileData;
 }
@@ -1090,8 +1156,6 @@ e2::MeshProxy* e2::HexGrid::createForestProxyForTile(e2::TileData* tileData, e2:
 
 	e2::MeshProxyConfiguration treeConf;
 	treeConf.mesh = tileData->forestMesh;
-
-
 
 	if (!treeConf.mesh)
 		return nullptr;
@@ -1222,6 +1286,7 @@ void e2::HexGrid::clearLoadTime()
 {
 	m_highLoadTime = 0.0;
 }
+
 
 void e2::HexGrid::initializeFogOfWar()
 {
@@ -1714,7 +1779,7 @@ void e2::HexGrid::renderFogOfWar()
 
 
 		outlineConstants.mvpMatrix = vpMatrix * transform;
-		outlineConstants.color = { 1.0f, 1.0f, 1.0f, 1.0f };
+		outlineConstants.color = { 1.0f, 1.0f, 1.0f, 0.01f };
 
 		buff->pushConstants(m_outlinePipelineLayout, 0, sizeof(e2::OutlineConstants), reinterpret_cast<uint8_t*>(&outlineConstants));
 		buff->draw(hexSpec.indexCount, 1);
@@ -1726,6 +1791,7 @@ void e2::HexGrid::renderFogOfWar()
 
 		glm::mat4 transform = glm::identity<glm::mat4>();
 		transform = glm::translate(transform, worldOffset);
+		transform = glm::scale(transform, { 1.01f, 1.01f, 1.01f });
 
 		outlineConstants.mvpMatrix = vpMatrix * transform;
 		outlineConstants.color = { 0.5f, 0.04f, 0.03f, 0.0f };
@@ -2492,9 +2558,6 @@ void e2::HexGrid::refreshChunkMeshes(e2::ChunkState* state)
 				if (newForestProxy)
 					state->extraMeshes.push(newForestProxy);
 			}
-
-
-
 		}
 	}
 

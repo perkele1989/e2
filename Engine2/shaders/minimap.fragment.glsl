@@ -63,17 +63,17 @@ void main()
 	float s = 0.0;
 	float o = 0.0;
 
-	if(h > 0.81)
+	if(h > 0.90)
 		m = 1.0;
-	else if(h > 0.39)
+	else if(h > 0.5)
 		g = 1.0;
-	else if (h > 0.03)
+	else if (h > 0.45)
 		s = 1.0;
 	else 
 		o = 1.0;
 
-	float f = sampleBaseHeight((position + vec2(321.4, 2928.0)) * 4);
-	if(f > 0.2 && h > 0.6)
+	float f = sampleSimplex((position + vec2(32.14, 29.28)) * 4.0);
+	if(f > 0.4 && h > 0.6)
 		f = 1.0;
 	else
 		f = 0.0;

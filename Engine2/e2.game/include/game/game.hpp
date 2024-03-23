@@ -38,7 +38,8 @@ namespace e2
 	{
 		Unlocked,
 		UnitAction_Move,
-		UnitAction_Generic
+		EntityAction_Generic,
+		EntityAction_Target
 	};
 
 	class GameUnit;
@@ -116,6 +117,8 @@ namespace e2
 
 
 
+		glm::vec2 worldToPixels(glm::vec3 const& world);
+
 		virtual ApplicationType type() override;
 
 		virtual e2::Game* game() override;
@@ -131,8 +134,8 @@ namespace e2
 		void updateTurnLocal();
 		void updateTurnAI();
 
-		void updateUnitAttack();
-		void updateUnitMove();
+		//void updateUnitAttack();
+
 
 		void endTurn();
 		void onTurnPreparingBegin();
@@ -190,6 +193,11 @@ namespace e2
 			return m_animationIndex[(uint64_t)index];
 		}
 
+		double timeDelta()
+		{
+			return m_timeDelta;
+		}
+
 	protected:
 
 		e2::MeshPtr m_dummyMesh;
@@ -245,6 +253,7 @@ namespace e2
 		glm::vec2 m_cursorPlane; // mouse position as projected on to the world xz plane
 		e2::Hex m_cursorHex; // mouse position as projected upon a hex
 		e2::Hex m_prevCursorHex;
+		bool m_hexChanged{};
 		e2::MeshPtr m_cursorMesh;
 
 		bool m_uiHovered{};
@@ -270,12 +279,24 @@ namespace e2
 
 		void deselect();
 
+		void applyDamage(e2::GameEntity* entity, e2::GameEntity* instigator, float damage);
+
 		// game units 
 		void selectUnit(e2::GameUnit* unit);
 		void deselectUnit();
+		
 		void moveSelectedUnitTo(e2::Hex const& to);
-		void beginCustomUnitAction();
-		void endCustomUnitAction();
+		void updateUnitMove();
+
+		void beginCustomEntityAction();
+		void endCustomEntityAction();
+		void updateEntityAction();
+
+		void beginEntityTargeting();
+		void endEntityTargeting();
+		void updateEntityTarget();
+		
+
 
 		template<typename UnitType, typename... Args>
 		UnitType* spawnUnit(e2::Hex const& location, EmpireId empire, Args... args)
@@ -309,15 +330,20 @@ namespace e2
 		uint32_t m_unitMoveIndex{};
 		float m_unitMoveDelta{};
 
-
 		GameUnit* m_selectedUnit{};
 		std::unordered_set<GameUnit*> m_units;
 		std::unordered_map<glm::ivec2, GameUnit*> m_unitIndex;
 
+		std::unordered_set<GameUnit*> m_unitsPendingDestroy;
 
 	public:
-		void harvestWood(e2::Hex const& location, EmpireId empire);
 
+		void queueDestroyUnit(e2::GameUnit* unit);
+
+		e2::GameEntity* selectedEntity();
+
+		void harvestWood(e2::Hex const& location, EmpireId empire);
+		void removeWood(e2::Hex const& location);
 
 		void selectStructure(e2::GameStructure* structure);
 		void deselectStructure();
@@ -339,6 +365,8 @@ namespace e2
 				m_empires[empire]->structures.insert(newStructure);
 
 			m_resources.fiscalStreams.insert(newStructure);
+
+			removeWood(location);
 
 			return newStructure;
 		}

@@ -24,14 +24,37 @@ e2::Engineer::Engineer(e2::GameContext* ctx, glm::ivec2 const& tile, uint8_t emp
 
 e2::Engineer::~Engineer()
 {
+	if (m_idlePose)
+		e2::destroy(m_idlePose);
 
+	if (m_runPose)
+		e2::destroy(m_runPose);
+
+	if (m_hitPose)
+		e2::destroy(m_hitPose);
+
+	if (m_diePose)
+		e2::destroy(m_diePose);
+
+	if (m_buildPose)
+		e2::destroy(m_buildPose);
 }
 
 void e2::Engineer::updateAnimation(double seconds)
 {
+	if (dying && (!m_diePose->playing() || m_diePose->time() > m_diePose->animation()->timeSeconds() - 0.05f))
+	{
+		game()->queueDestroyUnit(this);
+		return;
+	}
+
+
+
 	m_buildPose->updateAnimation(seconds*4.0f);
 	m_idlePose->updateAnimation(seconds);
 	m_runPose->updateAnimation(seconds);
+	m_hitPose->updateAnimation(seconds);
+	m_diePose->updateAnimation(seconds);
 
 	e2::GameUnit::updateAnimation(seconds);
 
@@ -70,16 +93,18 @@ void e2::Engineer::drawUI(e2::UIContext* ui)
 			if (ui->button("hrvst", std::format("Harvest Wood on tile ({:.0f} Wood)", woodAbundance * 14.0f)))
 			{
 				m_buildType = e2::EngineerBuildType::HarvestWood;
-				game()->beginCustomUnitAction();
+				game()->beginCustomEntityAction();
 				playAction(m_buildPose, 0.5f, 1.0f);
+				m_buildPointsLeft--;
 			}
 
 			// sawmill
 			if (ui->button("sawmill", std::format("Build Saw Mill (+{:.0f} Wood per turn)", woodAbundance)))
 			{
 				m_buildType = e2::EngineerBuildType::SawMill;
-				game()->beginCustomUnitAction();
+				game()->beginCustomEntityAction();
 				playAction(m_buildPose, 0.5f, 1.0f);
+				m_buildPointsLeft--;
 			}
 		}
 
@@ -88,8 +113,9 @@ void e2::Engineer::drawUI(e2::UIContext* ui)
 			if (ui->button("goldmine", std::format("Build Gold Mine (+{:.0f} Gold per turn)", abundance)))
 			{
 				m_buildType = e2::EngineerBuildType::GoldMine;
-				game()->beginCustomUnitAction();
+				game()->beginCustomEntityAction();
 				playAction(m_buildPose, 0.5f, 1.0f);
+				m_buildPointsLeft--;
 			}
 		}
 
@@ -98,8 +124,9 @@ void e2::Engineer::drawUI(e2::UIContext* ui)
 			if (ui->button("oilwell", std::format("Build Oil Well (+{:.0f} Oil per turn)", abundance)))
 			{
 				m_buildType = e2::EngineerBuildType::OilWell;
-				game()->beginCustomUnitAction();
+				game()->beginCustomEntityAction();
 				playAction(m_buildPose, 0.5f, 1.0f);
+				m_buildPointsLeft--;
 			}
 		}
 
@@ -108,8 +135,9 @@ void e2::Engineer::drawUI(e2::UIContext* ui)
 			if (ui->button("oremine", std::format("Build Ore Mine (+{:.0f} Metal per turn)", abundance)))
 			{
 				m_buildType = e2::EngineerBuildType::OreMine;
-				game()->beginCustomUnitAction();
+				game()->beginCustomEntityAction();
 				playAction(m_buildPose, 0.5f, 1.0f);
+				m_buildPointsLeft--;
 			}
 		}
 
@@ -118,8 +146,9 @@ void e2::Engineer::drawUI(e2::UIContext* ui)
 			if (ui->button("qwarry", std::format("Build Quarry (+{:.0f} Stone per turn)", abundance)))
 			{
 				m_buildType = e2::EngineerBuildType::Quarry;
-				game()->beginCustomUnitAction();
+				game()->beginCustomEntityAction();
 				playAction(m_buildPose, 0.5f, 1.0f);
+				m_buildPointsLeft--;
 			}
 		}
 
@@ -128,8 +157,9 @@ void e2::Engineer::drawUI(e2::UIContext* ui)
 			if (ui->button("urine", std::format("Build Uranium Mine (+{:.0f} Uranium per turn)", abundance)))
 			{
 				m_buildType = e2::EngineerBuildType::UraniumMine;
-				game()->beginCustomUnitAction();
+				game()->beginCustomEntityAction();
 				playAction(m_buildPose, 0.5f, 1.0f);
+				m_buildPointsLeft--;
 			}
 		}
 	}
@@ -146,12 +176,14 @@ void e2::Engineer::initialize()
 	m_idlePose = e2::create<e2::AnimationPose>(m_skeleton, game()->getAnimationByIndex(AnimationIndex::EngineerIdle), true);
 	m_runPose = e2::create<e2::AnimationPose>(m_skeleton, game()->getAnimationByIndex(AnimationIndex::EngineerRun), true);
 	m_buildPose = e2::create<e2::AnimationPose>(m_skeleton, game()->getAnimationByIndex(AnimationIndex::EngineerBuild), false);
+	m_hitPose = e2::create<e2::AnimationPose>(m_skeleton, game()->getAnimationByIndex(AnimationIndex::SoldierHit), false); // @todo 
+	m_diePose = e2::create<e2::AnimationPose>(m_skeleton, game()->getAnimationByIndex(AnimationIndex::EngineerDie), false);
 
 	m_currentPose = m_idlePose;
 	m_oldPose = m_idlePose;
 }
 
-void e2::Engineer::updateUnitAction(double seconds)
+void e2::Engineer::updateEntityAction(double seconds)
 {
 	if (!m_buildPose->playing())
 	{
@@ -178,11 +210,10 @@ void e2::Engineer::updateUnitAction(double seconds)
 		else if (m_buildType == e2::EngineerBuildType::Quarry)
 		{
 			game()->spawnStructure<e2::Mine>(e2::Hex(tileIndex), empireId, e2::EntityType::Structure_Quarry);
+			
 		}
-
-
-
-		game()->endCustomUnitAction();
+		 
+		game()->endCustomEntityAction();
 	}
 
 }
@@ -206,4 +237,26 @@ void e2::Engineer::onTurnEnd()
 void e2::Engineer::onTurnStart()
 {
 	e2::GameUnit::onTurnStart();
+}
+
+void e2::Engineer::onHit(e2::GameEntity* instigator, float dmg)
+{
+	e2::GameUnit::onHit(instigator, dmg);
+
+	if (health <= 0.0f)
+	{
+		kill();
+	}
+	else
+	{
+		playAction(m_hitPose, 0.2f, 0.2f);
+	}
+
+}
+
+void e2::Engineer::kill()
+{
+	e2::GameUnit::kill();
+
+	playAction(m_diePose, 0.2f, 0.0f);
 }

@@ -110,6 +110,13 @@ namespace e2
 		virtual void initialize();
 
 
+		virtual void onHit(e2::GameEntity* instigator, float damage);
+
+		virtual void onEntityTargetChanged(e2::Hex const& location);
+		virtual void onEntityTargetClicked();
+
+		virtual void updateEntityAction(double seconds);
+
 		void spreadVisibility();
 		void rollbackVisibility();
 
@@ -197,7 +204,14 @@ namespace e2
 
 
 
-
+	struct HitLabel
+	{
+		bool active{};
+		e2::Moment timeCreated;
+		std::string text;
+		glm::vec2 offset;
+		glm::vec2 velocity;
+	};
 
 	class GameUnit : public e2::GameEntity
 	{
@@ -209,15 +223,25 @@ namespace e2
 		virtual void onTurnEnd() override;
 		virtual void onTurnStart() override;
 
-		virtual void updateUnitAction(double seconds);
+		virtual void onHit(e2::GameEntity* instigator, float dmg) override;
 
 		virtual void drawUI(e2::UIContext* ctx);
 
-		virtual e2::PassableFlags getPassableFlags();
+		
+		e2::PassableFlags passableFlags{ e2::PassableFlags::Land };
 
 		float health{ 100.0f };
 		int32_t moveRange{ 3 };
 		int32_t movePointsLeft{ 3 };
+
+
+		virtual void kill();
+
+
+		bool dying{};
+
+		e2::StackVector<HitLabel, 3> labels;
+		uint32_t labelIndex{};
 
 	protected:
 

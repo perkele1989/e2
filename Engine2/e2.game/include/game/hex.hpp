@@ -380,7 +380,15 @@ namespace e2
 		void clearLoadTime();
 
 		/** */
-		e2::TileData calculateTileDataForHex(Hex hex);
+
+		float calculateBaseHeight(glm::vec2 const& planarCoords);
+		void calculateBiome(glm::vec2 const& planarCoords, e2::TileFlags& outFlags);
+		void calculateResources(glm::vec2 const& planarCoords, e2::TileFlags& outFlags);
+		void calculateFeaturesAndWater(glm::vec2 const& planarCoords, float baseHeight, e2::TileFlags& outFlags);
+
+		e2::MeshPtr getForestMeshForFlags(e2::TileFlags flags);
+
+		e2::TileData calculateTileDataForHex(Hex const& hex);
 
 		e2::MeshProxy* createForestProxyForTile(e2::TileData* tileData, e2::Hex const& hex);
 		static float sampleSimplex(glm::vec2 const& position);

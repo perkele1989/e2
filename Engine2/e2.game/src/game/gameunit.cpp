@@ -13,9 +13,17 @@ e2::GameUnit::GameUnit(e2::GameContext* ctx, glm::ivec2 const& tile, uint8_t emp
 	: e2::GameEntity(ctx, tile, empire)
 {
 	movePointsLeft = moveRange;
+
+	labels.resize(3);
+	for (HitLabel& label : labels)
+		label.active = false;
 }
 
 
+void e2::GameUnit::kill()
+{
+	dying = true;
+}
 
 void e2::GameEntity::updateAnimation(double seconds)
 {
@@ -107,7 +115,7 @@ void e2::GameEntity::updateAnimation(double seconds)
 
 
 
-void e2::GameUnit::updateUnitAction(double seconds)
+void e2::GameEntity::updateEntityAction(double seconds)
 {
 
 }
@@ -115,18 +123,30 @@ void e2::GameUnit::updateUnitAction(double seconds)
 void e2::GameUnit::drawUI(e2::UIContext* ui)
 {
 
-	ui->beginStackV("test2");
 
-	ui->gameLabel(std::format("**{}**", displayName), 12, e2::UITextAlign::Middle);
+	for (HitLabel& label : labels)
+	{
+		if (!label.active)
+			continue;
 
-	ui->gameLabel(std::format("Movement points left: {}", movePointsLeft), 11);
+		if (label.timeCreated.durationSince().seconds() > 1.0f)
+		{
+			label.active = false;
+			continue;
+		}
 
-	ui->endStackV();
-}
+		label.velocity.y += 1000.0f * (float)game()->timeDelta();
 
-e2::PassableFlags e2::GameUnit::getPassableFlags()
-{
-	return e2::PassableFlags::Land;
+		label.offset += label.velocity * (float)game()->timeDelta();
+
+		float fontSize = 14.0f + glm::smoothstep(0.0f, 1.0f, (float)label.timeCreated.durationSince().seconds()) * 10.0f;
+
+		float alpha = (1.0f - glm::smoothstep(0.4f, 1.0f, (float)label.timeCreated.durationSince().seconds())) * 255.f;
+
+		ui->drawSDFText(e2::FontFace::Sans, fontSize, e2::UIColor(255, 255, 255, (uint8_t)alpha), label.offset, label.text);
+
+	}
+
 }
 
 e2::GameUnit::~GameUnit()
@@ -160,6 +180,21 @@ void e2::GameEntity::initialize()
 
 }
 
+void e2::GameEntity::onHit(e2::GameEntity* instigator, float damage)
+{
+
+}
+
+void e2::GameEntity::onEntityTargetChanged(e2::Hex const& location)
+{
+
+}
+
+void e2::GameEntity::onEntityTargetClicked()
+{
+
+}
+
 void e2::GameUnit::onTurnEnd()
 {
 	
@@ -168,6 +203,13 @@ void e2::GameUnit::onTurnEnd()
 void e2::GameUnit::onTurnStart()
 {
 	movePointsLeft = moveRange;
+}
+
+void e2::GameUnit::onHit(e2::GameEntity* instigator, float dmg)
+{
+	e2::GameEntity::onHit(instigator, dmg);
+
+	health -= dmg;
 }
 
 e2::GameEntity::GameEntity(e2::GameContext* ctx, glm::ivec2 const& tile, EmpireId empire)

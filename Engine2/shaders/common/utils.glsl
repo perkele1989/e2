@@ -76,13 +76,16 @@ float simplex(vec2 v){
 		return 130.0 * dot(m, g);
 }
 
-float sampleSimplex(vec2 position, float scale)
+float sampleSimplex(vec2 position)
 {
-	return simplex(position*scale) * 0.5 + 0.5;
+	return simplex(position) * 0.5 + 0.5;
 }
 
 float sampleBaseHeight(vec2 position)
 {
+    float baseHeight = sampleSimplex((position + vec2(32.16, 64.32)) * 0.0135);
+    return baseHeight;
+/*
 	float h1p = 0.42;
 	float scale1 = 0.058;
 	float h1 = pow(sampleSimplex(position, scale1), h1p);
@@ -96,7 +99,7 @@ float sampleBaseHeight(vec2 position)
 	float semiSize2 = 0.1; 
 	float h3p = (0.75 * 20) / 5000;
 	float h3 = 1.0 - smoothstep(semiStart2, semiStart2 + semiSize2, sampleSimplex(position, h3p));
-	return h1 * h2 * h3;
+	return h1 * h2 * h3;*/
 }
 
 

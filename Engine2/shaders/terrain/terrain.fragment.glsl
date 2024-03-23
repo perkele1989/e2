@@ -41,19 +41,36 @@ void main()
 
 	float smallSimplexS = simplex(fragmentPosition.xz * 1.1) * 0.5 + 0.5;
 
-	float mainHeight = sampleBaseHeight(fragmentPosition.xz);
-	float greenCoeff = clamp(smoothstep(0.4 + 0.1 * smallSimplexS, 0.5+ 0.1 * smallSimplexS, mainHeight), 0.0, 1.0);
+	//float mainHeight = sampleBaseHeight(fragmentPosition.xz);
+	//float greenCoeff = clamp(smoothstep(0.4 + 0.1 * smallSimplexS, 0.5+ 0.1 * smallSimplexS, mainHeight), 0.0, 1.0);
+	
+	
+	//greenCoeff = clamp(fragmentColor.r * greenCoeff, 0.0, 1.0);
 
-	greenCoeff = clamp(fragmentColor.r * greenCoeff, 0.0, 1.0);
+	float waterKill = smoothstep(0.0, 0.15, fragmentPosition.y);
+
+	float sandCoeff = fragmentColor.r;
+
+
+	float tundraCoeff =fragmentColor.b;
+	tundraCoeff = mix(tundraCoeff, 0.0, waterKill);
+	float greenCoeff = fragmentColor.g;	
+	greenCoeff = mix(greenCoeff, 0.0, waterKill);
+
+
 
 
     float waterLineCoeff = smoothstep(-0.1, 0.0, -fragmentPosition.y);
     float waterLineCoeff2 = pow(smoothstep(-0.1, 0.0, -fragmentPosition.y), 0.2);
 	albedoSand = heightlerp(pow(albedoSand, vec3(1.2)), 0.5, albedoSand, smallSimplexS, waterLineCoeff);
 
+	float mountainCoeff = 1.0 - smoothstep(-0.2, 0.0, fragmentPosition.y);
+
+	vec3 grassTundraMix = heightlerp(albedoGreen, 0.5, vec3(0.7, 0.67, 0.66), bigSimplex + smallSimplex, tundraCoeff);
+
 	vec3 albedo;
-	albedo = heightlerp(albedoSand, 0.5, albedoGreen, bigSimplex * smallSimplex, greenCoeff);
-	albedo = heightlerp(albedo, 0.5, albedoMountains, bigSimplex, fragmentColor.g);
+	albedo = heightlerp(albedoSand, 0.9, grassTundraMix, bigSimplex + smallSimplex, clamp(greenCoeff + tundraCoeff, 0.0, 1.0));
+	albedo = heightlerp(albedo, 0.9, albedoMountains, bigSimplex, mountainCoeff);
 
 
 	vec3 nmMountains = normalize(texture(sampler2D(mountainNormal, repeatSampler), texUv * texScaleMountains).xyz * 2.0 - 1.0);
@@ -73,7 +90,7 @@ void main()
 
 	vec3 normalTexel;
 	normalTexel = normalize(heightlerp(nmSand, 0.5, nmGreen, bigSimplex * smallSimplex, greenCoeff));
-	normalTexel = normalize(heightlerp(normalTexel, 0.5, nmMountains, bigSimplex, fragmentColor.g));
+	normalTexel = normalize(heightlerp(normalTexel, 0.5, nmMountains, bigSimplex, mountainCoeff));
 
 	vec3 fragNormal = normalize(fragmentNormal.xyz);
 	vec3 fragTangent = normalize(fragmentTangent.xyz);

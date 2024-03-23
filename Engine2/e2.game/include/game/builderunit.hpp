@@ -31,7 +31,7 @@ namespace e2
 
 		virtual void initialize() override;
 
-		virtual void updateUnitAction(double seconds) override;
+		virtual void updateEntityAction(double seconds) override;
 
 		virtual void onBeginMove() override;
 		virtual void onEndMove() override;
@@ -39,9 +39,16 @@ namespace e2
 		virtual void onTurnEnd() override;
 		virtual void onTurnStart() override;
 
+		virtual void onHit(e2::GameEntity* instigator, float dmg) override;
+		virtual void kill() override;
+
+
 	protected:
 		e2::AnimationPose* m_idlePose{};
 		e2::AnimationPose* m_runPose{};
+
+		e2::AnimationPose* m_hitPose{};
+		e2::AnimationPose* m_diePose{};
 
 		e2::AnimationPose* m_buildPose{};
 

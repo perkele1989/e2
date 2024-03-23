@@ -7,6 +7,7 @@
 #include "uuid.h"
 
 #include <glm/gtc/integer.hpp>
+#include <glm/gtx/vector_angle.hpp>
 
 #include "utf8.h"
 //#include "utf8/cpp11.h"
@@ -96,6 +97,17 @@ glm::vec2 e2::rotate2d(glm::vec2 const& vec, float angleDegrees)
 	out.x = vec.x * glm::cos(rad) - vec.y * glm::sin(rad);
 	out.y = vec.x * glm::sin(rad) + vec.y * glm::cos(rad);
 	return out;
+}
+
+float e2::radiansBetween(glm::vec3 const& a, glm::vec3 const& b)
+{
+	glm::vec2 a2 = { a.x, a.z };
+	glm::vec2 b2 = { b.x, b.z };
+	glm::vec2 na = glm::normalize(a2 - b2);
+
+	glm::vec2 nb = glm::normalize(glm::vec2(0.0f, -1.0f));
+
+	return glm::orientedAngle(nb, na);
 }
 
 size_t e2::hash(UUID const& id)
