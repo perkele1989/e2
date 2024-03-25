@@ -10,6 +10,11 @@ e2::Context::~Context()
 
 }
 
+e2::Profiler* e2::Context::profiler()
+{
+	return engine()->m_profiler;
+}
+
 e2::Application* e2::Context::application()
 {
 	return engine()->application();

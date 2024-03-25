@@ -133,6 +133,7 @@ void e2::Game::initialize()
 	m_viewOrigin = m_startViewOrigin;
 	m_hexGrid->initializeWorldBounds(m_viewOrigin);
 
+	profiler()->start();
 }
 
 void e2::Game::shutdown()
@@ -233,6 +234,25 @@ void e2::Game::updateGame(double seconds)
 	if (kb.keys[int16_t(e2::Key::F9)].pressed)
 	{
 		m_hexGrid->invalidateFogOfWarShaders();
+	}
+
+
+	if (kb.keys[int16_t(e2::Key::F4)].pressed)
+	{
+		profiler()->stop();
+		auto rep =profiler()->report();
+		std::stringstream ss;
+		ss << std::endl;
+		ss << "------------------------------" << std::endl;
+		ss << "Profiler report, for " << profiler()->frameCount() << " frames" << std::endl;
+		ss << "------------------------------" << std::endl;
+
+		for (auto& f : rep)
+		{
+			ss << std::format("{}: avg {:.3f} ms, high {:.3f} ms | avg frame {:.3f} ms, high frame {:.3f} ms", f.displayName, f.avgTimeInScope * 1000.0, f.highTimeInScope * 1000.0, f.avgTimeInFrame * 1000.0, f.highTimeInFrame * 1000.0) << std::endl;
+		}
+		LogNotice("{}", ss.str());
+		profiler()->start();
 	}
 
 	updateCamera(seconds);
@@ -1403,7 +1423,7 @@ void e2::Game::endEntityTargeting()
 
 void e2::Game::updateMainCamera(double seconds)
 {
-	constexpr float moveSpeed = 50.0f;
+	constexpr float moveSpeed = 5.0f;
 	constexpr float viewSpeed = .3f;
 
 	e2::GameSession* session = gameSession();
@@ -1743,9 +1763,18 @@ void e2::Game::updateAltCamera(double seconds)
 
 void e2::Game::updateAnimation(double seconds)
 {
-	for (e2::GameUnit* unit : m_units)
+	// 1 / 30 = 33.333ms = 30 fps 
+	constexpr double targetFrameTime = 1.0 / 60.0;
+	m_accumulatedAnimationTime += seconds;
+
+	while (m_accumulatedAnimationTime > targetFrameTime)
 	{
-		unit->updateAnimation(seconds);
+		for (e2::GameUnit* unit : m_units)
+		{
+			unit->updateAnimation(targetFrameTime);
+		}
+
+		m_accumulatedAnimationTime -= targetFrameTime;
 	}
 }
 

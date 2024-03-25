@@ -10,6 +10,9 @@
                 "defines": {
                     "GLM_FORCE_DEPTH_ZERO_TO_ONE": "1"
                 },
+                "defines-profile": {
+                    "GLM_FORCE_DEPTH_ZERO_TO_ONE": "1"
+                },
                 "defines-devel": {
                     "GLM_FORCE_DEPTH_ZERO_TO_ONE": "1",
                     "E2_DEVELOPMENT": "true"
@@ -19,6 +22,10 @@
             },
             "private": {
                 "defines": { 
+                    "E2_BUILD": "true",
+                    "VK_USE_PLATFORM_WIN32_KHR": "true"
+                },
+                "defines-profile": { 
                     "E2_BUILD": "true",
                     "VK_USE_PLATFORM_WIN32_KHR": "true"
                 },

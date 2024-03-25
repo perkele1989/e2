@@ -4,8 +4,19 @@
 #include <e2/export.hpp>
 #include <e2/context.hpp>
 #include <e2/config.hpp>
+#include <e2/timer.hpp>
+#include <e2/utils.hpp>
 
 #include <vector>
+#include <unordered_map>
+#include <unordered_set>
+
+#define E2_BEGIN_SCOPE() profiler()->beginScope(__FUNCDNAME__, __FUNCTION__);
+#define E2_END_SCOPE() profiler()->endScope();
+
+#define E2_BEGIN_SCOPE_CTX(x) x->profiler()->beginScope(__FUNCDNAME__, __FUNCTION__);
+#define E2_END_SCOPE_CTX(x) x->profiler()->endScope();
+
 
 namespace e2
 {
@@ -43,6 +54,70 @@ namespace e2
 
 	};
 
+
+	constexpr uint64_t profileStackSize = 1024;
+
+
+	struct E2_API ProfileFunction
+	{
+		/** decorated function name, used as unique identifier */
+		std::string functionId;
+
+		std::string displayName;
+
+		double timeInFrame{}; // time in seconds this function has been executing, in this frame
+		double avgTimeInFrame{}; // average time this function spent executing, per frame
+		double highTimeInFrame{}; // highest time this function spent executing, per frame
+
+		// variables below are never reset, and are updated every frame
+		uint64_t timesInScope{}; // num times this function has had a scope, since profiling started
+		double timeInScope{}; // time in seconds this function has been in scope, since profiling started
+
+		double avgTimeInScope{}; // average time this function spent in scope, per invocation
+		double highTimeInScope{}; // highest time this function spent in scope, per invocation
+
+	};
+
+	struct E2_API ProfileScope
+	{
+		/** The function in which this scope was opened (and is closed) */
+		ProfileFunction* function{};
+
+		/** moment in time this scope was opened */
+		e2::Moment openTime;
+	};
+
+
+	class E2_API Profiler
+	{
+	public:
+
+		void start();
+		void stop();
+
+		void newFrame();
+
+		void beginScope(std::string const& funcId, std::string const& funcDisplayName);
+
+		void endScope();
+
+		std::vector<e2::ProfileFunction> report();
+
+		uint64_t frameCount()
+		{
+			return m_numFrames;
+		}
+
+	protected:
+		bool m_enabled{};
+		uint64_t m_numFrames{};
+		e2::StackVector<e2::ProfileScope, profileStackSize> m_stack;
+		std::unordered_map<std::string, e2::ProfileFunction> m_functions;
+
+	};
+
+
+
 	class E2_API Engine : public Context
 	{
 	public:
@@ -73,6 +148,7 @@ namespace e2
 		e2::Application* m_application{};
 		
 		e2::Config* m_config{};
+		e2::Profiler* m_profiler{};
 
 		e2::RenderManager* m_renderManager{};
 		e2::GameManager* m_gameManager{};
@@ -80,7 +156,7 @@ namespace e2
 		e2::AssetManager* m_assetManager{};
 		e2::TypeManager* m_typeManager{};
 		e2::UIManager* m_uiManager{};
-
+		
 	};
 
 }

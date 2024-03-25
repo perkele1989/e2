@@ -76,6 +76,7 @@ namespace e2
 
 	struct E2_API Ray2D
 	{
+		bool edgeTest(glm::vec2 const& circleOrigin, float circleRadius) const;
 		bool edgeTest(glm::vec2 const& point) const;
 
 		glm::vec2 position{};
@@ -124,6 +125,7 @@ namespace e2
 		Ray2D bottomRay;
 
 		bool isWithin(glm::vec2 const& point) const;
+		bool isWithin(glm::vec2 const& circleOrigin, float circeRadius) const;
 
 		bool test(e2::Aabb2D const& aabb) const;
 

@@ -149,14 +149,16 @@ namespace e2
 	};*/
 
 
-	/** @tags(arena, arenaSize=1024) */
-	class E2_API Pose : public e2::Object
+	/** @tags(arena, arenaSize=4096) */
+	class E2_API Pose : public e2::Object, public e2::Context
 	{
 		ObjectDeclaration();
 	public:
 		/** initialize pose from skeleton */
 		Pose(e2::Ptr<e2::Skeleton> skeleton);
 		virtual ~Pose();
+
+		virtual Engine* engine() override;
 
 		void updateSkin();
 
@@ -189,7 +191,7 @@ namespace e2
 	};
 
 
-	/** @tags(arena, arenaSize=1024) */
+	/** @tags(arena, arenaSize=16384) */
 	class E2_API AnimationPose : public e2::Pose
 	{
 		ObjectDeclaration();
@@ -197,7 +199,7 @@ namespace e2
 		AnimationPose(e2::Ptr<e2::Skeleton> skeleton, e2::Ptr<e2::Animation> animation, bool loop);
 		virtual ~AnimationPose();
 
-		void updateAnimation(float timeDelta);
+		void updateAnimation(float timeDelta, bool onlyTickTime);
 
 		void pause()
 		{
@@ -244,6 +246,11 @@ namespace e2
 
 	protected:
 		e2::Ptr<e2::Animation> m_animation;
+
+		e2::StackVector<e2::AnimationTrack*, e2::maxNumSkeletonBones> m_translationTracks;
+		e2::StackVector<e2::AnimationTrack*, e2::maxNumSkeletonBones> m_rotationTracks;
+
+
 		bool m_loop{};
 		bool m_playing{};
 		float m_time{};

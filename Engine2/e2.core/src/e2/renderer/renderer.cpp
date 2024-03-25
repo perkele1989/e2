@@ -667,6 +667,19 @@ bool e2::Viewpoints2D::isWithin(glm::vec2 const& point) const
 	return true;
 }
 
+bool e2::Viewpoints2D::isWithin(glm::vec2 const& circleOrigin, float circleRadius) const
+{
+	if (!leftRay.edgeTest(circleOrigin, circleRadius))
+		return false;
+	if (!rightRay.edgeTest(circleOrigin, circleRadius))
+		return false;
+	if (!topRay.edgeTest(circleOrigin, circleRadius))
+		return false;
+	if (!bottomRay.edgeTest(circleOrigin, circleRadius))
+		return false;
+	return true;
+}
+
 bool e2::Viewpoints2D::test(e2::Aabb2D const& aabb) const
 {
 	glm::vec2 aabbPoints[4] = { aabb.min, {aabb.max.x, aabb.min.y}, aabb.max, {aabb.min.x, aabb.max.y} };
@@ -788,6 +801,11 @@ E2_API bool e2::boxRayIntersection2D(Aabb2D box, Ray2D ray)
 bool e2::Ray2D::edgeTest(glm::vec2 const& point) const
 {
 	return glm::dot(perpendicular, point - position) < 0.0f;
+}
+
+bool e2::Ray2D::edgeTest(glm::vec2 const& circleOrigin, float circleRadius) const
+{
+	return glm::dot(perpendicular, circleOrigin - position) < circleRadius;
 }
 
 e2::StackVector<glm::vec2, 4> e2::Aabb2D::points()

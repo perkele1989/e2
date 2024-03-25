@@ -63,7 +63,7 @@ namespace e2
 		Count
 	};
 
-	/** @tags(arena, arenaSize=4096) */
+	/** @tags(arena, arenaSize=16384) */
 	class PathFindingHex : public e2::Object
 	{
 		ObjectDeclaration();
@@ -378,13 +378,19 @@ namespace e2
 			return m_view;
 		}
 
+		e2::Viewpoints2D viewPoints()
+		{
+			return m_viewPoints;
+		}
+
 	protected:
 		e2::GameStructure* m_selectedStructure{};
 		std::unordered_set<e2::GameStructure*> m_structures;
 		std::unordered_map<glm::ivec2, e2::GameStructure*> m_structureIndex;
 
 
-
+		// anim stuff 
+		double m_accumulatedAnimationTime{};
 
 
 		// camera stuff 

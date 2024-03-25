@@ -17,6 +17,7 @@
 
 e2::Engine::Engine()
 {
+	m_profiler = new Profiler();
 	m_config = new Config();
 	m_typeManager = new e2::TypeManager(this);
 	m_asyncManager = new e2::AsyncManager(this);
@@ -38,6 +39,7 @@ e2::Engine::~Engine()
 	delete m_typeManager;
 	
 	delete m_config;
+	delete m_profiler;
 
 #if defined(E2_DEVELOPMENT)
 	e2::printLingeringObjects();
@@ -79,6 +81,10 @@ void e2::Engine::run(e2::Application* app)
 			deltaTime = lastFrameStart.durationSince().seconds();
 			lastFrameStart = e2::timeNow();
 
+			m_profiler->newFrame();
+
+			E2_BEGIN_SCOPE();
+
 			m_asyncManager->update(deltaTime);
 			m_assetManager->update(deltaTime);
 			m_renderManager->update(deltaTime);
@@ -93,6 +99,8 @@ void e2::Engine::run(e2::Application* app)
 			// Only dispatch render stuff if we are actually still running
 			if (m_running)
 				m_renderManager->dispatch();
+
+			E2_END_SCOPE();
 
 			m_metrics.frameTimeMs[m_metrics.cursor] = (float)lastFrameStart.durationSince().milliseconds();
 
@@ -171,4 +179,112 @@ e2::EngineMetrics& e2::Engine::metrics()
 {
 	return m_metrics;
 
+}
+
+void e2::Profiler::start()
+{
+	if (m_enabled)
+		return;
+
+	m_functions.clear();
+	m_stack.clear();
+	m_enabled = true;
+	m_numFrames = 0;
+}
+
+void e2::Profiler::stop()
+{
+	m_enabled = false;
+}
+
+void e2::Profiler::newFrame()
+{
+	if (!m_enabled)
+		return;
+
+	if (!m_stack.empty())
+	{
+		LogError("Mismatching profiler scope brackets; new frame but we got stuff on stack.");
+		m_stack.clear();
+	}
+
+	for (auto& [id, function] : m_functions)
+	{
+		e2::ProfileFunction* func = &function;
+		
+
+		if (func->timeInFrame > func->highTimeInFrame)
+			func->highTimeInFrame = func->timeInFrame;
+
+
+		func->avgTimeInFrame = (double(m_numFrames) * func->avgTimeInFrame + func->timeInFrame) / (double(m_numFrames) + 1.0);
+
+		func->timeInFrame = 0.0f;
+	}
+	m_numFrames++;
+}
+
+void e2::Profiler::beginScope(std::string const& funcId, std::string const& funcDisplayName)
+{
+	if (!m_enabled)
+		return;
+
+	e2::ProfileFunction* func{};
+	auto finder = m_functions.find(funcId);
+	if (finder == m_functions.end())
+	{
+		e2::ProfileFunction newFunc;
+		newFunc.displayName = funcDisplayName;
+		newFunc.functionId = funcId;
+
+		m_functions[funcId] = newFunc;
+		func = &m_functions.at(funcId);
+	}
+	else
+	{
+		func = &finder->second;
+	}
+
+	e2::ProfileScope newScope;
+	newScope.function = func;
+	newScope.openTime = e2::timeNow();
+	m_stack.push(newScope);
+}
+
+void e2::Profiler::endScope()
+{
+	if (!m_enabled)
+		return;
+
+	if (m_stack.empty())
+	{
+		LogError("Mismatching profiler scope brackets; ended scope but we ain't got none.");
+		return;
+	}
+
+	e2::ProfileScope top = m_stack.back();
+	double secondsInScope = top.openTime.durationSince().seconds();
+	m_stack.pop();
+
+	top.function->timeInFrame += secondsInScope;
+
+	top.function->timeInScope += secondsInScope;
+	if (secondsInScope > top.function->highTimeInScope)
+		top.function->highTimeInScope = secondsInScope;
+
+	top.function->avgTimeInScope = (double(top.function->timesInScope) * top.function->avgTimeInScope + secondsInScope) / (double(top.function->timesInScope) + 1.0);
+
+	top.function->timesInScope++;
+}
+
+std::vector<e2::ProfileFunction> e2::Profiler::report()
+{
+	std::vector<e2::ProfileFunction> returner;
+	for (auto& [id, func] : m_functions)
+	{
+		returner.push_back(func);
+	}
+
+	std::sort(returner.begin(), returner.end(), [](e2::ProfileFunction const& lhs, e2::ProfileFunction const& rhs) -> bool { return lhs.highTimeInScope > rhs.highTimeInScope;  });
+	return returner;
 }

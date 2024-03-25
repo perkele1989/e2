@@ -56,6 +56,28 @@ e2::MeshProxy::~MeshProxy()
 	}
 }
 
+bool e2::MeshProxy::enabled()
+{
+	return id != UINT32_MAX;
+}
+
+void e2::MeshProxy::enable()
+{
+	if (enabled())
+		return;
+
+	id = session->registerMeshProxy(this);
+}
+
+void e2::MeshProxy::disable()
+{
+	if (!enabled())
+		return;
+
+	session->unregisterMeshProxy(this);
+	id = UINT32_MAX;
+}
+
 void e2::MeshProxy::invalidatePipeline()
 {
 	if (id != UINT32_MAX)

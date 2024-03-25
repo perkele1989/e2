@@ -3,6 +3,7 @@
 #include "game/game.hpp"
 
 
+#include <e2/e2.hpp>
 #include <e2/game/gamesession.hpp>
 #include <e2/transform.hpp>
 #include <e2/renderer/renderer.hpp>
@@ -77,20 +78,43 @@ void e2::Grunt::initialize()
 
 void e2::Grunt::updateAnimation(double seconds)
 {
+	E2_BEGIN_SCOPE_CTX(game());
+
+	e2::Hex hex = e2::Hex(tileIndex);
+	e2::Viewpoints2D viewpoints = game()->viewPoints();
+	bool inView = viewpoints.isWithin(hex.planarCoords(), 1.0f);
+
 	if (dying && (!m_diePose->playing() || m_diePose->time() > m_diePose->animation()->timeSeconds() - 0.05f))
 	{
 		game()->queueDestroyUnit(this);
+		E2_END_SCOPE_CTX(game());
 		return;
 	}
 
-	m_idlePose->updateAnimation(seconds);
-	m_runPose->updateAnimation(seconds);
-	m_firePose->updateAnimation(seconds);
-	m_hitPose->updateAnimation(seconds);
-	m_diePose->updateAnimation(seconds);
+	if (inView && !m_proxy->enabled())
+		m_proxy->enable();
+
+	if (!inView && m_proxy->enabled())
+		m_proxy->disable();
 
 
-	e2::MilitaryUnit::updateAnimation(seconds);
+	// Only update main poses if we are in view, and if so do it fully, these are noop's if they arent playing so that is already optimized
+	if (inView)
+	{
+		m_idlePose->updateAnimation(seconds, false);
+		m_runPose->updateAnimation(seconds, false);
+	}
+
+	// Update action poses always, but only tick time if we aren't in view.
+	m_firePose->updateAnimation(seconds, !inView);
+	m_hitPose->updateAnimation(seconds, !inView);
+	m_diePose->updateAnimation(seconds, !inView);
+
+	// dont update base entity animation stuff unless we are in view
+	if (inView)
+		e2::MilitaryUnit::updateAnimation(seconds);
+
+	E2_END_SCOPE_CTX(game());
 }
 
 void e2::Grunt::drawUI(e2::UIContext* ui)

@@ -7,6 +7,8 @@
 
 #include "e2/rhi/rendercontext.hpp"
 
+#include "e2/e2.hpp"
+
 #include <glm/gtx/quaternion.hpp>
 #include <glm/gtx/transform.hpp>
 #include <glm/gtx/matrix_decompose.hpp>
@@ -644,8 +646,34 @@ e2::Pose::~Pose()
 
 }
 
+e2::Engine* e2::Pose::engine()
+{
+	return m_skeleton->engine();
+}
+
 void e2::Pose::updateSkin()
 {
+	E2_BEGIN_SCOPE();
+
+	// these are sorted by hierarchy so fine to just do them linearly
+	glm::mat4 identityTransform = glm::identity<glm::mat4>();
+
+	for (uint32_t id = 0; id < m_skeleton->numBones(); id++)
+	{
+		e2::Bone* bone = m_skeleton->boneById(id);
+		e2::Bone* parentBone = bone->parent;
+
+		e2::PoseBone* poseBone = &m_poseBones[id];
+		e2::PoseBone* parentPoseBone = parentBone ? &m_poseBones[parentBone->index] : nullptr;
+
+		glm::mat4 parentTransform = parentPoseBone ? parentPoseBone->cachedGlobalTransform : identityTransform;
+
+		poseBone->cachedGlobalTransform = parentTransform * poseBone->localTransform;
+		poseBone->cachedSkinTransform = poseBone->cachedGlobalTransform * bone->bindMatrix;
+		m_skin[id] = poseBone->cachedSkinTransform;
+	}
+
+	/*
 	struct WorkChunk
 	{
 		glm::mat4 parentTransform;
@@ -677,21 +705,27 @@ void e2::Pose::updateSkin()
 			chunks.push({ poseBone->cachedGlobalTransform, child });
 		}
 	}
+	*/
+	E2_END_SCOPE();
 }
 
 void e2::Pose::applyBindPose()
 {
+	E2_BEGIN_SCOPE();
 	for (e2::PoseBone& bone : m_poseBones)
 	{
 		bone.localTransform = bone.assetBone->localTransform;
 	}
+	E2_END_SCOPE();
 }
 
 void e2::Pose::applyPose(Pose* otherPose)
 {
+	E2_BEGIN_SCOPE();
 	if (m_skeleton != otherPose->skeleton())
 	{
 		LogError("incompatible poses (skeleton mismatch)");
+		E2_END_SCOPE();
 		return;
 	}
 
@@ -701,25 +735,30 @@ void e2::Pose::applyPose(Pose* otherPose)
 
 		poseBone->localTransform = otherPose->poseBoneById(boneId)->localTransform;
 	}
+	E2_END_SCOPE();
 }
 
 void e2::Pose::applyBlend(Pose* a, Pose* b, float alpha)
 {
+	E2_BEGIN_SCOPE();
 	if (m_skeleton != a->skeleton() || m_skeleton != b->skeleton())
 	{
 		LogError("incompatible poses (skeleton mismatch)");
+		E2_END_SCOPE();
 		return;
 	}
 
 	if (alpha < 0.001f)
 	{
 		applyPose(a);
+		E2_END_SCOPE();
 		return;
 	}
 	
 	if (alpha > 1.0f - 0.001f)
 	{
 		applyPose(b);
+		E2_END_SCOPE();
 		return;
 	}
 	
@@ -744,6 +783,7 @@ void e2::Pose::applyBlend(Pose* a, Pose* b, float alpha)
 
 		//poseBone->localTransform = glm::interpolate(a->poseBoneById(boneId)->localTransform, b->poseBoneById(boneId)->localTransform, alpha);
 	}
+	E2_END_SCOPE();
 }
 
 void e2::Pose::blendWith(Pose* b, float alpha)
@@ -757,6 +797,7 @@ void e2::Pose::blendWith(Pose* b, float alpha)
 
 void e2::Pose::applyAnimation(e2::Ptr<e2::Animation> anim, float time)
 {
+	E2_BEGIN_SCOPE();
 	for (uint32_t boneId = 0; boneId < m_poseBones.size(); boneId++)
 	{
 		e2::PoseBone* poseBone = &m_poseBones[boneId];
@@ -782,6 +823,7 @@ void e2::Pose::applyAnimation(e2::Ptr<e2::Animation> anim, float time)
 
 		poseBone->localTransform = recompose(translation, scale, skew, perspective, rotation);
 	}
+	E2_END_SCOPE();
 }
 
 e2::StackVector<glm::mat4, e2::maxNumSkeletonBones> const& e2::Pose::skin()
@@ -808,7 +850,20 @@ e2::AnimationPose::AnimationPose(e2::Ptr<e2::Skeleton> skeleton, e2::Ptr<e2::Ani
 	, m_loop(loop)
 	, m_playing(true)
 {
+	m_rotationTracks.resize(skeleton->numBones());
+	m_translationTracks.resize(skeleton->numBones());
 
+	for (uint32_t boneId = 0; boneId < m_poseBones.size(); boneId++)
+	{
+		e2::PoseBone* poseBone = &m_poseBones[boneId];
+		e2::Bone* bone = m_skeleton->boneById(boneId);
+
+		e2::Name trackName_pos = std::format("{}.position", bone->name.cstring());
+		m_translationTracks[boneId] = m_animation->trackByName(trackName_pos, e2::AnimationType::Vec3);
+
+		e2::Name trackName_rot = std::format("{}.rotation", bone->name.cstring());
+		m_rotationTracks[boneId] = m_animation->trackByName(trackName_rot, e2::AnimationType::Quat);
+	}
 }
 
 e2::AnimationPose::~AnimationPose()
@@ -816,8 +871,12 @@ e2::AnimationPose::~AnimationPose()
 
 }
 
-void e2::AnimationPose::updateAnimation(float timeDelta)
+void e2::AnimationPose::updateAnimation(float timeDelta, bool onlyTickTime)
 {
+	if (!m_playing)
+		return;
+
+	E2_BEGIN_SCOPE();
 	m_time += timeDelta;
 	while (m_time >= m_animation->timeSeconds())
 	{
@@ -830,6 +889,41 @@ void e2::AnimationPose::updateAnimation(float timeDelta)
 
 		m_time -= m_animation->timeSeconds();
 	}
-	applyBindPose();
-	applyAnimation(m_animation, m_time);
+
+	if (onlyTickTime)
+		return;
+
+	//applyBindPose();
+	for (uint32_t boneId = 0; boneId < m_poseBones.size(); boneId++)
+	{
+		e2::PoseBone* poseBone = &m_poseBones[boneId];
+		e2::Bone* bone = poseBone->assetBone; // m_skeleton->boneById(boneId);
+
+		e2::AnimationTrack* posTrack = m_translationTracks[boneId];
+		e2::AnimationTrack* rotTrack = m_rotationTracks[boneId];
+
+		//poseBone->localTransform = poseBone->assetBone->localTransform;
+
+		if (!posTrack && !rotTrack)
+		{
+			poseBone->localTransform = poseBone->assetBone->localTransform;
+			continue;
+		}
+
+		glm::vec3 translation, scale, skew;
+		glm::vec4 perspective;
+		glm::quat rotation;
+		glm::decompose(poseBone->assetBone->localTransform, scale, rotation, translation, skew, perspective);
+
+		if (posTrack)
+			translation = posTrack->getVec3(m_time, m_animation->frameRate());
+
+		if (rotTrack)
+			rotation = rotTrack->getQuat(m_time, m_animation->frameRate());
+
+		poseBone->localTransform = recompose(translation, scale, skew, perspective, rotation);
+	}
+
+	//applyAnimation(m_animation, m_time);
+	E2_END_SCOPE();
 }

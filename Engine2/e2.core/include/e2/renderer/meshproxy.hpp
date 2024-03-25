@@ -110,6 +110,10 @@ namespace e2
 		MeshProxy(e2::Session* inSession, e2::MeshProxyConfiguration const& config);
 		virtual ~MeshProxy();
 
+		bool enabled();
+		void enable();
+		void disable();
+
 		void invalidatePipeline();
 
 		virtual Engine* engine() override;

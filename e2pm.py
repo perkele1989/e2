@@ -49,6 +49,7 @@ class PackageTarget():
 
         # A dict of defines for development
         self.defines_devel : dict[str, str] = {}
+        self.defines_profile : dict[str, str] = {}
 
         # If not empty, these are the include paths that should be used when using this target
         # These paths are relative to the package folder
@@ -58,11 +59,13 @@ class PackageTarget():
         # Note: ONLY VALID if type is SharedLibrary or StaticLibrary
         self.libraries : list[str] = []
         self.libraries_devel : list[str] = []
+        self.libraries_profile : list[str] = []
 
         # If not empty, these are the binaries that should be used when using this target 
         # Note: ONLY VALID if type is SharedLibrary, RuntimeLibrary or Application
         self.binaries : list[str] = []
         self.binaries_devel : list[str] = []
+        self.binaries_profile : list[str] = []
 
     def parse_from_json(self, json_obj):
         # first reset to sane defaults
@@ -72,11 +75,14 @@ class PackageTarget():
         self.dependencies.clear()
         self.defines.clear()
         self.defines_devel.clear()
+        self.defines_profile.clear()
         self.include_paths.clear()
         self.libraries.clear()
         self.libraries_devel.clear()
+        self.libraries_profile.clear()
         self.binaries.clear()
         self.binaries_devel.clear()
+        self.binaries_profile.clear()
 
         if "name" in json_obj:
             self.name = json_obj["name"]
@@ -96,6 +102,9 @@ class PackageTarget():
         if "defines-devel" in json_obj:
             self.defines_devel = json_obj["defines-devel"]
 
+        if "defines-profile" in json_obj:
+            self.defines_profile = json_obj["defines-profile"]
+
         if "include-paths" in json_obj:
             self.include_paths = json_obj["include-paths"]
 
@@ -105,11 +114,17 @@ class PackageTarget():
         if "libraries-devel" in json_obj:
             self.libraries_devel = json_obj["libraries-devel"]
 
+        if "libraries-profile" in json_obj:
+            self.libraries_profile = json_obj["libraries-profile"]
+
         if "binaries" in json_obj:
             self.binaries = json_obj["binaries"]
 
         if "binaries-devel" in json_obj:
             self.binaries_devel = json_obj["binaries-devel"]
+
+        if "binaries-profile" in json_obj:
+            self.binaries_profile = json_obj["binaries-profile"]
 
     def headers_relevant(self):
         return self.type in [TargetType.SharedLibrary, TargetType.StaticLibrary, TargetType.HeaderOnly]
@@ -287,6 +302,8 @@ class SourceTargetBlock():
         # Defines, if public they will only be inherited, if private they will only be defined when building
         self.defines_devel : dict[str,str] = {}
 
+        self.defines_profile : dict[str,str] = {}
+
         # Package-relative include paths, if private they will only be used when building, if public they will also be packaged and referenced when used
         self.include_paths : list[str] = []
 
@@ -294,6 +311,7 @@ class SourceTargetBlock():
         self.dependencies.clear()
         self.defines.clear()
         self.defines_devel.clear()
+        self.defines_profile.clear()
         self.include_paths.clear()
 
         if "dependencies" in json_obj:
@@ -304,6 +322,9 @@ class SourceTargetBlock():
 
         if "defines-devel" in json_obj:
             self.defines_devel = json_obj["defines-devel"]
+
+        if "defines-profile" in json_obj:
+            self.defines_profile = json_obj["defines-profile"]
 
         if "include-paths" in json_obj:
             self.include_paths = json_obj["include-paths"]
@@ -449,26 +470,32 @@ class IntermediateProject():
         # these are maps etc to be prepared later
         self.defines : dict[str,str] = {}
         self.defines_devel : dict[str,str] = {}
+        self.defines_profile : dict[str,str] = {}
         self.include_dirs : set[str] = set()
         self.lib_dirs : set[str] = set()
         self.libs : set[str] = set()
         self.libs_devel : set[str] = set()
+        self.libs_profile : set[str] = set()
 
         # These are prepared strings for project generation
         self.defines_string : str = ""
         self.defines_devel_string : str = ""
+        self.defines_profile_string : str = ""
         self.include_dirs_string : str = ""
         self.lib_dirs_string : str = ""
         self.libs_string : str = ""
         self.libs_devel_string : str = ""
+        self.libs_profile_string : str = ""
         self.include_files : list[str] = []
         self.source_files : list[str] = []
 
         self.binary_files : list[str] = []
         self.binary_files_devel : list[str] = []
+        self.binary_files_profile : list[str] = []
 
         self.debug_binary : str = ""
         self.debug_binary_devel : str = ""
+        self.debug_binary_profile : str = ""
         self.debug_dir : str = ""
 
         # For generating filters 
@@ -486,6 +513,9 @@ class IntermediateProject():
         for k, v in self.source_target.public.defines_devel.items():
             self.defines_devel[k] = v
 
+        for k, v in self.source_target.public.defines_profile.items():
+            self.defines_profile[k] = v
+
         for inc_dir in self.source_target.public.include_paths:
             if inc_dir.startswith("!"):
                 self.include_dirs.add( os.path.expandvars(inc_dir[1:]) )
@@ -497,6 +527,9 @@ class IntermediateProject():
 
         for k, v in self.source_target.private.defines_devel.items():
             self.defines_devel[k] = v
+
+        for k, v in self.source_target.private.defines_profile.items():
+            self.defines_profile[k] = v
 
         for inc_dir in self.source_target.private.include_paths:
             if inc_dir.startswith("!"):
@@ -513,10 +546,12 @@ class IntermediateProject():
     def prepare(self):
         self.defines_string = ";".join(["{}={}".format(x, y) for x, y in self.defines.items()])
         self.defines_devel_string = ";".join(["{}={}".format(x, y) for x, y in self.defines_devel.items()])
+        self.defines_profile_string = ";".join(["{}={}".format(x, y) for x, y in self.defines_profile.items()])
         self.include_dirs_string = ";".join(["\"{}\"".format(x) for x in self.include_dirs])
         self.lib_dirs_string = ";".join(["\"{}\"".format(x) for x in self.lib_dirs])
         self.libs_string = ";".join([x for x in self.libs])
         self.libs_devel_string = ";".join([x for x in self.libs_devel])
+        self.libs_profile_string = ";".join([x for x in self.libs_profile])
 
 
         # populate filters 
@@ -685,11 +720,14 @@ class IntermediateSolution():
             if proj.source_target.type == TargetType.Application:
                 proj.binary_files.append( base_dir / f"{proj.source_project.name}.{proj.source_target.name}.exe" )
                 proj.binary_files_devel.append( base_dir / f"{proj.source_project.name}.{proj.source_target.name}-dev.exe" )
+                proj.binary_files_profile.append( base_dir / f"{proj.source_project.name}.{proj.source_target.name}-profiler.exe" )
                 proj.debug_binary = str(deploy_dir / f"{proj.source_project.name}.{proj.source_target.name}.exe")
                 proj.debug_binary_devel = str(deploy_dir / f"{proj.source_project.name}.{proj.source_target.name}-dev.exe")
+                proj.debug_binary_profile = str(deploy_dir / f"{proj.source_project.name}.{proj.source_target.name}-profiler.exe")
             else:
                 proj.binary_files.append( base_dir / f"{proj.source_project.name}.{proj.source_target.name}.dll" )
                 proj.binary_files_devel.append( base_dir / f"{proj.source_project.name}.{proj.source_target.name}-dev.dll" )
+                proj.binary_files_profile.append( base_dir / f"{proj.source_project.name}.{proj.source_target.name}-profiler.dll" )
 
 
             int_deps, ext_deps = self.gather_dependencies(proj)
@@ -705,6 +743,9 @@ class IntermediateSolution():
                 for k, v in other.source_target.public.defines_devel.items():
                     proj.defines_devel[k] = v
 
+                for k, v in other.source_target.public.defines_profile.items():
+                    proj.defines_profile[k] = v
+
                 for inc_dir in other.source_target.public.include_paths:
                     proj.include_dirs.add( str( (other.source_project.get_folder() / inc_dir).resolve() ) )
 
@@ -716,15 +757,18 @@ class IntermediateSolution():
                     proj.lib_dirs.add( str( (other.source_project.get_folder() / f"{other.source_project.name}.{other.source_target.name}" / "lib").resolve() ))
                     proj.libs.add(other.name + ".lib")
                     proj.libs_devel.add(other.name + "-dev.lib")
+                    proj.libs_profile.add(other.name + "-profiler.lib")
                 
                 if other.source_target.binaries_relevant():
                     base_dir = (other.source_project.get_folder() / f"{other.source_project.name}.{other.source_target.name}" / "bin").resolve()
                     if other.source_target.type == TargetType.Application:
                         proj.binary_files.append( base_dir / f"{other.source_project.name}.{other.source_target.name}.exe" )
                         proj.binary_files_devel.append( base_dir / f"{other.source_project.name}.{other.source_target.name}-dev.exe" )
+                        proj.binary_files_profile.append( base_dir / f"{other.source_project.name}.{other.source_target.name}-profiler.exe" )
                     else:
                         proj.binary_files.append( base_dir / f"{other.source_project.name}.{other.source_target.name}.dll" )
                         proj.binary_files_devel.append( base_dir / f"{other.source_project.name}.{other.source_target.name}-dev.dll" )
+                        proj.binary_files_profile.append( base_dir / f"{other.source_project.name}.{other.source_target.name}-profiler.dll" )
 
                 proj.resolved_deps.add(other.name)
 
@@ -755,6 +799,9 @@ class IntermediateSolution():
                 for k, v in dep_tgt.defines_devel.items():
                     proj.defines_devel[k] = v 
 
+                for k, v in dep_tgt.defines_profile.items():
+                    proj.defines_profile[k] = v 
+
                 for inc_dir in dep_tgt.include_paths:
                     proj.include_dirs.add( str( (dep_pkg.get_folder() / inc_dir).resolve() ) )
 
@@ -767,6 +814,9 @@ class IntermediateSolution():
                 for bin in dep_tgt.binaries_devel:
                     proj.binary_files_devel.append( str( (dep_pkg.get_folder() / "bin" / bin).resolve() ))
 
+                for bin in dep_tgt.binaries_profile:
+                    proj.binary_files_profile.append( str( (dep_pkg.get_folder() / "bin" / bin).resolve() ))
+
                 if dep_tgt.libraries_relevant():
                     proj.lib_dirs.add( str( (dep_pkg.get_folder() / "lib").resolve() ))
                     proj.lib_dirs.add( str( (dep_pkg.get_folder() / dep_tgt.name / "lib").resolve() ))
@@ -776,6 +826,9 @@ class IntermediateSolution():
 
                     for lib in dep_tgt.libraries_devel:
                         proj.libs_devel.add(lib)
+
+                    for lib in dep_tgt.libraries_profile:
+                        proj.libs_profile.add(lib)
                 
                 proj.resolved_deps.add(dep_tgt.name)
 

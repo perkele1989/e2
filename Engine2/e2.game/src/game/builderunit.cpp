@@ -6,6 +6,8 @@
 #include <e2/renderer/renderer.hpp>
 
 
+#include <e2/e2.hpp>
+
 #include <glm/gtx/quaternion.hpp>
 #include <glm/ext/matrix_transform.hpp>
 
@@ -42,21 +44,42 @@ e2::Engineer::~Engineer()
 
 void e2::Engineer::updateAnimation(double seconds)
 {
+	E2_BEGIN_SCOPE_CTX(game());
+
+	e2::Hex hex = e2::Hex(tileIndex);
+	e2::Viewpoints2D viewpoints = game()->viewPoints();
+	bool inView = viewpoints.isWithin(hex.planarCoords(), 1.0f);
+
+
 	if (dying && (!m_diePose->playing() || m_diePose->time() > m_diePose->animation()->timeSeconds() - 0.05f))
 	{
 		game()->queueDestroyUnit(this);
+		E2_END_SCOPE_CTX(game());
 		return;
 	}
 
+	if (inView && !m_proxy->enabled())
+		m_proxy->enable();
+
+	if (!inView && m_proxy->enabled())
+		m_proxy->disable();
 
 
-	m_buildPose->updateAnimation(seconds*4.0f);
-	m_idlePose->updateAnimation(seconds);
-	m_runPose->updateAnimation(seconds);
-	m_hitPose->updateAnimation(seconds);
-	m_diePose->updateAnimation(seconds);
+	if (inView)
+	{
+		m_idlePose->updateAnimation(seconds, false);
+		m_runPose->updateAnimation(seconds, false);
+	}
 
-	e2::GameUnit::updateAnimation(seconds);
+	m_buildPose->updateAnimation(seconds*4.0f, !inView);
+	m_hitPose->updateAnimation(seconds, !inView);
+	m_diePose->updateAnimation(seconds, !inView);
+
+	if(inView)
+		e2::GameUnit::updateAnimation(seconds);
+
+
+	E2_END_SCOPE_CTX(game());
 
 }
 
