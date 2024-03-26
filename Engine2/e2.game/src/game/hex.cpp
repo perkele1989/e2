@@ -718,7 +718,7 @@ void e2::HexGrid::updateStreaming(glm::vec2 const& streamCenter, e2::Viewpoints2
 		}
 	}
 
-	debugDraw();
+	//debugDraw();
 
 }
 

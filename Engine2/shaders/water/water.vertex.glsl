@@ -50,6 +50,7 @@ void main()
 	//wh = wh * wd;
 
 	waterPosition.y -= wh * 0.24;
+	waterPosition.y += 0.1;
 
 	fragmentNormal = sampleWaterNormal(vertexWorld.xz, time);
 
