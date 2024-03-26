@@ -77,6 +77,8 @@ namespace e2
 
 		e2::DirtyParameter<e2::ITexture*> reflectionHdr;
 
+		e2::DirtyParameter<e2::ITexture*> visibilityMasks[2];
+
 
 	};
 

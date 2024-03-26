@@ -96,6 +96,9 @@ void e2::Session::tick(double seconds)
 
 	for (e2::MeshProxy* proxy : m_meshProxies)
 	{
+		if (!proxy->enabled())
+			continue;
+
 		if (proxy->modelMatrixDirty[frameIndex])
 		{
 			proxy->modelMatrixDirty[frameIndex] = false;
@@ -148,14 +151,6 @@ void e2::Session::destroyWorld(e2::World* world)
 
 uint32_t e2::Session::registerMeshProxy(e2::MeshProxy* proxy)
 {
-	if (m_meshProxies.size() >= e2::maxNumMeshProxies)
-	{
-		LogError("maxNumMeshProxies reached");
-		return UINT32_MAX;
-	}
-
-	m_meshProxies.insert(proxy);
-
 	for (uint8_t i = 0; i < proxy->asset->submeshCount(); i++)
 	{
 		e2::ShaderModel* shaderModel = proxy->materialProxies[i]->asset->model();
@@ -179,8 +174,6 @@ void e2::Session::unregisterMeshProxy(e2::MeshProxy* proxy)
 
 		m_submeshIndex[layer].erase({ proxy, i });
 	}
-
-	m_meshProxies.erase(proxy);
 }
 
 

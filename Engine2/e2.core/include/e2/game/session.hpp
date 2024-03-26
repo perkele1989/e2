@@ -102,6 +102,8 @@ namespace e2
 		/** Buffers for skin matrices (one per frame index) */
 		e2::Pair<e2::IDataBuffer*> m_skinBuffers{ nullptr };
 
+		friend MeshProxy;
+
 		/** All the registered mesh proxies */
 		std::unordered_set<e2::MeshProxy*> m_meshProxies;
 

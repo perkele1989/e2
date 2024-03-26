@@ -29,7 +29,7 @@ in uvec4 vertexIds;
 layout(push_constant) uniform ConstantData
 {
     mat4 mvpMatrix;
-	vec3 visibility;
+	vec4 visibility;
 };
 
 void main()

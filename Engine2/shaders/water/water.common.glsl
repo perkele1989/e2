@@ -9,7 +9,7 @@ layout(set = 2, binding = 0) uniform MaterialData
 } material;
 
 layout(set = 2, binding = 1) uniform texture2D reflectionHdr;
-//layout(set = 2, binding = 3) uniform texture2D visibilityMask;
+layout(set = 2, binding = 2) uniform texture2D visibilityMask;
 // End Set2
 
 
@@ -36,9 +36,8 @@ float sampleWaterDepth(vec2 position)
 {
     float baseHeight = sampleBaseHeight(position);
 
-    float depthCoeff = smoothstep(0.03, 0.39, baseHeight);
+    return 1.0 - step(0.25, baseHeight);
 
-    return 1.0 - depthCoeff;
 }
 
 float sampleWaterHeight(vec2 position, float time)

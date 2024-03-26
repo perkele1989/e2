@@ -47,6 +47,7 @@ void main()
     float wh = sampleWaterHeight(vertexWorld.xz, time);
     float wd = sampleWaterDepth(vertexWorld.xz);
     wh = mix(wh*0.5, wh, wd);
+	//wh = wh * wd;
 
 	waterPosition.y -= wh * 0.24;
 

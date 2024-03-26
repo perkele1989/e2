@@ -6,10 +6,10 @@ out vec4 outColor;
 layout(push_constant) uniform ConstantData
 {
     mat4 mvpMatrix;
-	vec3 visibility;
+	vec4 visibility;
 };
 
 void main()
 {
-	outColor = vec4(visibility, 1.0);
+	outColor = visibility;
 }

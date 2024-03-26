@@ -146,6 +146,8 @@ namespace e2
 
 		e2::StackVector<e2::MeshProxy*, e2::maxNumMeshesPerChunk> forestMeshes;
 
+		bool m_hasWaterTile{};
+
 		float m_ms;
 	};
 
@@ -178,6 +180,8 @@ namespace e2
 		// chunk index in offset coordinates 
 		glm::ivec2 chunkIndex;
 
+		bool hasWaterTile{};
+
 		StreamState streamState{ StreamState::Poked };
 		bool visibilityState{ false };
 		
@@ -205,7 +209,7 @@ namespace e2
 	struct FogOfWarConstants
 	{
 		glm::mat4 mvpMatrix;
-		glm::vec3 visibility;
+		glm::vec4 visibility;
 	};
 
 	struct OutlineConstants
@@ -261,7 +265,7 @@ namespace e2
 		void startStreamingChunk(e2::ChunkState* state);
 
 		/** finalizes a streaming chunk */
-		void endStreamingChunk(glm::ivec2 const& chunkIndex, e2::MeshPtr newMesh, double timeMs);
+		void endStreamingChunk(glm::ivec2 const& chunkIndex, e2::MeshPtr newMesh, double timeMs, bool hasWaterTile);
 
 		/** pops in chunk, no questions asked, self-corrective states and safe to call whenever  */
 		void popInChunk(e2::ChunkState* state);

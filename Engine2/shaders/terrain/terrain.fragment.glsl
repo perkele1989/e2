@@ -116,6 +116,6 @@ void main()
 
 	float gridCoeff2 = smoothstep(0.92, 0.95, fragmentColor.a);
 	gridCoeff2 *= 0.15;
-	outColor.rgb = mix(outColor.rgb, vec3(0.0), gridCoeff2);
+	//outColor.rgb = mix(outColor.rgb, vec3(0.0), gridCoeff2);
 
 }

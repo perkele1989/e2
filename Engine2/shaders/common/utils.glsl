@@ -182,7 +182,7 @@ vec3 sampleFogNormal(vec2 position, float time)
     return normalize(vec3(hR - hL, -eps2 * 0.2, hU - hD));
 }
 
-vec3 undiscovered(float f, vec3 color, vec3 position, vec3 vis, float time)
+vec3 undiscovered(float f,vec3 n, vec3 color, vec3 position, vec3 vis)
 {
     vec3 tint = vec3(250, 187, 107) / 255.0;
     float y = -position.y + f - 0.5;
@@ -198,7 +198,8 @@ vec3 undiscovered(float f, vec3 color, vec3 position, vec3 vis, float time)
     gr = mix(gr, gg, h2);
     vec3 undis = mix(color, gr, h * 0.99);
     
-    vec3 n = sampleFogNormal(position.xz, time);
+    //vec3 n = sampleFogNormal(position.xz, time);
+     //   vec3 n = vec3(0.0, -1.0, 0.0);
 	vec3 l = normalize(vec3(-1.0, -1.0, -1.0));
     vec3 ndotl = vec3(clamp(pow(dot(n, l), 1.2), 0.0, 1.0));
 
@@ -212,7 +213,7 @@ vec3 undiscovered(float f, vec3 color, vec3 position, vec3 vis, float time)
     return mix(undis, color, vis.y);
 }
 
-vec3 outOfSight(float f, vec3 color, vec3 position, vec3 vis, float time) 
+vec3 outOfSight(float f, vec3 n, vec3 color, vec3 position, vec3 vis) 
 {
     vec3 tint = vec3(250, 187, 107) / 255.0;
 
@@ -223,28 +224,29 @@ vec3 outOfSight(float f, vec3 color, vec3 position, vec3 vis, float time)
     float h = 1.0 -smoothstep(0.4, 1.5, y);
     float h2 = 1.0 - smoothstep(-0.1, 0.1, y);
     vec3 grb = color * 0.95;
-    vec3 gra = mix(grb, vec3(desaturate(grb)), 0.7);
+    vec3 gra = mix(grb, vec3(desaturate(grb)), 0.5);
     
-    vec3 gr = mix(gra,gg, 0.858);
+    vec3 gr = mix(gra,gg, 0.758);
     gr = mix(gr, gg, h2*0.9);
     vec3 undis = mix(color, gr, h * 0.99);
     
-    vec3 n = sampleFogNormal(position.xz, time);
+    //vec3 n = sampleFogNormal(position.xz, time);
+    //vec3 n = vec3(0.0, -1.0, 0.0);
 	vec3 l = normalize(vec3(-1.0, -1.0, -1.0));
     vec3 ndotl = vec3(clamp(pow(dot(n, l), 2.2), 0.0, 1.0));
-    //return ndotl;
 
     undis += ndotl * tint * 0.06;
 
-    return mix(undis, color, vis.y*0.8);
+    return mix(undis, color, vis.y*1.0);
 }
 
 vec3 fogOfWar(vec3 color, vec3 position, vec3 vis, float time)
 {
     float f = sampleFogHeight(position.xz, time);
+    vec3 fn = sampleFogNormal(position.xz, time);
 	
-    vec3 oos = outOfSight(f, color, position, vis, time);
-    vec3 und = undiscovered(f, color, position, vis, time);
+    vec3 oos = outOfSight(f, fn, color, position, vis);
+    vec3 und = undiscovered(f, fn, color, position, vis);
     vec3 fow = mix(und, oos, vis.x);
 
     return fow;

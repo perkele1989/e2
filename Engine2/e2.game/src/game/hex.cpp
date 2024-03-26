@@ -859,7 +859,7 @@ void e2::HexGrid::calculateFeaturesAndWater(glm::vec2 const& planarCoords, float
 				outFlags |= TileFlags::FeatureMountains;
 		}
 	}
-	else if (baseHeight > 0.45f)
+	else if (baseHeight > 0.25f)
 	{
 		outFlags |= TileFlags::WaterShallow;
 	}
@@ -1314,6 +1314,10 @@ void e2::HexGrid::invalidateFogOfWarRenderTarget(glm::uvec2 const& newResolution
 
 	m_fogProxy->visibilityMasks[0].set(m_frameData[0].fogOfWarMasks[0]);
 	m_fogProxy->visibilityMasks[1].set(m_frameData[1].fogOfWarMasks[0]);
+
+	m_waterProxy->visibilityMasks[0].set(m_frameData[0].fogOfWarMasks[0]);
+	m_waterProxy->visibilityMasks[1].set(m_frameData[1].fogOfWarMasks[0]);
+
 	//m_waterProxy->visibilityMask.set(m_fogOfWarMask[0]);
 	//m_terrainProxy->visibilityMask.set(m_fogOfWarMask[0]);
 
@@ -1612,6 +1616,7 @@ void e2::HexGrid::renderFogOfWar()
 				fogOfWarConstants.visibility.x = 1.0;
 				fogOfWarConstants.visibility.y = m_tileVisibility[finder->second] > 0 ? 1.0 : 0.0;
 				fogOfWarConstants.visibility.z =  spooky;
+				fogOfWarConstants.visibility.w = m_tiles[finder->second].getWater() == TileFlags::WaterDeep ? 1.0 : 0.0;
 
 
 				buff->pushConstants(m_fogOfWarPipelineLayout, 0, sizeof(e2::FogOfWarConstants), reinterpret_cast<uint8_t*>(&fogOfWarConstants));
@@ -2150,6 +2155,8 @@ bool e2::ChunkLoadTask::execute()
 	HexShaderData shaderData;
 	shaderData.chunkOffset = { chunkOffset.x, chunkOffset.z };
 
+	
+
 	for (int32_t y = 0; y < e2::hexChunkResolution; y++)
 	{
 		for (int32_t x = 0; x < e2::hexChunkResolution; x++)
@@ -2170,6 +2177,11 @@ bool e2::ChunkLoadTask::execute()
 				newChunkMesh->addMeshWithShaderFunction(m_dynaHex, transform, ::hexShader, &shaderData);
 			}
 
+			if ((shaderData.tileData.flags & e2::TileFlags::WaterMask) != e2::TileFlags::WaterNone)
+			{
+				m_hasWaterTile = true;
+			}
+
 		}
 	}
 	//newChunkMesh->calculateFaceNormals();
@@ -2186,7 +2198,7 @@ bool e2::ChunkLoadTask::execute()
 
 bool e2::ChunkLoadTask::finalize()
 {
-	m_grid->endStreamingChunk(m_chunkIndex, m_generatedMesh, m_ms);
+	m_grid->endStreamingChunk(m_chunkIndex, m_generatedMesh, m_ms, m_hasWaterTile);
 	return true;
 }
 
@@ -2211,7 +2223,7 @@ void e2::HexGrid::popInChunk(e2::ChunkState* state)
 		refreshChunkMeshes(state);
 	}
 
-	if (!state->waterProxy)
+	if (!state->waterProxy && state->hasWaterTile)
 	{
 		e2::MeshProxyConfiguration waterConf;
 		waterConf.mesh = m_waterChunk;
@@ -2348,7 +2360,7 @@ void e2::HexGrid::startStreamingChunk(e2::ChunkState* state)
 
 }
 
-void e2::HexGrid::endStreamingChunk(glm::ivec2 const& chunkIndex, e2::MeshPtr newMesh, double timeMs)
+void e2::HexGrid::endStreamingChunk(glm::ivec2 const& chunkIndex, e2::MeshPtr newMesh, double timeMs, bool hasWaterTile)
 {
 	// If the chunkstate is no longer valid, throw away the work silently
 	auto finder = m_chunkIndex.find(chunkIndex);
@@ -2365,6 +2377,7 @@ void e2::HexGrid::endStreamingChunk(glm::ivec2 const& chunkIndex, e2::MeshPtr ne
 	e2::ChunkState* chunk = m_chunkIndex[chunkIndex];
 	chunk->mesh = newMesh;
 	chunk->task = nullptr;
+	chunk->hasWaterTile = hasWaterTile;
 	chunk->streamState = StreamState::Ready;
 
 	m_streamingChunks.erase(chunk);

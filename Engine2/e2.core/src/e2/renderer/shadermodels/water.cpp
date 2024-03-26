@@ -49,6 +49,7 @@ void e2::WaterModel::postConstruct(e2::Context* ctx)
 	setLayoutCreateInfo.bindings = {
 		{ e2::DescriptorBindingType::UniformBuffer , 1}, // ubo params
 		{ e2::DescriptorBindingType::Texture, 1}, // reflection cubemap
+		{ e2::DescriptorBindingType::Texture, 2}, // visibility
 	};
 	m_descriptorSetLayout = renderContext()->createDescriptorSetLayout(setLayoutCreateInfo);
 
@@ -268,6 +269,13 @@ void e2::WaterProxy::invalidate(uint8_t frameIndex)
 		e2::ITexture* tex = reflectionHdr.data();
 		if (tex)
 			sets[frameIndex]->writeTexture(1, tex);
+	}
+
+	if (visibilityMasks[frameIndex].invalidate(frameIndex))
+	{
+		e2::ITexture* tex = visibilityMasks[frameIndex].data();
+		if (tex)
+			sets[frameIndex]->writeTexture(2, tex);
 	}
 
 }

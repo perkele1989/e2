@@ -28,6 +28,8 @@ e2::MeshProxy::MeshProxy(e2::Session* inSession, e2::MeshProxyConfiguration cons
 	: session{ inSession }
 	, asset(config.mesh)
 {
+	session->m_meshProxies.insert(this);
+
 	if (config.materials.size() > 0)
 	{
 		materialProxies = config.materials;
@@ -42,18 +44,16 @@ e2::MeshProxy::MeshProxy(e2::Session* inSession, e2::MeshProxyConfiguration cons
 	}
 
 	modelMatrix = glm::mat4(1.0f);
-
-
+	
 	invalidatePipeline();
+	enable();
 
 }
 
 e2::MeshProxy::~MeshProxy()
 {
-	if (id != UINT32_MAX)
-	{
-		session->unregisterMeshProxy(this);
-	}
+	disable();
+	session->m_meshProxies.erase(this);
 }
 
 bool e2::MeshProxy::enabled()
@@ -78,13 +78,14 @@ void e2::MeshProxy::disable()
 	id = UINT32_MAX;
 }
 
+// this is never called for disabled proxies
 void e2::MeshProxy::invalidatePipeline()
 {
-	if (id != UINT32_MAX)
-	{
-		session->unregisterMeshProxy(this);
-		id = UINT32_MAX;
-	}
+	bool wasEnabled = enabled();
+
+
+	if (wasEnabled)
+		disable();
 
 	pipelineLayouts.resize(asset->submeshCount());
 	pipelines.resize(asset->submeshCount());
@@ -96,7 +97,8 @@ void e2::MeshProxy::invalidatePipeline()
 		pipelines[submeshIndex] = model->getOrCreatePipeline(this, submeshIndex, skinProxy ? RendererFlags::Skin : e2::RendererFlags::None);
 	}
 
-	id = session->registerMeshProxy(this);
+	if (wasEnabled)
+		enable();
 }
 
 e2::Engine* e2::MeshProxy::engine()
