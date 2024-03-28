@@ -206,11 +206,7 @@ namespace e2
 		virtual void onTurnStart() override;
 		virtual void onTurnEnd() override;
 
-
-
 	protected:
-
-
 
 		uint32_t m_attackPoints{};
 		uint32_t m_attackPointsLeft{};
@@ -225,6 +221,83 @@ namespace e2
 		e2::AnimationPose* m_hitPose{};
 		e2::AnimationPose* m_diePose{};
 
+	};
+
+	/** @tags(arena, arenaSize=1024) */
+	class Tank : public e2::MilitaryUnit
+	{
+		ObjectDeclaration();
+	public:
+		Tank(e2::GameContext* ctx, glm::ivec2 const& tile, uint8_t empire);
+		virtual ~Tank();
+		virtual void initialize() override;
+
+		virtual void updateAnimation(double seconds) override;
+		virtual void drawUI(e2::UIContext* ctx) override;
+
+		virtual void onBeginMove();
+		virtual void onEndMove();
+
+		virtual void onHit(e2::GameEntity* instigator, float dmg) override;
+		virtual void kill() override;
+
+		virtual void updateEntityAction(double seconds);
+		virtual void onEntityTargetChanged(e2::Hex const& location) override;
+		virtual void onEntityTargetClicked() override;
+
+		virtual void onTurnStart() override;
+		virtual void onTurnEnd() override;
+
+	protected:
+
+		uint32_t m_attackPoints{};
+		uint32_t m_attackPointsLeft{};
+
+		e2::GameUnit* m_targetUnit{};
+		e2::Moment m_fireBegin;
+		bool m_didFire{};
+
+		e2::AnimationPose* m_idlePose{};
+		e2::AnimationPose* m_drivePose{};
+		e2::AnimationPose* m_firePose{};
+	};
+
+	/** @tags(arena, arenaSize=1024) */
+	class CombatBoat : public e2::MilitaryUnit
+	{
+		ObjectDeclaration();
+	public:
+		CombatBoat(e2::GameContext* ctx, glm::ivec2 const& tile, uint8_t empire);
+		virtual ~CombatBoat();
+		virtual void initialize() override;
+
+		virtual void updateAnimation(double seconds) override;
+		virtual void drawUI(e2::UIContext* ctx) override;
+
+		virtual void onBeginMove();
+		virtual void onEndMove();
+
+		virtual void onHit(e2::GameEntity* instigator, float dmg) override;
+		virtual void kill() override;
+
+		virtual void updateEntityAction(double seconds);
+		virtual void onEntityTargetChanged(e2::Hex const& location) override;
+		virtual void onEntityTargetClicked() override;
+
+		virtual void onTurnStart() override;
+		virtual void onTurnEnd() override;
+
+	protected:
+
+		uint32_t m_attackPoints{};
+		uint32_t m_attackPointsLeft{};
+
+		e2::GameUnit* m_targetUnit{};
+		e2::Moment m_fireBegin;
+		bool m_didFire{};
+
+		e2::AnimationPose* m_idlePose{};
+		e2::AnimationPose* m_drivePose{};
 	};
 }
 

@@ -12,7 +12,7 @@ namespace e2
 	{
 		Land = 0b0000'0001,
 		WaterShallow = 0b0000'0010,
-		WaterDeep = 0b0000'0010,
+		WaterDeep = 0b0000'0100,
 		Mountain = 0b0000'1000,
 	};
 

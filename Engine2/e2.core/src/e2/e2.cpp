@@ -66,7 +66,8 @@ void e2::Engine::run(e2::Application* app)
 	double deltaTime{};
 	m_running = true;
 
-	constexpr double targetMsPerFrame = 6.944444444444444;
+	//constexpr double targetMsPerFrame = 6.944444444444444; // 144 fps
+	constexpr double targetMsPerFrame = 3.33333333333; // 300 fps
 
 
 	m_application->initialize();
@@ -76,7 +77,7 @@ void e2::Engine::run(e2::Application* app)
 	while (m_running)
 	{
 
-		if (lastFrameStart.durationSince().milliseconds() >= targetMsPerFrame)
+		//if (lastFrameStart.durationSince().milliseconds() >= targetMsPerFrame)
 		{
 			deltaTime = lastFrameStart.durationSince().seconds();
 			lastFrameStart = e2::timeNow();

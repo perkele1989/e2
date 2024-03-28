@@ -74,6 +74,19 @@ void e2::Game::initialize()
 
 
 
+
+
+	am->prescribeALJ(alj, "assets/vehicles/SK_Boat.e2a");
+	am->prescribeALJ(alj, "assets/vehicles/SM_Boat.e2a");
+	am->prescribeALJ(alj, "assets/vehicles/A_BoatIdle.e2a");
+	am->prescribeALJ(alj, "assets/vehicles/A_BoatDriving.e2a");
+
+	am->prescribeALJ(alj, "assets/vehicles/SK_Tank.e2a");
+	am->prescribeALJ(alj, "assets/vehicles/SM_Tank.e2a");
+	am->prescribeALJ(alj, "assets/vehicles/A_Tank_Idle.e2a");
+	am->prescribeALJ(alj, "assets/vehicles/A_Tank_Moving.e2a");
+	am->prescribeALJ(alj, "assets/vehicles/A_Tank_Fire.e2a");
+
 	am->queueWaitALJ(alj);
 	m_uiTextureResources = am->get("assets/UI_ResourceIcons.e2a").cast<e2::Texture2D>();
 	m_cursorMesh = am->get("assets/environment/trees/SM_PalmTree001.e2a").cast<e2::Mesh>();
@@ -83,11 +96,16 @@ void e2::Game::initialize()
 
 	m_session->renderer()->setEnvironment(m_irradianceMap->handle(), m_radianceMap->handle());
 
+	m_entityMeshes.resize(size_t(e2::EntityType::Count));
+	m_entitySkeletons.resize(size_t(e2::EntityType::Count));
 	for (uint8_t i = 0; i < size_t(e2::EntityType::Count); i++)
 	{
 		m_entityMeshes[i] = am->get("assets/characters/SM_Soldier.e2a").cast<e2::Mesh>();
 		m_entitySkeletons[i] = am->get("assets/characters/SK_Soldier.e2a").cast<e2::Skeleton>();
 	}
+
+	m_animationIndex.resize(uint8_t(e2::AnimationIndex::Count));
+
 	for (uint8_t i = 0; i < (uint8_t)e2::AnimationIndex::Count; i++)
 	{
 		m_animationIndex[i] = am->get("assets/characters/A_SoldierDance.e2a").cast<e2::Animation>();
@@ -106,6 +124,12 @@ void e2::Game::initialize()
 	m_entityMeshes[size_t(e2::EntityType::Unit_Grunt)] = am->get("assets/characters/SM_Soldier.e2a").cast<e2::Mesh>();
 	m_entitySkeletons[size_t(e2::EntityType::Unit_Grunt)] = am->get("assets/characters/SK_Soldier.e2a").cast<e2::Skeleton>();
 
+	m_entityMeshes[size_t(e2::EntityType::Unit_AssaultCraft)] = am->get("assets/vehicles/SM_Boat.e2a").cast<e2::Mesh>();
+	m_entitySkeletons[size_t(e2::EntityType::Unit_AssaultCraft)] = am->get("assets/vehicles/SK_Boat.e2a").cast<e2::Skeleton>();
+
+	m_entityMeshes[size_t(e2::EntityType::Unit_Tank)] = am->get("assets/vehicles/SM_Tank.e2a").cast<e2::Mesh>();
+	m_entitySkeletons[size_t(e2::EntityType::Unit_Tank)] = am->get("assets/vehicles/SK_Tank.e2a").cast<e2::Skeleton>();
+
 	m_entityMeshes[size_t(e2::EntityType::Unit_Engineer)] = am->get("assets/characters/SM_Engineer.e2a").cast<e2::Mesh>();
 	m_entitySkeletons[size_t(e2::EntityType::Unit_Engineer)] = am->get("assets/characters/SK_Engineer.e2a").cast<e2::Skeleton>();
 
@@ -120,6 +144,15 @@ void e2::Game::initialize()
 	m_animationIndex[(uint8_t)e2::AnimationIndex::EngineerBuild] = am->get("assets/characters/A_EngineerBuild.e2a").cast<e2::Animation>();
 	m_animationIndex[(uint8_t)e2::AnimationIndex::EngineerDie] = am->get("assets/characters/A_EngineerDie.e2a").cast<e2::Animation>();
 	m_animationIndex[(uint8_t)e2::AnimationIndex::EngineerRun] = am->get("assets/characters/A_EngineerRun.e2a").cast<e2::Animation>();
+
+
+	m_animationIndex[(uint8_t)e2::AnimationIndex::CombatBoatDrive] = am->get("assets/vehicles/A_BoatDriving.e2a").cast<e2::Animation>();
+	m_animationIndex[(uint8_t)e2::AnimationIndex::CombatBoatIdle] = am->get("assets/vehicles/A_BoatIdle.e2a").cast<e2::Animation>();
+
+	m_animationIndex[(uint8_t)e2::AnimationIndex::TankDrive] = am->get("assets/vehicles/A_Tank_Moving.e2a").cast<e2::Animation>();
+	m_animationIndex[(uint8_t)e2::AnimationIndex::TankFire] = am->get("assets/vehicles/A_Tank_Fire.e2a").cast<e2::Animation>();
+	m_animationIndex[(uint8_t)e2::AnimationIndex::TankIdle] = am->get("assets/vehicles/A_Tank_Idle.e2a").cast<e2::Animation>();
+
 
 	m_empires.resize(e2::maxNumEmpires);
 	for (EmpireId i = 0; uint64_t(i) < e2::maxNumEmpires - 1; i++)
@@ -200,6 +233,8 @@ void e2::Game::updateGame(double seconds)
 	m_hexChanged = newHex != m_prevCursorHex;
 	m_prevCursorHex = m_cursorHex;
 	m_cursorHex = newHex;
+
+	m_cursorTile = m_hexGrid->getTileData(m_cursorHex.offsetCoords());
 
 	constexpr float invisibleChunkLifetime = 3.0f;
 
@@ -699,7 +734,10 @@ void e2::Game::updateTurnLocal()
 	{
 		if (kb.state(e2::Key::LeftShift))
 		{
-			spawnUnit<e2::Grunt>(m_cursorHex, 0);
+			if(m_cursorTile && m_cursorTile->getWater() == TileFlags::WaterNone)
+				spawnUnit<e2::Tank>(m_cursorHex, 0);
+			else 
+				spawnUnit<e2::CombatBoat>(m_cursorHex, 0);
 			return;
 		}
 		e2::GameUnit* unitAtHex = nullptr;
@@ -826,8 +864,9 @@ void e2::Game::onTurnEndingEnd()
 void e2::Game::updateUnitMove()
 {
 	// how many hexes per second it moves
-	constexpr float unitMoveSpeed = 2.4f;
-	m_unitMoveDelta += m_timeDelta * unitMoveSpeed;
+	//constexpr float unitMoveSpeed = 2.4f;
+	
+	m_unitMoveDelta += m_timeDelta * m_selectedUnit->moveSpeed;
 
 	while (m_unitMoveDelta > 1.0f)
 	{

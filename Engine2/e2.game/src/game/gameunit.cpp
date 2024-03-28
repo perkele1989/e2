@@ -60,7 +60,7 @@ void e2::GameEntity::updateAnimation(double seconds)
 
 	if (m_proxy)
 	{
-		m_proxy->modelMatrix = glm::translate(glm::mat4(1.0), m_position);
+		m_proxy->modelMatrix = glm::translate(glm::mat4(1.0), m_position + glm::vec3(e2::worldUp()) * m_heightOffset);
 		m_proxy->modelMatrix = m_proxy->modelMatrix * glm::toMat4(m_rotation) * glm::scale(glm::mat4(1.0f), m_modelScale);
 		m_proxy->modelMatrixDirty = true;
 	}
@@ -174,6 +174,9 @@ void e2::GameEntity::initialize()
 	m_mesh = game()->getEntityMesh(entityType);
 	m_skeleton = game()->getEntitySkeleton(entityType);
 
+	m_targetRotation = glm::angleAxis(0.0f, glm::vec3(e2::worldUp()));
+	m_rotation = m_targetRotation;
+
 	buildProxy();
 
 	m_mainPose = e2::create<e2::Pose>(m_skeleton);
@@ -257,7 +260,9 @@ void e2::GameEntity::buildProxy()
 		proxyConf.mesh = m_mesh;
 
 		m_proxy = e2::create<e2::MeshProxy>(gameSession(), proxyConf);
-		m_proxy->modelMatrix = glm::translate(glm::identity<glm::mat4>(), m_position);
+		m_proxy->modelMatrix = glm::translate(glm::mat4(1.0), m_position + glm::vec3(e2::worldUp()) * m_heightOffset);
+		m_proxy->modelMatrix = m_proxy->modelMatrix * glm::toMat4(m_rotation) * glm::scale(glm::mat4(1.0f), m_modelScale);
+
 		m_proxy->modelMatrixDirty = true;
 	}
 

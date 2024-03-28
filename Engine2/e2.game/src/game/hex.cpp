@@ -887,7 +887,7 @@ e2::MeshPtr e2::HexGrid::getForestMeshForFlags(e2::TileFlags flags)
 			return m_treeMesh[2];
 			break;
 		case TileFlags::WoodAbundance4:
-			return m_treeMesh[3];
+			return m_treeMesh[2]; // we skip 3 because its too THICCCCC
 			break;
 		}
 	}
@@ -2399,7 +2399,7 @@ bool e2::TileData::isPassable(PassableFlags passableFlags)
 
 	bool waterLevelLand = (flags & e2::TileFlags::WaterMask) == e2::TileFlags::WaterNone;
 	bool waterLevelShallow = (flags & e2::TileFlags::WaterMask) == e2::TileFlags::WaterShallow;
-	bool waterLevelDeep = (flags & e2::TileFlags::WaterMask) == e2::TileFlags::WaterShallow;
+	bool waterLevelDeep = (flags & e2::TileFlags::WaterMask) == e2::TileFlags::WaterDeep;
 	bool isMountain = (flags & e2::TileFlags::FeatureMountains) != e2::TileFlags::FeatureNone;
 
 	if (waterLevelLand)

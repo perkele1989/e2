@@ -1,0 +1,33 @@
+unit_type 0
+unit_name Ranger
+
+unit_upgrade 0
+	modifier att+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+XP curve 
+
+level_name 1 
+level 1 
+level 1 
+level 1 
+level 1 
+level 1 
+level 1 
+level 1 
+level 1 
+level 1 
+level 1 

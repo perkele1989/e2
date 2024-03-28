@@ -581,6 +581,10 @@ namespace e2
 
 		DataType& operator[](size_t index)
 		{
+			if (index >= m_size)
+			{
+				LogError("out of bounds");
+			}
 			return m_data[index];
 		}
 

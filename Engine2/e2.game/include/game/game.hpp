@@ -60,6 +60,13 @@ namespace e2
 		EngineerDie,
 		EngineerBuild,
 
+		CombatBoatIdle,
+		CombatBoatDrive,
+
+		TankIdle,
+		TankDrive,
+		TankFire,
+
 		Count
 	};
 
@@ -253,6 +260,7 @@ namespace e2
 		glm::vec2 m_cursorPlane; // mouse position as projected on to the world xz plane
 		e2::Hex m_cursorHex; // mouse position as projected upon a hex
 		e2::Hex m_prevCursorHex;
+		e2::TileData* m_cursorTile{};
 		bool m_hexChanged{};
 		e2::MeshPtr m_cursorMesh;
 

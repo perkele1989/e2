@@ -69,8 +69,8 @@ e2::IRenderContext_Vk::IRenderContext_Vk(e2::Context* engineContext, e2::Name ap
 	createDevice();
 
 	// null initialize the sampler cache
-	m_samplerCache.resize(8);
-	for (uint8_t i = 0; i < 8; i++)
+	m_samplerCache.resize(16);
+	for (uint8_t i = 0; i < 16; i++)
 	{
 		m_samplerCache[i] = nullptr;
 	}

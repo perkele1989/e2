@@ -64,7 +64,7 @@ namespace e2
 		Unit_AircraftCarrier, // transport for air units 
 
 		// Primary buildings
-		Structure_MainOperatingBase = 0,
+		Structure_MainOperatingBase,
 		Structure_ForwardOperatingBase,
 
 		// Unit builders
@@ -145,6 +145,8 @@ namespace e2
 		glm::quat m_rotation{};
 		glm::quat m_targetRotation{};
 		glm::vec3 m_position{};
+
+		float m_heightOffset{};
 
 		glm::vec3 m_modelScale{ glm::vec3(1.0f, -1.0f, -1.0f) / 200.0f };
 		e2::MeshPtr m_mesh;
@@ -233,7 +235,7 @@ namespace e2
 		float health{ 100.0f };
 		int32_t moveRange{ 3 };
 		int32_t movePointsLeft{ 3 };
-
+		float moveSpeed{ 2.4f };
 
 		virtual void kill();
 
