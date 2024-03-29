@@ -710,19 +710,26 @@ void e2::Game::beginStartGame()
 {
 	m_haveBegunStart = true;
 	m_beginStartTime = e2::timeNow();
-	findStartLocation();
+	do {} while (!findStartLocation(e2::randomIvec2(glm::ivec2(-1024), glm::ivec2(1024)), { 1024, 1024 }, m_startLocation, false));
 	pauseWorldStreaming();
 	forceStreamLocation(e2::Hex(m_startLocation).planarCoords());
 }
 
-void e2::Game::findStartLocation()
+bool e2::Game::findStartLocation(glm::ivec2 const& offset, glm::ivec2 const& rangeSize, glm::ivec2 &outLocation, bool forAi)
 {
+	glm::ivec2 returner;
+	int32_t numTries = 0;
+
 	// plop us down somehwere nice 
 	std::unordered_set<glm::ivec2> attemptedStartLocations;
 	bool foundStartLocation{};
 	while (!foundStartLocation)
 	{
-		glm::ivec2 startLocation = e2::randomIvec2({ -512, -512 }, { 512, 512 });
+		glm::ivec2 rangeStart = offset - (rangeSize / 2);
+		glm::ivec2 rangeEnd = offset + (rangeSize / 2);
+		glm::ivec2 startLocation = e2::randomIvec2(rangeStart, rangeEnd);
+
+		//glm::ivec2 startLocation = e2::randomIvec2({ -512, -512 }, { 512, 512 });
 		if (attemptedStartLocations.contains(startLocation))
 			continue;
 
@@ -741,11 +748,22 @@ void e2::Game::findStartLocation()
 		if (numWalkableHexes < 64)
 			continue;
 
+		if (forAi)
+		{
 
-		m_startLocation = startLocation;
+		}
+
+		returner = startLocation;
 		foundStartLocation = true;
+
+		if (numTries++ >= 20)
+			break;
 	}
 
+	if(foundStartLocation)
+		outLocation = returner;
+
+	return foundStartLocation;
 }
 
 void e2::Game::startGame()
@@ -879,13 +897,20 @@ void e2::Game::updateTurnLocal()
 		e2::GameUnit* unitAtHex = nullptr;
 		e2::GameStructure* structureAtHex = nullptr;
 
+		
 		auto finder = m_unitIndex.find(m_cursorHex.offsetCoords());
 		if (finder != m_unitIndex.end())
 			unitAtHex = finder->second;
 		
+		if (unitAtHex && unitAtHex->empireId != m_localEmpireId)
+			unitAtHex = nullptr;
+
 		auto finder2 = m_structureIndex.find(m_cursorHex.offsetCoords());
 		if (finder2 != m_structureIndex.end())
 			structureAtHex = finder2->second;
+
+		if (structureAtHex && structureAtHex->empireId != m_localEmpireId)
+			structureAtHex = nullptr;
 
 		if (unitAtHex && unitAtHex == m_selectedUnit && structureAtHex)
 			selectStructure(structureAtHex);
@@ -947,6 +972,10 @@ void e2::Game::onStartOfTurn()
 	// ignore visibility for AI since we dont want to see what theyre up to 
 	if (m_empireTurn == 0)
 	{
+		while (m_undiscoveredEmpires.size() < 3)
+			spawnAIEmpire();
+
+
 		// clear and calculate visibility
 		m_hexGrid->clearVisibility();
 
@@ -1475,6 +1504,7 @@ e2::EmpireId e2::Game::spawnEmpire()
 		if (!m_empires[i])
 		{
 			m_empires[i] = e2::create<e2::GameEmpire>(this, i);
+			m_undiscoveredEmpires.insert(m_empires[i]);
 			return i;
 		}
 	}
@@ -1488,8 +1518,66 @@ void e2::Game::destroyEmpire(EmpireId empireId)
 	if (!m_empires[empireId])
 		return;
 
+	m_aiEmpires.erase(m_empires[empireId]);
+	m_discoveredEmpires.erase(m_empires[empireId]);
+	m_undiscoveredEmpires.erase(m_empires[empireId]);
+
 	e2::destroy(m_empires[empireId]);
 	m_empires[empireId] = nullptr;
+}
+
+void e2::Game::spawnAIEmpire()
+{
+	e2::EmpireId newEmpireId = spawnEmpire();
+	if (newEmpireId == 0)
+		return;
+
+	e2::GameEmpire* newEmpire = m_empires[newEmpireId];
+	m_aiEmpires.insert(newEmpire);
+
+
+	e2::Aabb2D worldBounds = m_hexGrid->worldBounds();
+	bool foundLocation = false;
+	glm::ivec2 aiStartLocation;
+	do
+	{
+		glm::vec2 random = e2::randomVec2(worldBounds.min, worldBounds.max);
+		float distLeft = glm::abs(worldBounds.min.x - random.x);
+		float distRight = glm::abs(worldBounds.max.x - random.x);
+		float distUp = glm::abs(worldBounds.min.y - random.y);
+		float distDown = glm::abs(worldBounds.max.y - random.y);
+		glm::vec2 offsetDir{};
+
+		if (distLeft < distRight && distLeft < distUp && distLeft < distDown)
+		{
+			random.x = worldBounds.min.x;
+			offsetDir = { -1.0f, 0.0f };
+		}
+		else if (distRight < distLeft && distRight < distUp && distRight < distDown)
+		{
+			random.x = worldBounds.max.x;
+			offsetDir = { 1.0f, 0.0f };
+		}
+		else if (distUp < distRight && distUp < distLeft && distUp < distDown)
+		{
+			random.y = worldBounds.min.y;
+			offsetDir = { 0.0f, -1.0f };
+		}
+		else
+		{
+			random.y = worldBounds.max.y;
+			offsetDir = { 0.0f, 1.0f };
+		}
+
+		glm::vec2 offsetPoint = random + offsetDir * 128.0f;
+
+		foundLocation = findStartLocation(e2::Hex(offsetPoint).offsetCoords(), { 128, 128 }, aiStartLocation, true);
+	} while (!foundLocation);
+
+
+	spawnStructure<e2::MainOperatingBase>(aiStartLocation, newEmpireId);
+	
+
 }
 
 void e2::Game::deselect()
@@ -1869,6 +1957,13 @@ e2::SkeletonPtr e2::Game::getEntitySkeleton(e2::EntityType  type)
 	return m_entitySkeletons[uint8_t(type)];
 }
 
+
+void e2::Game::discoverEmpire(EmpireId empireId)
+{
+	// @todo optimize
+	m_discoveredEmpires.insert(m_empires[empireId]);
+	m_undiscoveredEmpires.erase(m_empires[empireId]);
+}
 
 void e2::Game::updateAltCamera(double seconds)
 {

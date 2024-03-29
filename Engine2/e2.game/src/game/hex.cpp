@@ -908,6 +908,12 @@ e2::TileData e2::HexGrid::calculateTileDataForHex(Hex const& hex)
 
 	newTileData.forestMesh = getForestMeshForFlags(newTileData.flags);
 
+	e2::GameStructure* existingStructure = game()->structureAtHex(hex.offsetCoords());
+	if (existingStructure)
+	{
+		newTileData.empireId = existingStructure->empireId;
+	}
+
 	return newTileData;
 }
 
@@ -962,6 +968,11 @@ size_t e2::HexGrid::discover(Hex hex)
 
 	flagChunkOutdated(chunkIndex);
 	
+	if (tileData->empireId < 255)
+	{
+		game()->discoverEmpire(tileData->empireId);
+	}
+
 
 	return m_tiles.size() - 1;
 }

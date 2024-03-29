@@ -137,7 +137,7 @@ namespace e2
 		void resumeWorldStreaming();
 		void forceStreamLocation(glm::vec2 const& planarCoords);
 		void beginStartGame();
-		void findStartLocation();
+		bool findStartLocation(glm::ivec2 const& offset, glm::ivec2 const& rangeSize, glm::ivec2 &outLocation, bool forAi);
 		void startGame();
 
 
@@ -223,6 +223,7 @@ namespace e2
 			return m_timeDelta;
 		}
 
+		void discoverEmpire(EmpireId empireId);
 	protected:
 
 		e2::MeshPtr m_dummyMesh;
@@ -293,6 +294,8 @@ namespace e2
 		EmpireId spawnEmpire();
 		void destroyEmpire(EmpireId empireId);
 
+		void spawnAIEmpire();
+
 		e2::GameEmpire* localEmpire()
 		{
 			return m_localEmpire;
@@ -302,6 +305,10 @@ namespace e2
 		e2::EmpireId m_localEmpireId{};
 		e2::GameEmpire* m_localEmpire{};
 		e2::StackVector<e2::GameEmpire*, e2::maxNumEmpires> m_empires;
+		std::unordered_set<e2::GameEmpire*> m_aiEmpires;
+
+		std::unordered_set<e2::GameEmpire*> m_discoveredEmpires;
+		std::unordered_set<e2::GameEmpire*> m_undiscoveredEmpires;
 
 	public:
 
@@ -395,6 +402,12 @@ namespace e2
 			m_resources.fiscalStreams.insert(newStructure);
 
 			removeWood(location);
+
+			e2::TileData* existingData = m_hexGrid->getTileData(coords);
+			if (existingData)
+			{
+				existingData->empireId = empire;
+			}
 
 			return newStructure;
 		}
