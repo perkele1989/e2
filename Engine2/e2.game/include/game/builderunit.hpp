@@ -55,6 +55,38 @@ namespace e2
 		uint32_t m_buildPointsLeft = 1;
 		uint32_t m_buildPoints = 1;
 	};
+
+
+	/** @tags(arena, arenaSize=4096)*/
+	class MobileMOB : public e2::GameUnit
+	{
+		ObjectDeclaration();
+	public:
+		MobileMOB(e2::GameContext* ctx, glm::ivec2 const& tile, uint8_t empire);
+		virtual ~MobileMOB();
+		virtual void updateAnimation(double seconds) override;
+		virtual void drawUI(e2::UIContext* ctx) override;
+
+		virtual void initialize() override;
+
+		virtual void updateEntityAction(double seconds) override;
+
+		virtual void onBeginMove() override;
+		virtual void onEndMove() override;
+
+		virtual void onTurnEnd() override;
+		virtual void onTurnStart() override;
+
+		virtual void onHit(e2::GameEntity* instigator, float dmg) override;
+		virtual void kill() override;
+
+
+	protected:
+		e2::AnimationPose* m_idlePose{};
+		e2::AnimationPose* m_drivePose{};
+
+	};
+
 }
 
 #include "builderunit.generated.hpp"

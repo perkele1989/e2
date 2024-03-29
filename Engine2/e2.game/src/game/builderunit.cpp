@@ -371,3 +371,173 @@ void e2::Engineer::kill()
 
 	playAction(m_diePose, 0.2f, 0.0f);
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+e2::MobileMOB::MobileMOB(e2::GameContext* ctx, glm::ivec2 const& tile, uint8_t empire)
+	: e2::GameUnit(ctx, tile, empire)
+
+{
+	displayName = "Mobile MOB";
+	sightRange = 3;
+	moveRange = 3;
+	movePointsLeft = 3;
+
+	entityType = e2::EntityType::Unit_MobileMOB;
+	//m_modelScale = glm::vec3(1.0f, 1.0f, 1.0f);
+}
+
+e2::MobileMOB::~MobileMOB()
+{
+	if (m_idlePose)
+		e2::destroy(m_idlePose);
+
+	if (m_drivePose)
+		e2::destroy(m_drivePose);
+}
+
+void e2::MobileMOB::updateAnimation(double seconds)
+{
+	E2_BEGIN_SCOPE_CTX(game());
+
+	e2::Hex hex = e2::Hex(tileIndex);
+	e2::Viewpoints2D viewpoints = game()->viewPoints();
+	bool inView = viewpoints.isWithin(hex.planarCoords(), 1.0f);
+
+
+	if (dying)
+	{
+		game()->queueDestroyUnit(this);
+		E2_END_SCOPE_CTX(game());
+		return;
+	}
+
+	if (inView && !m_proxy->enabled())
+		m_proxy->enable();
+
+	if (!inView && m_proxy->enabled())
+		m_proxy->disable();
+
+
+	if (inView)
+	{
+		//m_idlePose->updateAnimation(seconds, false);
+		//m_drivePose->updateAnimation(seconds, false);
+	}
+
+	if (inView)
+		e2::GameUnit::updateAnimation(seconds);
+
+
+	E2_END_SCOPE_CTX(game());
+
+}
+
+void e2::MobileMOB::drawUI(e2::UIContext* ui)
+{
+
+	e2::TileData* tileData = game()->hexGrid()->getTileData(tileIndex);
+	if (!tileData)
+		return;
+
+	e2::TileFlags resource = tileData->getResource();
+
+	ui->beginStackV("test2");
+
+	ui->gameLabel(std::format("**{}**", displayName), 12, e2::UITextAlign::Middle);
+
+	ui->gameLabel(std::format("Movement points left: {}", movePointsLeft), 11);
+
+
+	bool isForested = (tileData->flags & e2::TileFlags::FeatureForest) != e2::TileFlags::FeatureNone;
+	bool hasResource = (tileData->flags & e2::TileFlags::ResourceMask) != e2::TileFlags::ResourceNone;
+	bool hasStructure = game()->structureAtHex(tileIndex);
+	bool canBuild = !hasStructure && !isForested && !hasResource;
+
+	if (canBuild && ui->button("deploy", "Deploy Main Operating Base"))
+	{
+		game()->beginCustomEntityAction();
+	}
+
+	ui->endStackV();
+
+}
+
+void e2::MobileMOB::initialize()
+{
+	e2::GameUnit::initialize();
+	//m_idlePose = e2::create<e2::AnimationPose>(m_skeleton, game()->getAnimationByIndex(AnimationIndex::MobIdle), true);
+	//m_drivePose = e2::create<e2::AnimationPose>(m_skeleton, game()->getAnimationByIndex(AnimationIndex::MobDrive), true);
+
+	//m_currentPose = m_idlePose;
+	//m_oldPose = m_idlePose;
+}
+
+void e2::MobileMOB::updateEntityAction(double seconds)
+{
+	game()->spawnStructure<e2::MainOperatingBase>(e2::Hex(tileIndex), empireId);
+	game()->endCustomEntityAction();
+	game()->destroyUnit(e2::Hex(tileIndex));
+}
+
+void e2::MobileMOB::onBeginMove()
+{
+	//setCurrentPose(m_drivePose, 0.2f);
+}
+
+void e2::MobileMOB::onEndMove()
+{
+	//setCurrentPose(m_idlePose, 0.2f);
+}
+
+void e2::MobileMOB::onTurnEnd()
+{
+	e2::GameUnit::onTurnEnd();
+}
+
+void e2::MobileMOB::onTurnStart()
+{
+	e2::GameUnit::onTurnStart();
+}
+
+void e2::MobileMOB::onHit(e2::GameEntity* instigator, float dmg)
+{
+	e2::GameUnit::onHit(instigator, dmg);
+
+	if (health <= 0.0f)
+	{
+		kill();
+	}
+	//else
+	//{
+	//	playAction(m_hitPose, 0.2f, 0.2f);
+	//}
+
+}
+
+void e2::MobileMOB::kill()
+{
+	e2::GameUnit::kill();
+
+	//playAction(m_diePose, 0.2f, 0.0f);
+}

@@ -11,6 +11,7 @@
 #include "game/mob.hpp"
 
 #include "game/militaryunit.hpp"
+#include "game/builderunit.hpp"
 
 #include <glm/gtx/intersect.hpp>
 #include <glm/gtx/vector_angle.hpp>
@@ -137,6 +138,8 @@ void e2::Game::initialize()
 	am->prescribeALJ(alj, "assets/vehicles/A_Tank_Fire.e2a");
 
 
+	am->prescribeALJ(alj, "assets/vehicles/SM_MobileMob.e2a");
+
 	am->prescribeALJ(alj, "assets/structures/SM_BuildingPlaceholder.e2a");
 
 	am->queueWaitALJ(alj);
@@ -170,6 +173,7 @@ void e2::Game::initialize()
 	m_entityMeshes[size_t(e2::EntityType::Structure_Quarry)] = am->get("assets/environment/SM_Quarry.e2a").cast<e2::Mesh>();
 	m_entityMeshes[size_t(e2::EntityType::Structure_SawMill)] = am->get("assets/environment/SM_SawMill.e2a").cast<e2::Mesh>();
 
+	
 
 
 
@@ -181,6 +185,9 @@ void e2::Game::initialize()
 
 	m_entityMeshes[size_t(e2::EntityType::Unit_Tank)] = am->get("assets/vehicles/SM_Tank.e2a").cast<e2::Mesh>();
 	m_entitySkeletons[size_t(e2::EntityType::Unit_Tank)] = am->get("assets/vehicles/SK_Tank.e2a").cast<e2::Skeleton>();
+
+	m_entityMeshes[size_t(e2::EntityType::Unit_MobileMOB)] = am->get("assets/vehicles/SM_MobileMob.e2a").cast<e2::Mesh>();
+
 
 	m_entityMeshes[size_t(e2::EntityType::Unit_Engineer)] = am->get("assets/characters/SM_Engineer.e2a").cast<e2::Mesh>();
 	m_entitySkeletons[size_t(e2::EntityType::Unit_Engineer)] = am->get("assets/characters/SK_Engineer.e2a").cast<e2::Skeleton>();
@@ -651,7 +658,8 @@ void e2::Game::updateMenu(double seconds)
 		// spawn local empire
 		m_localEmpireId = spawnEmpire();
 		m_localEmpire = m_empires[m_localEmpireId];
-		spawnStructure<e2::MainOperatingBase>(m_startLocation, m_localEmpireId);
+		//spawnStructure<e2::MainOperatingBase>(m_startLocation, m_localEmpireId);
+		spawnUnit<e2::MobileMOB>(m_startLocation, m_localEmpireId);
 
 	}
 	if (m_haveStreamedStart)

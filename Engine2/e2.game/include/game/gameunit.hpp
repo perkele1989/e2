@@ -27,6 +27,9 @@ namespace e2
 		// base builder/worker unit 
 		Unit_Engineer = 0,
 
+		Unit_MobileMOB,
+		Unit_MobileFOB,
+
 		// tier1 infantry units, offensive 
 		// all of these can upgrade the Signaleer perk (lets you call in airstrikes from nearby air and artillery units)
 		Unit_Grunt, //base melee tank, short range, low unit damage, high defensive strength
