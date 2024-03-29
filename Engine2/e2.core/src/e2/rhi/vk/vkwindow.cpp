@@ -228,6 +228,7 @@ void e2::IWindow_Vk::cursor(e2::CursorShape newCursor)
 	if (::glfwCursors.size() == 0)
 	{
 		::glfwCursors.resize(size_t(e2::CursorShape::Count));
+		::glfwMap.resize(size_t(e2::CursorShape::Count));
 		::glfwMap[size_t(e2::CursorShape::Default)] = GLFW_ARROW_CURSOR;
 		::glfwMap[size_t(e2::CursorShape::Text)] = GLFW_IBEAM_CURSOR;
 		::glfwMap[size_t(e2::CursorShape::Crosshair)] = GLFW_CROSSHAIR_CURSOR;

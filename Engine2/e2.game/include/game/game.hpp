@@ -14,10 +14,19 @@
 namespace e2
 {
 
+	enum class InGameMenuState : uint8_t
+	{
+		Main,
+		Save,
+		Load,
+		Options
+	};
+
 	enum class GlobalState : uint8_t
 	{
 		Menu,
-		Game
+		Game,
+		InGameMenu
 	};
 
 	enum class CursorMode : uint8_t
@@ -109,11 +118,20 @@ namespace e2
 		Game(e2::Context* ctx);
 		virtual ~Game();
 
+		// thsi function inits game specific stuff (as opposed to resources). Creates grid etc
+		void setupGame();
+
+		// this function nukes shit from setupgame 
+		void nukeGame();
+
+		void exitToMenu();
+
 		virtual void initialize() override;
 		virtual void shutdown() override;
 		virtual void update(double seconds) override;
 		void updateGame(double seconds);
 		void updateMenu(double seconds);
+		void updateInGameMenu(double seconds);
 
 		void pauseWorldStreaming();
 		void resumeWorldStreaming();
@@ -223,6 +241,8 @@ namespace e2
 
 
 		GlobalState m_globalState{ GlobalState::Menu };
+
+		InGameMenuState m_inGameMenuState{ InGameMenuState::Main };
 
 
 		friend class GameContext;

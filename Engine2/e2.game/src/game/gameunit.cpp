@@ -179,7 +179,8 @@ void e2::GameEntity::initialize()
 
 	buildProxy();
 
-	m_mainPose = e2::create<e2::Pose>(m_skeleton);
+	if(m_skinProxy)
+		m_mainPose = e2::create<e2::Pose>(m_skeleton);
 
 }
 

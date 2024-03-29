@@ -11,12 +11,8 @@ namespace e2
 	enum class EngineerBuildType : uint8_t
 	{
 		HarvestWood,
-		SawMill,
-		GoldMine,
-		OilWell,
-		OreMine,
-		UraniumMine,
-		Quarry,
+		SpawnEntity,
+		SpawnWaterEntity
 	};
 
 	/** @tags(arena, arenaSize=4096)*/
@@ -53,6 +49,8 @@ namespace e2
 		e2::AnimationPose* m_buildPose{};
 
 		e2::EngineerBuildType m_buildType{};
+		e2::EntityType m_spawnEntityType{};
+		e2::Hex m_waterHex{};
 
 		uint32_t m_buildPointsLeft = 1;
 		uint32_t m_buildPoints = 1;

@@ -529,6 +529,7 @@ bool e2::UfbxImporter::writeAssets()
 		meshHeader.assetType = "e2::Mesh";
 
 		e2::StackVector<uint32_t, 256> tmpIndices;
+		tmpIndices.resize(256);
 
 		// Process
 		for (e2::UfbxImportSubmesh &submesh : m_mesh.submeshes)

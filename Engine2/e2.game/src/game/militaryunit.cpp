@@ -42,7 +42,7 @@ e2::Grunt::Grunt(e2::GameContext* ctx, glm::ivec2 const& tile, uint8_t empire)
 	entityType = EntityType::Unit_Grunt;
 	m_attackPoints = 1;
 	m_attackPointsLeft = m_attackPoints;
-
+	m_modelScale = glm::vec3(1.0f, -1.0f, -1.0f) / 200.0f;
 
 
 }

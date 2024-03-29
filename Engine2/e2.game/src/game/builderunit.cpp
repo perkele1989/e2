@@ -1,6 +1,7 @@
 
 #include "game/builderunit.hpp"
 #include "game/game.hpp"
+#include "game/mob.hpp"
 #include <e2/game/gamesession.hpp>
 #include <e2/transform.hpp>
 #include <e2/renderer/renderer.hpp>
@@ -21,7 +22,7 @@ e2::Engineer::Engineer(e2::GameContext* ctx, glm::ivec2 const& tile, uint8_t emp
 	movePointsLeft = 3;
 
 	entityType = e2::EntityType::Unit_Engineer;
-
+	m_modelScale = glm::vec3(1.0f, -1.0f, -1.0f) / 200.0f;
 }
 
 e2::Engineer::~Engineer()
@@ -107,9 +108,68 @@ void e2::Engineer::drawUI(e2::UIContext* ui)
 	float woodAbundance = tileData->getWoodAbundanceAsFloat();
 	
 	bool isForested = (tileData->flags & e2::TileFlags::FeatureForest) != e2::TileFlags::FeatureNone;
+	bool hasResource = (tileData->flags & e2::TileFlags::ResourceMask) != e2::TileFlags::ResourceNone;
+	bool hasWaterTile = false;
+	for (e2::Hex nb : e2::Hex(tileIndex).neighbours())
+	{
+		e2::TileData* nbData = game()->hexGrid()->getTileData(nb.offsetCoords());
+		if (!nbData)
+			continue;
+
+		if ((nbData->flags & e2::TileFlags::WaterMask) == e2::TileFlags::WaterShallow)
+		{
+			if (game()->structureAtHex(nb.offsetCoords()))
+				continue;
+
+			m_waterHex = nb;
+			hasWaterTile = true;
+			break;
+		}
+	}
+
 
 	if (canBuild)
 	{
+		if (!isForested && !hasResource)
+		{
+			if (ui->button("wf", "Build War Factory"))
+			{
+				m_buildType = e2::EngineerBuildType::SpawnEntity;
+				m_spawnEntityType = e2::EntityType::Structure_Factory;
+				game()->beginCustomEntityAction();
+				playAction(m_buildPose, 0.5f, 1.0f);
+				m_buildPointsLeft--;
+			}
+
+			if (ui->button("brc", "Build Barracks"))
+			{
+				m_buildType = e2::EngineerBuildType::SpawnEntity;
+				m_spawnEntityType = e2::EntityType::Structure_Barracks;
+				game()->beginCustomEntityAction();
+				playAction(m_buildPose, 0.5f, 1.0f);
+				m_buildPointsLeft--;
+			}
+
+			if (ui->button("arb", "Build Airbase"))
+			{
+				m_buildType = e2::EngineerBuildType::SpawnEntity;
+				m_spawnEntityType = e2::EntityType::Structure_Airbase;
+				game()->beginCustomEntityAction();
+				playAction(m_buildPose, 0.5f, 1.0f);
+				m_buildPointsLeft--;
+			}
+		}
+
+		if (hasWaterTile && ui->button("navb", "Build Naval Base"))
+		{
+			m_buildType = e2::EngineerBuildType::SpawnWaterEntity;
+			m_spawnEntityType = e2::EntityType::Structure_NavalBase;
+			game()->beginCustomEntityAction();
+			playAction(m_buildPose, 0.5f, 1.0f);
+			m_buildPointsLeft--;
+		}
+
+
 		if (isForested)
 		{
 			// harvest 
@@ -124,7 +184,8 @@ void e2::Engineer::drawUI(e2::UIContext* ui)
 			// sawmill
 			if (ui->button("sawmill", std::format("Build Saw Mill (+{:.0f} Wood per turn)", woodAbundance)))
 			{
-				m_buildType = e2::EngineerBuildType::SawMill;
+				m_buildType = e2::EngineerBuildType::SpawnEntity;
+				m_spawnEntityType = e2::EntityType::Structure_SawMill;
 				game()->beginCustomEntityAction();
 				playAction(m_buildPose, 0.5f, 1.0f);
 				m_buildPointsLeft--;
@@ -135,7 +196,8 @@ void e2::Engineer::drawUI(e2::UIContext* ui)
 		{
 			if (ui->button("goldmine", std::format("Build Gold Mine (+{:.0f} Gold per turn)", abundance)))
 			{
-				m_buildType = e2::EngineerBuildType::GoldMine;
+				m_buildType = e2::EngineerBuildType::SpawnEntity;
+				m_spawnEntityType = e2::EntityType::Structure_GoldMine;
 				game()->beginCustomEntityAction();
 				playAction(m_buildPose, 0.5f, 1.0f);
 				m_buildPointsLeft--;
@@ -146,7 +208,8 @@ void e2::Engineer::drawUI(e2::UIContext* ui)
 		{
 			if (ui->button("oilwell", std::format("Build Oil Well (+{:.0f} Oil per turn)", abundance)))
 			{
-				m_buildType = e2::EngineerBuildType::OilWell;
+				m_buildType = e2::EngineerBuildType::SpawnEntity;
+				m_spawnEntityType = e2::EntityType::Structure_OilWell;
 				game()->beginCustomEntityAction();
 				playAction(m_buildPose, 0.5f, 1.0f);
 				m_buildPointsLeft--;
@@ -157,7 +220,8 @@ void e2::Engineer::drawUI(e2::UIContext* ui)
 		{
 			if (ui->button("oremine", std::format("Build Ore Mine (+{:.0f} Metal per turn)", abundance)))
 			{
-				m_buildType = e2::EngineerBuildType::OreMine;
+				m_buildType = e2::EngineerBuildType::SpawnEntity;
+				m_spawnEntityType = e2::EntityType::Structure_OreMine;
 				game()->beginCustomEntityAction();
 				playAction(m_buildPose, 0.5f, 1.0f);
 				m_buildPointsLeft--;
@@ -168,7 +232,8 @@ void e2::Engineer::drawUI(e2::UIContext* ui)
 		{
 			if (ui->button("qwarry", std::format("Build Quarry (+{:.0f} Stone per turn)", abundance)))
 			{
-				m_buildType = e2::EngineerBuildType::Quarry;
+				m_buildType = e2::EngineerBuildType::SpawnEntity;
+				m_spawnEntityType = e2::EntityType::Structure_Quarry;
 				game()->beginCustomEntityAction();
 				playAction(m_buildPose, 0.5f, 1.0f);
 				m_buildPointsLeft--;
@@ -179,7 +244,8 @@ void e2::Engineer::drawUI(e2::UIContext* ui)
 		{
 			if (ui->button("urine", std::format("Build Uranium Mine (+{:.0f} Uranium per turn)", abundance)))
 			{
-				m_buildType = e2::EngineerBuildType::UraniumMine;
+				m_buildType = e2::EngineerBuildType::SpawnEntity;
+				m_spawnEntityType = e2::EntityType::Structure_UraniumMine;
 				game()->beginCustomEntityAction();
 				playAction(m_buildPose, 0.5f, 1.0f);
 				m_buildPointsLeft--;
@@ -214,26 +280,48 @@ void e2::Engineer::updateEntityAction(double seconds)
 		{
 			game()->harvestWood(e2::Hex(tileIndex), empireId);
 		}
-		else if (m_buildType == e2::EngineerBuildType::SawMill)
+		else if (m_buildType == e2::EngineerBuildType::SpawnEntity)
 		{
-			game()->spawnStructure<e2::Mine>(e2::Hex(tileIndex), empireId, e2::EntityType::Structure_SawMill);
-		}
-		else if (m_buildType == e2::EngineerBuildType::GoldMine)
-		{
-			game()->spawnStructure<e2::Mine>(e2::Hex(tileIndex), empireId, e2::EntityType::Structure_GoldMine);
-		}
-		else if (m_buildType == e2::EngineerBuildType::OreMine)
-		{
-			game()->spawnStructure<e2::Mine>(e2::Hex(tileIndex), empireId, e2::EntityType::Structure_OreMine);
-		}
-		else if (m_buildType == e2::EngineerBuildType::UraniumMine)
-		{
-			game()->spawnStructure<e2::Mine>(e2::Hex(tileIndex), empireId, e2::EntityType::Structure_UraniumMine);
-		}
-		else if (m_buildType == e2::EngineerBuildType::Quarry)
-		{
-			game()->spawnStructure<e2::Mine>(e2::Hex(tileIndex), empireId, e2::EntityType::Structure_Quarry);
+			switch (m_spawnEntityType)
+			{
+			case EntityType::Structure_Factory:
+				game()->spawnStructure<e2::WarFactory>(e2::Hex(tileIndex), empireId);
+				break;
+			case EntityType::Structure_Barracks:
+				game()->spawnStructure<e2::Barracks>(e2::Hex(tileIndex), empireId);
+				break;
+			case EntityType::Structure_Airbase:
+				game()->spawnStructure<e2::AirBase>(e2::Hex(tileIndex), empireId);
+				break;
+			case EntityType::Structure_OilWell:
+				game()->spawnStructure<e2::Mine>(e2::Hex(tileIndex), empireId, m_spawnEntityType);
+				break;
+			case EntityType::Structure_GoldMine:
+				game()->spawnStructure<e2::Mine>(e2::Hex(tileIndex), empireId, m_spawnEntityType);
+				break;
+			case EntityType::Structure_OreMine:
+				game()->spawnStructure<e2::Mine>(e2::Hex(tileIndex), empireId, m_spawnEntityType);
+				break;
+			case EntityType::Structure_UraniumMine:
+				game()->spawnStructure<e2::Mine>(e2::Hex(tileIndex), empireId, m_spawnEntityType);
+				break;
+			case EntityType::Structure_Quarry:
+				game()->spawnStructure<e2::Mine>(e2::Hex(tileIndex), empireId, m_spawnEntityType);
+				break;
+			case EntityType::Structure_SawMill:
+				game()->spawnStructure<e2::Mine>(e2::Hex(tileIndex), empireId, m_spawnEntityType);
+				break;
+			}
 			
+		}
+		else if (m_buildType == e2::EngineerBuildType::SpawnWaterEntity)
+		{
+			switch (m_spawnEntityType)
+			{
+			case EntityType::Structure_NavalBase:
+				game()->spawnStructure<e2::NavalBase>(m_waterHex, empireId);
+				break;
+			}
 		}
 		 
 		game()->endCustomEntityAction();

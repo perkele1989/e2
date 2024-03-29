@@ -148,7 +148,7 @@ namespace e2
 
 		float m_heightOffset{};
 
-		glm::vec3 m_modelScale{ glm::vec3(1.0f, -1.0f, -1.0f) / 200.0f };
+		glm::vec3 m_modelScale{ glm::vec3(1.0f, 1.0f, 1.0f) };
 		e2::MeshPtr m_mesh;
 		e2::SkeletonPtr m_skeleton;
 

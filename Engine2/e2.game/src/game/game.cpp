@@ -30,6 +30,55 @@ e2::Game::~Game()
 
 }
 
+void e2::Game::setupGame()
+{
+	m_hexGrid = e2::create<e2::HexGrid>(this);
+
+	m_startViewOrigin = glm::vec2(528.97f, 587.02f);
+	m_viewOrigin = m_startViewOrigin;
+	m_hexGrid->initializeWorldBounds(m_viewOrigin);
+
+
+
+}
+
+void e2::Game::nukeGame()
+{
+	deselectStructure();
+	deselectUnit();
+
+	auto unitsClone = m_units;
+	for (GameUnit* unit : unitsClone)
+		destroyUnit(unit->tileIndex);
+
+	auto structuresClone = m_structures;
+	for (GameStructure* structure: structuresClone)
+		destroyStructure(structure->tileIndex);
+
+	for (EmpireId i = 0; i < e2::maxNumEmpires-1; i++)
+	{
+		destroyEmpire(i);
+	}
+
+	e2::destroy(m_hexGrid);
+
+	m_globalState = GlobalState::Menu;
+	m_inGameMenuState = InGameMenuState::Main;
+	m_state = GameState::TurnPreparing;
+	m_turn = 0;
+	m_empireTurn = 0;
+	m_turnState = TurnState::Unlocked;
+	m_timeDelta = 0.0;
+	m_localEmpireId = 0;
+	m_localEmpire = nullptr;
+}
+
+void e2::Game::exitToMenu()
+{
+	nukeGame();
+	setupGame();
+}
+
 void e2::Game::initialize()
 {
 	m_session = e2::create<e2::GameSession>(this);
@@ -87,6 +136,9 @@ void e2::Game::initialize()
 	am->prescribeALJ(alj, "assets/vehicles/A_Tank_Moving.e2a");
 	am->prescribeALJ(alj, "assets/vehicles/A_Tank_Fire.e2a");
 
+
+	am->prescribeALJ(alj, "assets/structures/SM_BuildingPlaceholder.e2a");
+
 	am->queueWaitALJ(alj);
 	m_uiTextureResources = am->get("assets/UI_ResourceIcons.e2a").cast<e2::Texture2D>();
 	m_cursorMesh = am->get("assets/environment/trees/SM_PalmTree001.e2a").cast<e2::Mesh>();
@@ -100,8 +152,8 @@ void e2::Game::initialize()
 	m_entitySkeletons.resize(size_t(e2::EntityType::Count));
 	for (uint8_t i = 0; i < size_t(e2::EntityType::Count); i++)
 	{
-		m_entityMeshes[i] = am->get("assets/characters/SM_Soldier.e2a").cast<e2::Mesh>();
-		m_entitySkeletons[i] = am->get("assets/characters/SK_Soldier.e2a").cast<e2::Skeleton>();
+		m_entityMeshes[i] = am->get("assets/structures/SM_BuildingPlaceholder.e2a").cast<e2::Mesh>();
+		m_entitySkeletons[i] = nullptr;
 	}
 
 	m_animationIndex.resize(uint8_t(e2::AnimationIndex::Count));
@@ -160,11 +212,7 @@ void e2::Game::initialize()
 		m_empires[i] = nullptr;
 	}
 
-	m_hexGrid = e2::create<e2::HexGrid>(this);
-
-	m_startViewOrigin = glm::vec2(528.97f, 587.02f);
-	m_viewOrigin = m_startViewOrigin;
-	m_hexGrid->initializeWorldBounds(m_viewOrigin);
+	setupGame();
 
 	profiler()->start();
 }
@@ -206,6 +254,79 @@ void e2::Game::update(double seconds)
 		updateMenu(seconds);
 	else if (m_globalState == GlobalState::Game)
 		updateGame(seconds);
+	else if (m_globalState == GlobalState::InGameMenu)
+		updateInGameMenu(seconds);
+}
+
+void e2::Game::updateInGameMenu(double seconds)
+{
+	constexpr float moveSpeed = 10.0f;
+	constexpr float viewSpeed = .3f;
+
+	e2::GameSession* session = gameSession();
+	e2::Renderer* renderer = session->renderer();
+	e2::UIContext* ui = session->uiContext();
+	auto& kb = ui->keyboardState();
+	auto& mouse = ui->mouseState();
+
+	m_session->renderer()->setEnvironment(m_irradianceMap->handle(), m_radianceMap->handle());
+
+
+	if (kb.pressed(Key::Escape))
+	{
+		if (m_inGameMenuState == InGameMenuState::Main)
+			m_globalState = GlobalState::Game;
+		else
+			m_inGameMenuState = InGameMenuState::Main;
+	}
+
+	//m_hexGrid->assertChunksWithinRangeVisible(m_viewOrigin, m_viewPoints, m_viewVelocity);
+	m_hexGrid->updateStreaming(m_viewOrigin, m_viewPoints, m_viewVelocity);
+	m_hexGrid->updateWorldBounds();
+	m_hexGrid->renderFogOfWar();
+
+	// ticking session renders renderer too, and blits it to the UI, so we need to do it precisely here (after rendering fog of war and before rendering UI)
+	m_session->tick(seconds);
+
+	glm::vec2 size(256.0f, 320.0f);
+	glm::vec2 offset = (glm::vec2(ui->size()) / 2.0f) - (size / 2.0f);
+
+	ui->pushFixedPanel("ingameMenuContainer", offset, size);
+
+	if (m_inGameMenuState == InGameMenuState::Main)
+	{
+
+
+		ui->beginStackV("ingameMenu");
+
+		if (ui->button("btnCont", "Continue"))
+			m_globalState = GlobalState::Game;
+
+		if (ui->button("btnSave", "Save.."))
+			m_inGameMenuState = InGameMenuState::Save;
+
+		if (ui->button("btnLoad", "Load.."))
+			m_inGameMenuState = InGameMenuState::Load;
+
+		if (ui->button("btnExitMenu", "Exit to Menu"))
+			exitToMenu();
+
+		if (ui->button("btnQuitDesktop", "Quit to Desktop"))
+			engine()->shutdown();
+
+		ui->endStackV();
+	}
+	else if (m_inGameMenuState == InGameMenuState::Save)
+	{
+	}
+	else if (m_inGameMenuState == InGameMenuState::Load)
+	{
+	}
+	else if (m_inGameMenuState == InGameMenuState::Options)
+	{
+	}
+
+	ui->popFixedPanel();
 }
 
 void e2::Game::updateGame(double seconds)
@@ -288,6 +409,12 @@ void e2::Game::updateGame(double seconds)
 		}
 		LogNotice("{}", ss.str());
 		profiler()->start();
+	}
+
+
+	if (kb.pressed(Key::Escape))
+	{
+		m_globalState = GlobalState::InGameMenu;
 	}
 
 	updateCamera(seconds);
@@ -540,6 +667,7 @@ void e2::Game::updateMenu(double seconds)
 		resumeWorldStreaming();
 		startGame();
 		m_haveBegunStart = false;
+		m_haveStreamedStart = false;
 	}
 
 }

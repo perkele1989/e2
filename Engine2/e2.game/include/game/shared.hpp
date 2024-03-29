@@ -14,6 +14,8 @@ namespace e2
 		WaterShallow = 0b0000'0010,
 		WaterDeep = 0b0000'0100,
 		Mountain = 0b0000'1000,
+
+		Air = 0b0000'1111,
 	};
 
 	EnumFlagsDeclaration(PassableFlags);
