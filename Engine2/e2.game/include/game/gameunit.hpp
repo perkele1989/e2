@@ -98,10 +98,16 @@ namespace e2
 	{
 		ObjectDeclaration();
 	public:
+		GameEntity();
 		GameEntity(e2::GameContext* ctx, glm::ivec2 const& tile, EmpireId empireId);
 		virtual ~GameEntity();
 
-		EntityType entityType;
+		void postConstruct(e2::GameContext* ctx, glm::ivec2 const& tile, EmpireId empireId);
+
+		virtual void writeForSave(e2::Buffer& toBuffer);
+		virtual void readForSave(e2::Buffer& fromBuffer);
+
+
 
 		virtual e2::Game* game() override
 		{
@@ -134,7 +140,10 @@ namespace e2
 
 		void setMeshTransform(glm::vec3 const& pos, float angle);
 
+		bool isLocal();
 
+		// these are set during constructor
+		EntityType entityType;
 		std::string displayName{ "Entity" };
 		uint32_t sightRange{ 5 };
 		glm::ivec2 tileIndex;
@@ -181,8 +190,14 @@ namespace e2
 	{
 		ObjectDeclaration();
 	public:
-		GameStructure(e2::GameContext* ctx, glm::ivec2 const& tile, uint8_t empireId);
+		GameStructure();
+		GameStructure(e2::GameContext* ctx, glm::ivec2 const& tile, EmpireId empireId);
 		virtual ~GameStructure();
+
+		
+		virtual void writeForSave(e2::Buffer& toBuffer) override;
+		virtual void readForSave(e2::Buffer& fromBuffer) override;
+
 
 		float health{ 100.0f };
 		
@@ -191,13 +206,20 @@ namespace e2
 	};
 
 	// we say mine but really a sawmill, mine or quarry. generic resource improevment
+	/** @tags(dynamic, arena, arenaSize=1024) */
 	class Mine : public e2::GameStructure
 	{
 		ObjectDeclaration();
+		void setupConfig();
 	public:
-		Mine(e2::GameContext* ctx, glm::ivec2 const& tile, uint8_t empireId, e2::EntityType type);
+		Mine();
+		Mine(e2::GameContext* ctx, glm::ivec2 const& tile, EmpireId empireId, e2::EntityType entityType);
 		virtual ~Mine();
 
+		virtual void writeForSave(e2::Buffer& toBuffer);
+		virtual void readForSave(e2::Buffer& fromBuffer);
+
+		virtual void initialize() override;
 
 		virtual void collectRevenue(ResourceTable& outRevenueTable) override;
 		virtual void collectExpenditure(ResourceTable& outExpenditureTable) override;
@@ -221,7 +243,10 @@ namespace e2
 	class GameUnit : public e2::GameEntity
 	{
 		ObjectDeclaration();
+
+		void setupConfig();
 	public:
+		GameUnit();
 		GameUnit(e2::GameContext* ctx, glm::ivec2 const& tile, uint8_t empireId);
 		virtual ~GameUnit();
 
@@ -232,11 +257,14 @@ namespace e2
 
 		virtual void drawUI(e2::UIContext* ctx);
 
+		virtual void writeForSave(e2::Buffer& toBuffer) override;
+		virtual void readForSave(e2::Buffer& fromBuffer) override;
+
 		
 		e2::PassableFlags passableFlags{ e2::PassableFlags::Land };
 
 		float health{ 100.0f };
-		int32_t moveRange{ 3 };
+		int32_t movePoints{ 3 };
 		int32_t movePointsLeft{ 3 };
 		float moveSpeed{ 2.4f };
 

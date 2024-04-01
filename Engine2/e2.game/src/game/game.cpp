@@ -20,15 +20,257 @@
 
 #include <glm/gtx/easing.hpp>
 
+#pragma warning(disable : 4996)
+
+#include <filesystem>
+#include <Shlobj.h>
+#include <ctime>
+
 e2::Game::Game(e2::Context* ctx)
 	: e2::Application(ctx)
 {
-
+	readAllSaveMetas();
 }
 
 e2::Game::~Game()
 {
 
+}
+
+void e2::Game::saveGame(uint8_t slot)
+{
+	if (m_empireTurn != m_localEmpireId)
+	{
+		LogError("refuse to save game on AI turn");
+		return;
+	}
+
+	e2::SaveMeta newMeta;
+	newMeta.exists = true;
+	newMeta.timestamp = std::time(nullptr);
+	newMeta.slot = slot;
+
+	e2::Buffer buf;
+
+	buf << int64_t(newMeta.timestamp);
+
+
+	buf << m_startViewOrigin;
+	buf << m_viewOrigin;
+	buf << m_turn;
+
+	// store all ais 
+	for (EmpireId i = 1; i < e2::maxNumEmpires-1; i++)
+	{
+		buf << int32_t(m_empires[i] != nullptr ? 1 : 0);
+
+		if (m_empires[i])
+		{
+			// @todo store ai shit here yo 
+		}
+
+	}
+
+	buf << uint64_t(m_structures.size());
+	for (e2::GameStructure* structure : m_structures)
+	{
+		// structure type 
+		buf << structure->type()->fqn;
+
+		// structure empire id 
+		buf << int64_t(structure->empireId);
+
+		// structure tileIndex 
+		buf << structure->tileIndex;
+
+		structure->writeForSave(buf);
+	}
+
+	buf << uint64_t(m_units.size());
+	for (e2::GameUnit* unit : m_units)
+	{
+		// unit type 
+		buf << unit->type()->fqn;
+
+		// unit empire id 
+		buf << int64_t(unit->empireId);
+
+		// unit tileIndex 
+		buf << unit->tileIndex;
+
+		unit->writeForSave(buf);
+	}
+
+
+	// write discovered empires 
+	buf << uint64_t(m_discoveredEmpires.size());
+	for (e2::GameEmpire* discEm : m_discoveredEmpires)
+		buf << int64_t(discEm->id);
+
+
+	buf.writeToFile(newMeta.fileName());
+
+	saveSlots[slot] = newMeta;
+
+}
+
+e2::SaveMeta e2::Game::readSaveMeta(uint8_t slot)
+{
+	e2::SaveMeta meta;
+	meta.slot = slot;
+	meta.cachedFileName = meta.fileName();
+
+	// header is just int64_t timestamp
+	constexpr uint64_t headerSize = 8 ;
+
+	e2::Buffer buf;
+	uint64_t bytesRead = buf.readFromFile(meta.cachedFileName, 0, headerSize);
+	if (bytesRead != headerSize)
+	{
+		meta.cachedDisplayName = meta.displayName();
+		saveSlots[slot] = meta;
+		return meta;
+	}
+
+	meta.exists = true;
+	int64_t time{};
+	buf >> time;
+	meta.timestamp = time;
+
+	meta.cachedDisplayName = meta.displayName();
+
+
+	saveSlots[slot] = meta;
+
+	
+
+	return meta;
+
+}
+
+void e2::Game::readAllSaveMetas()
+{
+	for (uint8_t slot = 0; slot < e2::numSaveSlots; slot++)
+		readSaveMeta(slot);
+}
+
+void e2::Game::loadGame(uint8_t slot)
+{
+	// header is just uint64_t discoveredTiles + int64_t timestamp
+	constexpr uint64_t headerSize = 8 ;
+
+	e2::Buffer buf;
+	uint64_t readBytes = buf.readFromFile(saveSlots[slot].fileName(), headerSize, 0);
+	if (readBytes == 0)
+	{
+		LogError("save slot missing or corrupted"); 
+		return;
+	}
+
+	nukeGame();
+	setupGame();
+
+
+	buf >> m_startViewOrigin;
+	buf >> m_viewOrigin;
+	buf >> m_turn;
+
+	m_hexGrid->initializeWorldBounds(m_viewOrigin);
+
+
+	m_localEmpireId = spawnEmpire();
+	m_localEmpire = m_empires[m_localEmpireId];
+	discoverEmpire(m_localEmpireId);
+
+	for (EmpireId i = 1; i < e2::maxNumEmpires - 1; i++)
+	{
+		int32_t hasAiEmpire = 0;
+		buf >> hasAiEmpire;
+
+		if (hasAiEmpire != 0)
+		{
+			// @todo store ai shit here yo 
+			m_empires[i] = e2::create<e2::GameEmpire>(this, i);
+			m_undiscoveredEmpires.insert(m_empires[i]);
+			m_aiEmpires.insert(m_empires[i]);
+			m_empires[i]->ai = e2::create<e2::CommanderAI>(this, i);
+
+
+		}
+
+	}
+
+
+
+
+	uint64_t numStructures{};
+	buf >> numStructures;
+	for (uint64_t i = 0; i < numStructures; i++)
+	{
+		e2::Name fqn;
+		buf >> fqn;
+
+		int64_t empireId{};
+		buf >> empireId;
+
+		glm::ivec2 tileIndex;
+		buf >> tileIndex;
+
+		e2::Type* ty = e2::Type::fromName(fqn);
+		if (!ty || !ty->inherits("e2::GameStructure"))
+		{
+			LogError("no such type, or doesn't inherit proper parent, corrupted save");
+			continue;
+		}
+
+		e2::GameStructure* newStructure = ty->create()->cast<e2::GameStructure>();
+		newStructure->postConstruct(this, tileIndex, empireId);
+
+		newStructure->readForSave(buf);
+
+		postSpawnStructure(newStructure);
+	}
+
+
+
+	uint64_t numUnits{};
+	buf >> numUnits;
+	for (uint64_t i = 0; i < numUnits; i++)
+	{
+		e2::Name fqn;
+		buf >> fqn;
+
+		int64_t empireId{};
+		buf >> empireId;
+
+		glm::ivec2 tileIndex;
+		buf >> tileIndex;
+
+		e2::Type* ty = e2::Type::fromName(fqn);
+		if (!ty || !ty->inherits("e2::GameUnit"))
+		{
+			LogError("no such type, or doesn't inherit proper parent, corrupted save");
+			continue;
+		}
+
+		e2::GameUnit* newUnit = ty->create()->cast<e2::GameUnit>();
+		newUnit->postConstruct(this, tileIndex, empireId);
+
+		newUnit->readForSave(buf);
+
+		postSpawnUnit(newUnit);
+	}
+
+	uint64_t numDiscoveredEmpires{};
+	buf >> numDiscoveredEmpires;
+	for (uint64_t i = 0; i < numDiscoveredEmpires;i++)
+	{
+		int64_t empId;
+		buf >> empId;
+		discoverEmpire(empId);
+	}
+
+	startGame();
 }
 
 void e2::Game::setupGame()
@@ -38,9 +280,6 @@ void e2::Game::setupGame()
 	m_startViewOrigin = glm::vec2(528.97f, 587.02f);
 	m_viewOrigin = m_startViewOrigin;
 	m_hexGrid->initializeWorldBounds(m_viewOrigin);
-
-
-
 }
 
 void e2::Game::nukeGame()
@@ -325,9 +564,29 @@ void e2::Game::updateInGameMenu(double seconds)
 	}
 	else if (m_inGameMenuState == InGameMenuState::Save)
 	{
+		ui->beginStackV("saveMenu");
+
+		for (uint8_t i = 0; i < e2::numSaveSlots; i++)
+		{
+			if (ui->button(std::format("save{}", uint32_t(i)), saveSlots[i].displayName()))
+				saveGame(i);
+		}
+
+
+		ui->endStackV();
 	}
 	else if (m_inGameMenuState == InGameMenuState::Load)
 	{
+		ui->beginStackV("loadMenu");
+
+		for (uint8_t i = 0; i < e2::numSaveSlots; i++)
+		{
+			if (ui->button(std::format("load{}", uint32_t(i)), saveSlots[i].displayName()))
+				loadGame(i);
+		}
+
+
+		ui->endStackV();
 	}
 	else if (m_inGameMenuState == InGameMenuState::Options)
 	{
@@ -440,10 +699,13 @@ void e2::Game::updateGame(double seconds)
 	m_hexGrid->updateWorldBounds();
 	m_hexGrid->renderFogOfWar();
 
+	e2::ITexture* outlineTextures[2] = { m_hexGrid->outlineTexture(0), m_hexGrid->outlineTexture(1) };
+	m_session->renderer()->setOutlineTextures(outlineTextures);
+
 	// ticking session renders renderer too, and blits it to the UI, so we need to do it precisely here (after rendering fog of war and before rendering UI)
 	m_session->tick(seconds);
 
-	ui->drawTexturedQuad({}, resolution, 0xFFFFFFFF, m_hexGrid->outlineTexture(renderManager()->frameIndex()));
+	//ui->drawTexturedQuad({}, resolution, 0xFFFFFFFF, m_hexGrid->outlineTexture(renderManager()->frameIndex()));
 
 	drawUI();
 
@@ -537,7 +799,48 @@ void e2::Game::updateMenu(double seconds)
 	m_session->tick(seconds);
 
 	glm::vec2 resolution = renderer->resolution();
-	ui->drawTexturedQuad({}, resolution, 0xFFFFFFFF, m_hexGrid->outlineTexture(renderManager()->frameIndex()));
+	
+
+
+
+	if (m_mainMenuState != MainMenuState::Main)
+	{
+		if (kb.pressed(Key::Escape))
+		{
+			m_mainMenuState = MainMenuState::Main;
+		}
+		float width = ui->calculateSDFTextWidth(FontFace::Serif, 42.0f, "Reveal & Annihilate");
+
+
+		float menuHeight = 280.0f;
+		float menuOffset = resolution.y / 2.0f - menuHeight / 2.0f;
+		float cursorY = menuOffset;
+		float xOffset = resolution.x / 2.0f - width / 2.0f;
+
+		if (m_mainMenuState == MainMenuState::Load)
+		{
+			for (uint8_t sl = 0; sl < e2::numSaveSlots; sl++)
+			{
+				float slotWidth = ui->calculateSDFTextWidth(FontFace::Serif, 24.0f, saveSlots[sl].cachedDisplayName);
+
+				bool slotHovered = mouse.relativePosition.x > xOffset && mouse.relativePosition.x < xOffset + slotWidth
+					&& mouse.relativePosition.y > cursorY && mouse.relativePosition.y < cursorY + 40.0f;
+
+				ui->drawSDFText(FontFace::Serif, 24.0f, 0x000000FF, glm::vec2(xOffset, cursorY + 20.0), saveSlots[sl].cachedDisplayName);
+				if (saveSlots[sl].exists && slotHovered && leftMouse.clicked)
+				{
+					loadGame(sl);
+				}
+
+				cursorY += 40.0f;
+			}
+		}
+
+
+
+		return;
+	}
+
 
 
 	float globalMenuFade = m_haveBegunStart ? 1.0 - glm::smoothstep(0.0, 2.0, m_beginStartTime.durationSince().seconds()) : 1.0f;
@@ -628,6 +931,12 @@ void e2::Game::updateMenu(double seconds)
 	bool loadGameHovered = !m_haveBegunStart && timer > 15.5 && mouse.relativePosition.x > xOffset && mouse.relativePosition.x < xOffset + loadGameWidth
 		&& mouse.relativePosition.y > cursorY + 60.0f && mouse.relativePosition.y < cursorY + 100.0f;
 	ui->drawSDFText(FontFace::Serif, 24.0f, loadGameHovered ? 0x000000FF : textColorLoadGame, glm::vec2(xOffset, cursorY + 40.0f * 2), "Load Game");
+	if (!m_haveBegunStart && loadGameHovered && leftMouse.clicked)
+	{
+		m_mainMenuState = MainMenuState::Load;
+	}
+
+
 
 	float blockAlphaOptions = glm::smoothstep(15.5, 15.75, timer);
 	e2::UIColor textColorOptions(0, 0, 0, uint8_t(blockAlphaOptions * 170.0f * globalMenuFade));
@@ -635,6 +944,11 @@ void e2::Game::updateMenu(double seconds)
 	bool optionsHovered = !m_haveBegunStart && timer > 15.75 && mouse.relativePosition.x > xOffset && mouse.relativePosition.x < xOffset + optionsWidth
 		&& mouse.relativePosition.y > cursorY + 100.0f && mouse.relativePosition.y < cursorY + 140.0f;
 	ui->drawSDFText(FontFace::Serif, 24.0f, optionsHovered ? 0x000000FF : textColorOptions, glm::vec2(xOffset, cursorY + 40.0f * 3), "Options");
+	if (!m_haveBegunStart && optionsHovered && leftMouse.clicked)
+	{
+		m_mainMenuState = MainMenuState::Options;
+	}
+
 
 	float blockAlphaQuit = glm::smoothstep(15.75, 16.0, timer);
 	e2::UIColor textColorQuit(0, 0, 0, uint8_t(blockAlphaQuit * 170.0f * globalMenuFade));
@@ -658,7 +972,7 @@ void e2::Game::updateMenu(double seconds)
 		// spawn local empire
 		m_localEmpireId = spawnEmpire();
 		m_localEmpire = m_empires[m_localEmpireId];
-		//spawnStructure<e2::MainOperatingBase>(m_startLocation, m_localEmpireId);
+		discoverEmpire(m_localEmpireId);
 		spawnUnit<e2::MobileMOB>(m_startLocation, m_localEmpireId);
 
 	}
@@ -943,7 +1257,9 @@ void e2::Game::updateTurnLocal()
 
 void e2::Game::updateTurnAI()
 {
-
+	e2::GameEmpire* empire = m_empires[m_empireTurn];
+	if (empire->ai)
+		empire->ai->grugBrainTick();
 }
 
 
@@ -970,7 +1286,7 @@ void e2::Game::onTurnPreparingEnd()
 void e2::Game::onStartOfTurn()
 {
 	// ignore visibility for AI since we dont want to see what theyre up to 
-	if (m_empireTurn == 0)
+	if (m_empireTurn == m_localEmpireId)
 	{
 		while (m_undiscoveredEmpires.size() < 3)
 			spawnAIEmpire();
@@ -979,12 +1295,12 @@ void e2::Game::onStartOfTurn()
 		// clear and calculate visibility
 		m_hexGrid->clearVisibility();
 
-		for (e2::GameUnit* unit : m_units)
+		for (e2::GameUnit* unit : m_localEmpire->units)
 		{
 			unit->spreadVisibility();
 		}
 
-		for (e2::GameStructure* structure : m_structures)
+		for (e2::GameStructure* structure : m_localEmpire->structures)
 		{
 			structure->spreadVisibility();
 		}
@@ -1043,11 +1359,15 @@ void e2::Game::updateUnitMove()
 			e2::Hex prevHex = m_unitMovePath[m_unitMovePath.size() - 2];
 			e2::Hex finalHex = m_unitMovePath[m_unitMovePath.size() - 1];
 			// we are done
-			m_selectedUnit->rollbackVisibility();
+			if(m_selectedUnit->isLocal())
+				m_selectedUnit->rollbackVisibility();
+
 			m_unitIndex.erase(m_selectedUnit->tileIndex);
 			m_selectedUnit->tileIndex = finalHex.offsetCoords();
 			m_unitIndex[m_selectedUnit->tileIndex] = m_selectedUnit;
-			m_selectedUnit->spreadVisibility();
+
+			if(m_selectedUnit->isLocal())
+				m_selectedUnit->spreadVisibility();
 
 			
 
@@ -1109,6 +1429,19 @@ void e2::Game::updateEntityTarget()
 	{
 		ent->onEntityTargetClicked();
 	}
+}
+
+void e2::Game::postSpawnUnit(e2::GameUnit* unit)
+{
+	unit->initialize();
+
+	m_units.insert(unit);
+	m_unitIndex[unit->tileIndex] = unit;
+
+	if (m_empires[unit->empireId])
+		m_empires[unit->empireId]->units.insert(unit);
+
+	m_resources.fiscalStreams.insert(unit);
 }
 
 void e2::Game::drawUI()
@@ -1515,15 +1848,20 @@ e2::EmpireId e2::Game::spawnEmpire()
 
 void e2::Game::destroyEmpire(EmpireId empireId)
 {
-	if (!m_empires[empireId])
+	e2::GameEmpire* empire = m_empires[empireId];
+	m_empires[empireId] = nullptr;
+
+	if (!empire)
 		return;
 
-	m_aiEmpires.erase(m_empires[empireId]);
-	m_discoveredEmpires.erase(m_empires[empireId]);
-	m_undiscoveredEmpires.erase(m_empires[empireId]);
+	m_aiEmpires.erase(empire);
+	m_discoveredEmpires.erase(empire);
+	m_undiscoveredEmpires.erase(empire);
 
-	e2::destroy(m_empires[empireId]);
-	m_empires[empireId] = nullptr;
+	if (empire->ai)
+		e2::destroy(empire->ai);
+
+	e2::destroy(empire);
 }
 
 void e2::Game::spawnAIEmpire()
@@ -1535,6 +1873,7 @@ void e2::Game::spawnAIEmpire()
 	e2::GameEmpire* newEmpire = m_empires[newEmpireId];
 	m_aiEmpires.insert(newEmpire);
 
+	newEmpire->ai = e2::create<e2::CommanderAI>(this, newEmpireId);
 
 	e2::Aabb2D worldBounds = m_hexGrid->worldBounds();
 	bool foundLocation = false;
@@ -1569,9 +1908,9 @@ void e2::Game::spawnAIEmpire()
 			offsetDir = { 0.0f, 1.0f };
 		}
 
-		glm::vec2 offsetPoint = random + offsetDir * 128.0f;
+		glm::vec2 offsetPoint = random + offsetDir * 64.0f;
 
-		foundLocation = findStartLocation(e2::Hex(offsetPoint).offsetCoords(), { 128, 128 }, aiStartLocation, true);
+		foundLocation = findStartLocation(e2::Hex(offsetPoint).offsetCoords(), { 64, 64 }, aiStartLocation, true);
 	} while (!foundLocation);
 
 
@@ -1794,7 +2133,9 @@ void e2::Game::destroyUnit(e2::Hex const& location)
 		return;
 
 	e2::GameUnit* unit = finder->second;
-	unit->rollbackVisibility();
+
+	if(unit->isLocal())
+		unit->rollbackVisibility();
 
 	if (m_selectedUnit && m_selectedUnit == unit)
 		deselectUnit();
@@ -1904,6 +2245,27 @@ void e2::Game::deselectStructure()
 
 }
 
+void e2::Game::postSpawnStructure(e2::GameStructure* structure)
+{
+	structure->initialize();
+
+	m_structures.insert(structure);
+	m_structureIndex[structure->tileIndex] = structure;
+
+	if (m_empires[structure->empireId])
+		m_empires[structure->empireId]->structures.insert(structure);
+
+	m_resources.fiscalStreams.insert(structure);
+
+	removeWood(e2::Hex(structure->tileIndex));
+
+	e2::TileData* existingData = m_hexGrid->getTileData(structure->tileIndex);
+	if (existingData)
+	{
+		existingData->empireId = structure->empireId;
+	}
+}
+
 void e2::Game::destroyStructure(e2::Hex const& location)
 {
 	auto finder = m_structureIndex.find(location.offsetCoords());
@@ -1911,7 +2273,9 @@ void e2::Game::destroyStructure(e2::Hex const& location)
 		return;
 
 	e2::GameStructure* structure = finder->second;
-	structure->rollbackVisibility();
+
+	if (structure->isLocal())
+		structure->rollbackVisibility();
 
 	if (m_selectedStructure && m_selectedStructure == structure)
 		deselectStructure();
@@ -2223,4 +2587,37 @@ e2::PathFindingHex::PathFindingHex(e2::Hex const& _index)
 e2::PathFindingHex::~PathFindingHex()
 {
 
+}
+
+std::string e2::SaveMeta::displayName()
+{
+	if (!exists)
+		return std::format("{}: empty", uint32_t(slot+1));
+
+	char timeString[std::size("hh:mm:ss yyyy-mm-dd")];
+
+	std::strftime(std::data(timeString), std::size(timeString), "%T %F", (std::gmtime)(&timestamp));
+
+	return std::format("{}: {}", uint32_t(slot+1), std::string(timeString));
+
+}
+
+std::string e2::SaveMeta::fileName()
+{
+	PWSTR saveGameFolder{};
+	if (SHGetKnownFolderPath(FOLDERID_SavedGames, KF_FLAG_DEFAULT, nullptr, &saveGameFolder) != S_OK)
+	{
+		LogError("SHGetKnownFolderPath failed, returning backup folder");
+		return std::filesystem::path(std::format("./saves/{}.sav", uint32_t(slot))).string();
+	}
+
+	std::wstring wstr = saveGameFolder;
+	CoTaskMemFree(saveGameFolder);
+
+	std::string str;
+	std::transform(wstr.begin(), wstr.end(), std::back_inserter(str), [](wchar_t c) {
+		return (char)c;
+	});
+
+	return std::filesystem::path(std::format("{}/reveal_and_annihilate/{}.sav",str, uint32_t(slot))).string();
 }

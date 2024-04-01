@@ -19,6 +19,7 @@ void main()
 	vec4 vis = texture(sampler2D(visibilityMask, clampSampler), gl_FragCoord.xy / vec2(resolution.x, resolution.y)).rgba;
 	vec3 frontBuffer = texture(sampler2D(frontBufferColor, clampSampler), gl_FragCoord.xy / vec2(resolution.x, resolution.y)).rgb;
 	vec3 frontPosition = texture(sampler2D(frontBufferPosition, clampSampler), gl_FragCoord.xy / vec2(resolution.x, resolution.y)).xyz;
+	vec4 outline = texture(sampler2D(outlineTexture, clampSampler),  gl_FragCoord.xy / vec2(resolution.x, resolution.y)).rgba;
 
     float time = renderer.time.x;
 
@@ -110,6 +111,10 @@ void main()
 
 	// debug normal 
 	//outColor.rgb = clamp(vec3(n.x, n.z, -n.y) * 0.5 + 0.5, vec3(0.0), vec3(1.0));
+
+
+	outColor.rgb = mix(outColor.rgb, outline.rgb, outline.a*0.25);
+
 
 	outColor.rgb = clamp(outColor.rgb, vec3(0.0), vec3(1.0));
 	outColor.a = 1.0;

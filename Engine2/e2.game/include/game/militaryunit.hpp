@@ -101,7 +101,11 @@ namespace e2
 	class MilitaryUnit : public e2::GameUnit
 	{
 		ObjectDeclaration();
+
+		void setupConfig();
+
 	public:
+		MilitaryUnit();
 		MilitaryUnit(e2::GameContext* ctx, glm::ivec2 const& tile, uint8_t empire);
 		virtual ~MilitaryUnit();
 
@@ -181,11 +185,14 @@ namespace e2
 	};
 
 
-	/** @tags(arena, arenaSize=1024) */
+	/** @tags(dynamic, arena, arenaSize=1024) */
 	class Grunt : public e2::MilitaryUnit
 	{
 		ObjectDeclaration();
+
+		void setupConfig();
 	public:
+		Grunt();
 		Grunt(e2::GameContext* ctx, glm::ivec2 const& tile, uint8_t empire);
 		virtual ~Grunt();
 		virtual void initialize() override;
@@ -223,11 +230,14 @@ namespace e2
 
 	};
 
-	/** @tags(arena, arenaSize=1024) */
+	/** @tags(dynamic, arena, arenaSize=1024) */
 	class Tank : public e2::MilitaryUnit
 	{
 		ObjectDeclaration();
+
+		void setupConfig();
 	public:
+		Tank();
 		Tank(e2::GameContext* ctx, glm::ivec2 const& tile, uint8_t empire);
 		virtual ~Tank();
 		virtual void initialize() override;
@@ -262,11 +272,14 @@ namespace e2
 		e2::AnimationPose* m_firePose{};
 	};
 
-	/** @tags(arena, arenaSize=1024) */
+	/** @tags(dynamic, arena, arenaSize=1024) */
 	class CombatBoat : public e2::MilitaryUnit
 	{
 		ObjectDeclaration();
+
+		void setupConfig();
 	public:
+		CombatBoat();
 		CombatBoat(e2::GameContext* ctx, glm::ivec2 const& tile, uint8_t empire);
 		virtual ~CombatBoat();
 		virtual void initialize() override;

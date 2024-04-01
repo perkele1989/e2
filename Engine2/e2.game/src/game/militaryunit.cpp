@@ -11,14 +11,25 @@
 #include <glm/gtx/quaternion.hpp>
 #include <glm/ext/matrix_transform.hpp>
 
-e2::MilitaryUnit::MilitaryUnit(e2::GameContext* ctx, glm::ivec2 const& tile, uint8_t empire)
-	: e2::GameUnit(ctx, tile, empire)
-
+void e2::MilitaryUnit::setupConfig()
 {
 	displayName = "Ranger";
 	sightRange = 5;
 
 	entityType = e2::EntityType::Unit_Ranger;
+}
+
+e2::MilitaryUnit::MilitaryUnit(e2::GameContext* ctx, glm::ivec2 const& tile, uint8_t empire)
+	: e2::GameUnit(ctx, tile, empire)
+
+{
+	setupConfig();
+}
+
+e2::MilitaryUnit::MilitaryUnit()
+	: e2::GameUnit()
+{
+	setupConfig();
 }
 
 e2::MilitaryUnit::~MilitaryUnit()
@@ -31,20 +42,31 @@ void e2::MilitaryUnit::calculateStats()
 
 }
 
-e2::Grunt::Grunt(e2::GameContext* ctx, glm::ivec2 const& tile, uint8_t empire)
-	: e2::MilitaryUnit(ctx, tile, empire)
+void e2::Grunt::setupConfig()
 {
 	displayName = "Grunt";
 	sightRange = 5;
-	moveRange = 5;
+	movePoints = 5;
 	movePointsLeft = 5;
 
 	entityType = EntityType::Unit_Grunt;
 	m_attackPoints = 1;
 	m_attackPointsLeft = m_attackPoints;
 	m_modelScale = glm::vec3(1.0f, -1.0f, -1.0f) / 200.0f;
+}
 
+e2::Grunt::Grunt(e2::GameContext* ctx, glm::ivec2 const& tile, uint8_t empire)
+	: e2::MilitaryUnit(ctx, tile, empire)
+{
 
+	setupConfig();
+
+}
+
+e2::Grunt::Grunt()
+	: e2::MilitaryUnit()
+{
+	setupConfig();
 }
 
 e2::Grunt::~Grunt()
@@ -240,12 +262,11 @@ void e2::Grunt::onTurnEnd()
 	e2::MilitaryUnit::onTurnEnd();
 }
 
-e2::CombatBoat::CombatBoat(e2::GameContext* ctx, glm::ivec2 const& tile, uint8_t empire)
-	: e2::MilitaryUnit(ctx, tile, empire)
+void e2::CombatBoat::setupConfig()
 {
 	displayName = "CB-90";
 	sightRange = 10;
-	moveRange = 10;
+	movePoints = 10;
 	movePointsLeft = 10;
 
 	entityType = EntityType::Unit_AssaultCraft;
@@ -257,6 +278,17 @@ e2::CombatBoat::CombatBoat(e2::GameContext* ctx, glm::ivec2 const& tile, uint8_t
 	m_modelScale = (glm::vec3(1.0f, -1.0f, -1.0f) / 4.0f) * 2.5f;
 	m_heightOffset = -0.25f;
 	moveSpeed = 2.8f;
+}
+
+e2::CombatBoat::CombatBoat(e2::GameContext* ctx, glm::ivec2 const& tile, uint8_t empire)
+	: e2::MilitaryUnit(ctx, tile, empire)
+{
+	setupConfig();
+}
+
+e2::CombatBoat::CombatBoat()
+{
+	setupConfig();
 }
 
 e2::CombatBoat::~CombatBoat()
@@ -441,12 +473,11 @@ void e2::CombatBoat::onTurnEnd()
 	e2::MilitaryUnit::onTurnEnd();
 }
 
-e2::Tank::Tank(e2::GameContext* ctx, glm::ivec2 const& tile, uint8_t empire)
-	: e2::MilitaryUnit(ctx, tile, empire)
+void e2::Tank::setupConfig()
 {
 	displayName = "Stridsvagn 122";
 	sightRange = 10;
-	moveRange = 10;
+	movePoints = 10;
 	movePointsLeft = 10;
 
 	entityType = EntityType::Unit_Tank;
@@ -455,6 +486,18 @@ e2::Tank::Tank(e2::GameContext* ctx, glm::ivec2 const& tile, uint8_t empire)
 
 	m_modelScale = glm::vec3(1.0f, -1.0f, -1.0f) / 8.0f;
 	moveSpeed = 2.8f;
+}
+
+e2::Tank::Tank(e2::GameContext* ctx, glm::ivec2 const& tile, uint8_t empire)
+	: e2::MilitaryUnit(ctx, tile, empire)
+{
+	setupConfig();
+}
+
+e2::Tank::Tank()
+	: e2::MilitaryUnit()
+{
+	setupConfig();
 }
 
 e2::Tank::~Tank()

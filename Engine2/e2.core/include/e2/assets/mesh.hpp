@@ -199,7 +199,7 @@ namespace e2
 		AnimationPose(e2::Ptr<e2::Skeleton> skeleton, e2::Ptr<e2::Animation> animation, bool loop);
 		virtual ~AnimationPose();
 
-		void updateAnimation(float timeDelta, bool onlyTickTime);
+		void updateAnimation(double timeDelta, bool onlyTickTime);
 
 		void pause()
 		{
@@ -253,7 +253,7 @@ namespace e2
 
 		bool m_loop{};
 		bool m_playing{};
-		float m_time{};
+		double m_time{};
 	};
 
 

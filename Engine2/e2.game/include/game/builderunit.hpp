@@ -15,11 +15,13 @@ namespace e2
 		SpawnWaterEntity
 	};
 
-	/** @tags(arena, arenaSize=4096)*/
+	/** @tags(dynamic, arena, arenaSize=4096)*/
 	class Engineer : public e2::GameUnit
 	{
 		ObjectDeclaration();
+		void setupConfig();
 	public:
+		Engineer();
 		Engineer(e2::GameContext* ctx, glm::ivec2 const& tile, uint8_t empire);
 		virtual ~Engineer();
 		virtual void updateAnimation(double seconds) override;

@@ -5,18 +5,28 @@
 
 #include "game/militaryunit.hpp"
 
-e2::MainOperatingBase::MainOperatingBase(e2::GameContext* gameCtx, glm::ivec2 const& tile, uint8_t empire)
-	: e2::GameStructure(gameCtx, tile, empire)
+void e2::MainOperatingBase::setupConfig()
 {
 	displayName = "Main Operating Base";
 	sightRange = 2;
-	
+
 	entityType = e2::EntityType::Structure_MainOperatingBase;
 
 	m_buildActionEngineer.buildTurns = 3;
 	m_buildActionEngineer.buildTurnsLeft = 3;
 	m_buildActionEngineer.buildType = EntityType::Unit_Engineer;
 	m_buildActionEngineer.displayName = "Engineer";
+}
+
+e2::MainOperatingBase::MainOperatingBase(e2::GameContext* gameCtx, glm::ivec2 const& tile, uint8_t empire)
+	: e2::GameStructure(gameCtx, tile, empire)
+{
+	setupConfig();
+}
+
+e2::MainOperatingBase::MainOperatingBase()
+{
+	setupConfig();
 }
 
 e2::MainOperatingBase::~MainOperatingBase()
@@ -130,8 +140,7 @@ void e2::MainOperatingBase::onTurnStart()
 	}
 }
 
-e2::Barracks::Barracks(e2::GameContext* gameCtx, glm::ivec2 const& tile, uint8_t empire)
-	: e2::GameStructure(gameCtx, tile, empire)
+void e2::Barracks::setupConfig()
 {
 	displayName = "Barracks";
 	sightRange = 2;
@@ -142,6 +151,19 @@ e2::Barracks::Barracks(e2::GameContext* gameCtx, glm::ivec2 const& tile, uint8_t
 	m_buildActionGrunt.buildTurnsLeft = 3;
 	m_buildActionGrunt.buildType = EntityType::Unit_Grunt;
 	m_buildActionGrunt.displayName = "Grunt";
+
+}
+
+e2::Barracks::Barracks(e2::GameContext* gameCtx, glm::ivec2 const& tile, uint8_t empire)
+	: e2::GameStructure(gameCtx, tile, empire)
+{
+	setupConfig();
+}
+
+e2::Barracks::Barracks()
+	: e2::GameStructure()
+{
+	setupConfig();
 }
 
 e2::Barracks::~Barracks()
@@ -254,8 +276,7 @@ void e2::Barracks::onTurnStart()
 	}
 }
 
-e2::WarFactory::WarFactory(e2::GameContext* gameCtx, glm::ivec2 const& tile, uint8_t empire)
-	: e2::GameStructure(gameCtx, tile, empire)
+void e2::WarFactory::setupConfig()
 {
 	displayName = "War Factory";
 	sightRange = 2;
@@ -268,6 +289,18 @@ e2::WarFactory::WarFactory(e2::GameContext* gameCtx, glm::ivec2 const& tile, uin
 	m_buildActionTank.displayName = "Stridsvagn 122";
 
 	m_modelScale = glm::vec3(1.0f, 1.0f, 1.0f) / 1.0f;
+}
+
+e2::WarFactory::WarFactory(e2::GameContext* gameCtx, glm::ivec2 const& tile, uint8_t empire)
+	: e2::GameStructure(gameCtx, tile, empire)
+{
+	setupConfig();
+}
+
+e2::WarFactory::WarFactory()
+	: e2::GameStructure()
+{
+	setupConfig();
 }
 
 e2::WarFactory::~WarFactory()
@@ -384,8 +417,7 @@ void e2::WarFactory::onTurnStart()
 
 
 
-e2::NavalBase::NavalBase(e2::GameContext* gameCtx, glm::ivec2 const& tile, uint8_t empire)
-	: e2::GameStructure(gameCtx, tile, empire)
+void e2::NavalBase::setupConfig()
 {
 	displayName = "Naval Base";
 	sightRange = 2;
@@ -396,6 +428,18 @@ e2::NavalBase::NavalBase(e2::GameContext* gameCtx, glm::ivec2 const& tile, uint8
 	m_buildActionCombatBoat.buildTurnsLeft = 4;
 	m_buildActionCombatBoat.buildType = EntityType::Unit_AssaultCraft;
 	m_buildActionCombatBoat.displayName = "CB-90";
+}
+
+e2::NavalBase::NavalBase(e2::GameContext* gameCtx, glm::ivec2 const& tile, uint8_t empire)
+	: e2::GameStructure(gameCtx, tile, empire)
+{
+	setupConfig();
+}
+
+e2::NavalBase::NavalBase()
+	: e2::GameStructure()
+{
+	setupConfig();
 }
 
 e2::NavalBase::~NavalBase()
@@ -520,8 +564,7 @@ void e2::NavalBase::onTurnStart()
 
 
 
-e2::AirBase::AirBase(e2::GameContext* gameCtx, glm::ivec2 const& tile, uint8_t empire)
-	: e2::GameStructure(gameCtx, tile, empire)
+void e2::AirBase::setupConfig()
 {
 	displayName = "Air Base";
 	sightRange = 2;
@@ -532,6 +575,18 @@ e2::AirBase::AirBase(e2::GameContext* gameCtx, glm::ivec2 const& tile, uint8_t e
 	m_buildActionJetFighter.buildTurnsLeft = 4;
 	m_buildActionJetFighter.buildType = EntityType::Unit_Fighter;
 	m_buildActionJetFighter.displayName = "Fighter Jet";
+}
+
+e2::AirBase::AirBase(e2::GameContext* gameCtx, glm::ivec2 const& tile, uint8_t empire)
+	: e2::GameStructure(gameCtx, tile, empire)
+{
+	setupConfig();
+}
+
+e2::AirBase::AirBase()
+	: e2::GameStructure()
+{
+	setupConfig();
 }
 
 e2::AirBase::~AirBase()
@@ -659,8 +714,7 @@ void e2::AirBase::onTurnStart()
 
 
 
-e2::ForwardOperatingBase::ForwardOperatingBase(e2::GameContext* gameCtx, glm::ivec2 const& tile, uint8_t empire)
-	: e2::GameStructure(gameCtx, tile, empire)
+void e2::ForwardOperatingBase::setupConfig()
 {
 	displayName = "Forward Operating Base";
 	sightRange = 2;
@@ -671,6 +725,18 @@ e2::ForwardOperatingBase::ForwardOperatingBase(e2::GameContext* gameCtx, glm::iv
 	m_buildActionEngineer.buildTurnsLeft = 3;
 	m_buildActionEngineer.buildType = EntityType::Unit_Engineer;
 	m_buildActionEngineer.displayName = "Engineer";
+}
+
+e2::ForwardOperatingBase::ForwardOperatingBase(e2::GameContext* gameCtx, glm::ivec2 const& tile, uint8_t empire)
+	: e2::GameStructure(gameCtx, tile, empire)
+{
+	setupConfig();
+}
+
+e2::ForwardOperatingBase::ForwardOperatingBase()
+	: e2::GameStructure()
+{
+	setupConfig();
 }
 
 e2::ForwardOperatingBase::~ForwardOperatingBase()

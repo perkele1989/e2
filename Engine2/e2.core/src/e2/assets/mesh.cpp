@@ -871,7 +871,7 @@ e2::AnimationPose::~AnimationPose()
 
 }
 
-void e2::AnimationPose::updateAnimation(float timeDelta, bool onlyTickTime)
+void e2::AnimationPose::updateAnimation(double timeDelta, bool onlyTickTime)
 {
 	if (!m_playing)
 		return;

@@ -243,6 +243,7 @@ void e2::RenderManager::initialize()
 	rendererSetLayoutInfo.bindings.push({ e2::DescriptorBindingType::Texture, 1 }); // frontbuffer color 
 	rendererSetLayoutInfo.bindings.push({ e2::DescriptorBindingType::Texture, 1 }); // frontbuffer position
 	rendererSetLayoutInfo.bindings.push({ e2::DescriptorBindingType::Texture, 1 }); // frontbuffer depth
+	rendererSetLayoutInfo.bindings.push({ e2::DescriptorBindingType::Texture, 1 }); // outline texture
 	m_rendererSetLayout = renderContext()->createDescriptorSetLayout(rendererSetLayoutInfo);
 	
 	e2::PipelineLayoutCreateInfo lineCreateInfo{};

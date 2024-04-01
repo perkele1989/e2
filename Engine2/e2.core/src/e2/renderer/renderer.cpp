@@ -54,6 +54,8 @@ layout(set = 0, binding = 6) uniform texture2D radianceCube;
 layout(set = 0, binding = 7) uniform texture2D frontBufferColor;
 layout(set = 0, binding = 8) uniform texture2D frontBufferPosition;
 layout(set = 0, binding = 9) uniform texture2D frontBufferDepth;
+
+layout(set = 0, binding = 10) uniform texture2D outlineTexture;
 // End Set0
 
 	void main()
@@ -304,6 +306,12 @@ void e2::Renderer::recordFrame(double deltaTime)
 	{
 		m_renderBuffers[0].sets[frameIndex]->writeTexture(6, m_radiance);
 		m_renderBuffers[1].sets[frameIndex]->writeTexture(6, m_radiance);
+	}
+
+	if (m_outlineTextures[frameIndex])
+	{
+		m_renderBuffers[0].sets[frameIndex]->writeTexture(10, m_outlineTextures[frameIndex]);
+		m_renderBuffers[1].sets[frameIndex]->writeTexture(10, m_outlineTextures[frameIndex]);
 	}
 
 	// Begin command buffer
@@ -590,6 +598,12 @@ void e2::Renderer::setSun(glm::vec3 const& dir, glm::vec3 const& color, float st
 	m_sunColor = color;
 	m_sunDirection = glm::normalize(dir);
 	m_sunStrength = strength;
+}
+
+void e2::Renderer::setOutlineTextures(e2::ITexture* textures[2])
+{
+	m_outlineTextures[0] = textures[0];
+	m_outlineTextures[1] = textures[1];
 }
 
 void e2::Renderer::swapRenderBuffers()

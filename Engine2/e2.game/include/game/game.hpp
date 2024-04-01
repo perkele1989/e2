@@ -14,6 +14,15 @@
 namespace e2
 {
 
+
+	enum class MainMenuState : uint8_t
+	{
+		Main,
+		Load,
+		Options,
+		Credits
+	};
+
 	enum class InGameMenuState : uint8_t
 	{
 		Main,
@@ -111,12 +120,36 @@ namespace e2
 		
 	};
 
+	struct SaveMeta
+	{
+		bool exists{};
+
+		uint8_t slot{};
+		std::time_t timestamp;
+
+		std::string cachedDisplayName;
+		std::string cachedFileName;
+
+		std::string displayName();
+		std::string fileName();
+	};
+
+	constexpr uint64_t numSaveSlots = 8;
+
 	class Game : public e2::Application, public e2::GameContext
 	{
 	public:
 
+
+		SaveMeta saveSlots[e2::numSaveSlots];
+
 		Game(e2::Context* ctx);
 		virtual ~Game();
+
+		void saveGame(uint8_t slot);
+		e2::SaveMeta readSaveMeta(uint8_t slot);
+		void readAllSaveMetas();
+		void loadGame(uint8_t slot);
 
 		// thsi function inits game specific stuff (as opposed to resources). Creates grid etc
 		void setupGame();
@@ -242,6 +275,7 @@ namespace e2
 
 
 		GlobalState m_globalState{ GlobalState::Menu };
+		MainMenuState m_mainMenuState{ MainMenuState::Main };
 
 		InGameMenuState m_inGameMenuState{ InGameMenuState::Main };
 
@@ -331,6 +365,7 @@ namespace e2
 		void endEntityTargeting();
 		void updateEntityTarget();
 		
+		void postSpawnUnit(e2::GameUnit* unit);
 
 
 		template<typename UnitType, typename... Args>
@@ -342,15 +377,8 @@ namespace e2
 
 
 			UnitType* newUnit = e2::create<UnitType>(this, coords, empire, std::forward<Args>(args)...);
-			newUnit->initialize();
 
-			m_units.insert(newUnit);
-			m_unitIndex[coords] = newUnit;
-
-			if (m_empires[empire])
-				m_empires[empire]->units.insert(newUnit);
-
-			m_resources.fiscalStreams.insert(newUnit);
+			postSpawnUnit(newUnit);
 
 			return newUnit;
 		}
@@ -383,6 +411,9 @@ namespace e2
 		void selectStructure(e2::GameStructure* structure);
 		void deselectStructure();
 
+
+		void postSpawnStructure(e2::GameStructure* structure);
+
 		template<typename UnitType, typename... Args>
 		UnitType* spawnStructure(e2::Hex const& location, EmpireId empire, Args... args)
 		{
@@ -391,23 +422,8 @@ namespace e2
 				return nullptr;
 
 			UnitType* newStructure = e2::create<UnitType>(this, coords, empire, std::forward<Args>(args)...);
-			newStructure->initialize();
-
-			m_structures.insert(newStructure);
-			m_structureIndex[coords] = newStructure;
-
-			if (m_empires[empire])
-				m_empires[empire]->structures.insert(newStructure);
-
-			m_resources.fiscalStreams.insert(newStructure);
-
-			removeWood(location);
-
-			e2::TileData* existingData = m_hexGrid->getTileData(coords);
-			if (existingData)
-			{
-				existingData->empireId = empire;
-			}
+			
+			postSpawnStructure(newStructure);
 
 			return newStructure;
 		}

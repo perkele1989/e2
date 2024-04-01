@@ -28,6 +28,7 @@ layout(set = 0, binding = 6) uniform texture2D radianceCube;
 layout(set = 0, binding = 7) uniform texture2D frontBufferColor;
 layout(set = 0, binding = 8) uniform texture2D frontBufferPosition;
 layout(set = 0, binding = 9) uniform texture2D frontBufferDepth;
+layout(set = 0, binding = 10) uniform texture2D outlineTexture;
 // End Set0
 
 // Begin Set1: Mesh 

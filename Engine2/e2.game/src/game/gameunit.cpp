@@ -9,16 +9,27 @@
 #include <glm/gtx/quaternion.hpp>
 #include <glm/ext/matrix_transform.hpp>
 
-e2::GameUnit::GameUnit(e2::GameContext* ctx, glm::ivec2 const& tile, uint8_t empire)
-	: e2::GameEntity(ctx, tile, empire)
+void e2::GameUnit::setupConfig()
 {
-	movePointsLeft = moveRange;
+	movePointsLeft = movePoints;
 
 	labels.resize(3);
 	for (HitLabel& label : labels)
 		label.active = false;
 }
 
+e2::GameUnit::GameUnit(e2::GameContext* ctx, glm::ivec2 const& tile, uint8_t empire)
+	: e2::GameEntity(ctx, tile, empire)
+{
+	setupConfig();
+}
+
+
+e2::GameUnit::GameUnit()
+	: e2::GameEntity()
+{
+	setupConfig();
+}
 
 void e2::GameUnit::kill()
 {
@@ -149,6 +160,23 @@ void e2::GameUnit::drawUI(e2::UIContext* ui)
 
 }
 
+void e2::GameUnit::writeForSave(e2::Buffer& toBuffer)
+{
+	e2::GameEntity::writeForSave(toBuffer);
+
+	toBuffer << health;
+	toBuffer << movePoints;
+	toBuffer << movePointsLeft;
+}
+
+void e2::GameUnit::readForSave(e2::Buffer& fromBuffer)
+{
+	e2::GameEntity::readForSave(fromBuffer);
+	fromBuffer >> health;
+	fromBuffer >> movePoints;
+	fromBuffer >> movePointsLeft;
+}
+
 e2::GameUnit::~GameUnit()
 {
 	destroyProxy();
@@ -169,13 +197,12 @@ void e2::GameEntity::collectExpenditure(ResourceTable& outExpenditureTable)
 
 void e2::GameEntity::initialize()
 {
-	spreadVisibility();
+	if(isLocal())
+		spreadVisibility();
 
 	m_mesh = game()->getEntityMesh(entityType);
 	m_skeleton = game()->getEntitySkeleton(entityType);
 
-	m_targetRotation = glm::angleAxis(0.0f, glm::vec3(e2::worldUp()));
-	m_rotation = m_targetRotation;
 
 	buildProxy();
 
@@ -206,7 +233,7 @@ void e2::GameUnit::onTurnEnd()
 
 void e2::GameUnit::onTurnStart()
 {
-	movePointsLeft = moveRange;
+	movePointsLeft = movePoints;
 }
 
 void e2::GameUnit::onHit(e2::GameEntity* instigator, float dmg)
@@ -217,16 +244,48 @@ void e2::GameUnit::onHit(e2::GameEntity* instigator, float dmg)
 }
 
 e2::GameEntity::GameEntity(e2::GameContext* ctx, glm::ivec2 const& tile, EmpireId empire)
-	: m_game(ctx->game())
-	, tileIndex(tile)
-	, empireId(empire)
+	: e2::GameEntity()
 {
-	m_position = e2::Hex(tile).localCoords();
+	postConstruct(ctx, tile, empire);
+}
+
+e2::GameEntity::GameEntity()
+{
+
+	m_targetRotation = glm::angleAxis(0.0f, glm::vec3(e2::worldUp()));
+	m_rotation = m_targetRotation;
 }
 
 e2::GameEntity::~GameEntity()
 {
 	destroyProxy();
+}
+
+void e2::GameEntity::postConstruct(e2::GameContext* ctx, glm::ivec2 const& tile, EmpireId empire)
+{
+	m_game = ctx->game();
+	tileIndex = tile;
+	empireId = empire;
+	m_position = e2::Hex(tileIndex).localCoords();
+}
+
+void e2::GameEntity::writeForSave(e2::Buffer& toBuffer)
+{
+	toBuffer << displayName;
+	toBuffer << sightRange;
+	toBuffer << m_rotation;
+	toBuffer << m_targetRotation;
+	toBuffer << m_position;
+
+}
+
+void e2::GameEntity::readForSave(e2::Buffer& fromBuffer)
+{
+	fromBuffer >> displayName;
+	fromBuffer >> sightRange;
+	fromBuffer >> m_rotation;
+	fromBuffer >> m_targetRotation;
+	fromBuffer >> m_position;
 }
 
 namespace
@@ -246,6 +305,11 @@ void e2::GameEntity::setMeshTransform(glm::vec3 const& pos, float angle)
 {
 	m_targetRotation = glm::angleAxis(angle, glm::vec3(e2::worldUp()));
 	m_position = pos;
+}
+
+bool e2::GameEntity::isLocal()
+{
+	return empireId == game()->localEmpire()->id;
 }
 
 glm::vec2 e2::GameEntity::planarCoords()
@@ -360,8 +424,14 @@ void e2::GameEntity::onEndMove()
 
 }
 
-e2::GameStructure::GameStructure(e2::GameContext* ctx, glm::ivec2 const& tile, uint8_t empireId)
+e2::GameStructure::GameStructure(e2::GameContext* ctx, glm::ivec2 const& tile, EmpireId empireId)
 	: e2::GameEntity(ctx, tile, empireId)
+{
+
+}
+
+e2::GameStructure::GameStructure()
+	: e2::GameEntity()
 {
 
 }
@@ -369,6 +439,16 @@ e2::GameStructure::GameStructure(e2::GameContext* ctx, glm::ivec2 const& tile, u
 e2::GameStructure::~GameStructure()
 {
 
+}
+
+void e2::GameStructure::writeForSave(e2::Buffer& toBuffer)
+{
+	toBuffer << health;
+}
+
+void e2::GameStructure::readForSave(e2::Buffer& fromBuffer)
+{
+	fromBuffer >> health;
 }
 
 void e2::GameStructure::drawUI(e2::UIContext* ui)
@@ -380,51 +460,63 @@ void e2::GameStructure::drawUI(e2::UIContext* ui)
 	ui->endStackV();
 }
 
-e2::Mine::Mine(e2::GameContext* ctx, glm::ivec2 const& tile, uint8_t empireId, e2::EntityType type)
+void e2::Mine::setupConfig()
+{
+	sightRange = 2;
+}
+
+e2::Mine::Mine(e2::GameContext* ctx, glm::ivec2 const& tile, EmpireId empireId, e2::EntityType type)
 	: e2::GameStructure(ctx, tile, empireId)
 {
-	e2::TileData* tileData = game()->hexGrid()->getTileData(tile);
-	if (!tileData)
-		return;
-
-	e2::TileFlags resource = tileData->getResource();
-	
 	entityType = type;
-	if (entityType == e2::EntityType::Structure_GoldMine)
-	{
-		displayName = "Gold mine";
-		;
-	}
-	else if (entityType == e2::EntityType::Structure_UraniumMine)
-	{
-		displayName = "Uranium mine";
-		;
-	}
-	else if (entityType == e2::EntityType::Structure_OreMine)
-	{
-		displayName = "Ore mine";
-		;
-	}
-	else if (entityType == e2::EntityType::Structure_SawMill)
-	{
-		displayName = "Saw Mill";
-		;
-	}
-	else if (entityType == e2::EntityType::Structure_Quarry)
-	{
-		displayName = "Quarry";
-	}
+	setupConfig();
+}
 
-	sightRange = 2;
-
-	// refresh the chunk to remove forest we just ploinked
-	e2::ChunkState* chunk = hexGrid()->getOrCreateChunk(hexGrid()->chunkIndexFromPlanarCoords(e2::Hex(tileIndex).planarCoords()));
-	hexGrid()->refreshChunkMeshes(chunk);
+e2::Mine::Mine()
+	: e2::GameStructure()
+{
+	setupConfig();
 }
 
 e2::Mine::~Mine()
 {
 
+}
+
+void e2::Mine::writeForSave(e2::Buffer& toBuffer)
+{
+	e2::GameStructure::writeForSave(toBuffer);
+
+	toBuffer << (uint32_t)entityType;
+}
+
+void e2::Mine::readForSave(e2::Buffer& fromBuffer)
+{
+	e2::GameStructure::readForSave(fromBuffer);
+
+	uint32_t newType;
+	fromBuffer >> newType;
+	entityType = (EntityType)newType;
+}
+
+void e2::Mine::initialize()
+{
+	// refresh the chunk to remove forest we just ploinked @todo this doesnt always actually refresh! why? (chunkindexfromplanarcoords wrong? should we use fromoffsetcoords?)
+	e2::ChunkState* chunk = hexGrid()->getOrCreateChunk(hexGrid()->chunkIndexFromPlanarCoords(e2::Hex(tileIndex).planarCoords()));
+	hexGrid()->refreshChunkMeshes(chunk);
+
+	if (entityType == e2::EntityType::Structure_GoldMine)
+		displayName = "Gold mine";
+	else if (entityType == e2::EntityType::Structure_UraniumMine)
+		displayName = "Uranium mine";
+	else if (entityType == e2::EntityType::Structure_OreMine)
+		displayName = "Ore mine";
+	else if (entityType == e2::EntityType::Structure_SawMill)
+		displayName = "Saw Mill";
+	else if (entityType == e2::EntityType::Structure_Quarry)
+		displayName = "Quarry";
+
+	e2::GameStructure::initialize();
 }
 
 void e2::Mine::collectRevenue(ResourceTable& outRevenueTable)

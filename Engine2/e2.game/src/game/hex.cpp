@@ -1264,6 +1264,8 @@ void e2::HexGrid::invalidateFogOfWarRenderTarget(glm::uvec2 const& newResolution
 
 	if (m_frameData[0].outlineTexture)
 		e2::discard(m_frameData[0].outlineTexture);
+	if (m_frameData[1].outlineTexture)
+		e2::discard(m_frameData[1].outlineTexture);
 
 	if (m_frameData[0].fogOfWarMasks[0])
 		e2::discard(m_frameData[0].fogOfWarMasks[0]);
@@ -1548,7 +1550,10 @@ void e2::HexGrid::renderFogOfWar()
 	// base
 	for (glm::ivec2 const& hexIndex : m_outlineTiles)
 	{
+		//e2::TileData* td = getTileData(hexIndex);
 		glm::vec3 worldOffset = e2::Hex(hexIndex).localCoords();
+		//if (td && td->getWater() != e2::TileFlags::WaterNone)
+		//	worldOffset.y += 0.1f;
 
 		glm::mat4 transform = glm::identity<glm::mat4>();
 		transform = glm::translate(transform, worldOffset);
@@ -1556,7 +1561,7 @@ void e2::HexGrid::renderFogOfWar()
 
 
 		outlineConstants.mvpMatrix = vpMatrix * transform;
-		outlineConstants.color = { 1.0f, 1.0f, 1.0f, 0.01f };
+		outlineConstants.color = { 1.0f, 1.0f, 1.0f, 1.0f };
 
 		buff->pushConstants(m_outlinePipelineLayout, 0, sizeof(e2::OutlineConstants), reinterpret_cast<uint8_t*>(&outlineConstants));
 		buff->draw(hexSpec.indexCount, 1);
@@ -1564,14 +1569,18 @@ void e2::HexGrid::renderFogOfWar()
 	// subtractive
 	for (glm::ivec2 const& hexIndex : m_outlineTiles)
 	{
+		//e2::TileData* td = getTileData(hexIndex);
 		glm::vec3 worldOffset = e2::Hex(hexIndex).localCoords();
+
+		//if (td && td->getWater() != e2::TileFlags::WaterNone)
+		//	worldOffset.y += 0.1f;
 
 		glm::mat4 transform = glm::identity<glm::mat4>();
 		transform = glm::translate(transform, worldOffset);
 		transform = glm::scale(transform, { 1.01f, 1.01f, 1.01f });
 
 		outlineConstants.mvpMatrix = vpMatrix * transform;
-		outlineConstants.color = { 0.5f, 0.04f, 0.03f, 0.0f };
+		outlineConstants.color = { 0.0f, 0.00f, 0.00f, 0.0f };
 
 		buff->pushConstants(m_outlinePipelineLayout, 0, sizeof(e2::OutlineConstants), reinterpret_cast<uint8_t*>(&outlineConstants));
 		buff->draw(hexSpec.indexCount, 1);
@@ -1954,6 +1963,11 @@ void e2::HexGrid::destroyFogOfWar()
 		e2::discard(m_frameData[1].fogOfWarMasks[1]);
 
 
+	if (m_frameData[0].fogOfWarTargets[0])
+		e2::discard(m_frameData[0].fogOfWarTargets[0]);
+	if (m_frameData[0].fogOfWarTargets[1])
+		e2::discard(m_frameData[0].fogOfWarTargets[1]);
+
 	if (m_frameData[1].fogOfWarTargets[0])
 		e2::discard(m_frameData[1].fogOfWarTargets[0]);
 	if (m_frameData[1].fogOfWarTargets[1])
@@ -1973,6 +1987,17 @@ void e2::HexGrid::destroyFogOfWar()
 
 	if (m_fogOfWarCommandBuffers[1])
 		e2::discard(m_fogOfWarCommandBuffers[1]);
+
+	if (m_frameData[0].outlineTarget)
+		e2::discard(m_frameData[0].outlineTarget);
+	if (m_frameData[1].outlineTarget)
+		e2::discard(m_frameData[1].outlineTarget);
+
+	if (m_frameData[0].outlineTexture)
+		e2::discard(m_frameData[0].outlineTexture);
+	if (m_frameData[1].outlineTexture)
+		e2::discard(m_frameData[1].outlineTexture);
+
 
 }
 

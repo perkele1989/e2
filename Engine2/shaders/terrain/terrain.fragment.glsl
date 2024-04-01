@@ -26,6 +26,8 @@ void main()
     vec2 texUv = fragmentPosition.xz;
     texUv.y = -texUv.y;
 
+	//vec3 frontBuffer = texture(sampler2D(frontBufferColor, clampSampler), gl_FragCoord.xy / vec2(resolution.x, resolution.y)).rgb;
+	vec4 outline = texture(sampler2D(outlineTexture, clampSampler),  gl_FragCoord.xy / vec2(resolution.x, resolution.y)).rgba;
 
 	vec3 albedoSand = texture(sampler2D(sandAlbedo, repeatSampler), texUv * texScaleSand).rgb;
 	//albedoSand *= vec3(1.0, 1.0, 1.0) * 0.8;
@@ -111,11 +113,13 @@ void main()
 	outColor.rgb *= getCloudShadows(fragmentPosition.xyz);
 
 
+	outColor.rgb = mix(outColor.rgb, outline.rgb, outline.a);
+
 	// debug norm
 	//outColor.rgb = clamp(vec3(finalNormal.x, finalNormal.z, -finalNormal.y) * 0.5 + 0.5, vec3(0.0), vec3(1.0));
 
 	float gridCoeff2 = smoothstep(0.92, 0.95, fragmentColor.a);
-	gridCoeff2 *= 0.15;
-	//outColor.rgb = mix(outColor.rgb, vec3(0.0), gridCoeff2);
+	gridCoeff2 *= 0.1;
+	outColor.rgb = mix(outColor.rgb, vec3(0.0), gridCoeff2);
 
 }

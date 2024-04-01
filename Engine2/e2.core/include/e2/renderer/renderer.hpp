@@ -181,6 +181,8 @@ namespace e2
 		void setEnvironment(e2::ITexture* irradiance, e2::ITexture* radiance);
 		void setSun(glm::vec3 const& dir, glm::vec3 const& color, float strength);
 
+		void setOutlineTextures(e2::ITexture* textures[2]);
+
 	protected:
 		e2::Session* m_session{};
 
@@ -220,6 +222,9 @@ namespace e2
 
 		e2::ITexture* m_irradiance{};
 		e2::ITexture* m_radiance{};
+
+		e2::ITexture* m_outlineTextures[2];
+
 		float m_iblStrength{ 1.0f };
 
 		glm::vec3 m_sunColor;
