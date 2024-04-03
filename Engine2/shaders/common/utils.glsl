@@ -249,6 +249,8 @@ vec3 fogOfWar(vec3 color, vec3 position, vec3 vis, float time)
     vec3 und = undiscovered(f, fn, color, position, vis);
     vec3 fow = mix(und, oos, vis.x);
 
+    //fow = vec3(vis.z, 0.0 ,0.0);
+
     return fow;
 }
 

@@ -62,8 +62,12 @@ namespace e2
 		bool intersects(Line2D const& other);
 	};
 
-	struct E2_API Aabb2D
+	struct E2_API Aabb2D : public e2::Data
 	{
+
+		virtual void write(Buffer& destination) const override;
+		virtual bool read(Buffer& source) override;
+
 		glm::vec2 min{};
 		glm::vec2 max{};
 

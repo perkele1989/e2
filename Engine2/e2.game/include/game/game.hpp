@@ -304,8 +304,7 @@ namespace e2
 		e2::Moment m_beginStreamTime;
 
 		// game economy
-		void updateResources();
-		GameResources m_resources;
+		//GameResources m_resources;
 		e2::Texture2DPtr m_uiTextureResources;
 
 		CursorMode m_cursorMode{ CursorMode::Select };

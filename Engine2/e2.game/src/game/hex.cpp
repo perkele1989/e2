@@ -164,6 +164,99 @@ e2::Game* e2::HexGrid::game()
 
 
 
+void e2::HexGrid::saveToBuffer(e2::Buffer& toBuffer)
+{
+	toBuffer << uint64_t(m_discoveredChunks.size());
+	for (glm::ivec2 const& vec : m_discoveredChunks)
+	{
+		toBuffer << vec;
+	}
+
+	toBuffer << m_discoveredChunksAABB;
+
+	toBuffer << uint64_t(m_tiles.size());
+	for (uint64_t i = 0; i < m_tiles.size(); i++)
+	{
+		toBuffer << int32_t(m_tileVisibility[i]);
+		toBuffer << uint16_t(m_tiles[i].empireId);
+		toBuffer << uint16_t(m_tiles[i].flags);
+
+		if (m_tiles[i].forestMesh)
+			toBuffer << m_tiles[i].forestMesh->uuid;
+		else
+			toBuffer << e2::UUID();
+	}
+
+	toBuffer << uint64_t(m_tileIndex.size());
+	for (auto& [hex, ind]: m_tileIndex)
+	{
+		toBuffer << uint64_t(ind) << hex.offsetCoords();
+	}
+
+	toBuffer << m_worldBounds;
+	toBuffer << m_minimapViewBounds;
+	toBuffer << m_minimapViewOffset;
+	toBuffer << m_minimapViewZoom;
+}
+
+void e2::HexGrid::loadFromBuffer(e2::Buffer& fromBuffer)
+{
+	uint64_t numDiscoveredChunks{};
+	fromBuffer >> numDiscoveredChunks;
+	for (uint64_t i = 0; i < numDiscoveredChunks; i++)
+	{
+		glm::ivec2 chunkIndex;
+		fromBuffer >> chunkIndex;
+		m_discoveredChunks.insert(chunkIndex);
+	}
+
+	fromBuffer >> m_discoveredChunksAABB;
+
+	uint64_t numTiles{};
+	fromBuffer >> numTiles;
+	for (uint64_t i = 0; i < numTiles; i++)
+	{
+		int32_t newVis{};
+		fromBuffer >> newVis;
+		m_tileVisibility.push_back(newVis);
+
+		TileData newTile;
+		uint16_t empId{};
+		fromBuffer >> empId;
+		newTile.empireId = empId;
+		uint16_t flags{};
+		fromBuffer >> flags;
+		newTile.flags = (e2::TileFlags)flags;
+		e2::UUID formes;
+		fromBuffer >> formes;
+		if (formes.valid())
+		{
+			newTile.forestMesh = assetManager()->get(formes).cast<e2::Mesh>();
+		}
+
+		m_tiles.push_back(newTile);
+
+	}
+
+	uint64_t numTileIndex{};
+	fromBuffer >> numTileIndex;
+
+	for (uint64_t i = 0; i < numTileIndex; i++)
+	{
+		glm::ivec2 hex;
+		uint64_t ind;
+		fromBuffer >> ind >> hex;
+		m_tileIndex[e2::Hex(hex)] = ind;
+	}
+
+
+
+	fromBuffer >> m_worldBounds;
+	fromBuffer >> m_minimapViewBounds;
+	fromBuffer >> m_minimapViewOffset;
+	fromBuffer >> m_minimapViewZoom;
+}
+
 e2::Aabb2D e2::HexGrid::getChunkAabb(glm::ivec2 const& chunkIndex)
 {
 	glm::vec2 _chunkSize = chunkSize();

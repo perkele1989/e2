@@ -822,6 +822,19 @@ bool e2::Ray2D::edgeTest(glm::vec2 const& circleOrigin, float circleRadius) cons
 	return glm::dot(perpendicular, circleOrigin - position) < circleRadius;
 }
 
+void e2::Aabb2D::write(Buffer& destination) const
+{
+	destination << min;
+	destination << max;
+}
+
+bool e2::Aabb2D::read(Buffer& source)
+{
+	source >> min;
+	source >> max;
+	return true;
+}
+
 e2::StackVector<glm::vec2, 4> e2::Aabb2D::points()
 {
 	e2::StackVector<glm::vec2, 4> p = {

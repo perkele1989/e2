@@ -96,11 +96,7 @@ namespace e2
 
 		// flags control biome, resources, abundance
 		TileFlags flags{ TileFlags::None }; // 16 bits
-		uint8_t empireId{255}; // 255 means no empire claim this, 254 empire ids that are recycled (max 254 concurrent empires)
-
-		// optional mesh proxy, it shows: structure if built, resource mesh if unbuilt but there is a resource here to be displayed, nothing otherwise
-		e2::MeshProxy* mainProxy{};
-		e2::MeshPtr mainMesh{};
+		EmpireId empireId{255}; // 255 means no empire claim this, 254 empire ids that are recycled (max 254 concurrent empires)
 
 		// optional forest proxy, if this tile is discovered it shows: forest abundance if unbuilt on forest, partly forest if built on forest, nothing if not on forest or if undiscovered (undiscovered tile meshes lives on chunk array)
 		e2::MeshProxy* forestProxy{};
@@ -252,6 +248,10 @@ namespace e2
 
 		virtual e2::Engine* engine() override;
 		virtual e2::Game* game() override;
+
+
+		void saveToBuffer(e2::Buffer& toBuffer);
+		void loadFromBuffer(e2::Buffer& fromBuffer);
 
 		/// Chunks Begin (and World Streaming)
 
@@ -421,12 +421,6 @@ namespace e2
 		}
 
 
-		std::mutex& dynamicMutex()
-		{
-			return m_dynamicMutex;
-		}
-
-
 		// fog of war in this function actually means fog of war, outlines and blur 
 		void initializeFogOfWar();
 		void invalidateFogOfWarRenderTarget(glm::uvec2 const& newResolution);
@@ -452,12 +446,6 @@ namespace e2
 
 
 		e2::Game* m_game{};
-
-		std::mutex m_dynamicMutex;
-
-//		e2::Viewpoints2D m_viewpoints;
-
-
 
 		//
 		// list of discovered tiles 

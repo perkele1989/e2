@@ -54,6 +54,7 @@ void e2::Game::saveGame(uint8_t slot)
 
 	buf << int64_t(newMeta.timestamp);
 
+	m_hexGrid->saveToBuffer(buf);
 
 	buf << m_startViewOrigin;
 	buf << m_viewOrigin;
@@ -170,13 +171,11 @@ void e2::Game::loadGame(uint8_t slot)
 	nukeGame();
 	setupGame();
 
+	m_hexGrid->loadFromBuffer(buf);
 
 	buf >> m_startViewOrigin;
 	buf >> m_viewOrigin;
 	buf >> m_turn;
-
-	m_hexGrid->initializeWorldBounds(m_viewOrigin);
-
 
 	m_localEmpireId = spawnEmpire();
 	m_localEmpire = m_empires[m_localEmpireId];
@@ -1306,7 +1305,7 @@ void e2::Game::onStartOfTurn()
 		}
 	}
 
-	m_resources.onNewTurn();
+	m_empires[m_empireTurn]->resources.onNewTurn();
 
 	for (e2::GameUnit* unit : m_empires[m_empireTurn]->units)
 	{
@@ -1441,7 +1440,7 @@ void e2::Game::postSpawnUnit(e2::GameUnit* unit)
 	if (m_empires[unit->empireId])
 		m_empires[unit->empireId]->units.insert(unit);
 
-	m_resources.fiscalStreams.insert(unit);
+	m_empires[unit->empireId]->resources.fiscalStreams.insert(unit);
 }
 
 void e2::Game::drawUI()
@@ -1588,11 +1587,13 @@ void e2::Game::drawStatusUI()
 	std::string str;
 	float strWidth;
 
+	e2::GameResources& resources = m_empires[m_localEmpireId]->resources;
+
 	// Gold
 	xCursor += 2.0f;
 	ui->drawTexturedQuad({ xCursor, 2.0f }, { 24.0f, 24.0f }, 0xFFFFFFFF, m_uiTextureResources->handle(), { (1.0f / 7.0f) * 0.0f, 0.0f }, { 1.0f / 7.0f, 1.0f });
 	xCursor += 26.0f;
-	str = std::format("{:} ({:+})", m_resources.funds.gold, m_resources.profits.gold);
+	str = std::format("{:} ({:+})", resources.funds.gold, resources.profits.gold);
 	strWidth = ui->calculateTextWidth(e2::FontFace::Serif, fontSize, str);
 	ui->drawRasterText(e2::FontFace::Serif, fontSize, 0xFFFFFFFF, { xCursor, 14.0f}, str);
 	xCursor += strWidth;
@@ -1601,7 +1602,7 @@ void e2::Game::drawStatusUI()
 	xCursor += 2.0f;
 	ui->drawTexturedQuad({ xCursor, 2.0f }, { 24.0f, 24.0f }, 0xFFFFFFFF, m_uiTextureResources->handle(), { (1.0f / 7.0f) * 1.0f, 0.0f }, { 1.0f / 7.0f, 1.0f });
 	xCursor += 26.0f;
-	str = std::format("{:} ({:+})", m_resources.funds.wood, m_resources.profits.wood);
+	str = std::format("{:} ({:+})", resources.funds.wood, resources.profits.wood);
 	strWidth = ui->calculateTextWidth(e2::FontFace::Serif, fontSize, str);
 	ui->drawRasterText(e2::FontFace::Serif, fontSize, 0xFFFFFFFF, { xCursor, 14.0f }, str);
 	xCursor += strWidth;
@@ -1610,7 +1611,7 @@ void e2::Game::drawStatusUI()
 	xCursor += 2.0f;
 	ui->drawTexturedQuad({ xCursor, 2.0f }, { 24.0f, 24.0f }, 0xFFFFFFFF, m_uiTextureResources->handle(), { (1.0f / 7.0f) * 2.0f, 0.0f }, { 1.0f / 7.0f, 1.0f });
 	xCursor += 26.0f;
-	str = std::format("{:} ({:+})", m_resources.funds.stone, m_resources.profits.stone);
+	str = std::format("{:} ({:+})", resources.funds.stone, resources.profits.stone);
 	strWidth = ui->calculateTextWidth(e2::FontFace::Serif, fontSize, str);
 	ui->drawRasterText(e2::FontFace::Serif, fontSize, 0xFFFFFFFF, { xCursor, 14.0f }, str);
 	xCursor += strWidth;
@@ -1619,7 +1620,7 @@ void e2::Game::drawStatusUI()
 	xCursor += 2.0f;
 	ui->drawTexturedQuad({ xCursor, 2.0f }, { 24.0f, 24.0f }, 0xFFFFFFFF, m_uiTextureResources->handle(), { (1.0f / 7.0f) * 3.0f, 0.0f }, { 1.0f / 7.0f, 1.0f });
 	xCursor += 26.0f;
-	str = std::format("{:} ({:+})", m_resources.funds.metal, m_resources.profits.metal);
+	str = std::format("{:} ({:+})", resources.funds.metal, resources.profits.metal);
 	strWidth = ui->calculateTextWidth(e2::FontFace::Serif, fontSize, str);
 	ui->drawRasterText(e2::FontFace::Serif, fontSize, 0xFFFFFFFF, { xCursor, 14.0f }, str);
 	xCursor += strWidth;
@@ -1628,7 +1629,7 @@ void e2::Game::drawStatusUI()
 	xCursor += 2.0f;
 	ui->drawTexturedQuad({ xCursor, 2.0f }, { 24.0f, 24.0f }, 0xFFFFFFFF, m_uiTextureResources->handle(), { (1.0f / 7.0f) * 4.0f, 0.0f }, { 1.0f / 7.0f, 1.0f });
 	xCursor += 26.0f;
-	str = std::format("{:} ({:+})", m_resources.funds.oil, m_resources.profits.oil);
+	str = std::format("{:} ({:+})", resources.funds.oil, resources.profits.oil);
 	strWidth = ui->calculateTextWidth(e2::FontFace::Serif, fontSize, str);
 	ui->drawRasterText(e2::FontFace::Serif, fontSize, 0xFFFFFFFF, { xCursor, 14.0f }, str);
 	xCursor += strWidth;
@@ -1637,7 +1638,7 @@ void e2::Game::drawStatusUI()
 	xCursor += 2.0f;
 	ui->drawTexturedQuad({ xCursor, 2.0f }, { 24.0f, 24.0f }, 0xFFFFFFFF, m_uiTextureResources->handle(), { (1.0f / 7.0f) * 5.0f, 0.0f }, { 1.0f / 7.0f, 1.0f });
 	xCursor += 26.0f;
-	str = std::format("{:} ({:+})", m_resources.funds.uranium, m_resources.profits.uranium);
+	str = std::format("{:} ({:+})", resources.funds.uranium, resources.profits.uranium);
 	strWidth = ui->calculateTextWidth(e2::FontFace::Serif, fontSize, str);
 	ui->drawRasterText(e2::FontFace::Serif, fontSize, 0xFFFFFFFF, { xCursor, 14.0f }, str);
 	xCursor += strWidth;
@@ -1646,7 +1647,7 @@ void e2::Game::drawStatusUI()
 	xCursor += 2.0f;
 	ui->drawTexturedQuad({ xCursor, 2.0f }, { 24.0f, 24.0f }, 0xFFFFFFFF, m_uiTextureResources->handle(), { (1.0f / 7.0f) * 6.0f, 0.0f }, { 1.0f / 7.0f, 1.0f });
 	xCursor += 26.0f;
-	str = std::format("{:} ({:+})", m_resources.funds.meteorite, m_resources.profits.meteorite);
+	str = std::format("{:} ({:+})", resources.funds.meteorite, resources.profits.meteorite);
 	strWidth = ui->calculateTextWidth(e2::FontFace::Serif, fontSize, str);
 	ui->drawRasterText(e2::FontFace::Serif, fontSize, 0xFFFFFFFF, { xCursor, 14.0f }, str);
 	xCursor += strWidth;
@@ -1823,11 +1824,6 @@ void e2::Game::onNewCursorHex()
 	{
 		m_unitHoverPath = m_unitAS->find(m_cursorHex);
 	}
-}
-
-void e2::Game::updateResources()
-{
-	
 }
 
 e2::EmpireId e2::Game::spawnEmpire()
@@ -2144,9 +2140,11 @@ void e2::Game::destroyUnit(e2::Hex const& location)
 	m_units.erase(unit);
 
 	if (m_empires[unit->empireId])
+	{
 		m_empires[unit->empireId]->units.erase(unit);
 
-	m_resources.fiscalStreams.erase(unit);
+		m_empires[unit->empireId]->resources.fiscalStreams.erase(unit);
+	}
 
 	e2::destroy(unit);
 }
@@ -2185,7 +2183,7 @@ void e2::Game::harvestWood(e2::Hex const& location, EmpireId empire)
 	if (!hasForest)
 		return;
 
-	m_resources.funds.wood += woodProfit;
+	m_empires[empire]->resources.funds.wood += woodProfit;
 	tileData->flags = e2::TileFlags(uint16_t(tileData->flags) & (~uint16_t(e2::TileFlags::FeatureForest)));
 
 	if (tileData->forestProxy)
@@ -2255,7 +2253,7 @@ void e2::Game::postSpawnStructure(e2::GameStructure* structure)
 	if (m_empires[structure->empireId])
 		m_empires[structure->empireId]->structures.insert(structure);
 
-	m_resources.fiscalStreams.insert(structure);
+	m_empires[structure->empireId]->resources.fiscalStreams.insert(structure);
 
 	removeWood(e2::Hex(structure->tileIndex));
 
@@ -2284,9 +2282,10 @@ void e2::Game::destroyStructure(e2::Hex const& location)
 	m_structures.erase(structure);
 
 	if (m_empires[structure->empireId])
+	{
 		m_empires[structure->empireId]->structures.erase(structure);
-
-	m_resources.fiscalStreams.erase(structure);
+		m_empires[structure->empireId]->resources.fiscalStreams.erase(structure);
+	}
 
 	e2::destroy(structure);
 }

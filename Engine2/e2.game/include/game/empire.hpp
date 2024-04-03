@@ -4,6 +4,7 @@
 #include <e2/utils.hpp>
 #include "game/gamecontext.hpp"
 #include "game/shared.hpp"
+#include "game/resources.hpp"
 
 #include <unordered_set>
 
@@ -31,7 +32,7 @@ namespace e2
 		std::unordered_set<e2::GameStructure*> structures;
 
 		CommanderAI* ai{};
-
+		GameResources resources;
 	protected:
 		e2::Game* m_game{};
 
