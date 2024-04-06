@@ -158,6 +158,8 @@ namespace e2
 		glm::quat m_targetRotation{};
 		glm::vec3 m_position{};
 
+		float m_rotationLerpSpeed = 10.0f;
+
 		float m_heightOffset{};
 
 		glm::vec3 m_modelScale{ glm::vec3(1.0f, 1.0f, 1.0f) };
@@ -170,19 +172,19 @@ namespace e2
 		e2::MeshProxy* m_proxy{};
 		e2::SkinProxy* m_skinProxy{};
 
-		void setCurrentPose(e2::Pose* pose, float lerpTime);
-		void playAction(e2::AnimationPose* anim, float blendIn = 0.2f, float blendOut = 0.2f);
+		void setCurrentPose(e2::Pose* pose, double lerpTime);
+		void playAction(e2::AnimationPose* anim, double blendIn = 0.2f, double blendOut = 0.2f);
 
 		e2::Pose* m_mainPose{};
 
-		float m_lerpTime{};
+		double m_lerpTime{};
 		e2::Moment m_lastChangePose;
 		e2::Pose* m_currentPose{};
 		e2::Pose* m_oldPose{};
 
 		e2::AnimationPose* m_actionPose{};
-		float m_actionBlendInTime = 0.2f;
-		float m_actionBlendOutTime = 0.2f;
+		double m_actionBlendInTime = 0.2f;
+		double m_actionBlendOutTime = 0.2f;
 	};
 
 
@@ -240,6 +242,12 @@ namespace e2
 		glm::vec2 velocity;
 	};
 
+	enum class UnitMoveType : uint8_t
+	{
+		Linear,
+		Smooth
+	};
+
 	class GameUnit : public e2::GameEntity
 	{
 		ObjectDeclaration();
@@ -262,6 +270,8 @@ namespace e2
 
 		
 		e2::PassableFlags passableFlags{ e2::PassableFlags::Land };
+
+		UnitMoveType moveType{ UnitMoveType::Smooth };
 
 		float health{ 100.0f };
 		int32_t movePoints{ 3 };

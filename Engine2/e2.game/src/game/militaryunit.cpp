@@ -100,7 +100,7 @@ void e2::Grunt::initialize()
 
 void e2::Grunt::updateAnimation(double seconds)
 {
-	E2_BEGIN_SCOPE_CTX(game());
+	E2_PROFILE_SCOPE_CTX(game());
 
 	e2::Hex hex = e2::Hex(tileIndex);
 	e2::Viewpoints2D viewpoints = game()->viewPoints();
@@ -109,7 +109,6 @@ void e2::Grunt::updateAnimation(double seconds)
 	if (dying && (!m_diePose->playing() || m_diePose->time() > m_diePose->animation()->timeSeconds() - 0.05f))
 	{
 		game()->queueDestroyUnit(this);
-		E2_END_SCOPE_CTX(game());
 		return;
 	}
 
@@ -135,8 +134,6 @@ void e2::Grunt::updateAnimation(double seconds)
 	// dont update base entity animation stuff unless we are in view
 	if (inView)
 		e2::MilitaryUnit::updateAnimation(seconds);
-
-	E2_END_SCOPE_CTX(game());
 }
 
 void e2::Grunt::drawUI(e2::UIContext* ui)
@@ -278,6 +275,7 @@ void e2::CombatBoat::setupConfig()
 	m_modelScale = (glm::vec3(1.0f, -1.0f, -1.0f) / 4.0f) * 2.5f;
 	m_heightOffset = -0.25f;
 	moveSpeed = 2.8f;
+	moveType = UnitMoveType::Smooth;
 }
 
 e2::CombatBoat::CombatBoat(e2::GameContext* ctx, glm::ivec2 const& tile, uint8_t empire)
@@ -313,7 +311,7 @@ void e2::CombatBoat::initialize()
 
 void e2::CombatBoat::updateAnimation(double seconds)
 {
-	E2_BEGIN_SCOPE_CTX(game());
+	E2_PROFILE_SCOPE_CTX(game());
 
 	e2::Hex hex = e2::Hex(tileIndex);
 	e2::Viewpoints2D viewpoints = game()->viewPoints();
@@ -349,7 +347,6 @@ void e2::CombatBoat::updateAnimation(double seconds)
 	if (inView)
 		e2::MilitaryUnit::updateAnimation(seconds);
 
-	E2_END_SCOPE_CTX(game());
 }
 
 void e2::CombatBoat::drawUI(e2::UIContext* ui)
@@ -486,6 +483,7 @@ void e2::Tank::setupConfig()
 
 	m_modelScale = glm::vec3(1.0f, -1.0f, -1.0f) / 8.0f;
 	moveSpeed = 2.8f;
+	moveType = UnitMoveType::Smooth;
 }
 
 e2::Tank::Tank(e2::GameContext* ctx, glm::ivec2 const& tile, uint8_t empire)
@@ -525,7 +523,7 @@ void e2::Tank::initialize()
 
 void e2::Tank::updateAnimation(double seconds)
 {
-	E2_BEGIN_SCOPE_CTX(game());
+	E2_PROFILE_SCOPE_CTX(game());
 
 	e2::Hex hex = e2::Hex(tileIndex);
 	e2::Viewpoints2D viewpoints = game()->viewPoints();
@@ -561,7 +559,7 @@ void e2::Tank::updateAnimation(double seconds)
 	if (inView)
 		e2::MilitaryUnit::updateAnimation(seconds);
 
-	E2_END_SCOPE_CTX(game());
+
 }
 
 void e2::Tank::drawUI(e2::UIContext* ui)

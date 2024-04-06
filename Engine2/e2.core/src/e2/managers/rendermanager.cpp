@@ -380,10 +380,16 @@ void e2::RenderManager::update(double deltaTime)
 {
 	m_renderContext->tick(deltaTime);
 
+#if defined(E2_PROFILER)
 	e2::Moment preWait;
+#endif 
+
 	// wait for this frames fence, and then reset it
 	m_fences[m_frameIndex]->wait();
+
+#if defined(E2_PROFILER)
 	engine()->metrics().gpuWaitTimeUs[engine()->metrics().cursor] = (float)preWait.durationSince().microseconds();
+#endif
 
 	m_fences[m_frameIndex]->reset();
 

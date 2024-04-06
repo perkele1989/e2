@@ -34,14 +34,6 @@ e2::IPipelineLayout_Vk::IPipelineLayout_Vk(e2::IRenderContext* context, e2::Pipe
 	vkCreateInfo.setLayoutCount = (uint32_t)setLayouts.size();
 	vkCreateInfo.pSetLayouts = setLayouts.data();
 
-	
-	LogNotice("Creating pipeline layout with {} push constant ranges:", vkCreateInfo.pushConstantRangeCount);
-	for (uint32_t i = 0; i < vkCreateInfo.pushConstantRangeCount; i++)
-	{
-		LogNotice("\tRange {}: offset {}, size {}", i, vkCreateInfo.pPushConstantRanges[i].offset, vkCreateInfo.pPushConstantRanges[i].size);
-	}
-	
-
 	VkResult result = vkCreatePipelineLayout(m_renderContextVk->m_vkDevice, &vkCreateInfo, nullptr, &m_vkHandle);
 	if (result != VK_SUCCESS)
 	{

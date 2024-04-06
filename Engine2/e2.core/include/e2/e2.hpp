@@ -11,11 +11,25 @@
 #include <unordered_map>
 #include <unordered_set>
 
+#if defined(E2_PROFILER)
 #define E2_BEGIN_SCOPE() profiler()->beginScope(__FUNCDNAME__, __FUNCTION__);
 #define E2_END_SCOPE() profiler()->endScope();
 
 #define E2_BEGIN_SCOPE_CTX(x) x->profiler()->beginScope(__FUNCDNAME__, __FUNCTION__);
 #define E2_END_SCOPE_CTX(x) x->profiler()->endScope();
+
+
+#define E2_PROFILE_SCOPE() ProfileBlock __profileBlock__##__LINE__(profiler(), __FUNCDNAME__, __FUNCTION__)
+#define E2_PROFILE_SCOPE_CTX(x) ProfileBlock __profileBlock__##__LINE__(x->profiler(), __FUNCDNAME__, __FUNCTION__)
+#else 
+#define E2_BEGIN_SCOPE() void()
+#define E2_END_SCOPE() void()
+#define E2_BEGIN_SCOPE_CTX(x) void()
+#define E2_END_SCOPE_CTX(x) void()
+#define E2_PROFILE_SCOPE() void()
+#define E2_PROFILE_SCOPE_CTX(x) void()
+#endif
+
 
 
 namespace e2
@@ -57,7 +71,7 @@ namespace e2
 
 	constexpr uint64_t profileStackSize = 1024;
 
-
+#if defined(E2_PROFILER)
 	struct E2_API ProfileFunction
 	{
 		/** decorated function name, used as unique identifier */
@@ -116,7 +130,22 @@ namespace e2
 
 	};
 
+	struct ProfileBlock
+	{
+		Profiler* profiler{};
 
+		ProfileBlock(Profiler* inProfiler, std::string const& funcId, std::string const& funcDisplayName)
+			: profiler(inProfiler)
+		{
+			profiler->beginScope(funcId, funcDisplayName);
+		}
+
+		~ProfileBlock()
+		{
+			profiler->endScope();
+		}
+	};
+#endif
 
 	class E2_API Engine : public Context
 	{
@@ -136,20 +165,25 @@ namespace e2
 			return m_application;
 		}
 
+#if defined(E2_PROFILER)
 		e2::EngineMetrics& metrics();
-
+#endif
 	protected:
 		friend Context;
 
 		bool m_running{ false };
 
+#if defined(E2_PROFILER)
 		e2::EngineMetrics m_metrics;
+#endif
 
 		e2::Application* m_application{};
 		
 		e2::Config* m_config{};
-		e2::Profiler* m_profiler{};
 
+#if defined(E2_PROFILER)
+		e2::Profiler* m_profiler{};
+#endif
 		e2::RenderManager* m_renderManager{};
 		e2::GameManager* m_gameManager{};
 		e2::AsyncManager* m_asyncManager{};

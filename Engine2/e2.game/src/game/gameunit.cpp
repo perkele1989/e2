@@ -38,13 +38,13 @@ void e2::GameUnit::kill()
 
 void e2::GameEntity::updateAnimation(double seconds)
 {
-	m_rotation = glm::slerp(m_rotation, m_targetRotation, glm::min(1.0f, float(8.02 * seconds)));
+	m_rotation = glm::slerp(m_rotation, m_targetRotation, glm::min(1.0f, float(m_rotationLerpSpeed * seconds)));
 
 	if (m_skinProxy)
 	{
 		m_mainPose->applyBindPose();
 
-		float poseBlend = glm::clamp((float)m_lastChangePose.durationSince().seconds() / m_lerpTime, 0.0f, 1.0f);
+		double poseBlend = glm::clamp(m_lastChangePose.durationSince().seconds() / m_lerpTime, 0.0, 1.0);
 		if (m_oldPose && m_currentPose)
 		{
 			m_mainPose->applyBlend(m_oldPose, m_currentPose, poseBlend);
@@ -56,11 +56,11 @@ void e2::GameEntity::updateAnimation(double seconds)
 
 		if (m_actionPose && m_actionPose->playing())
 		{
-			float actionCurrentTime = m_actionPose->time();
-			float actionTotalTime = m_actionPose->animation()->timeSeconds();
-			float blendInCoeff = glm::smoothstep(0.0f, m_actionBlendInTime, actionCurrentTime);
-			float blendOutCoeff = 1.0f - glm::smoothstep(actionTotalTime - m_actionBlendOutTime, actionTotalTime, actionCurrentTime);
-			float actionBlendCoeff = blendInCoeff * blendOutCoeff;
+			double actionCurrentTime = m_actionPose->time();
+			double actionTotalTime = m_actionPose->animation()->timeSeconds();
+			double blendInCoeff = glm::smoothstep(0.0, m_actionBlendInTime, actionCurrentTime);
+			double blendOutCoeff = 1.0 - glm::smoothstep(actionTotalTime - m_actionBlendOutTime, actionTotalTime, actionCurrentTime);
+			double actionBlendCoeff = blendInCoeff * blendOutCoeff;
 			m_mainPose->blendWith(m_actionPose, actionBlendCoeff);
 		}
 
@@ -355,7 +355,7 @@ void e2::GameEntity::destroyProxy()
 }
 
 
-void e2::GameEntity::setCurrentPose(e2::Pose* pose, float lerpTime)
+void e2::GameEntity::setCurrentPose(e2::Pose* pose, double lerpTime)
 {
 	if (!m_skinProxy)
 		return;
@@ -367,7 +367,7 @@ void e2::GameEntity::setCurrentPose(e2::Pose* pose, float lerpTime)
 	m_lastChangePose = e2::timeNow();
 }
 
-void e2::GameEntity::playAction(e2::AnimationPose* anim, float blendIn /*= 0.2f*/, float blendOut /*= 0.2f*/)
+void e2::GameEntity::playAction(e2::AnimationPose* anim, double blendIn /*= 0.2f*/, double blendOut /*= 0.2f*/)
 {
 	if (!m_skinProxy)
 		return;

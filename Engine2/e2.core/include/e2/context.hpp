@@ -18,7 +18,10 @@ namespace e2
 	class GameSession;
 	class UIManager;
 	class Application;
+
+#if defined(E2_PROFILER)
 	class Profiler;
+#endif
 
 	class E2_API Context
 	{
@@ -27,7 +30,9 @@ namespace e2
 
 		virtual Engine* engine() = 0;
 
+#if defined(E2_PROFILER)
 		Profiler* profiler();
+#endif
 
 		Application* application();
 		Config* config();

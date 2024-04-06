@@ -365,19 +365,19 @@ void e2::DynamicMesh::addMeshWithShaderFunction(e2::DynamicMesh const* other, gl
 {
 	glm::mat3 normalMatrix = glm::transpose(glm::inverse(transform));
 
-	uint32_t vertexIndexOffset = m_vertices.size();
-	uint32_t triangleIndexOffset = m_triangles.size();
+	size_t vertexIndexOffset = m_vertices.size();
+	size_t triangleIndexOffset = m_triangles.size();
 
-	m_vertices.resize(vertexIndexOffset + other->m_vertices.size());
-	m_triangles.resize(triangleIndexOffset + other->m_triangles.size());
+	m_vertices.resize(size_t(vertexIndexOffset) + other->m_vertices.size());
+	m_triangles.resize(size_t(triangleIndexOffset) + other->m_triangles.size());
 	
 
-	uint32_t i = triangleIndexOffset;
+	size_t i = triangleIndexOffset;
 	for (e2::Triangle const& otherTriangle : other->m_triangles)
 	{
-		m_triangles[i].a = otherTriangle.a + vertexIndexOffset;
-		m_triangles[i].b = otherTriangle.b + vertexIndexOffset;
-		m_triangles[i].c = otherTriangle.c + vertexIndexOffset;
+		m_triangles[i].a = otherTriangle.a + (uint32_t)vertexIndexOffset;
+		m_triangles[i].b = otherTriangle.b + (uint32_t)vertexIndexOffset;
+		m_triangles[i].c = otherTriangle.c + (uint32_t)vertexIndexOffset;
 
 		i++;
 	}

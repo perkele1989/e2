@@ -223,7 +223,7 @@ void e2::HexGrid::loadFromBuffer(e2::Buffer& fromBuffer)
 		TileData newTile;
 		uint16_t empId{};
 		fromBuffer >> empId;
-		newTile.empireId = empId;
+		newTile.empireId = (EmpireId)empId;
 		uint16_t flags{};
 		fromBuffer >> flags;
 		newTile.flags = (e2::TileFlags)flags;
@@ -657,7 +657,7 @@ void e2::HexGrid::updateStreaming(glm::vec2 const& streamCenter, e2::Viewpoints2
 	if (!m_streamingPaused)
 	{
 		m_lookAheadChunks.clear();
-		uint32_t numLookAheads = lookSpeed / lookAheadTreshold;
+		uint32_t numLookAheads = uint32_t(lookSpeed / lookAheadTreshold);
 		for (uint32_t i = 0; i < numLookAheads; i++)
 		{
 			glm::vec2 lookAheadOffset = lookDir * (lookAheadLength * float(i));
@@ -754,7 +754,7 @@ void e2::HexGrid::updateStreaming(glm::vec2 const& streamCenter, e2::Viewpoints2
 			});
 	}
 
-	int32_t currStreaming = m_streamingChunks.size();
+	int32_t currStreaming = (int32_t)m_streamingChunks.size();
 	int32_t numFreeSlots = m_numThreads - currStreaming;
 	constexpr int32_t maxQueued = 32;
 	for (int32_t i = 0; i < sortedQueued.size(); i++)
@@ -767,7 +767,7 @@ void e2::HexGrid::updateStreaming(glm::vec2 const& streamCenter, e2::Viewpoints2
 	}
 
 	// prioritize and cull old chunks
-	int32_t numHidden = m_hiddenChunks.size();
+	int32_t numHidden = (int32_t)m_hiddenChunks.size();
 	int32_t numToCull = numHidden - e2::maxNumExtraChunks;
 	int32_t numToKeep = numHidden - numToCull;
 	if (numToCull > 0)
@@ -863,7 +863,7 @@ void e2::HexGrid::nukeChunk(e2::ChunkState* chunk)
 
 float e2::HexGrid::sampleSimplex(glm::vec2 const& position)
 {
-	return glm::simplex(position) * 0.5 + 0.5;
+	return glm::simplex(position) * 0.5f + 0.5f;
 }
 
 void e2::HexGrid::calculateBiome(glm::vec2 const& planarCoords, e2::TileFlags &outFlags)
@@ -1120,22 +1120,22 @@ void e2::HexGrid::clearAllChunks()
 
 uint32_t e2::HexGrid::numChunks()
 {
-	return m_chunkIndex.size();
+	return (uint32_t)m_chunkIndex.size();
 }
 
 uint32_t e2::HexGrid::numVisibleChunks()
 {
-	return m_visibleChunks.size();
+	return (uint32_t)m_visibleChunks.size();
 }
 
 uint32_t e2::HexGrid::numJobsInFlight()
 {
-	return m_streamingChunks.size();
+	return (uint32_t)m_streamingChunks.size();
 }
 
 uint32_t e2::HexGrid::numJobsInQueue()
 {
-	return m_queuedChunks.size();
+	return (uint32_t)m_queuedChunks.size();
 }
 
 void e2::HexGrid::flagChunkOutdated(glm::ivec2 const& chunkIndex)
@@ -1727,9 +1727,9 @@ void e2::HexGrid::renderFogOfWar()
 				
 				fogOfWarConstants.mvpMatrix = vpMatrix * transform;
 				fogOfWarConstants.visibility.x = 1.0;
-				fogOfWarConstants.visibility.y = m_tileVisibility[finder->second] > 0 ? 1.0 : 0.0;
+				fogOfWarConstants.visibility.y = m_tileVisibility[finder->second] > 0.0f ? 1.0f : 0.0f;
 				fogOfWarConstants.visibility.z =  spooky;
-				fogOfWarConstants.visibility.w = m_tiles[finder->second].getWater() == TileFlags::WaterDeep ? 1.0 : 0.0;
+				fogOfWarConstants.visibility.w = m_tiles[finder->second].getWater() == TileFlags::WaterDeep ? 1.0f : 0.0f;
 
 
 				buff->pushConstants(m_fogOfWarPipelineLayout, 0, sizeof(e2::FogOfWarConstants), reinterpret_cast<uint8_t*>(&fogOfWarConstants));
@@ -2102,7 +2102,7 @@ void e2::HexGrid::clearVisibility()
 
 void e2::HexGrid::flagVisible(glm::ivec2 const& v, bool onlyDiscover)
 {
-	int32_t tileIndex = getTileIndexFromHex(e2::Hex(v));
+	int32_t tileIndex = (int32_t)getTileIndexFromHex(e2::Hex(v));
 
 	if(!onlyDiscover)
 		m_tileVisibility[tileIndex] = m_tileVisibility[tileIndex]  + 1;
@@ -2117,7 +2117,7 @@ void e2::HexGrid::unflagVisible(glm::ivec2 const& v)
 		LogError("attempted to unflag visibility in nondiscovered area, this is likely a bug!");
 		return;
 	}
-	index = finder->second;
+	index = (int32_t)finder->second;
 
 	m_tileVisibility[index] = m_tileVisibility[index] - 1;
 }
@@ -2129,7 +2129,7 @@ bool e2::HexGrid::isVisible(glm::ivec2 const& v)
 	{
 		return false;
 	}
-	int32_t index = finder->second;
+	int32_t index = (int32_t)finder->second;
 	return m_tileVisibility[index];
 }
 
@@ -2320,7 +2320,7 @@ bool e2::ChunkLoadTask::execute()
 	e2::destroy(newChunkMesh);
 
 
-	m_ms = begin.durationSince().milliseconds();
+	m_ms = (float)begin.durationSince().milliseconds();
 
 	return true;
 }

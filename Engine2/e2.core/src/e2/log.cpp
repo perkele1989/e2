@@ -58,7 +58,7 @@ void e2::Log::write(e2::Severity severity, std::string const& function, std::str
 
 uint32_t e2::Log::numEntries()
 {
-	return ::logEntries.size();
+	return (uint32_t)::logEntries.size();
 }
 
 e2::LogEntry const& e2::Log::getEntry(uint32_t id)

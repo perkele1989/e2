@@ -8,13 +8,16 @@
             "source-paths": [ "e2.core/src" ],
             "public": {
                 "defines": {
-                    "GLM_FORCE_DEPTH_ZERO_TO_ONE": "1"
+                    "GLM_FORCE_DEPTH_ZERO_TO_ONE": "1",
+                    "GLM_ENABLE_EXPERIMENTAL": "1"
                 },
                 "defines-profile": {
-                    "GLM_FORCE_DEPTH_ZERO_TO_ONE": "1"
+                    "GLM_FORCE_DEPTH_ZERO_TO_ONE": "1",
+                    "GLM_ENABLE_EXPERIMENTAL": "1"
                 },
                 "defines-devel": {
                     "GLM_FORCE_DEPTH_ZERO_TO_ONE": "1",
+                    "GLM_ENABLE_EXPERIMENTAL": "1",
                     "E2_DEVELOPMENT": "true"
                 },
                 "dependencies": [ "glm.core", "glfw.core" ],
@@ -84,7 +87,16 @@
             "source-paths": ["e2.game/src"],
             "private": {
                 "dependencies": ["e2.core"],
-                "include-paths": ["e2.game/include"]
+                "include-paths": ["e2.game/include"],
+                "defines": {
+                    "GLM_ENABLE_EXPERIMENTAL": "1"
+                },
+                "defines-profile": {
+                    "GLM_ENABLE_EXPERIMENTAL": "1"
+                },
+                "defines-devel": {
+                    "GLM_ENABLE_EXPERIMENTAL": "1"
+                }
             }
         }
     ]

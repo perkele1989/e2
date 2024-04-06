@@ -33,7 +33,7 @@ e2::Session::Session(e2::Context* ctx)
 
 	uint64_t skinDataSize = sizeof(glm::mat4) * e2::maxNumSkeletonBones;
 
-	bufferCreateInfo.size = renderManager()->paddedBufferSize(skinDataSize * e2::maxNumSkinProxies);
+	bufferCreateInfo.size = renderManager()->paddedBufferSize((uint32_t)skinDataSize * e2::maxNumSkinProxies);
 	m_skinBuffers[0] = renderContext()->createDataBuffer(bufferCreateInfo);
 	m_skinBuffers[1] = renderContext()->createDataBuffer(bufferCreateInfo);
 
@@ -47,7 +47,7 @@ e2::Session::Session(e2::Context* ctx)
 	m_modelSets[0]->writeDynamicBuffer(0, m_modelBuffers[0], dynamicSize, 0);
 	m_modelSets[1]->writeDynamicBuffer(0, m_modelBuffers[1], dynamicSize, 0);
 
-	dynamicSize = renderManager()->paddedBufferSize(skinDataSize);
+	dynamicSize = renderManager()->paddedBufferSize((uint32_t)skinDataSize);
 	m_modelSets[0]->writeDynamicBuffer(1, m_skinBuffers[0], dynamicSize, 0);
 	m_modelSets[1]->writeDynamicBuffer(1, m_skinBuffers[1], dynamicSize, 0);
 

@@ -825,9 +825,13 @@ void e2::UIWindow::update(double deltaTime)
 		if (hasTitlebar)
 		{
 			glm::vec2 titlePosition = titlebarPosition + glm::vec2(25.0f * style.scale, titlebarSize.y / 2.0f);
+
+#if defined(E2_PROFILER)
 			e2::EngineMetrics& m = engine()->metrics();
 			std::string str = std::format("**e2 editor** ^m^5{:.1f}ms^- / ^5{:.1f}ms^- / ^7{:.1f}us^- / ^7{:.1f}us^-", m.frameTimeMsMean, m.frameTimeMsHigh, m.gpuWaitTimeUsMean, m.gpuWaitTimeUsHigh);
-			//std::string str = std::format("**e2 editor**");
+#else 
+			constexpr std::string str = "**e2 editor**";
+#endif
 			uiContext()->drawRasterText(e2::FontFace::Sans, uint8_t(11 * style.scale), 0x000000FF, titlePosition, str);
 
 

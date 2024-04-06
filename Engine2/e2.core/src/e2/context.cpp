@@ -10,10 +10,12 @@ e2::Context::~Context()
 
 }
 
+#if defined(E2_PROFILER)
 e2::Profiler* e2::Context::profiler()
 {
 	return engine()->m_profiler;
 }
+#endif
 
 e2::Application* e2::Context::application()
 {

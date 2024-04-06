@@ -33,6 +33,7 @@ namespace e2
 
 	enum class GlobalState : uint8_t
 	{
+		Boot,
 		Menu,
 		Game,
 		InGameMenu
@@ -159,6 +160,8 @@ namespace e2
 
 		void exitToMenu();
 
+		void finalizeBoot();
+
 		virtual void initialize() override;
 		virtual void shutdown() override;
 		virtual void update(double seconds) override;
@@ -259,6 +262,8 @@ namespace e2
 		void discoverEmpire(EmpireId empireId);
 	protected:
 
+		e2::ALJTicket m_bootTicket;
+
 		e2::MeshPtr m_dummyMesh;
 		e2::SkeletonPtr m_dummySkeleton;
 		e2::AnimationPtr m_dummyAnimation;
@@ -273,8 +278,8 @@ namespace e2
 		e2::Texture2DPtr m_irradianceMap;
 		e2::Texture2DPtr m_radianceMap;
 
-
-		GlobalState m_globalState{ GlobalState::Menu };
+		e2::Moment m_bootBegin;
+		GlobalState m_globalState{ GlobalState::Boot };
 		MainMenuState m_mainMenuState{ MainMenuState::Main };
 
 		InGameMenuState m_inGameMenuState{ InGameMenuState::Main };
@@ -348,6 +353,9 @@ namespace e2
 		void deselect();
 
 		void applyDamage(e2::GameEntity* entity, e2::GameEntity* instigator, float damage);
+
+		void resolveSelectedUnit();
+		void unresolveSelectedUnit();
 
 		// game units 
 		void selectUnit(e2::GameUnit* unit);

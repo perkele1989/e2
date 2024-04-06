@@ -56,7 +56,7 @@ e2::Engineer::~Engineer()
 
 void e2::Engineer::updateAnimation(double seconds)
 {
-	E2_BEGIN_SCOPE_CTX(game());
+	E2_PROFILE_SCOPE_CTX(game());
 
 	e2::Hex hex = e2::Hex(tileIndex);
 	e2::Viewpoints2D viewpoints = game()->viewPoints();
@@ -66,7 +66,6 @@ void e2::Engineer::updateAnimation(double seconds)
 	if (dying && (!m_diePose->playing() || m_diePose->time() > m_diePose->animation()->timeSeconds() - 0.05f))
 	{
 		game()->queueDestroyUnit(this);
-		E2_END_SCOPE_CTX(game());
 		return;
 	}
 
@@ -89,9 +88,6 @@ void e2::Engineer::updateAnimation(double seconds)
 
 	if(inView)
 		e2::GameUnit::updateAnimation(seconds);
-
-
-	E2_END_SCOPE_CTX(game());
 
 }
 
@@ -429,7 +425,7 @@ e2::MobileMOB::~MobileMOB()
 
 void e2::MobileMOB::updateAnimation(double seconds)
 {
-	E2_BEGIN_SCOPE_CTX(game());
+	E2_PROFILE_SCOPE_CTX(game());
 
 	e2::Hex hex = e2::Hex(tileIndex);
 	e2::Viewpoints2D viewpoints = game()->viewPoints();
@@ -439,7 +435,6 @@ void e2::MobileMOB::updateAnimation(double seconds)
 	if (dying)
 	{
 		game()->queueDestroyUnit(this);
-		E2_END_SCOPE_CTX(game());
 		return;
 	}
 
@@ -458,10 +453,6 @@ void e2::MobileMOB::updateAnimation(double seconds)
 
 	if (inView)
 		e2::GameUnit::updateAnimation(seconds);
-
-
-	E2_END_SCOPE_CTX(game());
-
 }
 
 void e2::MobileMOB::drawUI(e2::UIContext* ui)

@@ -18,7 +18,7 @@ namespace e2
 		uint32_t index{};
 		e2::Name name;
 
-		// geometry-to-bone (is this inverse bind pose?)
+		// geometry-to-bone (inverse bind pose)
 		glm::mat4 bindMatrix;
 
 		// node-to-parent 
@@ -86,15 +86,15 @@ namespace e2
 	struct AnimationTrack
 	{
 
-		std::pair<uint32_t, float> getFrameDelta(float time, float frameRate);
+		std::pair<uint32_t, double> getFrameDelta(double time, double frameRate);
 
-		float getFloat(float time, float frameRate);
+		float getFloat(double time, double frameRate);
 
-		glm::vec2 getVec2(float time, float frameRate);
+		glm::vec2 getVec2(double time, double frameRate);
 
-		glm::vec3 getVec3(float time, float frameRate);
+		glm::vec3 getVec3(double time, double frameRate);
 
-		glm::quat getQuat(float time, float frameRate);
+		glm::quat getQuat(double time, double frameRate);
 
 		e2::Name name;
 		AnimationType type;
@@ -116,12 +116,12 @@ namespace e2
 		e2::AnimationTrack* trackByName(e2::Name name, AnimationType type);
 
 		uint32_t numFrames();
-		float frameRate();
-		float timeSeconds();
+		double frameRate();
+		double timeSeconds();
 	protected:
 
 		uint32_t m_numFrames{};
-		float m_frameRate{};
+		double m_frameRate{};
 		std::unordered_map<e2::Name, uint32_t> m_trackIndex;
 		e2::StackVector<e2::AnimationTrack, e2::maxNumTracksPerAnimation> m_tracks;
 	};
@@ -168,16 +168,16 @@ namespace e2
 		void applyPose(Pose* otherPose);
 
 		/** Applies a blend between a and b on this pose */
-		void applyBlend(Pose* a, Pose* b, float alpha);
+		void applyBlend(Pose* a, Pose* b, double alpha);
 
 		/** Blends this pose directly with b, applying it to this pose */
-		void blendWith(Pose* b, float alpha);
+		void blendWith(Pose* b, double alpha);
 
 		/** 
 		 * Apply the given animation to this pose, at the given time in seconds
 		 * Ignores any bones not driven by animation
 		 */
-		void applyAnimation(e2::Ptr<e2::Animation> anim, float time);
+		void applyAnimation(e2::Ptr<e2::Animation> anim, double time);
 
 		e2::StackVector<glm::mat4, e2::maxNumSkeletonBones> const& skin();
 		e2::Ptr<e2::Skeleton> skeleton();
@@ -224,7 +224,7 @@ namespace e2
 			m_playing = true;
 		}
 
-		inline float time() const
+		inline double time() const
 		{
 			return m_time;
 		}

@@ -175,7 +175,7 @@ double e2::randomDouble(double min, double max)
 
 glm::ivec2 e2::randomIvec2(glm::ivec2 min, glm::ivec2 max)
 {
-	return glm::ivec2(randomFloat(min.x, max.x), randomFloat(min.y, max.y));
+	return glm::ivec2((int32_t)randomInt(min.x, max.x), (int32_t)randomInt(min.y, max.y));
 }
 
 glm::vec2 e2::randomVec2(glm::vec2 min, glm::vec2 max)

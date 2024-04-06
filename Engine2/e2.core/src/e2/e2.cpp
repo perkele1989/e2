@@ -17,29 +17,33 @@
 
 e2::Engine::Engine()
 {
-	m_profiler = new Profiler();
-	m_config = new Config();
-	m_typeManager = new e2::TypeManager(this);
-	m_asyncManager = new e2::AsyncManager(this);
-	m_assetManager = new e2::AssetManager(this);
-	m_renderManager = new e2::RenderManager(this);
-	m_uiManager = new e2::UIManager(this);
-	m_gameManager = new e2::GameManager(this);
+#if defined(E2_PROFILER)
+	m_profiler = e2::create<Profiler>();
+#endif
+	m_config = e2::create<Config>();
+	m_typeManager = e2::create<e2::TypeManager>(this);
+	m_asyncManager = e2::create<e2::AsyncManager>(this);
+	m_assetManager = e2::create<e2::AssetManager>(this);
+	m_renderManager = e2::create<e2::RenderManager>(this);
+	m_uiManager = e2::create<e2::UIManager>(this);
+	m_gameManager = e2::create<e2::GameManager>(this);
 
 	m_config->load("e2.cfg");
 }
 
 e2::Engine::~Engine()
 {
-	delete m_gameManager;
-	delete m_uiManager;
-	delete m_renderManager;
-	delete m_assetManager;
-	delete m_asyncManager;
-	delete m_typeManager;
+	e2::destroy(m_gameManager);
+	e2::destroy(m_uiManager);
+	e2::destroy(m_renderManager);
+	e2::destroy(m_assetManager);
+	e2::destroy(m_asyncManager);
+	e2::destroy(m_typeManager);
 	
-	delete m_config;
-	delete m_profiler;
+	e2::destroy(m_config);
+#if defined(E2_PROFILER)
+	e2::destroy(m_profiler);
+#endif
 
 #if defined(E2_DEVELOPMENT)
 	e2::printLingeringObjects();
@@ -82,7 +86,9 @@ void e2::Engine::run(e2::Application* app)
 			deltaTime = lastFrameStart.durationSince().seconds();
 			lastFrameStart = e2::timeNow();
 
+#if defined(E2_PROFILER)
 			m_profiler->newFrame();
+#endif
 
 			E2_BEGIN_SCOPE();
 
@@ -103,6 +109,7 @@ void e2::Engine::run(e2::Application* app)
 
 			E2_END_SCOPE();
 
+#if defined(E2_PROFILER)
 			m_metrics.frameTimeMs[m_metrics.cursor] = (float)lastFrameStart.durationSince().milliseconds();
 
 			if (++m_metrics.cursor >= e2::engineMetricsWindow)
@@ -142,6 +149,7 @@ void e2::Engine::run(e2::Application* app)
 
 				lastMetricsProbe = e2::timeNow();
 			}
+#endif
 			
 			e2::ManagedObject::keepAroundTick();
 		}
@@ -176,6 +184,7 @@ void e2::Engine::shutdown()
 	m_running = false;
 }
 
+#if defined(E2_PROFILER)
 e2::EngineMetrics& e2::Engine::metrics()
 {
 	return m_metrics;
@@ -289,3 +298,4 @@ std::vector<e2::ProfileFunction> e2::Profiler::report()
 	std::sort(returner.begin(), returner.end(), [](e2::ProfileFunction const& lhs, e2::ProfileFunction const& rhs) -> bool { return lhs.highTimeInScope > rhs.highTimeInScope;  });
 	return returner;
 }
+#endif

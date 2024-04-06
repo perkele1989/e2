@@ -11,7 +11,6 @@
 #include <e2/rhi/threadcontext.hpp>
 #include <e2/renderer/shared.hpp>
 
-#define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/perpendicular.hpp>
 
 namespace e2

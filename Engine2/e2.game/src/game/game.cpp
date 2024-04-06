@@ -17,7 +17,7 @@
 #include <glm/gtx/vector_angle.hpp>
 
 #include <glm/gtc/noise.hpp>
-
+#include <glm/gtx/spline.hpp>
 #include <glm/gtx/easing.hpp>
 
 #pragma warning(disable : 4996)
@@ -222,8 +222,14 @@ void e2::Game::loadGame(uint8_t slot)
 			continue;
 		}
 
+		if (empireId > (std::numeric_limits<EmpireId>::max)())
+		{
+			LogError("unsupported datatype in savefile, try updating your game before loading this save!");
+			continue;
+		}
+
 		e2::GameStructure* newStructure = ty->create()->cast<e2::GameStructure>();
-		newStructure->postConstruct(this, tileIndex, empireId);
+		newStructure->postConstruct(this, tileIndex, (EmpireId)empireId);
 
 		newStructure->readForSave(buf);
 
@@ -252,8 +258,15 @@ void e2::Game::loadGame(uint8_t slot)
 			continue;
 		}
 
+		if (empireId > (std::numeric_limits<EmpireId>::max)())
+		{
+			LogError("unsupported datatype in savefile, try updating your game before loading this save!");
+			continue;
+		}
+
+
 		e2::GameUnit* newUnit = ty->create()->cast<e2::GameUnit>();
-		newUnit->postConstruct(this, tileIndex, empireId);
+		newUnit->postConstruct(this, tileIndex, (EmpireId)empireId);
 
 		newUnit->readForSave(buf);
 
@@ -266,7 +279,15 @@ void e2::Game::loadGame(uint8_t slot)
 	{
 		int64_t empId;
 		buf >> empId;
-		discoverEmpire(empId);
+
+		if (empId > (std::numeric_limits<EmpireId>::max)())
+		{
+			LogError("unsupported datatype in savefile, try updating your game before loading this save!");
+			continue;
+		}
+
+
+		discoverEmpire((EmpireId)empId);
 	}
 
 	startGame();
@@ -318,9 +339,100 @@ void e2::Game::exitToMenu()
 	setupGame();
 }
 
+void e2::Game::finalizeBoot()
+{
+	auto am = assetManager();
+
+	m_uiTextureResources = am->get("assets/UI_ResourceIcons.e2a").cast<e2::Texture2D>();
+	m_cursorMesh = am->get("assets/environment/trees/SM_PalmTree001.e2a").cast<e2::Mesh>();
+
+	m_irradianceMap = am->get("assets/kloofendal_irr.e2a").cast<e2::Texture2D>();
+	m_radianceMap = am->get("assets/kloofendal_rad.e2a").cast<e2::Texture2D>();
+
+	m_session->renderer()->setEnvironment(m_irradianceMap->handle(), m_radianceMap->handle());
+
+	m_entityMeshes.resize(size_t(e2::EntityType::Count));
+	m_entitySkeletons.resize(size_t(e2::EntityType::Count));
+	for (uint8_t i = 0; i < size_t(e2::EntityType::Count); i++)
+	{
+		m_entityMeshes[i] = am->get("assets/structures/SM_BuildingPlaceholder.e2a").cast<e2::Mesh>();
+		m_entitySkeletons[i] = nullptr;
+	}
+
+	m_animationIndex.resize(uint8_t(e2::AnimationIndex::Count));
+
+	for (uint8_t i = 0; i < (uint8_t)e2::AnimationIndex::Count; i++)
+	{
+		m_animationIndex[i] = am->get("assets/characters/A_SoldierDance.e2a").cast<e2::Animation>();
+	}
+
+
+	m_entityMeshes[size_t(e2::EntityType::Structure_OreMine)] = am->get("assets/environment/SM_Mine.e2a").cast<e2::Mesh>();
+	m_entityMeshes[size_t(e2::EntityType::Structure_GoldMine)] = am->get("assets/environment/SM_GoldMine.e2a").cast<e2::Mesh>();
+	m_entityMeshes[size_t(e2::EntityType::Structure_UraniumMine)] = am->get("assets/environment/SM_UraniumMine.e2a").cast<e2::Mesh>();
+	m_entityMeshes[size_t(e2::EntityType::Structure_Quarry)] = am->get("assets/environment/SM_Quarry.e2a").cast<e2::Mesh>();
+	m_entityMeshes[size_t(e2::EntityType::Structure_SawMill)] = am->get("assets/environment/SM_SawMill.e2a").cast<e2::Mesh>();
+
+
+
+
+
+	m_entityMeshes[size_t(e2::EntityType::Unit_Grunt)] = am->get("assets/characters/SM_Soldier.e2a").cast<e2::Mesh>();
+	m_entitySkeletons[size_t(e2::EntityType::Unit_Grunt)] = am->get("assets/characters/SK_Soldier.e2a").cast<e2::Skeleton>();
+
+	m_entityMeshes[size_t(e2::EntityType::Unit_AssaultCraft)] = am->get("assets/vehicles/SM_Boat.e2a").cast<e2::Mesh>();
+	m_entitySkeletons[size_t(e2::EntityType::Unit_AssaultCraft)] = am->get("assets/vehicles/SK_Boat.e2a").cast<e2::Skeleton>();
+
+	m_entityMeshes[size_t(e2::EntityType::Unit_Tank)] = am->get("assets/vehicles/SM_Tank.e2a").cast<e2::Mesh>();
+	m_entitySkeletons[size_t(e2::EntityType::Unit_Tank)] = am->get("assets/vehicles/SK_Tank.e2a").cast<e2::Skeleton>();
+
+	m_entityMeshes[size_t(e2::EntityType::Unit_MobileMOB)] = am->get("assets/vehicles/SM_MobileMob.e2a").cast<e2::Mesh>();
+
+
+	m_entityMeshes[size_t(e2::EntityType::Unit_Engineer)] = am->get("assets/characters/SM_Engineer.e2a").cast<e2::Mesh>();
+	m_entitySkeletons[size_t(e2::EntityType::Unit_Engineer)] = am->get("assets/characters/SK_Engineer.e2a").cast<e2::Skeleton>();
+
+	m_animationIndex[(uint8_t)e2::AnimationIndex::SoldierIdle] = am->get("assets/characters/A_SoldierIdle.e2a").cast<e2::Animation>();
+	m_animationIndex[(uint8_t)e2::AnimationIndex::SoldierHit] = am->get("assets/characters/A_SoldierHit.e2a").cast<e2::Animation>();
+	m_animationIndex[(uint8_t)e2::AnimationIndex::SoldierFire] = am->get("assets/characters/A_SoldierFire.e2a").cast<e2::Animation>();
+	m_animationIndex[(uint8_t)e2::AnimationIndex::SoldierDie] = am->get("assets/characters/A_SoldierDie.e2a").cast<e2::Animation>();
+	m_animationIndex[(uint8_t)e2::AnimationIndex::SoldierRun] = am->get("assets/characters/A_SoldierRun.e2a").cast<e2::Animation>();
+
+	m_animationIndex[(uint8_t)e2::AnimationIndex::EngineerIdle] = am->get("assets/characters/A_EngineerIdle.e2a").cast<e2::Animation>();
+	//m_animationIndex[(uint8_t)e2::AnimationIndex::EngineerHit] = am->get("assets/characters/A_SoldierHit.e2a").cast<e2::Animation>();
+	m_animationIndex[(uint8_t)e2::AnimationIndex::EngineerBuild] = am->get("assets/characters/A_EngineerBuild.e2a").cast<e2::Animation>();
+	m_animationIndex[(uint8_t)e2::AnimationIndex::EngineerDie] = am->get("assets/characters/A_EngineerDie.e2a").cast<e2::Animation>();
+	m_animationIndex[(uint8_t)e2::AnimationIndex::EngineerRun] = am->get("assets/characters/A_EngineerRun.e2a").cast<e2::Animation>();
+
+
+	m_animationIndex[(uint8_t)e2::AnimationIndex::CombatBoatDrive] = am->get("assets/vehicles/A_BoatDriving.e2a").cast<e2::Animation>();
+	m_animationIndex[(uint8_t)e2::AnimationIndex::CombatBoatIdle] = am->get("assets/vehicles/A_BoatIdle.e2a").cast<e2::Animation>();
+
+	m_animationIndex[(uint8_t)e2::AnimationIndex::TankDrive] = am->get("assets/vehicles/A_Tank_Moving.e2a").cast<e2::Animation>();
+	m_animationIndex[(uint8_t)e2::AnimationIndex::TankFire] = am->get("assets/vehicles/A_Tank_Fire.e2a").cast<e2::Animation>();
+	m_animationIndex[(uint8_t)e2::AnimationIndex::TankIdle] = am->get("assets/vehicles/A_Tank_Idle.e2a").cast<e2::Animation>();
+
+
+	am->returnALJ(m_bootTicket);
+
+	m_empires.resize(e2::maxNumEmpires);
+	for (EmpireId i = 0; uint64_t(i) < e2::maxNumEmpires - 1; i++)
+	{
+		m_empires[i] = nullptr;
+	}
+
+	setupGame();
+
+#if defined(E2_PROFILER)
+	profiler()->start();
+#endif
+}
+
 void e2::Game::initialize()
 {
 	m_session = e2::create<e2::GameSession>(this);
+
+	m_bootBegin = e2::timeNow();
 
 	auto am = assetManager();
 
@@ -380,86 +492,8 @@ void e2::Game::initialize()
 
 	am->prescribeALJ(alj, "assets/structures/SM_BuildingPlaceholder.e2a");
 
-	am->queueWaitALJ(alj);
-	m_uiTextureResources = am->get("assets/UI_ResourceIcons.e2a").cast<e2::Texture2D>();
-	m_cursorMesh = am->get("assets/environment/trees/SM_PalmTree001.e2a").cast<e2::Mesh>();
-
-	m_irradianceMap = am->get("assets/kloofendal_irr.e2a").cast<e2::Texture2D>();
-	m_radianceMap = am->get("assets/kloofendal_rad.e2a").cast<e2::Texture2D>();
-
-	m_session->renderer()->setEnvironment(m_irradianceMap->handle(), m_radianceMap->handle());
-
-	m_entityMeshes.resize(size_t(e2::EntityType::Count));
-	m_entitySkeletons.resize(size_t(e2::EntityType::Count));
-	for (uint8_t i = 0; i < size_t(e2::EntityType::Count); i++)
-	{
-		m_entityMeshes[i] = am->get("assets/structures/SM_BuildingPlaceholder.e2a").cast<e2::Mesh>();
-		m_entitySkeletons[i] = nullptr;
-	}
-
-	m_animationIndex.resize(uint8_t(e2::AnimationIndex::Count));
-
-	for (uint8_t i = 0; i < (uint8_t)e2::AnimationIndex::Count; i++)
-	{
-		m_animationIndex[i] = am->get("assets/characters/A_SoldierDance.e2a").cast<e2::Animation>();
-	}
-
-
-	m_entityMeshes[size_t(e2::EntityType::Structure_OreMine)] = am->get("assets/environment/SM_Mine.e2a").cast<e2::Mesh>();
-	m_entityMeshes[size_t(e2::EntityType::Structure_GoldMine)] = am->get("assets/environment/SM_GoldMine.e2a").cast<e2::Mesh>();
-	m_entityMeshes[size_t(e2::EntityType::Structure_UraniumMine)] = am->get("assets/environment/SM_UraniumMine.e2a").cast<e2::Mesh>();
-	m_entityMeshes[size_t(e2::EntityType::Structure_Quarry)] = am->get("assets/environment/SM_Quarry.e2a").cast<e2::Mesh>();
-	m_entityMeshes[size_t(e2::EntityType::Structure_SawMill)] = am->get("assets/environment/SM_SawMill.e2a").cast<e2::Mesh>();
-
+	m_bootTicket = am->queueALJ(alj);
 	
-
-
-
-	m_entityMeshes[size_t(e2::EntityType::Unit_Grunt)] = am->get("assets/characters/SM_Soldier.e2a").cast<e2::Mesh>();
-	m_entitySkeletons[size_t(e2::EntityType::Unit_Grunt)] = am->get("assets/characters/SK_Soldier.e2a").cast<e2::Skeleton>();
-
-	m_entityMeshes[size_t(e2::EntityType::Unit_AssaultCraft)] = am->get("assets/vehicles/SM_Boat.e2a").cast<e2::Mesh>();
-	m_entitySkeletons[size_t(e2::EntityType::Unit_AssaultCraft)] = am->get("assets/vehicles/SK_Boat.e2a").cast<e2::Skeleton>();
-
-	m_entityMeshes[size_t(e2::EntityType::Unit_Tank)] = am->get("assets/vehicles/SM_Tank.e2a").cast<e2::Mesh>();
-	m_entitySkeletons[size_t(e2::EntityType::Unit_Tank)] = am->get("assets/vehicles/SK_Tank.e2a").cast<e2::Skeleton>();
-
-	m_entityMeshes[size_t(e2::EntityType::Unit_MobileMOB)] = am->get("assets/vehicles/SM_MobileMob.e2a").cast<e2::Mesh>();
-
-
-	m_entityMeshes[size_t(e2::EntityType::Unit_Engineer)] = am->get("assets/characters/SM_Engineer.e2a").cast<e2::Mesh>();
-	m_entitySkeletons[size_t(e2::EntityType::Unit_Engineer)] = am->get("assets/characters/SK_Engineer.e2a").cast<e2::Skeleton>();
-
-	m_animationIndex[(uint8_t)e2::AnimationIndex::SoldierIdle] = am->get("assets/characters/A_SoldierIdle.e2a").cast<e2::Animation>();
-	m_animationIndex[(uint8_t)e2::AnimationIndex::SoldierHit] = am->get("assets/characters/A_SoldierHit.e2a").cast<e2::Animation>();
-	m_animationIndex[(uint8_t)e2::AnimationIndex::SoldierFire] = am->get("assets/characters/A_SoldierFire.e2a").cast<e2::Animation>();
-	m_animationIndex[(uint8_t)e2::AnimationIndex::SoldierDie] = am->get("assets/characters/A_SoldierDie.e2a").cast<e2::Animation>();
-	m_animationIndex[(uint8_t)e2::AnimationIndex::SoldierRun] = am->get("assets/characters/A_SoldierRun.e2a").cast<e2::Animation>();
-
-	m_animationIndex[(uint8_t)e2::AnimationIndex::EngineerIdle] = am->get("assets/characters/A_EngineerIdle.e2a").cast<e2::Animation>();
-	//m_animationIndex[(uint8_t)e2::AnimationIndex::EngineerHit] = am->get("assets/characters/A_SoldierHit.e2a").cast<e2::Animation>();
-	m_animationIndex[(uint8_t)e2::AnimationIndex::EngineerBuild] = am->get("assets/characters/A_EngineerBuild.e2a").cast<e2::Animation>();
-	m_animationIndex[(uint8_t)e2::AnimationIndex::EngineerDie] = am->get("assets/characters/A_EngineerDie.e2a").cast<e2::Animation>();
-	m_animationIndex[(uint8_t)e2::AnimationIndex::EngineerRun] = am->get("assets/characters/A_EngineerRun.e2a").cast<e2::Animation>();
-
-
-	m_animationIndex[(uint8_t)e2::AnimationIndex::CombatBoatDrive] = am->get("assets/vehicles/A_BoatDriving.e2a").cast<e2::Animation>();
-	m_animationIndex[(uint8_t)e2::AnimationIndex::CombatBoatIdle] = am->get("assets/vehicles/A_BoatIdle.e2a").cast<e2::Animation>();
-
-	m_animationIndex[(uint8_t)e2::AnimationIndex::TankDrive] = am->get("assets/vehicles/A_Tank_Moving.e2a").cast<e2::Animation>();
-	m_animationIndex[(uint8_t)e2::AnimationIndex::TankFire] = am->get("assets/vehicles/A_Tank_Fire.e2a").cast<e2::Animation>();
-	m_animationIndex[(uint8_t)e2::AnimationIndex::TankIdle] = am->get("assets/vehicles/A_Tank_Idle.e2a").cast<e2::Animation>();
-
-
-	m_empires.resize(e2::maxNumEmpires);
-	for (EmpireId i = 0; uint64_t(i) < e2::maxNumEmpires - 1; i++)
-	{
-		m_empires[i] = nullptr;
-	}
-
-	setupGame();
-
-	profiler()->start();
 }
 
 void e2::Game::shutdown()
@@ -485,6 +519,22 @@ void e2::Game::update(double seconds)
 	e2::GameSession* session = gameSession();
 	e2::Renderer* renderer = session->renderer();
 	e2::UIContext* ui = session->uiContext();
+
+	if (m_globalState == GlobalState::Boot)
+	{
+		m_session->tick(seconds);
+
+		glm::vec2 winSize = m_session->window()->size();
+		float textWidth = m_session->uiContext()->calculateSDFTextWidth(FontFace::Serif, 22.0f, "Loading..");
+		m_session->uiContext()->drawSDFText(FontFace::Serif, 22.f, 0xFFFFFFFF, { winSize.x - textWidth - 16.f, winSize.y - 32.0f }, "Loading..");
+
+		if (assetManager()->queryALJ(m_bootTicket).status == ALJStatus::Completed && m_bootBegin.durationSince().seconds() > 4.0f)
+		{
+			m_globalState = GlobalState::Menu;
+			finalizeBoot();
+		}
+		return;
+	}
 
 	auto& kb = ui->keyboardState();
 	
@@ -657,7 +707,7 @@ void e2::Game::updateGame(double seconds)
 		m_hexGrid->invalidateFogOfWarShaders();
 	}
 
-
+#if defined(E2_PROFILER)
 	if (kb.keys[int16_t(e2::Key::F4)].pressed)
 	{
 		profiler()->stop();
@@ -675,6 +725,7 @@ void e2::Game::updateGame(double seconds)
 		LogNotice("{}", ss.str());
 		profiler()->start();
 	}
+#endif
 
 
 	if (kb.pressed(Key::Escape))
@@ -808,22 +859,22 @@ void e2::Game::updateMenu(double seconds)
 		{
 			m_mainMenuState = MainMenuState::Main;
 		}
-		float width = ui->calculateSDFTextWidth(FontFace::Serif, 42.0f, "Reveal & Annihilate");
+		double width = ui->calculateSDFTextWidth(FontFace::Serif, 42.0, "Reveal & Annihilate");
 
 
-		float menuHeight = 280.0f;
-		float menuOffset = resolution.y / 2.0f - menuHeight / 2.0f;
-		float cursorY = menuOffset;
-		float xOffset = resolution.x / 2.0f - width / 2.0f;
+		double menuHeight = 280.0;
+		double menuOffset = resolution.y / 2.0 - menuHeight / 2.0;
+		double cursorY = menuOffset;
+		double xOffset = resolution.x / 2.0 - width / 2.0;
 
 		if (m_mainMenuState == MainMenuState::Load)
 		{
 			for (uint8_t sl = 0; sl < e2::numSaveSlots; sl++)
 			{
-				float slotWidth = ui->calculateSDFTextWidth(FontFace::Serif, 24.0f, saveSlots[sl].cachedDisplayName);
+				double slotWidth = ui->calculateSDFTextWidth(FontFace::Serif, 24.0f, saveSlots[sl].cachedDisplayName);
 
 				bool slotHovered = mouse.relativePosition.x > xOffset && mouse.relativePosition.x < xOffset + slotWidth
-					&& mouse.relativePosition.y > cursorY && mouse.relativePosition.y < cursorY + 40.0f;
+					&& mouse.relativePosition.y > cursorY && mouse.relativePosition.y < cursorY + 40.0;
 
 				ui->drawSDFText(FontFace::Serif, 24.0f, 0x000000FF, glm::vec2(xOffset, cursorY + 20.0), saveSlots[sl].cachedDisplayName);
 				if (saveSlots[sl].exists && slotHovered && leftMouse.clicked)
@@ -831,7 +882,7 @@ void e2::Game::updateMenu(double seconds)
 					loadGame(sl);
 				}
 
-				cursorY += 40.0f;
+				cursorY += 40.0;
 			}
 		}
 
@@ -842,94 +893,94 @@ void e2::Game::updateMenu(double seconds)
 
 
 
-	float globalMenuFade = m_haveBegunStart ? 1.0 - glm::smoothstep(0.0, 2.0, m_beginStartTime.durationSince().seconds()) : 1.0f;
+	double globalMenuFade = m_haveBegunStart ? double(1.0 - glm::smoothstep(0.0, 2.0, m_beginStartTime.durationSince().seconds())) : 1.0;
 
 	// tinted block
-	float blockTimer1 = glm::smoothstep(12.0f, 15.0f, float(timer));
-	float blockAlpha = 0.9f - blockTimer1 * 0.9;
-	ui->drawQuad({}, resolution, e2::UIColor(102, 88, 66, uint8_t(blockAlpha * 255.0f)));
+	double blockTimer1 = glm::smoothstep(12.0, 15.0, double(timer));
+	double blockAlpha = 0.9f - blockTimer1 * 0.9f;
+	ui->drawQuad({}, resolution, e2::UIColor(102, 88, 66, uint8_t(blockAlpha * 255.0)));
 
 	// black screen
-	float blockAlpha2 = 1.0f - glm::smoothstep(8.0, 10.0, timer);
-	ui->drawQuad({}, resolution, e2::UIColor(0, 0, 0, uint8_t(blockAlpha2 * 255.0f)));
+	double blockAlpha2 = 1.0 - glm::smoothstep(8.0, 10.0, double(timer));
+	ui->drawQuad({}, resolution, e2::UIColor(0, 0, 0, uint8_t(blockAlpha2 * 255.0)));
 
 
-	float authorWidth = ui->calculateSDFTextWidth(FontFace::Serif, 36.0f, "Fredrik Haikarainen");
-	float authorWidth2 = ui->calculateSDFTextWidth(FontFace::Serif, 24.0f, "A game by");
-	float authorAlpha = glm::smoothstep(3.0, 4.0, timer);
-	float authorAlpha2 = glm::smoothstep(2.0, 3.0, timer);
+	double authorWidth = ui->calculateSDFTextWidth(FontFace::Serif, 36.0f, "Fredrik Haikarainen");
+	double authorWidth2 = ui->calculateSDFTextWidth(FontFace::Serif, 24.0f, "A game by");
+	double authorAlpha = (double)glm::smoothstep(3.0, 4.0, timer);
+	double authorAlpha2 = (double)glm::smoothstep(2.0, 3.0, timer);
 
-	float authorFadeOut = 1.0 - glm::smoothstep(6.0, 7.0, timer);
+	double authorFadeOut = double(1.0 - glm::smoothstep(6.0, 7.0, timer));
 	authorAlpha *= authorFadeOut;
 	authorAlpha2 *= authorFadeOut;
 
-	e2::UIColor authorColor(255, 255, 255, uint8_t(authorAlpha * 255.0f));
-	e2::UIColor authorColor2(255, 255, 255, uint8_t(authorAlpha2 * 255.0f));
-	ui->drawSDFText(FontFace::Serif, 36.0f, authorColor, glm::vec2(resolution.x / 2.0f - authorWidth / 2.0f, resolution.y / 2.0f), "Fredrik Haikarainen");
-	ui->drawSDFText(FontFace::Serif, 14.0f, authorColor2, glm::vec2(resolution.x / 2.0f - authorWidth2 / 2.0f, (resolution.y / 2.0f) - 36.0f), "A game by");
+	e2::UIColor authorColor(255, 255, 255, uint8_t(authorAlpha * 255.0));
+	e2::UIColor authorColor2(255, 255, 255, uint8_t(authorAlpha2 * 255.0));
+	ui->drawSDFText(FontFace::Serif, 36.0, authorColor, glm::vec2(resolution.x / 2.0 - authorWidth / 2.0, resolution.y / 2.0), "Fredrik Haikarainen");
+	ui->drawSDFText(FontFace::Serif, 14.0, authorColor2, glm::vec2(resolution.x / 2.0 - authorWidth2 / 2.0, (resolution.y / 2.0) - 36.0), "A game by");
 
-	float width = ui->calculateSDFTextWidth(FontFace::Serif, 42.0f, "Reveal & Annihilate");
+	double width = ui->calculateSDFTextWidth(FontFace::Serif, 42.0f, "Reveal & Annihilate");
 
-	float menuHeight = 280.0f;
-	float menuOffset = resolution.y / 2.0f - menuHeight / 2.0f;
+	double menuHeight = 280.0;
+	double menuOffset = resolution.y / 2.0 - menuHeight / 2.0;
 
-	float cursorY = menuOffset;
-	float xOffset = resolution.x / 2.0f - width / 2.0f;
+	double cursorY = menuOffset;
+	double xOffset = resolution.x / 2.0 - width / 2.0;
 
 
-	float blockAlpha3 = glm::smoothstep(10.0, 12.0, timer);
+	double blockAlpha3 = (double)glm::smoothstep(10.0, 12.0, timer);
 
-	e2::UIColor textColor(0, 0, 0, uint8_t(blockAlpha3 * 255.0f * globalMenuFade));
-	e2::UIColor textColor2(0, 0, 0, uint8_t(blockTimer1 * 170.0f * globalMenuFade));
+	e2::UIColor textColor(0, 0, 0, uint8_t(blockAlpha3 * 255.0 * globalMenuFade));
+	e2::UIColor textColor2(0, 0, 0, uint8_t(blockTimer1 * 170.0 * globalMenuFade));
 	ui->drawSDFText(FontFace::Serif, 42.0f, textColor, glm::vec2(xOffset, cursorY), "Reveal & Annihilate");
 
-	static float a = 0.0f;
+	static double a = 0.0;
 	a += seconds;
 
 	// outwards 
-	float sa = glm::simplex(glm::vec2(a*2.0f, 0.0f));
+	double sa = glm::simplex(glm::vec2(a*2.0, 0.0));
 	// rotation
-	float sb = glm::simplex(glm::vec2(a*50.0f + 21.f, 0.0f));
+	double sb = glm::simplex(glm::vec2(a*50.0 + 21.f, 0.0));
 
-	sa = glm::pow(sa, 4.0f);
-	sb = glm::pow(sb, 2.0f);
+	sa = glm::pow(sa, 4.0);
+	sb = glm::pow(sb, 2.0);
 
 	if (glm::abs(sa) < 0.2f)
-		sa = 0.0f;
+		sa = 0.0;
 
 	if (glm::abs(sb) < 0.5f)
-		sb = 0.0f;
+		sb = 0.0;
 
-	glm::vec2 ori(0.0f, -sa * 10.0f);
-	glm::vec2 offset1 = e2::rotate2d(ori, sb * 360.0f);
+	glm::vec2 ori(0.0f, float(-sa) * 10.0f);
+	glm::vec2 offset1 = e2::rotate2d(ori, float(sb) * 360.0f);
 
-	glm::vec2 ori2(0.0f, -sb * 5.f);
-	glm::vec2 offset2 = e2::rotate2d(ori2, sb * 360.0f);
+	glm::vec2 ori2(0.0f, float(-sb) * 5.0f);
+	glm::vec2 offset2 = e2::rotate2d(ori2, float(sb) * 360.0f);
 
 
 
 	ui->drawSDFText(FontFace::Serif, 42.0f, textColor2, glm::vec2(xOffset, cursorY) + offset1, "Reveal & Annihilate");
 	ui->drawSDFText(FontFace::Serif, 42.0f, textColor2, glm::vec2(xOffset, cursorY) + offset2, "Reveal & Annihilate");
 
-	cursorY += 64.0f;
+	cursorY += 64.0;
 
-	float blockAlphaNewGame = glm::smoothstep(15.0, 15.25, timer);
-	e2::UIColor textColorNewGame(0, 0, 0, uint8_t(blockAlphaNewGame * 170.0f * globalMenuFade));
-	float newGameWidth = ui->calculateSDFTextWidth(FontFace::Serif, 24.0f, "New Game");
+	double blockAlphaNewGame = glm::smoothstep(15.0, 15.25, timer);
+	e2::UIColor textColorNewGame(0, 0, 0, uint8_t(blockAlphaNewGame * 170.0 * globalMenuFade));
+	double newGameWidth = ui->calculateSDFTextWidth(FontFace::Serif, 24.0f, "New Game");
 	bool newGameHovered = !m_haveBegunStart && timer > 15.25&& mouse.relativePosition.x > xOffset && mouse.relativePosition.x < xOffset + newGameWidth
-		&& mouse.relativePosition.y > cursorY + 20.0f && mouse.relativePosition.y < cursorY + 60.0f;
-	ui->drawSDFText(FontFace::Serif, 24.0f, newGameHovered ? 0x000000FF : textColorNewGame, glm::vec2(xOffset, cursorY + 40.0f), "New Game");
+		&& mouse.relativePosition.y > cursorY + 20.0 && mouse.relativePosition.y < cursorY + 60.0;
+	ui->drawSDFText(FontFace::Serif, 24.0f, newGameHovered ? 0x000000FF : textColorNewGame, glm::vec2(xOffset, cursorY + 40.0), "New Game");
 	if (!m_haveBegunStart && newGameHovered && leftMouse.clicked)
 	{
 		beginStartGame();
 	}
 
-	float blockAlphaLoadGame = glm::smoothstep(15.25, 15.5, timer);
-	e2::UIColor textColorLoadGame(0, 0, 0, uint8_t(blockAlphaLoadGame * 170.0f * globalMenuFade));
-	float loadGameWidth = ui->calculateSDFTextWidth(FontFace::Serif, 24.0f, "Load Game");
+	double blockAlphaLoadGame = glm::smoothstep(15.25, 15.5, timer);
+	e2::UIColor textColorLoadGame(0, 0, 0, uint8_t(blockAlphaLoadGame * 170.0 * globalMenuFade));
+	double loadGameWidth = ui->calculateSDFTextWidth(FontFace::Serif, 24.0f, "Load Game");
 	bool loadGameHovered = !m_haveBegunStart && timer > 15.5 && mouse.relativePosition.x > xOffset && mouse.relativePosition.x < xOffset + loadGameWidth
-		&& mouse.relativePosition.y > cursorY + 60.0f && mouse.relativePosition.y < cursorY + 100.0f;
-	ui->drawSDFText(FontFace::Serif, 24.0f, loadGameHovered ? 0x000000FF : textColorLoadGame, glm::vec2(xOffset, cursorY + 40.0f * 2), "Load Game");
+		&& mouse.relativePosition.y > cursorY + 60.0 && mouse.relativePosition.y < cursorY + 100.0;
+	ui->drawSDFText(FontFace::Serif, 24.0f, loadGameHovered ? 0x000000FF : textColorLoadGame, glm::vec2(xOffset, cursorY + 40.0 * 2), "Load Game");
 	if (!m_haveBegunStart && loadGameHovered && leftMouse.clicked)
 	{
 		m_mainMenuState = MainMenuState::Load;
@@ -937,24 +988,24 @@ void e2::Game::updateMenu(double seconds)
 
 
 
-	float blockAlphaOptions = glm::smoothstep(15.5, 15.75, timer);
-	e2::UIColor textColorOptions(0, 0, 0, uint8_t(blockAlphaOptions * 170.0f * globalMenuFade));
-	float optionsWidth = ui->calculateSDFTextWidth(FontFace::Serif, 24.0f, "Options");
+	double blockAlphaOptions = glm::smoothstep(15.5, 15.75, timer);
+	e2::UIColor textColorOptions(0, 0, 0, uint8_t(blockAlphaOptions * 170.0 * globalMenuFade));
+	double optionsWidth = ui->calculateSDFTextWidth(FontFace::Serif, 24.0f, "Options");
 	bool optionsHovered = !m_haveBegunStart && timer > 15.75 && mouse.relativePosition.x > xOffset && mouse.relativePosition.x < xOffset + optionsWidth
-		&& mouse.relativePosition.y > cursorY + 100.0f && mouse.relativePosition.y < cursorY + 140.0f;
-	ui->drawSDFText(FontFace::Serif, 24.0f, optionsHovered ? 0x000000FF : textColorOptions, glm::vec2(xOffset, cursorY + 40.0f * 3), "Options");
+		&& mouse.relativePosition.y > cursorY + 100.0 && mouse.relativePosition.y < cursorY + 140.0;
+	ui->drawSDFText(FontFace::Serif, 24.0f, optionsHovered ? 0x000000FF : textColorOptions, glm::vec2(xOffset, cursorY + 40.0 * 3), "Options");
 	if (!m_haveBegunStart && optionsHovered && leftMouse.clicked)
 	{
 		m_mainMenuState = MainMenuState::Options;
 	}
 
 
-	float blockAlphaQuit = glm::smoothstep(15.75, 16.0, timer);
-	e2::UIColor textColorQuit(0, 0, 0, uint8_t(blockAlphaQuit * 170.0f * globalMenuFade));
-	float quitWidth = ui->calculateSDFTextWidth(FontFace::Serif, 24.0f, "Quit");
+	double blockAlphaQuit = glm::smoothstep(15.75, 16.0, timer);
+	e2::UIColor textColorQuit(0, 0, 0, uint8_t(blockAlphaQuit * 170.0 * globalMenuFade));
+	double quitWidth = ui->calculateSDFTextWidth(FontFace::Serif, 24.0f, "Quit");
 	bool quitHovered = !m_haveBegunStart && timer > 16.0 && mouse.relativePosition.x > xOffset && mouse.relativePosition.x < xOffset + optionsWidth
-		&& mouse.relativePosition.y > cursorY + 140.0f && mouse.relativePosition.y < cursorY + 180.0f;
-	ui->drawSDFText(FontFace::Serif, 24.0f, quitHovered ? 0x000000FF : textColorQuit, glm::vec2(xOffset, cursorY + 40.0f * 4), "Quit");
+		&& mouse.relativePosition.y > cursorY + 140.0 && mouse.relativePosition.y < cursorY + 180.0;
+	ui->drawSDFText(FontFace::Serif, 24.0f, quitHovered ? 0x000000FF : textColorQuit, glm::vec2(xOffset, cursorY + 40.0 * 4), "Quit");
 	if (quitHovered && leftMouse.clicked)
 	{
 		engine()->shutdown();
@@ -977,12 +1028,12 @@ void e2::Game::updateMenu(double seconds)
 	}
 	if (m_haveStreamedStart)
 	{
-		float sec = m_beginStreamTime.durationSince().seconds();
-		float a = glm::smoothstep(0.0f, 2.0f, sec);
+		double sec = m_beginStreamTime.durationSince().seconds();
+		double a = glm::smoothstep(0.0, 2.0, sec);
 		m_viewOrigin = glm::mix(m_startViewOrigin, e2::Hex(m_startLocation).planarCoords(), glm::exponentialEaseInOut(a));
 	}
 
-	if (m_haveStreamedStart && m_beginStreamTime.durationSince().seconds() > 2.1f)
+	if (m_haveStreamedStart && m_beginStreamTime.durationSince().seconds() > 2.1)
 	{
 		
 		resumeWorldStreaming();
@@ -1343,67 +1394,150 @@ void e2::Game::onTurnEndingEnd()
 
 void e2::Game::updateUnitMove()
 {
-	// how many hexes per second it moves
-	//constexpr float unitMoveSpeed = 2.4f;
-	
-	m_unitMoveDelta += m_timeDelta * m_selectedUnit->moveSpeed;
 
-	while (m_unitMoveDelta > 1.0f)
+	if (m_selectedUnit->moveType == UnitMoveType::Linear)
 	{
-		m_unitMoveDelta -= 1.0;
-		m_unitMoveIndex++;
+		m_unitMoveDelta += float(m_timeDelta) * m_selectedUnit->moveSpeed;
 
-		if (m_unitMoveIndex >= m_unitMovePath.size() - 1)
+		while (m_unitMoveDelta > 1.0f)
 		{
-			e2::Hex prevHex = m_unitMovePath[m_unitMovePath.size() - 2];
-			e2::Hex finalHex = m_unitMovePath[m_unitMovePath.size() - 1];
-			// we are done
-			if(m_selectedUnit->isLocal())
-				m_selectedUnit->rollbackVisibility();
+			m_unitMoveDelta -= 1.0;
+			m_unitMoveIndex++;
 
-			m_unitIndex.erase(m_selectedUnit->tileIndex);
-			m_selectedUnit->tileIndex = finalHex.offsetCoords();
-			m_unitIndex[m_selectedUnit->tileIndex] = m_selectedUnit;
-
-			if(m_selectedUnit->isLocal())
-				m_selectedUnit->spreadVisibility();
-
-			
-
-			float angle = e2::radiansBetween(finalHex.localCoords(), prevHex.localCoords());
-			m_selectedUnit->setMeshTransform(finalHex.localCoords(), angle);
-			if (m_unitAS)
-				e2::destroy(m_unitAS);
-			m_unitAS = e2::create<PathFindingAccelerationStructure>(m_selectedUnit);
-			m_hexGrid->clearOutline();
-			for (auto& [coords, hexAS] : m_unitAS->hexIndex)
+			if (m_unitMoveIndex >= m_unitMovePath.size() - 1)
 			{
-				m_hexGrid->pushOutline(coords);
+				e2::Hex prevHex = m_unitMovePath[m_unitMovePath.size() - 2];
+				e2::Hex finalHex = m_unitMovePath[m_unitMovePath.size() - 1];
+				// we are done
+				if (m_selectedUnit->isLocal())
+					m_selectedUnit->rollbackVisibility();
+
+				m_unitIndex.erase(m_selectedUnit->tileIndex);
+				m_selectedUnit->tileIndex = finalHex.offsetCoords();
+				m_unitIndex[m_selectedUnit->tileIndex] = m_selectedUnit;
+
+				if (m_selectedUnit->isLocal())
+					m_selectedUnit->spreadVisibility();
+
+
+
+				float angle = e2::radiansBetween(finalHex.localCoords(), prevHex.localCoords());
+				m_selectedUnit->setMeshTransform(finalHex.localCoords(), angle);
+
+				resolveSelectedUnit();
+
+				m_selectedUnit->onEndMove();
+
+				m_turnState = TurnState::Unlocked;
+
+				return;
 			}
-
-			m_selectedUnit->onEndMove();
-
-			m_turnState = TurnState::Unlocked;
-
-			return;
 		}
+
+		e2::Hex currHex = m_unitMovePath[m_unitMoveIndex];
+		e2::Hex nextHex = m_unitMovePath[m_unitMoveIndex + 1];
+
+		glm::vec3 currHexPos = currHex.localCoords();
+		glm::vec3 nextHexPos = nextHex.localCoords();
+
+		glm::vec3 newPos = glm::mix(currHexPos, nextHexPos, m_unitMoveDelta);
+		float angle = radiansBetween(nextHexPos, currHexPos);
+		m_selectedUnit->setMeshTransform(newPos, angle);
 	}
+	else if (m_selectedUnit->moveType == e2::UnitMoveType::Smooth)
+	{
 
-	e2::Hex currHex = m_unitMovePath[m_unitMoveIndex];
-	e2::Hex nextHex = m_unitMovePath[m_unitMoveIndex +1];
+		m_unitMoveDelta += float(m_timeDelta) * m_selectedUnit->moveSpeed;
 
-	glm::vec3 currHexPos = currHex.localCoords();
-	glm::vec3 nextHexPos = nextHex.localCoords();
+		while (m_unitMoveDelta > 1.0f)
+		{
+			m_unitMoveDelta -= 1.0;
+			m_unitMoveIndex++;
 
-	glm::vec3 newPos = glm::mix(currHexPos, nextHexPos, m_unitMoveDelta);
+			if (m_unitMoveIndex >= m_unitMovePath.size() - 1)
+			{
+				e2::Hex prevHex = m_unitMovePath[m_unitMovePath.size() - 2];
+				e2::Hex finalHex = m_unitMovePath[m_unitMovePath.size() - 1];
+				// we are done
+				if (m_selectedUnit->isLocal())
+					m_selectedUnit->rollbackVisibility();
+
+				m_unitIndex.erase(m_selectedUnit->tileIndex);
+				m_selectedUnit->tileIndex = finalHex.offsetCoords();
+				m_unitIndex[m_selectedUnit->tileIndex] = m_selectedUnit;
+
+				if (m_selectedUnit->isLocal())
+					m_selectedUnit->spreadVisibility();
 
 
-	float angle = radiansBetween(nextHexPos, currHexPos);
-	//m_session->uiContext()->drawRasterText(e2::FontFace::Sans, 16, 0xFFFF00FF, { 4.0f, 450.0f }, std::format("Angle: {}", angle));
-	//LogNotice("Angle: {}", angle);
-	//glm::quat rotation = glm::angleAxis(angle, e2::worldUp());
 
-	m_selectedUnit->setMeshTransform(newPos, angle);
+				float angle = e2::radiansBetween(finalHex.localCoords(), prevHex.localCoords());
+				m_selectedUnit->setMeshTransform(finalHex.localCoords(), angle);
+
+
+				resolveSelectedUnit();
+
+
+				m_selectedUnit->onEndMove();
+
+				m_turnState = TurnState::Unlocked;
+
+				return;
+			}
+		}
+
+
+		e2::Hex currHex = m_unitMovePath[m_unitMoveIndex];
+		e2::Hex nextHex = m_unitMovePath[m_unitMoveIndex + 1];
+
+		glm::vec3 currHexPos = currHex.localCoords();
+		glm::vec3 nextHexPos = nextHex.localCoords();
+
+
+		glm::vec3 prevHexPos = m_unitMoveIndex > 0 ? m_unitMovePath[m_unitMoveIndex - 1].localCoords() : currHexPos - (nextHexPos - currHexPos);
+
+		glm::vec3 nextNextHexPos = m_unitMoveIndex + 2 < m_unitMovePath.size() ? m_unitMovePath[m_unitMoveIndex + 2].localCoords() : nextHexPos + (nextHexPos - currHexPos);
+
+
+		glm::vec3 newPos = glm::catmullRom(prevHexPos, currHexPos, nextHexPos, nextNextHexPos, m_unitMoveDelta);
+		glm::vec3 newPos2 = glm::catmullRom(prevHexPos, currHexPos, nextHexPos, nextNextHexPos, m_unitMoveDelta + 0.01f);
+
+
+		constexpr bool debugRender = false;
+		if (debugRender)
+		{
+			for (uint32_t k = 0; k < m_unitMovePath.size() - 1; k++)
+			{
+
+				e2::Hex currHex = m_unitMovePath[k];
+				e2::Hex nextHex = m_unitMovePath[k + 1];
+
+				glm::vec3 currHexPos = currHex.localCoords();
+				glm::vec3 nextHexPos = nextHex.localCoords();
+
+
+				glm::vec3 prevHexPos = k > 0 ? m_unitMovePath[k - 1].localCoords() : currHexPos - (nextHexPos - currHexPos);
+
+				glm::vec3 nextNextHexPos = k + 2 < m_unitMovePath.size() ? m_unitMovePath[k + 2].localCoords() : nextHexPos + (nextHexPos - currHexPos);
+
+
+				constexpr uint32_t debugResolution = 8;
+				for (uint32_t i = 0; i < debugResolution; i++)
+				{
+					float ii = glm::clamp(float(i) / float(debugResolution), 0.0f, 1.0f);
+					float ii2 = glm::clamp(float(i + 1) / float(debugResolution), 0.0f, 1.0f);
+					glm::vec3 currPos = glm::catmullRom(prevHexPos, currHexPos, nextHexPos, nextNextHexPos, ii);
+					glm::vec3 nextPos = glm::catmullRom(prevHexPos, currHexPos, nextHexPos, nextNextHexPos, ii2);
+
+					gameSession()->renderer()->debugLine(glm::vec3(1.0f, ii, 1.0f), currPos, nextPos);
+				}
+			}
+		}
+
+
+		float angle = radiansBetween(newPos2, newPos);
+		m_selectedUnit->setMeshTransform(newPos, angle);
+	}
 }
 
 void e2::Game::updateEntityTarget()
@@ -1725,8 +1859,8 @@ void e2::Game::drawMinimapUI()
 
 	glm::uvec2 miniSize = m_hexGrid->minimapSize();
 
-	float width = miniSize.x;
-	float height = miniSize.y;
+	float width = (float)miniSize.x;
+	float height = (float)miniSize.y;
 
 	glm::vec2 offset = {  16.0f , winSize.y - height - 16.0f };
 
@@ -1753,7 +1887,7 @@ void e2::Game::drawMinimapUI()
 
 void e2::Game::drawDebugUI()
 {
-
+#if defined(E2_PROFILER)
 	e2::GameSession* session = gameSession();
 	e2::Renderer* renderer = session->renderer();
 	e2::UIContext* ui = session->uiContext();
@@ -1776,7 +1910,7 @@ void e2::Game::drawDebugUI()
 	ui->drawRasterText(e2::FontFace::Monospace, 14, 0xFFFFFFFF, { xOffset, yOffset + (18.0f * 7.0f) }, std::format("^9Jobs in flight: {}", m_hexGrid->numJobsInFlight()));
 	ui->drawRasterText(e2::FontFace::Monospace, 14, 0xFFFFFFFF, { xOffset, yOffset + (18.0f * 8.0f) }, std::format("^2View Origin: {}", m_viewOrigin));
 	ui->drawRasterText(e2::FontFace::Monospace, 14, 0xFFFFFFFF, { xOffset, yOffset + (18.0f * 9.0f) }, std::format("^3View Velocity: {}", m_viewVelocity));
-
+#endif
 }
 
 void e2::Game::drawFinalUI()
@@ -1926,16 +2060,8 @@ void e2::Game::applyDamage(e2::GameEntity* entity, e2::GameEntity* instigator, f
 	entity->onHit(instigator, damage);
 }
 
-void e2::Game::selectUnit(e2::GameUnit* unit)
+void e2::Game::resolveSelectedUnit()
 {
-	if (!unit || unit == m_selectedUnit)
-		return;
-
-
-	deselectStructure();
-
-	m_selectedUnit = unit;
-
 	if (m_unitAS)
 		e2::destroy(m_unitAS);
 	m_unitAS = e2::create<PathFindingAccelerationStructure>(m_selectedUnit);
@@ -1948,16 +2074,36 @@ void e2::Game::selectUnit(e2::GameUnit* unit)
 	}
 }
 
+void e2::Game::unresolveSelectedUnit()
+{
+	if (m_unitAS)
+		e2::destroy(m_unitAS);
+	m_unitAS = nullptr;
+
+	m_hexGrid->clearOutline();
+}
+
+void e2::Game::selectUnit(e2::GameUnit* unit)
+{
+	if (!unit || unit == m_selectedUnit)
+		return;
+
+
+	deselectStructure();
+
+	m_selectedUnit = unit;
+
+	resolveSelectedUnit();
+}
+
 void e2::Game::deselectUnit()
 {
 	if (!m_selectedUnit)
 		return;
 
+	unresolveSelectedUnit();
+
 	m_selectedUnit = nullptr;
-	if (m_unitAS)
-		e2::destroy(m_unitAS);
-	m_unitAS = nullptr;
-	m_hexGrid->clearOutline();
 }
 
 void e2::Game::moveSelectedUnitTo(e2::Hex const& to)
@@ -1976,7 +2122,7 @@ void e2::Game::moveSelectedUnitTo(e2::Hex const& to)
 
 	m_hexGrid->clearOutline();
 
-	m_selectedUnit->movePointsLeft -= m_unitMovePath.size() - 1;
+	m_selectedUnit->movePointsLeft -= int32_t(m_unitMovePath.size()) - 1;
 
 	m_selectedUnit->onBeginMove();
 
@@ -2041,20 +2187,20 @@ void e2::Game::updateMainCamera(double seconds)
 	// move main camera 
 	if (kb.keys[int16_t(e2::Key::Left)].state)
 	{
-		m_viewOrigin.x -= moveSpeed * seconds;
+		m_viewOrigin.x -= moveSpeed * float(seconds);
 	}
 	if (kb.keys[int16_t(e2::Key::Right)].state)
 	{
-		m_viewOrigin.x += moveSpeed * seconds;
+		m_viewOrigin.x += moveSpeed * float(seconds);
 	}
 
 	if (kb.keys[int16_t(e2::Key::Up)].state)
 	{
-		m_viewOrigin.y -= moveSpeed * seconds;
+		m_viewOrigin.y -= moveSpeed * float(seconds);
 	}
 	if (kb.keys[int16_t(e2::Key::Down)].state)
 	{
-		m_viewOrigin.y += moveSpeed * seconds;
+		m_viewOrigin.y += moveSpeed * float(seconds);
 	}
 
 	if (kb.pressed(e2::Key::K))

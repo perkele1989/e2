@@ -409,12 +409,12 @@ e2::Bone* e2::Skeleton::boneByName(e2::Name name)
 
 uint32_t e2::Skeleton::numBones()
 {
-	return m_bones.size();
+	return (uint32_t)m_bones.size();
 }
 
 e2::Bone* e2::Skeleton::boneById(uint32_t id)
 {
-	if (id >= m_bones.size())
+	if (id >= (uint32_t)m_bones.size())
 		return nullptr;
 
 	return &m_bones[id];
@@ -422,7 +422,7 @@ e2::Bone* e2::Skeleton::boneById(uint32_t id)
 
 uint32_t e2::Skeleton::numRootBones()
 {
-	return m_roots.size();
+	return (uint32_t)m_roots.size();
 }
 
 e2::Bone* e2::Skeleton::rootBoneById(uint32_t rootId)
@@ -448,7 +448,9 @@ void e2::Animation::write(Buffer& destination) const
 bool e2::Animation::read(Buffer& source)
 {
 	source >> m_numFrames;
-	source >> m_frameRate;
+	float readFrameRate = 0.0f;
+	source >> readFrameRate;
+	m_frameRate = (double)readFrameRate;
 	
 	uint32_t numTracks{};
 	source >> numTracks;
@@ -513,32 +515,32 @@ uint32_t e2::Animation::numFrames()
 	return m_numFrames;
 }
 
-float e2::Animation::frameRate()
+double e2::Animation::frameRate()
 {
 	return m_frameRate;
 }
 
-float e2::Animation::timeSeconds()
+double e2::Animation::timeSeconds()
 {
-	return float(m_numFrames) / m_frameRate;
+	return double(m_numFrames) / m_frameRate;
 }
 
-std::pair<uint32_t, float> e2::AnimationTrack::getFrameDelta(float time, float frameRate)
+std::pair<uint32_t, double> e2::AnimationTrack::getFrameDelta(double time, double frameRate)
 {
-	float totalTime = (float)frames.size() / frameRate;
+	double totalTime = (double)frames.size() / frameRate;
 	while (time >= totalTime)
 		time -= totalTime;
 
-	float timeCoefficient = time / totalTime;
-	float frameF = timeCoefficient * frames.size();
-	float truncated = glm::trunc(frameF);
-	float frameDelta = frameF - truncated;
+	double timeCoefficient = time / totalTime;
+	double frameF = timeCoefficient * frames.size();
+	double truncated = glm::trunc(frameF);
+	double frameDelta = frameF - truncated;
 	uint32_t frameIndex = (uint32_t)truncated;
 
 	return { frameIndex, frameDelta };
 }
 
-float e2::AnimationTrack::getFloat(float time, float frameRate)
+float e2::AnimationTrack::getFloat(double time, double frameRate)
 {
 	if (type != AnimationType::Float)
 		LogWarning("using non-float animtrack as float");
@@ -551,10 +553,10 @@ float e2::AnimationTrack::getFloat(float time, float frameRate)
 
 	float a = frames[frameIndex].asFloat();
 	float b = frames[nextFrame].asFloat();
-	return glm::mix(a, b, frameDelta);
+	return glm::mix(a, b, (float)frameDelta);
 }
 
-glm::vec2 e2::AnimationTrack::getVec2(float time, float frameRate)
+glm::vec2 e2::AnimationTrack::getVec2(double time, double frameRate)
 {
 	if (type != AnimationType::Vec2)
 		LogWarning("using non-vec2 animtrack as vec2");
@@ -567,10 +569,10 @@ glm::vec2 e2::AnimationTrack::getVec2(float time, float frameRate)
 
 	glm::vec2 a = frames[frameIndex].asVec2();
 	glm::vec2 b = frames[nextFrame].asVec2();
-	return glm::mix(a, b, frameDelta);
+	return glm::mix(a, b, (float)frameDelta);
 }
 
-glm::vec3 e2::AnimationTrack::getVec3(float time, float frameRate)
+glm::vec3 e2::AnimationTrack::getVec3(double time, double frameRate)
 {
 	if (type != AnimationType::Vec3)
 		LogWarning("using non-vec3 animtrack as vec3");
@@ -583,10 +585,10 @@ glm::vec3 e2::AnimationTrack::getVec3(float time, float frameRate)
 
 	glm::vec3 a = frames[frameIndex].asVec3();
 	glm::vec3 b = frames[nextFrame].asVec3();
-	return glm::mix(a, b, frameDelta);
+	return glm::mix(a, b, (float)frameDelta);
 }
 
-glm::quat e2::AnimationTrack::getQuat(float time, float frameRate)
+glm::quat e2::AnimationTrack::getQuat(double time, double frameRate)
 {
 	if (type != AnimationType::Quat)
 		LogWarning("using non-quat animtrack as quat");
@@ -599,7 +601,7 @@ glm::quat e2::AnimationTrack::getQuat(float time, float frameRate)
 
 	glm::quat a = frames[frameIndex].asQuat();
 	glm::quat b = frames[nextFrame].asQuat();
-	return glm::slerp(a, b, frameDelta);
+	return glm::slerp(a, b, (float)frameDelta);
 }
 
 float e2::AnimationTrackFrame::asFloat()
@@ -653,7 +655,7 @@ e2::Engine* e2::Pose::engine()
 
 void e2::Pose::updateSkin()
 {
-	E2_BEGIN_SCOPE();
+	E2_PROFILE_SCOPE();
 
 	// these are sorted by hierarchy so fine to just do them linearly
 	glm::mat4 identityTransform = glm::identity<glm::mat4>();
@@ -706,26 +708,23 @@ void e2::Pose::updateSkin()
 		}
 	}
 	*/
-	E2_END_SCOPE();
 }
 
 void e2::Pose::applyBindPose()
 {
-	E2_BEGIN_SCOPE();
+	E2_PROFILE_SCOPE();
 	for (e2::PoseBone& bone : m_poseBones)
 	{
 		bone.localTransform = bone.assetBone->localTransform;
 	}
-	E2_END_SCOPE();
 }
 
 void e2::Pose::applyPose(Pose* otherPose)
 {
-	E2_BEGIN_SCOPE();
+	E2_PROFILE_SCOPE();
 	if (m_skeleton != otherPose->skeleton())
 	{
 		LogError("incompatible poses (skeleton mismatch)");
-		E2_END_SCOPE();
 		return;
 	}
 
@@ -735,30 +734,26 @@ void e2::Pose::applyPose(Pose* otherPose)
 
 		poseBone->localTransform = otherPose->poseBoneById(boneId)->localTransform;
 	}
-	E2_END_SCOPE();
 }
 
-void e2::Pose::applyBlend(Pose* a, Pose* b, float alpha)
+void e2::Pose::applyBlend(Pose* a, Pose* b, double alpha)
 {
-	E2_BEGIN_SCOPE();
+	E2_PROFILE_SCOPE();
 	if (m_skeleton != a->skeleton() || m_skeleton != b->skeleton())
 	{
 		LogError("incompatible poses (skeleton mismatch)");
-		E2_END_SCOPE();
 		return;
 	}
 
 	if (alpha < 0.001f)
 	{
 		applyPose(a);
-		E2_END_SCOPE();
 		return;
 	}
 	
 	if (alpha > 1.0f - 0.001f)
 	{
 		applyPose(b);
-		E2_END_SCOPE();
 		return;
 	}
 	
@@ -776,17 +771,16 @@ void e2::Pose::applyBlend(Pose* a, Pose* b, float alpha)
 		scaleC = glm::mix(scaleA, scaleB, alpha);
 		skewC = glm::mix(skewA, skewB, alpha);
 		perspectiveC = glm::mix(perspectiveA, perspectiveB, alpha);
-		rotationC = glm::slerp(rotationA, rotationB, alpha);
+		rotationC = glm::slerp(rotationA, rotationB, (float)alpha);
 
 		poseBone->localTransform = recompose(translationC, scaleC, skewC, perspectiveC, rotationC);
 
 
 		//poseBone->localTransform = glm::interpolate(a->poseBoneById(boneId)->localTransform, b->poseBoneById(boneId)->localTransform, alpha);
 	}
-	E2_END_SCOPE();
 }
 
-void e2::Pose::blendWith(Pose* b, float alpha)
+void e2::Pose::blendWith(Pose* b, double alpha)
 {
 	if (alpha < 0.001f)
 		return;
@@ -795,9 +789,9 @@ void e2::Pose::blendWith(Pose* b, float alpha)
 	applyBlend(this, b, alpha);
 }
 
-void e2::Pose::applyAnimation(e2::Ptr<e2::Animation> anim, float time)
+void e2::Pose::applyAnimation(e2::Ptr<e2::Animation> anim, double time)
 {
-	E2_BEGIN_SCOPE();
+	E2_PROFILE_SCOPE();
 	for (uint32_t boneId = 0; boneId < m_poseBones.size(); boneId++)
 	{
 		e2::PoseBone* poseBone = &m_poseBones[boneId];
@@ -823,7 +817,6 @@ void e2::Pose::applyAnimation(e2::Ptr<e2::Animation> anim, float time)
 
 		poseBone->localTransform = recompose(translation, scale, skew, perspective, rotation);
 	}
-	E2_END_SCOPE();
 }
 
 e2::StackVector<glm::mat4, e2::maxNumSkeletonBones> const& e2::Pose::skin()
@@ -876,7 +869,7 @@ void e2::AnimationPose::updateAnimation(double timeDelta, bool onlyTickTime)
 	if (!m_playing)
 		return;
 
-	E2_BEGIN_SCOPE();
+	E2_PROFILE_SCOPE();
 	m_time += timeDelta;
 	while (m_time >= m_animation->timeSeconds())
 	{
@@ -924,6 +917,4 @@ void e2::AnimationPose::updateAnimation(double timeDelta, bool onlyTickTime)
 		poseBone->localTransform = recompose(translation, scale, skew, perspective, rotation);
 	}
 
-	//applyAnimation(m_animation, m_time);
-	E2_END_SCOPE();
 }
