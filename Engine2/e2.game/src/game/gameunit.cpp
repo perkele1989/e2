@@ -249,27 +249,18 @@ e2::GameEntity::GameEntity(e2::GameContext* ctx, glm::ivec2 const& tile, EmpireI
 	postConstruct(ctx, tile, empire);
 }
 
-namespace {
-	int32_t numEnts = 0;
-}
 e2::GameEntity::GameEntity()
 {
 
 	m_targetRotation = glm::angleAxis(0.0f, glm::vec3(e2::worldUp()));
 	m_rotation = m_targetRotation;
 
-	numEnts++;
-
-	LogNotice("new ent: {}", numEnts);
 }
 
 e2::GameEntity::~GameEntity()
 {
 	destroyProxy();
 
-	numEnts--;
-
-	LogNotice("remaining ents: {}", numEnts);
 }
 
 void e2::GameEntity::postConstruct(e2::GameContext* ctx, glm::ivec2 const& tile, EmpireId empire)

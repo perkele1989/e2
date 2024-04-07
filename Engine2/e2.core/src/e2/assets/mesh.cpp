@@ -56,25 +56,12 @@ namespace
 }
 
 
-namespace
-{
-	uint64_t numMeshes{};
-	std::unordered_set<e2::Mesh*> meshes;
-}
-
 e2::Mesh::Mesh()
 {
-	::numMeshes++;
-	meshes.insert(this);
-	LogNotice("Num meshes increased to {}", ::numMeshes);
 }
 
 e2::Mesh::~Mesh()
 {
-	meshes.erase(this);
-	::numMeshes--;
-	LogNotice("Num meshes decreased to {}", ::numMeshes);
-
 	for (uint8_t i = 0; i < m_specifications.size(); i++)
 	{
 		e2::SubmeshSpecification &spec = m_specifications[i];
