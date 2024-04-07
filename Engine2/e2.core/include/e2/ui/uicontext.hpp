@@ -293,6 +293,7 @@ namespace e2
 		 */
 		void drawRasterText(e2::FontFace fontFace, uint8_t fontSize,  e2::UIColor color, glm::vec2 position, std::string const& markdownUtf8, bool enableColorChange = true, bool soft = false);
 		void drawSDFText(e2::FontFace fontFace, float fontSize, e2::UIColor color, glm::vec2 position, std::string const& markdownUtf8, bool enableColorChange = true, bool soft = false);
+		void drawSDFTextCarousel(e2::FontFace fontFace, float fontSize, e2::UIColor color, glm::vec2 position, std::string const& markdownUtf8, float heightScale, float time);
 		void drawRasterTextShadow(e2::FontFace fontFace, uint8_t fontSize,glm::vec2 position, std::string const& markdownUtf8);
 
 		float calculateSDFTextWidth(e2::FontFace fontFace, float fontSize, std::string const& markdownUtf8);

@@ -561,8 +561,8 @@ void e2::Game::update(double seconds)
 		m_session->tick(seconds);
 
 		glm::vec2 winSize = m_session->window()->size();
-		float textWidth = m_session->uiContext()->calculateSDFTextWidth(FontFace::Serif, 22.0f, "Loading..");
-		m_session->uiContext()->drawSDFText(FontFace::Serif, 22.f, 0xFFFFFFFF, { winSize.x - textWidth - 16.f, winSize.y - 32.0f }, "Loading..");
+		float textWidth = m_session->uiContext()->calculateSDFTextWidth(FontFace::Serif, 22.0f, "Loading... ");
+		m_session->uiContext()->drawSDFTextCarousel(FontFace::Serif, 22.f, 0xFFFFFFFF, { winSize.x - textWidth - 16.f, winSize.y - 32.0f }, "Loading... ", 8.0f, m_bootBegin.durationSince().seconds() * 4.0f);
 
 		if (assetManager()->queryALJ(m_bootTicket).status == ALJStatus::Completed && m_bootBegin.durationSince().seconds() > 4.0f)
 		{
