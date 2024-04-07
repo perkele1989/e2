@@ -1075,6 +1075,17 @@ namespace e2
 			return newPtr;
 		}
 
+		/** Like Ptr::create, except lets caller specify an already created instance, making this the owning pointer and thus acts like a RAII pointer */
+		template<typename... Args>
+		static Ptr<Type> emplace(Type* instance)
+		{
+			e2::Ptr<Type> newPtr;
+			newPtr.m_object = instance;
+			newPtr.m_object->block()->objIncrement();
+			e2::destroy(newPtr.m_object);
+			return newPtr;
+		}
+
 		Type* get() const
 		{
 			return m_object;

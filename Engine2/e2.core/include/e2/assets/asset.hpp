@@ -71,6 +71,7 @@ namespace e2
 		// dependencies, these are guaranteed to be fully loaded in when this asset begins loading 
 		// optionally named
 
+		std::string debugName;
 		e2::UUID uuid;
 		e2::AssetVersion version;
 

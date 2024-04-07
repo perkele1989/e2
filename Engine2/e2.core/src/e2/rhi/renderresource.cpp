@@ -10,7 +10,7 @@ e2::RenderResource::RenderResource(IRenderContext* context)
 {
 #if defined(E2_DEVELOPMENT)
 	std::stringstream ss;
-	//ss << std::stacktrace::current();
+	ss << std::stacktrace::current();
 
 	m_renderContext->m_trackers[this] = { this, ss.str() };
 #endif

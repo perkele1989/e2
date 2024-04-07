@@ -59,11 +59,15 @@ namespace e2
 	};
 
 
-	/** @tags(arena, arenaSize=4096)*/
+	/** @tags(dynamic, arena, arenaSize=4096)*/
 	class MobileMOB : public e2::GameUnit
 	{
 		ObjectDeclaration();
+
+		void setupConfig();
+
 	public:
+		MobileMOB();
 		MobileMOB(e2::GameContext* ctx, glm::ivec2 const& tile, uint8_t empire);
 		virtual ~MobileMOB();
 		virtual void updateAnimation(double seconds) override;

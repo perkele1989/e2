@@ -1004,11 +1004,15 @@ if __name__ == "__main__":
         all_bins : set[str] = set()
 
         for binary in int_proj.binary_files:
-            #print(f"using binary {binary}")
+            print(f"using binary {binary}")
             all_bins.add(binary)
 
         for binary in int_proj.binary_files_devel:
-            #print(f"using devel binary {binary}")
+            print(f"using devel binary {binary}")
+            all_bins.add(binary)
+
+        for binary in int_proj.binary_files_profile:
+            print(f"using profile binary {binary}")
             all_bins.add(binary)
 
         for bin in all_bins:

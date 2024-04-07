@@ -258,6 +258,7 @@ void e2::AssetManager::shutdown()
 	fileBuffer.writeToFile("./assets/registry.db");
 
 	m_uuidIndex.clear();
+	m_database.clear();
 }
 
 void e2::AssetManager::preUpdate(double deltaTime)
@@ -312,12 +313,12 @@ e2::AssetTask::AssetTask(e2::Context* context, e2::AssetEntry* entry)
 	: e2::AsyncTask(context)
 	, m_entry(entry)
 {
-
+	
 }
 
 e2::AssetTask::~AssetTask()
 {
-
+	
 }
 
 
@@ -345,7 +346,7 @@ bool e2::AssetTask::prepare()
 		return false;
 	}
 
-	m_asset = object->cast<e2::Asset>();
+	m_asset = e2::Ptr<e2::Asset>::emplace(object->cast<e2::Asset>());
 	if (!m_asset)
 	{
 		LogError("Broken reflection");
@@ -353,6 +354,8 @@ bool e2::AssetTask::prepare()
 	}
 
 	m_asset->postConstruct(this, m_entry->uuid);
+
+	m_asset->debugName = m_entry->path;
 
 	return true;
 }
@@ -420,10 +423,45 @@ e2::AssetDatabase::AssetDatabase(e2::Context* ctx)
 
 e2::AssetDatabase::~AssetDatabase()
 {
+	clear();
+}
+
+void e2::AssetDatabase::clear()
+{
 	for (e2::AssetEntry* entry : m_assets)
 	{
 		e2::destroy(entry);
 	}
+	m_assets.clear();
+	m_pathIndex.clear();
+	m_uuidIndex.clear();
+
+	if (m_rootEditorEntry)
+	{
+		struct _Unit
+		{
+			e2::AssetEditorEntry* entry{};
+		};
+
+		std::queue<_Unit> q;
+		q.push({ m_rootEditorEntry });
+
+		while (!q.empty())
+		{
+			_Unit u = q.front();
+			q.pop();
+
+			for (e2::AssetEditorEntry* c : u.entry->children)
+			{
+				q.push({ c });
+			}
+
+			e2::destroy(u.entry);
+		}
+
+		m_rootEditorEntry = nullptr;
+	}
+	
 }
 
 void e2::AssetDatabase::validate(bool forceSave)
@@ -638,7 +676,7 @@ namespace
 				
 				editorEntry->children.push_back(newEntry);
 
-				LogNotice("Found editor asset: {}, of type {}: {}", assetEntry->path, assetEntry->header.assetType.cstring(), newEntry->fullPath().c_str());
+				//LogNotice("Found editor asset: {}, of type {}: {}", assetEntry->path, assetEntry->header.assetType.cstring(), newEntry->fullPath().c_str());
 			}
 		}
 	}

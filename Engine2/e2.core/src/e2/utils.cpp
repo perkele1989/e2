@@ -535,7 +535,7 @@ namespace
 void e2::Type::registerType()
 {
 	::typeIndex[fqn] = this;
-	LogNotice("Registered type: {}", fqn);
+	//LogNotice("Registered type: {}", fqn);
 }
 
 e2::Type* e2::Type::fromName(e2::Name name)
@@ -682,7 +682,7 @@ e2::Object::Object()
 	std::scoped_lock lock(trackedMutex);
 	ObjectTracker tracker;
 	tracker.object = this;
-	//tracker.callStack = std::to_string(std::stacktrace::current());
+	tracker.callStack = std::to_string(std::stacktrace::current());
 	::trackedObjects[this] = tracker;
 #endif
 }

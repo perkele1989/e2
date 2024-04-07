@@ -126,6 +126,8 @@ namespace e2
 
 	protected:
 
+		std::mutex m_vertexLayoutCacheMutex;
+
 		e2::IRenderContext* m_renderContext{};
 		e2::IThreadContext* m_mainThreadContext{};
 

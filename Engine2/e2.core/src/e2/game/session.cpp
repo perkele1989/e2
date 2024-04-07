@@ -65,7 +65,7 @@ e2::Session::~Session()
 
 	for (std::pair<e2::Material* const, e2::MaterialProxy*> & p : m_defaultMaterialProxies)
 	{
-		//p.second->keepAround();
+		p.first->sessions.erase(this);
 		e2::destroy(p.second);
 	}
 
@@ -224,12 +224,24 @@ e2::MaterialProxy* e2::Session::getOrCreateDefaultMaterialProxy(e2::MaterialPtr 
 	auto finder = m_defaultMaterialProxies.find(material.get());
 	if (finder == m_defaultMaterialProxies.end())
 	{
+		material->sessions.insert(this);
 		e2::MaterialProxy* newProxy = material->model()->createMaterialProxy(this, material);
 		m_defaultMaterialProxies[material.get()] = newProxy;
 		return newProxy;
 	}
 
 	return finder->second;
+}
+
+void e2::Session::nukeDefaultMaterialProxy(e2::MaterialPtr material)
+{
+	auto finder = m_defaultMaterialProxies.find(material.get());
+	if (finder == m_defaultMaterialProxies.end())
+	{
+		material->sessions.erase(this);
+		e2::destroy(finder->second);
+		m_defaultMaterialProxies.erase(finder->first);
+	}
 }
 
 void e2::Session::invalidateAllPipelines()

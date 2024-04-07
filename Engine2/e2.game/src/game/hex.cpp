@@ -39,28 +39,9 @@ e2::HexGrid::HexGrid(e2::GameContext* gameCtx)
 
 	auto am = game()->assetManager();
 
-	e2::ALJDescription aljDesc;
-	am->prescribeALJ(aljDesc, "assets/SM_HexBase.e2a");
-	am->prescribeALJ(aljDesc, "assets/SM_HexBaseHigh.e2a");
-	am->prescribeALJ(aljDesc, "assets/SM_CoordinateSpace.e2a");
-
-	am->prescribeALJ(aljDesc, "assets/environment/trees/SM_PineForest001.e2a");
-	am->prescribeALJ(aljDesc, "assets/environment/trees/SM_PineForest002.e2a");
-	am->prescribeALJ(aljDesc, "assets/environment/trees/SM_PineForest003.e2a");
-	am->prescribeALJ(aljDesc, "assets/environment/trees/SM_PineForest004.e2a");
-
-	am->prescribeALJ(aljDesc, "assets/environment/SM_MineTrees.e2a");
-	if (!am->queueWaitALJ(aljDesc))
-	{
-		LogError("Failed to load hex base mesh");
-		return;
-	}
-
 	m_treeMesh[0] = am->get("assets/environment/trees/SM_PineForest001.e2a")->cast<e2::Mesh>();
 	m_treeMesh[1] = am->get("assets/environment/trees/SM_PineForest002.e2a")->cast<e2::Mesh>();
 	m_treeMesh[2] = am->get("assets/environment/trees/SM_PineForest003.e2a")->cast<e2::Mesh>();
-	m_treeMesh[3] = am->get("assets/environment/trees/SM_PineForest004.e2a")->cast<e2::Mesh>();
-	m_mineTreeMesh = am->get("assets/environment/SM_MineTrees.e2a")->cast<e2::Mesh>();
 
 	m_baseHex = am->get("assets/SM_HexBase.e2a")->cast<e2::Mesh>();
 	m_dynaHex = e2::DynamicMesh(m_baseHex, 0, VertexAttributeFlags::Color);
@@ -124,20 +105,20 @@ e2::HexGrid::HexGrid(e2::GameContext* gameCtx)
 	auto rm = game()->renderManager();
 	auto session = game()->gameSession();
 
-	m_waterMaterial = e2::create<e2::Material>();
+	m_waterMaterial = e2::MaterialPtr::create();
 	m_waterMaterial->postConstruct(game(), {});
 	m_waterMaterial->overrideModel(rm->getShaderModel("e2::WaterModel"));
 	m_waterProxy = session->getOrCreateDefaultMaterialProxy(m_waterMaterial)->unsafeCast<e2::WaterProxy>();
 	m_waterChunk = dynaWater.bake(m_waterMaterial, VertexAttributeFlags::None);
 
 
-	m_fogMaterial = e2::create<e2::Material>();
+	m_fogMaterial = e2::MaterialPtr::create();
 	m_fogMaterial->postConstruct(game(), {});
 	m_fogMaterial->overrideModel(rm->getShaderModel("e2::FogModel"));
 	m_fogProxy = session->getOrCreateDefaultMaterialProxy(m_fogMaterial)->unsafeCast<e2::FogProxy>();
 	m_fogChunk = dynaWater.bake(m_fogMaterial, VertexAttributeFlags::None);
 
-	m_terrainMaterial = e2::create<e2::Material>();
+	m_terrainMaterial = e2::MaterialPtr::create();
 	m_terrainMaterial->postConstruct(game(), {});
 	m_terrainMaterial->overrideModel(rm->getShaderModel("e2::TerrainModel"));
 	m_terrainProxy = session->getOrCreateDefaultMaterialProxy(m_terrainMaterial)->unsafeCast<e2::TerrainProxy>();
@@ -856,8 +837,8 @@ void e2::HexGrid::nukeChunk(e2::ChunkState* chunk)
 	m_lookAheadChunks.erase(chunk);
 
 	m_chunkIndex.erase(chunk->chunkIndex);
-
-	e2::destroy(chunk);
+	chunk->task = nullptr;
+	e2::discard(chunk);
 }
 
 
@@ -2041,6 +2022,18 @@ void e2::HexGrid::destroyFogOfWar()
 
 	if (m_blurPipelineLayout)
 		e2::discard(m_blurPipelineLayout);
+
+	if (m_outlinePipelineLayout)
+		e2::discard(m_outlinePipelineLayout);
+
+	if (m_outlineVertexShader)
+		e2::discard(m_outlineVertexShader);
+
+	if (m_outlineFragmentShader)
+		e2::discard(m_outlineFragmentShader);
+
+	if (m_outlinePipeline)
+		e2::discard(m_outlinePipeline);
 
 	if (m_fogOfWarPipelineLayout)
 		e2::discard(m_fogOfWarPipelineLayout);

@@ -165,7 +165,7 @@ namespace e2
 
 
 	/** @tags(arena, arenaSize=e2::maxNumChunkStates)  */
-	class ChunkState : public e2::Object
+	class ChunkState : public e2::ManagedObject
 	{
 		ObjectDeclaration()
 	public:
@@ -455,8 +455,7 @@ namespace e2
 
 
 
-		e2::MeshPtr m_treeMesh[4];
-		e2::MeshPtr m_mineTreeMesh;
+		e2::MeshPtr m_treeMesh[3];
 
 		e2::MeshPtr m_baseHex;
 		e2::DynamicMesh m_dynaHex;

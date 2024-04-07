@@ -401,9 +401,7 @@ void e2::Engineer::kill()
 
 
 
-e2::MobileMOB::MobileMOB(e2::GameContext* ctx, glm::ivec2 const& tile, uint8_t empire)
-	: e2::GameUnit(ctx, tile, empire)
-
+void e2::MobileMOB::setupConfig()
 {
 	displayName = "Mobile MOB";
 	sightRange = 3;
@@ -411,7 +409,19 @@ e2::MobileMOB::MobileMOB(e2::GameContext* ctx, glm::ivec2 const& tile, uint8_t e
 	movePointsLeft = 3;
 
 	entityType = e2::EntityType::Unit_MobileMOB;
-	//m_modelScale = glm::vec3(1.0f, 1.0f, 1.0f);
+}
+
+e2::MobileMOB::MobileMOB(e2::GameContext* ctx, glm::ivec2 const& tile, uint8_t empire)
+	: e2::GameUnit(ctx, tile, empire)
+
+{
+	setupConfig();
+}
+
+e2::MobileMOB::MobileMOB()
+	: e2::GameUnit()
+{
+	setupConfig();
 }
 
 e2::MobileMOB::~MobileMOB()

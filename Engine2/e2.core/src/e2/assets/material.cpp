@@ -7,7 +7,10 @@
 
 e2::Material::~Material()
 {
-
+	for (e2::Session* s : sessions)
+	{
+		s->nukeDefaultMaterialProxy(e2::Ptr<Material>(this));
+	}
 }
 
 void e2::Material::write(Buffer& destination) const

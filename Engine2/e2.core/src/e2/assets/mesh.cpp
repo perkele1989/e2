@@ -58,29 +58,30 @@ namespace
 
 namespace
 {
-	//uint64_t numMeshes{};
+	uint64_t numMeshes{};
+	std::unordered_set<e2::Mesh*> meshes;
 }
 
 e2::Mesh::Mesh()
 {
-	//::numMeshes++;
-	//LogNotice("Num meshes increased to {}", ::numMeshes);
+	::numMeshes++;
+	meshes.insert(this);
+	LogNotice("Num meshes increased to {}", ::numMeshes);
 }
 
 e2::Mesh::~Mesh()
 {
-	//::numMeshes--;
-	//LogNotice("Num meshes decreased to {}", ::numMeshes);
+	meshes.erase(this);
+	::numMeshes--;
+	LogNotice("Num meshes decreased to {}", ::numMeshes);
 
 	for (uint8_t i = 0; i < m_specifications.size(); i++)
 	{
 		e2::SubmeshSpecification &spec = m_specifications[i];
 		for (uint8_t j = 0; j < spec.vertexAttributes.size(); j++)
 		{
-			spec.vertexAttributes[j]->keepAround();
 			e2::discard(spec.vertexAttributes[j]);
 		}
-		spec.indexBuffer->keepAround();
 		e2::discard(spec.indexBuffer);
 	}
 }
@@ -513,7 +514,7 @@ e2::AnimationTrack* e2::Animation::trackByName(e2::Name name, AnimationType type
 uint32_t e2::Animation::numFrames()
 {
 	return m_numFrames;
-}
+}  
 
 double e2::Animation::frameRate()
 {

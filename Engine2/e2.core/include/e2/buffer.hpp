@@ -21,7 +21,7 @@ namespace e2
 	class E2_API Data
 	{
 	public:
-
+		virtual ~Data();
 		virtual void write(Buffer& destination) const = 0;
 		virtual bool read(Buffer& source) = 0;
 

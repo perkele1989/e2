@@ -4,15 +4,9 @@
 
 #include<glm/gtc/integer.hpp>
 
-namespace
-{
-	uint64_t numTextures{};
-}
-
 e2::Texture2D::Texture2D()
 {
-	::numTextures++;
-	LogNotice("Num textures increased to {}", ::numTextures);
+
 }
 
 e2::Texture2D::~Texture2D()
@@ -20,8 +14,6 @@ e2::Texture2D::~Texture2D()
 	if(m_texture)
 		e2::discard(m_texture);
 
-	::numTextures--;
-	LogNotice("Num textures decreased to {}", ::numTextures);
 }
 
 

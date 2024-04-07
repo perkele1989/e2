@@ -68,6 +68,10 @@ void e2::AsyncManager::shutdown()
 	{
 		thread->kill();
 	}
+
+	m_queueSwap.clear();
+	m_queue.clear();
+	m_partQueue.clear();
 }
 
 void e2::AsyncManager::preUpdate(double deltaTime)
@@ -222,6 +226,8 @@ void e2::AsyncThread::kill()
 {
 	m_running = false;
 	m_thread.join();
+
+	m_fetchSwap.clear();
 }
 
 void e2::AsyncThread::enqueue(std::vector<e2::AsyncTaskPtr> &newTasks)

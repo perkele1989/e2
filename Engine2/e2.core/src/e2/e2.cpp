@@ -35,6 +35,7 @@ e2::Engine::~Engine()
 {
 	e2::destroy(m_gameManager);
 	e2::destroy(m_uiManager);
+
 	e2::destroy(m_renderManager);
 	e2::destroy(m_assetManager);
 	e2::destroy(m_asyncManager);
@@ -174,6 +175,8 @@ void e2::Engine::run(e2::Application* app)
 
 	m_uiManager->shutdown();
 	m_renderManager->shutdown();
+
+	e2::ManagedObject::keepAroundPrune();
 
 	m_typeManager->shutdown();
 

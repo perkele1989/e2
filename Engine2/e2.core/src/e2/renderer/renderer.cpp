@@ -239,7 +239,9 @@ e2::Renderer::Renderer(e2::Session* session, glm::uvec2 const& resolution)
 	m_linePipeline = renderContext()->createPipeline(lineCreateInfo);
 
 
-
+	e2::ITexture* fallback = renderManager()->defaultTexture()->handle();
+	m_outlineTextures[0] = fallback;
+	m_outlineTextures[1] = fallback;
 }
 
 e2::Renderer::~Renderer()
@@ -602,8 +604,17 @@ void e2::Renderer::setSun(glm::vec3 const& dir, glm::vec3 const& color, float st
 
 void e2::Renderer::setOutlineTextures(e2::ITexture* textures[2])
 {
-	m_outlineTextures[0] = textures[0];
-	m_outlineTextures[1] = textures[1];
+	if (textures[0] && textures[1])
+	{
+		m_outlineTextures[0] = textures[0];
+		m_outlineTextures[1] = textures[1];
+	}
+	else
+	{
+		e2::ITexture* fallback = renderManager()->defaultTexture()->handle();
+		m_outlineTextures[0] = fallback;
+		m_outlineTextures[1] = fallback;
+	}
 }
 
 void e2::Renderer::swapRenderBuffers()

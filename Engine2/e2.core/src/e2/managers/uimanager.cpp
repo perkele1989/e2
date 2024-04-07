@@ -830,7 +830,7 @@ void e2::UIWindow::update(double deltaTime)
 			e2::EngineMetrics& m = engine()->metrics();
 			std::string str = std::format("**e2 editor** ^m^5{:.1f}ms^- / ^5{:.1f}ms^- / ^7{:.1f}us^- / ^7{:.1f}us^-", m.frameTimeMsMean, m.frameTimeMsHigh, m.gpuWaitTimeUsMean, m.gpuWaitTimeUsHigh);
 #else 
-			constexpr std::string str = "**e2 editor**";
+			std::string str = "**e2 editor**";
 #endif
 			uiContext()->drawRasterText(e2::FontFace::Sans, uint8_t(11 * style.scale), 0x000000FF, titlePosition, str);
 

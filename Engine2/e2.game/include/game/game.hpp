@@ -218,36 +218,12 @@ namespace e2
 
 		e2::RenderView calculateRenderView(glm::vec2 const& viewOrigin);
 
-
-
-		e2::MeshPtr cursorMesh()
-		{
-			return m_cursorMesh;
-		}
-
-
-
 		GameUnit* unitAtHex(glm::ivec2 const& hex);
 		GameStructure* structureAtHex(glm::ivec2 const& hex);
 
 		e2::MeshPtr getEntityMesh(e2::EntityType type);
 		e2::SkeletonPtr getEntitySkeleton(e2::EntityType type);
 
-
-		e2::MeshPtr dummyMesh()
-		{
-			return m_dummyMesh;
-		}
-
-		e2::SkeletonPtr dummySkeleton()
-		{
-			return m_dummySkeleton;
-		}
-
-		e2::AnimationPtr dummyAnimation()
-		{
-			return m_dummyAnimation;
-		}
 
 		e2::AnimationPtr getAnimationByIndex(e2::AnimationIndex index)
 		{
@@ -264,14 +240,7 @@ namespace e2
 
 		e2::ALJTicket m_bootTicket;
 
-		e2::MeshPtr m_dummyMesh;
-		e2::SkeletonPtr m_dummySkeleton;
-		e2::AnimationPtr m_dummyAnimation;
-
 		e2::StackVector<e2::AnimationPtr, (uint64_t)e2::AnimationIndex::Count> m_animationIndex;
-
-
-		// shared resources
 		e2::StackVector<e2::MeshPtr, size_t(e2::EntityType::Count)> m_entityMeshes;
 		e2::StackVector<e2::SkeletonPtr, size_t(e2::EntityType::Count)> m_entitySkeletons;
 
@@ -321,7 +290,6 @@ namespace e2
 		e2::Hex m_prevCursorHex;
 		e2::TileData* m_cursorTile{};
 		bool m_hexChanged{};
-		e2::MeshPtr m_cursorMesh;
 
 		bool m_uiHovered{};
 		bool m_viewDragging{};

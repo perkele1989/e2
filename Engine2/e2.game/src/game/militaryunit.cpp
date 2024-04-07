@@ -82,6 +82,9 @@ e2::Grunt::~Grunt()
 
 	if (m_firePose)
 		e2::destroy(m_firePose);
+
+	if (m_diePose)
+		e2::destroy(m_diePose);
 }
 
 void e2::Grunt::initialize()

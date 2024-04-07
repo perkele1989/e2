@@ -72,6 +72,21 @@ namespace e2
 
 		void enqueue(std::vector<e2::AsyncTaskPtr> newTasks);
 
+		template <typename PredType>
+		void waitForPredicate(PredType predicate)
+		{
+			while (!predicate())
+			{
+				std::this_thread::yield();
+
+				// If this is called from main thread, we need to process the async and asset managers inline, otherwise we will block indefinitely and freeze the engine
+				// Do this after the yield since we want as up-to-date information as possible when we query to reduce latency
+				if (isMainthread())
+				{
+					asyncManager()->update(0.0);
+				}
+			}
+		}
 
 		bool isMainthread();
 	protected:

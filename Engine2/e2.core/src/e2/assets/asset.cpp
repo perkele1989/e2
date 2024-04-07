@@ -5,7 +5,7 @@
 
 e2::Asset::~Asset()
 {
-
+	//LogNotice("Asset DESTROY: {}", uuid.string());
 }
 
 void e2::Asset::postConstruct(e2::Context* ctx, e2::UUID const& inUuid)

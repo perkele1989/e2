@@ -3,6 +3,7 @@
 
 #include "e2/e2.hpp"
 #include "e2/managers/rendermanager.hpp"
+#include "e2/managers/asyncmanager.hpp"
 #include "e2/managers/typemanager.hpp"
 #include "e2/managers/assetmanager.hpp"
 #include "e2/managers/uimanager.hpp"
@@ -34,7 +35,7 @@ e2::Game::Game(e2::Context* ctx)
 
 e2::Game::~Game()
 {
-
+	
 }
 
 void e2::Game::saveGame(uint8_t slot)
@@ -304,8 +305,13 @@ void e2::Game::setupGame()
 
 void e2::Game::nukeGame()
 {
+	e2::ITexture* outlineTextures[2] = {nullptr, nullptr};
+	m_session->renderer()->setOutlineTextures(outlineTextures);
+
 	deselectStructure();
 	deselectUnit();
+
+	m_unitsPendingDestroy.clear();
 
 	auto unitsClone = m_units;
 	for (GameUnit* unit : unitsClone)
@@ -320,7 +326,15 @@ void e2::Game::nukeGame()
 		destroyEmpire(i);
 	}
 
-	e2::destroy(m_hexGrid);
+	if (m_hexGrid)
+	{
+
+		asyncManager()->waitForPredicate([this]()->bool {
+			return m_hexGrid->numJobsInFlight() == 0;
+		});
+		e2::destroy(m_hexGrid);
+		m_hexGrid = nullptr;
+	}
 
 	m_globalState = GlobalState::Menu;
 	m_inGameMenuState = InGameMenuState::Main;
@@ -344,7 +358,6 @@ void e2::Game::finalizeBoot()
 	auto am = assetManager();
 
 	m_uiTextureResources = am->get("assets/UI_ResourceIcons.e2a").cast<e2::Texture2D>();
-	m_cursorMesh = am->get("assets/environment/trees/SM_PalmTree001.e2a").cast<e2::Mesh>();
 
 	m_irradianceMap = am->get("assets/kloofendal_irr.e2a").cast<e2::Texture2D>();
 	m_radianceMap = am->get("assets/kloofendal_rad.e2a").cast<e2::Texture2D>();
@@ -437,6 +450,18 @@ void e2::Game::initialize()
 	auto am = assetManager();
 
 	e2::ALJDescription alj;
+
+	am->prescribeALJ(alj, "assets/SM_HexBase.e2a");
+	am->prescribeALJ(alj, "assets/SM_HexBaseHigh.e2a");
+
+	am->prescribeALJ(alj, "assets/environment/trees/SM_PineForest001.e2a");
+	am->prescribeALJ(alj, "assets/environment/trees/SM_PineForest002.e2a");
+	am->prescribeALJ(alj, "assets/environment/trees/SM_PineForest003.e2a");
+	am->prescribeALJ(alj, "assets/environment/trees/SM_PineForest004.e2a");
+
+	am->prescribeALJ(alj, "assets/environment/SM_MineTrees.e2a");
+
+
 	am->prescribeALJ(alj, "assets/UI_ResourceIcons.e2a");
 	am->prescribeALJ(alj, "assets/environment/trees/SM_PalmTree001.e2a");
 	am->prescribeALJ(alj, "assets/environment/trees/SM_PalmTree002.e2a");
@@ -498,19 +523,30 @@ void e2::Game::initialize()
 
 void e2::Game::shutdown()
 {
-	std::unordered_set<e2::GameUnit*> unitsCopy = m_units;
-	for (e2::GameUnit* unit : unitsCopy)
-		destroyUnit(unit->tileIndex);
 
-	std::unordered_set<e2::GameStructure*> structuresCopy = m_structures;
-	for (e2::GameStructure* structure : structuresCopy)
-		destroyStructure(structure->tileIndex);
+	nukeGame();
 
-
-	if (m_unitAS)
-		e2::destroy(m_unitAS);
-	e2::destroy(m_hexGrid);
 	e2::destroy(m_session);
+
+	m_irradianceMap = nullptr;
+	m_radianceMap = nullptr;
+	m_uiTextureResources = nullptr;
+
+	for (uint32_t i = 0; i < m_animationIndex.size(); i++)
+	{
+		m_animationIndex[i] = nullptr;
+	}
+
+	for (uint32_t i = 0; i < m_entityMeshes.size(); i++)
+	{
+		m_entityMeshes[i] = nullptr;
+	}
+
+	for (uint32_t i = 0; i < m_entitySkeletons.size(); i++)
+	{
+		m_entitySkeletons[i] = nullptr;
+	}
+
 }
 
 void e2::Game::update(double seconds)
@@ -607,7 +643,10 @@ void e2::Game::updateInGameMenu(double seconds)
 			exitToMenu();
 
 		if (ui->button("btnQuitDesktop", "Quit to Desktop"))
+		{
+			nukeGame();
 			engine()->shutdown();
+		}
 
 		ui->endStackV();
 	}
@@ -1008,6 +1047,9 @@ void e2::Game::updateMenu(double seconds)
 	ui->drawSDFText(FontFace::Serif, 24.0f, quitHovered ? 0x000000FF : textColorQuit, glm::vec2(xOffset, cursorY + 40.0 * 4), "Quit");
 	if (quitHovered && leftMouse.clicked)
 	{
+
+		nukeGame();
+
 		engine()->shutdown();
 	}
 
@@ -2584,7 +2626,7 @@ e2::PathFindingAccelerationStructure::PathFindingAccelerationStructure(e2::GameU
 
 		for (e2::Hex n : curr->index.neighbours())
 		{
-			if (curr->stepsFromOrigin + 1 > unit->movePointsLeft)
+			if (curr->stepsFromOrigin + 1 > unit->movePointsLeft) 
 				continue;
 
 			if (processed.contains(n))

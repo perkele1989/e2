@@ -6,6 +6,7 @@
 #include <e2/assets/asset.hpp>
 #include "e2/assets/texture2d.hpp"
 
+#include <unordered_set>
 #include <map>
 
 namespace e2
@@ -14,6 +15,7 @@ namespace e2
 	class ShaderModel;
 	class MaterialProxy;
 	class Texture2D;
+	class Session;
 
 	/** @tags(dynamic, arena, arenaSize=2048) */
 	class E2_API Material : public e2::Asset
@@ -42,8 +44,11 @@ namespace e2
 		e2::Name getDefine(e2::Name key, e2::Name fallback);
 		bool hasDefine(e2::Name key);
 
+		std::unordered_set<e2::Session*> sessions;
+
 	protected:
 		e2::ShaderModel* m_model{};
+		
 
 		std::unordered_map<e2::Name, e2::Ptr<e2::Texture2D>> m_textureIndex;
 		std::unordered_map<e2::Name, glm::vec4> m_vectorIndex;

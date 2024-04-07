@@ -29,6 +29,7 @@ uint32_t e2::RenderManager::paddedBufferSize(uint32_t originalSize)
 
 e2::IVertexLayout* e2::RenderManager::getOrCreateVertexLayout(e2::VertexAttributeFlags flags)
 {
+	std::scoped_lock lock(m_vertexLayoutCacheMutex);
 	uint8_t index = uint8_t(flags);
 	if (m_vertexLayoutCache[index])
 		return m_vertexLayoutCache[index];
@@ -346,11 +347,12 @@ void e2::RenderManager::shutdown()
 	for(e2::ShaderModel* model : m_shaderModels)
 		e2::destroy(model);
 
-	for (e2::IVertexLayout*& layout : m_vertexLayoutCache)
+	for (uint32_t i = 0; i < m_vertexLayoutCache.size(); i++)
 	{
-		if (layout)
-			e2::destroy(layout);
-		layout = nullptr;
+		if(m_vertexLayoutCache[i])
+			e2::destroy(m_vertexLayoutCache[i]);
+
+		m_vertexLayoutCache[i] = nullptr;
 	}
 
 	e2::destroy(m_modelSetLayout);

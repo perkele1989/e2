@@ -96,6 +96,8 @@ namespace e2
 		AssetDatabase(e2::Context* ctx);
 		virtual ~AssetDatabase();
 
+		void clear();
+
 		void readFromDisk();
 		void writeToDisk();
 
@@ -219,10 +221,6 @@ namespace e2
 
 		/** Queues an ALJ and waits for it. Returns true if assets loaded properly . */
 		bool queueWaitALJ(e2::ALJDescription const& description);
-
-		/** Create an asset pool from an ALJDescription. Protip: Reuse the one from a loadjob to pin the loaded assets in place after you've returned the ticket. */
-		e2::AssetPool* createAssetPool(ALJDescription const& description);
-
 
 		virtual void initialize() override;
 		virtual void shutdown() override;

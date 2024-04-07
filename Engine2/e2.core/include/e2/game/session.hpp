@@ -76,6 +76,7 @@ namespace e2
 		e2::IDescriptorSetLayout* getModelSetLayout();
 
 		e2::MaterialProxy* getOrCreateDefaultMaterialProxy(e2::MaterialPtr material);
+		void nukeDefaultMaterialProxy(e2::MaterialPtr material);
 
 		void invalidateAllPipelines();
 

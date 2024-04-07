@@ -362,3 +362,7 @@ e2::Buffer& e2::Buffer::operator>>(std::string& value)
 	return *this;
 }
 
+e2::Data::~Data()
+{
+
+}
