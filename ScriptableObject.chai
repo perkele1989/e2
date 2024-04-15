@@ -1,0 +1,124 @@
+
+// players max move speed, in pixels per second
+double playerSpeed = 48.0;
+
+// player direction, true means right, false means left
+bool playerFacingRight = true;
+
+string playerName = "Zethell";
+
+Sprite playerSprite;
+
+Animation playerJump;
+Animation playerFall;
+Animation playerIdleL;
+Animation playerIdleR;
+Animation playerRunL;
+Animation playerRunR;
+
+def onSpawned()
+{
+    object.physicsShape.width = 12;
+    object.physicsShape.height = 20;
+    object.physicsEnabled = true;
+    object.gravityEnabled = true;
+    object.massKg = 90.0;
+
+    playerJump = loadAnimation("data/animations/player_jump.anim");
+    playerFall = loadAnimation("data/animations/player_fall.anim");
+    playerIdleL = loadAnimation("data/animations/player_idle_l.anim");
+    playerIdleR = loadAnimation("data/animations/player_idle_r.anim");
+    playerRunL = loadAnimation("data/animations/player_run_l.anim");
+    playerRunR = loadAnimation("data/animations/player_run_r.anim");
+}
+
+def onDestroyed()
+{
+
+}
+
+// on render is called after all other updates, and after physics has calibrated velocity and position
+// in this function we only render
+def onRender()
+{
+    // render the player sprite at objects position
+    renderSprite(object.position, playerSprite);
+
+    // render name on top (20 pixels above player center)
+    renderText(object.position + vec2(0.0, -20.0), playerName);
+}
+
+// Update logic, input, animation etc.
+def onUpdate(double seconds)
+{
+    if(input.isDown("moveLeft"))
+    {
+        object.velocity.x = -playerSpeed;
+    }
+    
+    if(input.isDown("moveRight"))
+    {
+        object.velocity.x = playerSpeed;
+    }
+
+    if(input.isPressed("jump"))
+    {
+        object.velocity.y = -moveStrength;
+    }
+
+    // isMoving is set to true if the absolute velocity on x axis is greater than 0.0 (moving either left or right)
+    // we basically use abs(..) function to remove the minus sign
+    bool isMoving = abs(object.velocity.x) > 0.0;
+
+    // isFalling is set to true if the velocity on the y axis is greater than 0.0 (moving downwards)
+    bool isFalling = object.velocity.y > 0.0;
+
+    // isJumping is set to true if velocity on the y axis is less than 0.0 (moving upwards)
+    bool isJumping = object.velocity.y < 0.0;
+
+    // update player direction if we are moving
+    if(isMoving)
+    {        
+        playerFacingRight = object.velocity.x > 0.0;
+    }
+
+    // if we are falling down, so render falling animation
+    if(isFalling)
+    {
+        // set playerFall animation on playerSprite, true as second argument means it will loop
+        playerSprite.setAnimation(playerFall, true);
+    }
+    // otherwise, if we are jumping, render jump animation
+    else if(isJumping)
+    {
+        playerSprite.setAnimation(playerJump, true);
+    }
+    // otherwise, if we are moving
+    // we are moving, so render appropriate run animation
+    else if(isMoving)
+    {
+        if(playerFacingRight)
+        {
+            playerSprite.setAnimation(playerRunR, true);
+        }
+        else 
+        {
+            playerSprite.setAnimation(playerRunL, true);
+        }
+    }
+    // we arent falling, we arent jumping, and we arent moving, so we are idle
+    else 
+    {
+        if(playerFacingRight)
+        {
+            playerSprite.setAnimation(playerIdleR, true);
+        }
+        else 
+        {
+            playerSprite.setAnimation(playerIdleL, true);
+        }
+    }
+
+    // update the sprite, updates the animation
+    playerSprite.update(seconds);
+}

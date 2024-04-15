@@ -37,7 +37,7 @@
                     "VK_USE_PLATFORM_WIN32_KHR": "true"
                 },
                 "include-paths": [ "e2.core/private" ],
-                "dependencies": [ "libshaderc.core" ]
+                "dependencies": [ "libshaderc.core", "fmod.core" ]
             }
         },
         {

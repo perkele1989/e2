@@ -9,6 +9,7 @@
 #include "editor/importers/meshimporter.hpp"
 #include "editor/importers/textureimporter.hpp"
 #include "editor/importers/materialimporter.hpp"
+#include "editor/importers/soundimporter.hpp"
 
 #include <filesystem>
 
@@ -74,6 +75,18 @@ void e2::AssetBrowser::update(e2::UIContext* ui, double seconds)
 				cfg.input = file;
 				cfg.outputDirectory = std::format(".{}", m_path->fullPath());
 				e2::MaterialImporter* newImporter = e2::create<e2::MaterialImporter>(editor(), cfg);
+				if (!newImporter->writeAssets())
+				{
+					LogError("Failed to import file: {} to location {}", cfg.input, cfg.outputDirectory);
+				}
+				editor()->oneShotImporter(newImporter);
+			}
+			else if (ext == ".wav")
+			{
+				e2::SoundImportConfig cfg;
+				cfg.input = file;
+				cfg.outputDirectory = std::format(".{}", m_path->fullPath());
+				e2::SoundImporter* newImporter = e2::create<e2::SoundImporter>(editor(), cfg);
 				if (!newImporter->writeAssets())
 				{
 					LogError("Failed to import file: {} to location {}", cfg.input, cfg.outputDirectory);

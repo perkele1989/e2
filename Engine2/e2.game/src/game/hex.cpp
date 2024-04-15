@@ -53,12 +53,11 @@ e2::HexGrid::HexGrid(e2::GameContext* gameCtx)
 	glm::vec2 waterOrigin = e2::Hex(glm::ivec2(0)).planarCoords();
 	glm::vec2 waterEnd = e2::Hex(glm::ivec2(e2::hexChunkResolution)).planarCoords();
 	glm::vec2 waterSize = waterEnd - waterOrigin;
-	uint32_t waterResolution = 64;
+	uint32_t waterResolution = 16;
 	glm::vec2 waterTileSize = waterSize / float(waterResolution);
 
 
 	e2::DynamicMesh dynaWater;
-	constexpr uint32_t segments = 4;
 	for (uint32_t y = 0; y < waterResolution; y++)
 	{
 		for (uint32_t x = 0; x < waterResolution; x++)
@@ -2351,7 +2350,7 @@ void e2::HexGrid::popInChunk(e2::ChunkState* state)
 		waterConf.mesh = m_waterChunk;
 
 		state->waterProxy = e2::create<e2::MeshProxy>(gameSession(), waterConf);
-		state->waterProxy->modelMatrix = glm::translate(glm::mat4(1.0f), chunkOffset + glm::vec3(0.0f, 0.1f, 0.0f));
+		state->waterProxy->modelMatrix = glm::translate(glm::mat4(1.0f), chunkOffset + glm::vec3(0.0f, e2::waterLine, 0.0f));
 		state->waterProxy->modelMatrixDirty = { true };
 	}
 	if (!state->fogProxy)

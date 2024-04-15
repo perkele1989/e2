@@ -98,7 +98,7 @@ namespace e2
 
 		e2::Name name;
 		AnimationType type;
-		e2::StackVector<AnimationTrackFrame, e2::maxNumTrackFrames> frames;
+		std::vector<AnimationTrackFrame> frames;
 	};
 
 	/** @tags(arena, arenaSize=1024, dynamic) */
@@ -123,7 +123,7 @@ namespace e2
 		uint32_t m_numFrames{};
 		double m_frameRate{};
 		std::unordered_map<e2::Name, uint32_t> m_trackIndex;
-		e2::StackVector<e2::AnimationTrack, e2::maxNumTracksPerAnimation> m_tracks;
+		std::vector<e2::AnimationTrack> m_tracks;
 	};
 
 	struct PoseBone

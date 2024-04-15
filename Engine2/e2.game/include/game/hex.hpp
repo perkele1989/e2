@@ -232,6 +232,7 @@ namespace e2
 		glm::uvec2 resolution;
 	};
 
+	constexpr float waterLine = 0.025f;
 
 	/** 
 	 * Procedural hex grid

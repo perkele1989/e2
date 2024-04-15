@@ -103,11 +103,7 @@ void e2::Grunt::initialize()
 
 void e2::Grunt::updateAnimation(double seconds)
 {
-	E2_PROFILE_SCOPE_CTX(game());
-
-	e2::Hex hex = e2::Hex(tileIndex);
-	e2::Viewpoints2D viewpoints = game()->viewPoints();
-	bool inView = viewpoints.isWithin(hex.planarCoords(), 1.0f);
+	E2_PROFILE_SCOPE_CTX(Animation, game());
 
 	if (dying && (!m_diePose->playing() || m_diePose->time() > m_diePose->animation()->timeSeconds() - 0.05f))
 	{
@@ -134,9 +130,7 @@ void e2::Grunt::updateAnimation(double seconds)
 	m_hitPose->updateAnimation(seconds, !inView);
 	m_diePose->updateAnimation(seconds, !inView);
 
-	// dont update base entity animation stuff unless we are in view
-	if (inView)
-		e2::MilitaryUnit::updateAnimation(seconds);
+	e2::MilitaryUnit::updateAnimation(seconds);
 }
 
 void e2::Grunt::drawUI(e2::UIContext* ui)
@@ -276,7 +270,8 @@ void e2::CombatBoat::setupConfig()
 	passableFlags = PassableFlags::WaterDeep | PassableFlags::WaterShallow;
 
 	m_modelScale = (glm::vec3(1.0f, -1.0f, -1.0f) / 4.0f) * 2.5f;
-	m_heightOffset = -0.25f;
+	
+	m_heightOffset = -0.15f;
 	moveSpeed = 2.8f;
 	moveType = UnitMoveType::Smooth;
 }
@@ -314,11 +309,7 @@ void e2::CombatBoat::initialize()
 
 void e2::CombatBoat::updateAnimation(double seconds)
 {
-	E2_PROFILE_SCOPE_CTX(game());
-
-	e2::Hex hex = e2::Hex(tileIndex);
-	e2::Viewpoints2D viewpoints = game()->viewPoints();
-	bool inView = viewpoints.isWithin(hex.planarCoords(), 1.0f);
+	E2_PROFILE_SCOPE_CTX(Animation, game());
 
 	/*if (dying && (!m_diePose->playing() || m_diePose->time() > m_diePose->animation()->timeSeconds() - 0.05f))
 	{
@@ -347,8 +338,7 @@ void e2::CombatBoat::updateAnimation(double seconds)
 	//m_diePose->updateAnimation(seconds, !inView);
 
 	// dont update base entity animation stuff unless we are in view
-	if (inView)
-		e2::MilitaryUnit::updateAnimation(seconds);
+	e2::MilitaryUnit::updateAnimation(seconds);
 
 }
 
@@ -526,11 +516,7 @@ void e2::Tank::initialize()
 
 void e2::Tank::updateAnimation(double seconds)
 {
-	E2_PROFILE_SCOPE_CTX(game());
-
-	e2::Hex hex = e2::Hex(tileIndex);
-	e2::Viewpoints2D viewpoints = game()->viewPoints();
-	bool inView = viewpoints.isWithin(hex.planarCoords(), 1.0f);
+	E2_PROFILE_SCOPE_CTX(Animation, game());
 
 	/*if (dying && (!m_diePose->playing() || m_diePose->time() > m_diePose->animation()->timeSeconds() - 0.05f))
 	{
@@ -559,8 +545,7 @@ void e2::Tank::updateAnimation(double seconds)
 	//m_diePose->updateAnimation(seconds, !inView);
 
 	// dont update base entity animation stuff unless we are in view
-	if (inView)
-		e2::MilitaryUnit::updateAnimation(seconds);
+	e2::MilitaryUnit::updateAnimation(seconds);
 
 
 }

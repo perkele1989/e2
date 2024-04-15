@@ -11,6 +11,8 @@
 #include "e2/managers/typemanager.hpp"
 #include "e2/managers/uimanager.hpp"
 
+#include "e2/managers/audiomanager.hpp"
+
 #include "e2/game/gamesession.hpp"
 
 #include "e2/rhi/window.hpp"
@@ -24,6 +26,7 @@ e2::Engine::Engine()
 	m_typeManager = e2::create<e2::TypeManager>(this);
 	m_asyncManager = e2::create<e2::AsyncManager>(this);
 	m_assetManager = e2::create<e2::AssetManager>(this);
+	m_audioManager = e2::create<e2::AudioManager>(this);
 	m_renderManager = e2::create<e2::RenderManager>(this);
 	m_uiManager = e2::create<e2::UIManager>(this);
 	m_gameManager = e2::create<e2::GameManager>(this);
@@ -37,6 +40,7 @@ e2::Engine::~Engine()
 	e2::destroy(m_uiManager);
 
 	e2::destroy(m_renderManager);
+	e2::destroy(m_audioManager);
 	e2::destroy(m_assetManager);
 	e2::destroy(m_asyncManager);
 	e2::destroy(m_typeManager);
@@ -63,6 +67,7 @@ void e2::Engine::run(e2::Application* app)
 	m_typeManager->initialize();
 	m_asyncManager->initialize();
 	m_assetManager->initialize();
+	m_audioManager->initialize();
 	m_renderManager->initialize();
 	m_uiManager->initialize();
 	m_gameManager->initialize();
@@ -91,10 +96,11 @@ void e2::Engine::run(e2::Application* app)
 			m_profiler->newFrame();
 #endif
 
-			E2_BEGIN_SCOPE();
+			E2_BEGIN_SCOPE(Default);
 
 			m_asyncManager->update(deltaTime);
 			m_assetManager->update(deltaTime);
+			m_audioManager->update(deltaTime);
 			m_renderManager->update(deltaTime);
 			m_uiManager->update(deltaTime);
 			
@@ -169,6 +175,9 @@ void e2::Engine::run(e2::Application* app)
 	e2::ManagedObject::keepAroundPrune();
 
 	m_gameManager->shutdown();
+
+	m_audioManager->shutdown();
+
 	m_assetManager->shutdown();
 
 	e2::ManagedObject::keepAroundPrune();
@@ -194,10 +203,29 @@ e2::EngineMetrics& e2::Engine::metrics()
 
 }
 
+e2::Profiler::Profiler()
+{
+	m_groups.resize(size_t(e2::ProfileGroupId::Count));
+
+	m_groups[size_t(e2::ProfileGroupId::Default)].displayName = "Default";
+	m_groups[size_t(e2::ProfileGroupId::Animation)].displayName = "Animation";
+	m_groups[size_t(e2::ProfileGroupId::Rendering)].displayName = "Rendering";
+}
+
 void e2::Profiler::start()
 {
 	if (m_enabled)
 		return;
+
+
+	for (uint8_t i = 0; i < uint8_t(e2::ProfileGroupId::Count); i++)
+	{
+		e2::ProfileGroup* grp = &m_groups[i];
+		grp->highTimeInFrame = 0.0;
+
+		grp->avgTimeInFrame = 0.0;
+		grp->timeInFrame = 0.0;
+	}
 
 	m_functions.clear();
 	m_stack.clear();
@@ -225,22 +253,38 @@ void e2::Profiler::newFrame()
 	{
 		e2::ProfileFunction* func = &function;
 		
-
 		if (func->timeInFrame > func->highTimeInFrame)
 			func->highTimeInFrame = func->timeInFrame;
 
-
 		func->avgTimeInFrame = (double(m_numFrames) * func->avgTimeInFrame + func->timeInFrame) / (double(m_numFrames) + 1.0);
 
-		func->timeInFrame = 0.0f;
+		func->timeInFrame = 0.0;
 	}
+
+	for (uint8_t i = 0; i < uint8_t(e2::ProfileGroupId::Count); i++)
+	{
+		e2::ProfileGroup* grp = &m_groups[i];
+		if (grp->timeInFrame > grp->highTimeInFrame)
+			grp->highTimeInFrame = grp->timeInFrame;
+
+		grp->avgTimeInFrame = (double(m_numFrames) * grp->avgTimeInFrame + grp->timeInFrame) / (double(m_numFrames) + 1.0);
+		grp->timeInFrame = 0.0;
+	}
+
 	m_numFrames++;
 }
 
-void e2::Profiler::beginScope(std::string const& funcId, std::string const& funcDisplayName)
+void e2::Profiler::beginScope(std::string const& funcId, std::string const& funcDisplayName, e2::ProfileGroupId groupId)
 {
 	if (!m_enabled)
 		return;
+
+
+	if (!m_stack.empty())
+	{
+		e2::ProfileScope& top = m_stack.back();
+		top.closeScope();
+	}
 
 	e2::ProfileFunction* func{};
 	auto finder = m_functions.find(funcId);
@@ -259,8 +303,9 @@ void e2::Profiler::beginScope(std::string const& funcId, std::string const& func
 	}
 
 	e2::ProfileScope newScope;
+	newScope.groupId = groupId;
 	newScope.function = func;
-	newScope.openTime = e2::timeNow();
+	newScope.openScope();
 	m_stack.push(newScope);
 }
 
@@ -275,30 +320,40 @@ void e2::Profiler::endScope()
 		return;
 	}
 
-	e2::ProfileScope top = m_stack.back();
-	double secondsInScope = top.openTime.durationSince().seconds();
+	e2::ProfileScope& top = m_stack.back();
+	top.closeScope();
+	double secondsInScope = top.secondsInScope;
 	m_stack.pop();
 
-	top.function->timeInFrame += secondsInScope;
+	e2::ProfileGroup* grp = &m_groups[size_t(top.groupId)];
+	grp->timeInFrame += secondsInScope;
 
+	top.function->timeInFrame += secondsInScope;
 	top.function->timeInScope += secondsInScope;
 	if (secondsInScope > top.function->highTimeInScope)
 		top.function->highTimeInScope = secondsInScope;
-
 	top.function->avgTimeInScope = (double(top.function->timesInScope) * top.function->avgTimeInScope + secondsInScope) / (double(top.function->timesInScope) + 1.0);
 
 	top.function->timesInScope++;
+
+	if (!m_stack.empty())
+	{
+		e2::ProfileScope& top = m_stack.back();
+		top.openScope();
+	}
 }
 
-std::vector<e2::ProfileFunction> e2::Profiler::report()
+e2::ProfileReport e2::Profiler::report()
 {
-	std::vector<e2::ProfileFunction> returner;
+	e2::ProfileReport returner;
 	for (auto& [id, func] : m_functions)
 	{
-		returner.push_back(func);
+		returner.functions.push_back(func);
 	}
+	std::sort(returner.functions.begin(), returner.functions.end(), [](e2::ProfileFunction const& lhs, e2::ProfileFunction const& rhs) -> bool { return lhs.avgTimeInFrame > rhs.avgTimeInFrame;  });
 
-	std::sort(returner.begin(), returner.end(), [](e2::ProfileFunction const& lhs, e2::ProfileFunction const& rhs) -> bool { return lhs.highTimeInScope > rhs.highTimeInScope;  });
+	returner.groups = m_groups;
+	
 	return returner;
 }
 #endif

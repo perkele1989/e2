@@ -6,6 +6,7 @@
 #include "e2/managers/asyncmanager.hpp"
 #include "e2/managers/typemanager.hpp"
 #include "e2/managers/assetmanager.hpp"
+#include "e2/managers/audiomanager.hpp"
 #include "e2/managers/uimanager.hpp"
 #include "e2/game/gamesession.hpp"
 #include "e2/renderer/renderer.hpp"
@@ -20,6 +21,8 @@
 #include <glm/gtc/noise.hpp>
 #include <glm/gtx/spline.hpp>
 #include <glm/gtx/easing.hpp>
+
+#include <fmod_errors.h>
 
 #pragma warning(disable : 4996)
 
@@ -426,6 +429,8 @@ void e2::Game::finalizeBoot()
 	m_animationIndex[(uint8_t)e2::AnimationIndex::TankIdle] = am->get("assets/vehicles/A_Tank_Idle.e2a").cast<e2::Animation>();
 
 
+	m_testSound = am->get("assets/audio/S_Test.e2a").cast<e2::Sound>();
+
 	am->returnALJ(m_bootTicket);
 
 	m_empires.resize(e2::maxNumEmpires);
@@ -443,6 +448,8 @@ void e2::Game::finalizeBoot()
 
 void e2::Game::initialize()
 {
+
+
 	m_session = e2::create<e2::GameSession>(this);
 
 	m_bootBegin = e2::timeNow();
@@ -450,6 +457,8 @@ void e2::Game::initialize()
 	auto am = assetManager();
 
 	e2::ALJDescription alj;
+
+	am->prescribeALJ(alj, "assets/audio/S_Test.e2a");
 
 	am->prescribeALJ(alj, "assets/SM_HexBase.e2a");
 	am->prescribeALJ(alj, "assets/SM_HexBaseHigh.e2a");
@@ -547,6 +556,8 @@ void e2::Game::shutdown()
 		m_entitySkeletons[i] = nullptr;
 	}
 
+
+
 }
 
 void e2::Game::update(double seconds)
@@ -571,12 +582,25 @@ void e2::Game::update(double seconds)
 		}
 		return;
 	}
-
+	 
 	auto& kb = ui->keyboardState();
 	
 	if (kb.pressed(Key::Enter) && kb.state(Key::LeftAlt))
 	{
 		session->window()->setFullscreen(!session->window()->isFullscreen());
+	}
+
+	if (kb.pressed(e2::Key::O))
+	{
+		FMOD_RESULT result = audioManager()->coreSystem()->playSound(m_testSound->fmodSound(), nullptr, false, nullptr);
+		if (result != FMOD_OK)
+		{
+			LogError("Fmod: {}: {}", int32_t(result), FMOD_ErrorString(result));
+		}
+		else
+		{
+			LogError("Fmod OK!");
+		}
 	}
 
 
@@ -587,6 +611,14 @@ void e2::Game::update(double seconds)
 		updateGame(seconds);
 	else if (m_globalState == GlobalState::InGameMenu)
 		updateInGameMenu(seconds);
+
+	auto view = renderer->view();
+	glm::dmat4 listenerTransform = glm::mat4(1.0f);
+	listenerTransform = glm::translate(listenerTransform, view.origin);
+	listenerTransform = listenerTransform * glm::toMat4(view.orientation);
+
+	audioManager()->setListenerTransform(listenerTransform);
+	
 }
 
 void e2::Game::updateInGameMenu(double seconds)
@@ -726,6 +758,8 @@ void e2::Game::updateGame(double seconds)
 
 	}
 
+
+
 	if (kb.keys[int16_t(e2::Key::F1)].pressed)
 	{
 		m_hexGrid->clearAllChunks();
@@ -756,8 +790,14 @@ void e2::Game::updateGame(double seconds)
 		ss << "------------------------------" << std::endl;
 		ss << "Profiler report, for " << profiler()->frameCount() << " frames" << std::endl;
 		ss << "------------------------------" << std::endl;
+		ss << "Groups:" << std::endl;
 
-		for (auto& f : rep)
+		for (auto& g : rep.groups)
+		{
+			ss << std::format("{}: avg frame {:.3f} ms, high frame {:.3f} ms", g.displayName, g.avgTimeInFrame * 1000.0, g.highTimeInFrame * 1000.0) << std::endl;
+		}
+
+		for (auto& f : rep.functions)
 		{
 			ss << std::format("{}: avg {:.3f} ms, high {:.3f} ms | avg frame {:.3f} ms, high frame {:.3f} ms", f.displayName, f.avgTimeInScope * 1000.0, f.highTimeInScope * 1000.0, f.avgTimeInFrame * 1000.0, f.highTimeInFrame * 1000.0) << std::endl;
 		}
@@ -2588,15 +2628,32 @@ void e2::Game::updateAnimation(double seconds)
 	constexpr double targetFrameTime = 1.0 / 60.0;
 	m_accumulatedAnimationTime += seconds;
 
+	int32_t numTicks = 0;
 	while (m_accumulatedAnimationTime > targetFrameTime)
 	{
-		for (e2::GameUnit* unit : m_units)
-		{
-			unit->updateAnimation(targetFrameTime);
-		}
-
+		numTicks++;
 		m_accumulatedAnimationTime -= targetFrameTime;
 	}
+
+	if (numTicks < 1)
+		return;
+
+	e2::Aabb2D viewAabb = m_viewPoints.toAabb();
+
+	for (e2::GameUnit* unit : m_units)
+	{
+		// update inView, first check aabb to give chance for implicit early exit
+		glm::vec2 unitCoords = unit->visualPlanarCoords();
+		unit->inView = viewAabb.isWithin(unitCoords) && m_viewPoints.isWithin(unitCoords, 1.0f);
+
+		// @todo consider using this instead if things break
+		//for(int32_t i = 0; i < numTicks; i++)
+		//	unit->updateAnimation(targetFrameTime);
+
+		unit->updateAnimation(targetFrameTime * double(numTicks));
+	}
+
+
 }
 
 e2::PathFindingAccelerationStructure::PathFindingAccelerationStructure(e2::GameUnit* unit)

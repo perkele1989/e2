@@ -475,10 +475,10 @@ bool e2::Animation::read(Buffer& source)
 			source >> newFrame.data[1];
 			source >> newFrame.data[2];
 			source >> newFrame.data[3];
-			newTrack.frames.push(newFrame);
+			newTrack.frames.push_back(newFrame);
 		}
 
-		m_tracks.push(newTrack);
+		m_tracks.push_back(newTrack);
 		m_trackIndex[trackName] = i;
 	}
 
@@ -643,7 +643,7 @@ e2::Engine* e2::Pose::engine()
 
 void e2::Pose::updateSkin()
 {
-	E2_PROFILE_SCOPE();
+	E2_PROFILE_SCOPE(Animation);
 
 	// these are sorted by hierarchy so fine to just do them linearly
 	glm::mat4 identityTransform = glm::identity<glm::mat4>();
@@ -700,7 +700,7 @@ void e2::Pose::updateSkin()
 
 void e2::Pose::applyBindPose()
 {
-	E2_PROFILE_SCOPE();
+	E2_PROFILE_SCOPE(Animation);
 	for (e2::PoseBone& bone : m_poseBones)
 	{
 		bone.localTransform = bone.assetBone->localTransform;
@@ -709,7 +709,7 @@ void e2::Pose::applyBindPose()
 
 void e2::Pose::applyPose(Pose* otherPose)
 {
-	E2_PROFILE_SCOPE();
+	E2_PROFILE_SCOPE(Animation);
 	if (m_skeleton != otherPose->skeleton())
 	{
 		LogError("incompatible poses (skeleton mismatch)");
@@ -726,7 +726,7 @@ void e2::Pose::applyPose(Pose* otherPose)
 
 void e2::Pose::applyBlend(Pose* a, Pose* b, double alpha)
 {
-	E2_PROFILE_SCOPE();
+	E2_PROFILE_SCOPE(Animation);
 	if (m_skeleton != a->skeleton() || m_skeleton != b->skeleton())
 	{
 		LogError("incompatible poses (skeleton mismatch)");
@@ -779,7 +779,7 @@ void e2::Pose::blendWith(Pose* b, double alpha)
 
 void e2::Pose::applyAnimation(e2::Ptr<e2::Animation> anim, double time)
 {
-	E2_PROFILE_SCOPE();
+	E2_PROFILE_SCOPE(Animation);
 	for (uint32_t boneId = 0; boneId < m_poseBones.size(); boneId++)
 	{
 		e2::PoseBone* poseBone = &m_poseBones[boneId];
@@ -857,7 +857,7 @@ void e2::AnimationPose::updateAnimation(double timeDelta, bool onlyTickTime)
 	if (!m_playing)
 		return;
 
-	E2_PROFILE_SCOPE();
+	E2_PROFILE_SCOPE(Animation);
 	m_time += timeDelta;
 	while (m_time >= m_animation->timeSeconds())
 	{

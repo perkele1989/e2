@@ -38,6 +38,10 @@ void e2::GameUnit::kill()
 
 void e2::GameEntity::updateAnimation(double seconds)
 {
+	// never need to do these basic things if not in view
+	if (!inView)
+		return;
+
 	m_rotation = glm::slerp(m_rotation, m_targetRotation, glm::min(1.0f, float(m_rotationLerpSpeed * seconds)));
 
 	if (m_skinProxy)
@@ -424,6 +428,11 @@ void e2::GameEntity::onBeginMove()
 void e2::GameEntity::onEndMove()
 {
 
+}
+
+glm::vec2 e2::GameEntity::visualPlanarCoords()
+{
+	return { m_position.x, m_position.z };
 }
 
 e2::GameStructure::GameStructure(e2::GameContext* ctx, glm::ivec2 const& tile, EmpireId empireId)

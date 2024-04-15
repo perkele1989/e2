@@ -176,3 +176,18 @@ glm::dvec3 e2::worldForward()
 {
 	return {0.0, 0.0, -1.0};
 }
+
+glm::vec3 e2::worldUpf()
+{
+	return worldUp();
+}
+
+glm::vec3 e2::worldRightf()
+{
+	return worldRight();
+}
+
+glm::vec3 e2::worldForwardf()
+{
+	return worldForward();
+}

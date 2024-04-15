@@ -416,7 +416,7 @@ bool e2::UfbxImporter::analyze()
 		// hardcode framerate
 		float durationSecs = animStack->time_end - animStack->time_begin;
 
-		newAnim.duration = glm::clamp((uint32_t)glm::ceil(durationSecs * 24.0f), (uint32_t)2, (uint32_t)e2::maxNumTrackFrames);
+		newAnim.duration = glm::max((uint32_t)glm::ceil(durationSecs * 24.0f), (uint32_t)2);
 		newAnim.framesPerSecond = ((float)newAnim.duration - 1) / durationSecs;
 		newAnim.name = animStack->name.data;
 		std::vector<std::string> parts = e2::split(newAnim.name, '|');

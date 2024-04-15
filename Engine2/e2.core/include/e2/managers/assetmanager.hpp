@@ -137,20 +137,6 @@ namespace e2
 		std::unordered_set<e2::UUID> uuids;
 	};
 
-	/**
-	 * An asset pool, can be used to pin assets in memory for as long as this object exists
-	 * @tags(arena, arenaSize=e2::maxNumAssetPools)
-	 */
-	class E2_API AssetPool : public e2::ManagedObject
-	{
-		ObjectDeclaration()
-	public:
-
-		virtual ~AssetPool();
-
-		std::unordered_set<e2::AssetPtr> assets;
-	};
-
 	/** Asset-Load-Job ticket */
 	struct E2_API ALJTicket
 	{

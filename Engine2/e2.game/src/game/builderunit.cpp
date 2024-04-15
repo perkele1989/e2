@@ -56,12 +56,7 @@ e2::Engineer::~Engineer()
 
 void e2::Engineer::updateAnimation(double seconds)
 {
-	E2_PROFILE_SCOPE_CTX(game());
-
-	e2::Hex hex = e2::Hex(tileIndex);
-	e2::Viewpoints2D viewpoints = game()->viewPoints();
-	bool inView = viewpoints.isWithin(hex.planarCoords(), 1.0f);
-
+	E2_PROFILE_SCOPE_CTX(Animation, game());
 
 	if (dying && (!m_diePose->playing() || m_diePose->time() > m_diePose->animation()->timeSeconds() - 0.05f))
 	{
@@ -86,9 +81,8 @@ void e2::Engineer::updateAnimation(double seconds)
 	m_hitPose->updateAnimation(seconds, !inView);
 	m_diePose->updateAnimation(seconds, !inView);
 
-	if(inView)
-		e2::GameUnit::updateAnimation(seconds);
-
+	// update base stuff 
+	e2::GameUnit::updateAnimation(seconds);
 }
 
 void e2::Engineer::drawUI(e2::UIContext* ui)
@@ -435,12 +429,7 @@ e2::MobileMOB::~MobileMOB()
 
 void e2::MobileMOB::updateAnimation(double seconds)
 {
-	E2_PROFILE_SCOPE_CTX(game());
-
-	e2::Hex hex = e2::Hex(tileIndex);
-	e2::Viewpoints2D viewpoints = game()->viewPoints();
-	bool inView = viewpoints.isWithin(hex.planarCoords(), 1.0f);
-
+	E2_PROFILE_SCOPE_CTX(Animation, game());
 
 	if (dying)
 	{
@@ -461,8 +450,7 @@ void e2::MobileMOB::updateAnimation(double seconds)
 		//m_drivePose->updateAnimation(seconds, false);
 	}
 
-	if (inView)
-		e2::GameUnit::updateAnimation(seconds);
+	e2::GameUnit::updateAnimation(seconds);
 }
 
 void e2::MobileMOB::drawUI(e2::UIContext* ui)

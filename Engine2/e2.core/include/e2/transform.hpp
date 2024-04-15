@@ -20,6 +20,10 @@ namespace e2
 	E2_API glm::dvec3 worldRight();
 	E2_API glm::dvec3 worldForward();
 
+	E2_API glm::vec3 worldUpf();
+	E2_API glm::vec3 worldRightf();
+	E2_API glm::vec3 worldForwardf();
+
 	/** @tags(arena, arenaSize=16384) */
 	class E2_API Transform : public e2::Object
 	{

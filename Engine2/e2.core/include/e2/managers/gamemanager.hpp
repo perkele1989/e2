@@ -24,10 +24,10 @@ namespace e2
 		virtual void preUpdate(double deltaTime) override;
 		virtual void update(double deltaTime) override;
 
-		inline e2::GameSession* session() const
+		/*inline e2::GameSession* session() const
 		{
 			return m_session;
-		}
+		}*/
 
 		void registerSession(e2::Session* session);
 		void unregisterSession(e2::Session* session);
@@ -35,7 +35,7 @@ namespace e2
 		std::unordered_set<e2::Session*> & allSessions();
 
 	protected:
-		e2::GameSession* m_session{};
+		//e2::GameSession* m_session{};
 
 		std::unordered_set<e2::Session*> m_sessions;
 	};

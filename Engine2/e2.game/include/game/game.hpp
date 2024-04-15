@@ -4,12 +4,14 @@
 
 
 #include <e2/application.hpp>
+#include <e2/assets/sound.hpp>
 #include "game/hex.hpp"
 #include "game/gamecontext.hpp"
 #include "game/resources.hpp"
 #include "game/gameunit.hpp"
 #include "game/empire.hpp"
 #include "game/shared.hpp"
+
 
 namespace e2
 {
@@ -236,6 +238,8 @@ namespace e2
 		}
 
 		void discoverEmpire(EmpireId empireId);
+
+
 	protected:
 
 		e2::ALJTicket m_bootTicket;
@@ -424,6 +428,7 @@ namespace e2
 		// anim stuff 
 		double m_accumulatedAnimationTime{};
 
+		e2::SoundPtr m_testSound;
 
 		// camera stuff 
 		e2::RenderView m_view;

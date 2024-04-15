@@ -137,7 +137,7 @@ namespace e2
 		virtual void onBeginMove();
 		virtual void onEndMove();
 
-
+		virtual glm::vec2 visualPlanarCoords();
 		void setMeshTransform(glm::vec3 const& pos, float angle);
 
 		bool isLocal();
@@ -149,6 +149,9 @@ namespace e2
 		glm::ivec2 tileIndex;
 		EmpireId empireId;
 
+		// updated by game when needed
+		bool inView{};
+		
 		glm::vec2 planarCoords();
 
 	protected:

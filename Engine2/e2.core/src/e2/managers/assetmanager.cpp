@@ -809,10 +809,6 @@ void e2::ALJStateInternal::clear()
 	failure = false;
 }
 
-e2::AssetPool::~AssetPool()
-{
-
-}
 
 std::string e2::AssetEditorEntry::fullPath()
 {

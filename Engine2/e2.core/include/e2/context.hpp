@@ -18,6 +18,7 @@ namespace e2
 	class GameSession;
 	class UIManager;
 	class Application;
+	class AudioManager;
 
 #if defined(E2_PROFILER)
 	class Profiler;
@@ -41,6 +42,7 @@ namespace e2
 		e2::IRenderContext* renderContext();
 		e2::IThreadContext* mainThreadContext();
 
+		AudioManager* audioManager();
 		RenderManager* renderManager();
 		AssetManager* assetManager();
 		AsyncManager* asyncManager();

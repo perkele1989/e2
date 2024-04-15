@@ -12,22 +12,22 @@
 #include <unordered_set>
 
 #if defined(E2_PROFILER)
-#define E2_BEGIN_SCOPE() profiler()->beginScope(__FUNCDNAME__, __FUNCTION__);
+#define E2_BEGIN_SCOPE(g) profiler()->beginScope(__FUNCDNAME__, __FUNCTION__, e2::ProfileGroupId::##g);
 #define E2_END_SCOPE() profiler()->endScope();
 
-#define E2_BEGIN_SCOPE_CTX(x) x->profiler()->beginScope(__FUNCDNAME__, __FUNCTION__);
+#define E2_BEGIN_SCOPE_CTX(g, x) x->profiler()->beginScope(__FUNCDNAME__, __FUNCTION__, e2::ProfileGroupId::##g);
 #define E2_END_SCOPE_CTX(x) x->profiler()->endScope();
 
 
-#define E2_PROFILE_SCOPE() ProfileBlock __profileBlock__##__LINE__(profiler(), __FUNCDNAME__, __FUNCTION__)
-#define E2_PROFILE_SCOPE_CTX(x) ProfileBlock __profileBlock__##__LINE__(x->profiler(), __FUNCDNAME__, __FUNCTION__)
+#define E2_PROFILE_SCOPE(g) ProfileBlock __profileBlock__##__LINE__(profiler(), __FUNCDNAME__, __FUNCTION__, e2::ProfileGroupId::##g)
+#define E2_PROFILE_SCOPE_CTX(g, c) ProfileBlock __profileBlock__##__LINE__(c->profiler(), __FUNCDNAME__, __FUNCTION__, e2::ProfileGroupId::##g)
 #else 
-#define E2_BEGIN_SCOPE() void()
+#define E2_BEGIN_SCOPE(g) void()
 #define E2_END_SCOPE() void()
-#define E2_BEGIN_SCOPE_CTX(x) void()
+#define E2_BEGIN_SCOPE_CTX(g, x) void()
 #define E2_END_SCOPE_CTX(x) void()
-#define E2_PROFILE_SCOPE() void()
-#define E2_PROFILE_SCOPE_CTX(x) void()
+#define E2_PROFILE_SCOPE(g) void()
+#define E2_PROFILE_SCOPE_CTX(g, x) void()
 #endif
 
 
@@ -42,6 +42,7 @@ namespace e2
 	class AssetManager;
 	class TypeManager;
 	class UIManager;
+	class AudioManager;
 
 	/** Minimal and global engine performance metrics */
 	constexpr uint32_t engineMetricsWindow = 120;
@@ -72,6 +73,25 @@ namespace e2
 	constexpr uint64_t profileStackSize = 1024;
 
 #if defined(E2_PROFILER)
+
+	enum class ProfileGroupId : uint8_t
+	{
+		Default = 0,
+		Animation,
+		Rendering,
+
+		Count
+
+	};
+
+	struct E2_API ProfileGroup
+	{
+		std::string displayName;
+		double timeInFrame{}; // time in seconds this function has been executing, in this frame
+		double avgTimeInFrame{}; // average time this function spent executing, per frame
+		double highTimeInFrame{}; // highest time this function spent executing, per frame
+	};
+
 	struct E2_API ProfileFunction
 	{
 		/** decorated function name, used as unique identifier */
@@ -94,28 +114,49 @@ namespace e2
 
 	struct E2_API ProfileScope
 	{
+		e2::ProfileGroupId groupId = e2::ProfileGroupId::Default;
 		/** The function in which this scope was opened (and is closed) */
 		ProfileFunction* function{};
 
+		void openScope()
+		{
+			openTime = e2::timeNow();
+		}
+
+		void closeScope()
+		{
+			secondsInScope += openTime.durationSince().seconds();
+		}
+
 		/** moment in time this scope was opened */
+		double secondsInScope{};
 		e2::Moment openTime;
 	};
 
 
+	struct ProfileReport
+	{
+		std::vector<e2::ProfileFunction> functions;
+
+		e2::StackVector<e2::ProfileGroup, size_t(e2::ProfileGroupId::Count)> groups;
+	};
+
 	class E2_API Profiler
 	{
 	public:
+
+		Profiler();
 
 		void start();
 		void stop();
 
 		void newFrame();
 
-		void beginScope(std::string const& funcId, std::string const& funcDisplayName);
+		void beginScope(std::string const& funcId, std::string const& funcDisplayName, e2::ProfileGroupId groupId = ProfileGroupId::Default);
 
 		void endScope();
 
-		std::vector<e2::ProfileFunction> report();
+		ProfileReport report();
 
 		uint64_t frameCount()
 		{
@@ -127,6 +168,7 @@ namespace e2
 		uint64_t m_numFrames{};
 		e2::StackVector<e2::ProfileScope, profileStackSize> m_stack;
 		std::unordered_map<std::string, e2::ProfileFunction> m_functions;
+		e2::StackVector<e2::ProfileGroup, size_t(e2::ProfileGroupId::Count)> m_groups;
 
 	};
 
@@ -134,10 +176,10 @@ namespace e2
 	{
 		Profiler* profiler{};
 
-		ProfileBlock(Profiler* inProfiler, std::string const& funcId, std::string const& funcDisplayName)
+		ProfileBlock(Profiler* inProfiler, std::string const& funcId, std::string const& funcDisplayName, e2::ProfileGroupId groupId)
 			: profiler(inProfiler)
 		{
-			profiler->beginScope(funcId, funcDisplayName);
+			profiler->beginScope(funcId, funcDisplayName, groupId);
 		}
 
 		~ProfileBlock()
@@ -184,6 +226,7 @@ namespace e2
 #if defined(E2_PROFILER)
 		e2::Profiler* m_profiler{};
 #endif
+		e2::AudioManager* m_audioManager{};
 		e2::RenderManager* m_renderManager{};
 		e2::GameManager* m_gameManager{};
 		e2::AsyncManager* m_asyncManager{};

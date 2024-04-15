@@ -37,6 +37,11 @@ e2::IThreadContext* e2::Context::mainThreadContext()
 	return renderManager()->mainThreadContext();
 }
 
+e2::AudioManager* e2::Context::audioManager()
+{
+	return engine()->m_audioManager;
+}
+
 //e2::IRenderContext* e2::Context::renderContext()
 //{
 //	return renderManager()->context();
