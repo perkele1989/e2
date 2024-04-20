@@ -223,7 +223,7 @@ void e2::Game::loadGame(uint8_t slot)
 		glm::ivec2 tileIndex;
 		buf >> tileIndex;
 
-		e2::GameEntity* newEntity = spawnEntity(entityId, e2::Hex(tileIndex), EmpireId(empireId));
+		e2::GameEntity* newEntity = spawnEntity(entityId, tileIndex, EmpireId(empireId));
 		newEntity->readForSave(buf);
 	}
 
@@ -345,6 +345,83 @@ void e2::Game::initializeScriptEngine()
 		e2::TileData* getTileData(glm::ivec2 const& hex);
 		*/
 
+		chaiscript::utility::add_class<e2::Name>(*m_scriptModule,
+			"Name",
+			{
+				chaiscript::constructor<e2::Name(std::string const&)>(),
+			},
+			{
+				{chaiscript::fun(&e2::Name::string), "string"},
+			}
+			);
+
+		chaiscript::utility::add_class<glm::ivec2>(*m_scriptModule,
+			"ivec2",
+			{
+				chaiscript::constructor<glm::ivec2()>(),
+				chaiscript::constructor<glm::ivec2(int32_t, int32_t)>()
+			},
+			{
+				{chaiscript::fun(&glm::ivec2::x), "x"},
+				{chaiscript::fun(&glm::ivec2::y), "y"},
+			}
+			);
+
+		chaiscript::utility::add_class<e2::Hex>(*m_scriptModule,
+			"Hex",
+			{
+				chaiscript::constructor<e2::Hex()>(),
+				chaiscript::constructor<e2::Hex(glm::ivec2 const&)>(),
+				chaiscript::constructor<e2::Hex(glm::vec2 const&)>()
+			},
+			{
+				{chaiscript::fun(&e2::Hex::planarCoords), "planarCoords"},
+				{chaiscript::fun(&e2::Hex::offsetCoords), "offsetCoords"},
+				{chaiscript::fun(&e2::Hex::localCoords), "localCoords"},
+				{chaiscript::fun(&e2::Hex::x), "x"},
+				{chaiscript::fun(&e2::Hex::y), "y"},
+				{chaiscript::fun(&e2::Hex::z), "z"},
+			}
+			);
+
+		chaiscript::utility::add_class<glm::vec2>(*m_scriptModule,
+			"vec2",
+			{
+				chaiscript::constructor<glm::vec2()>(),
+				chaiscript::constructor<glm::vec2(float, float)>()
+			},
+			{
+				{chaiscript::fun(&glm::vec2::x), "x"},
+				{chaiscript::fun(&glm::vec2::y), "y"},
+			}
+		);
+
+		chaiscript::utility::add_class<glm::vec3>(*m_scriptModule,
+			"vec3",
+			{
+				chaiscript::constructor<glm::vec3()>(),
+				chaiscript::constructor<glm::vec3(float, float, float)>()
+			},
+			{
+				{chaiscript::fun(&glm::vec3::x), "x"},
+				{chaiscript::fun(&glm::vec3::y), "y"},
+				{chaiscript::fun(&glm::vec3::z), "z"},
+			}
+			);
+
+		chaiscript::utility::add_class<glm::vec4>(*m_scriptModule,
+			"vec4",
+			{
+				chaiscript::constructor<glm::vec4()>(),
+				chaiscript::constructor<glm::vec4(float, float, float, float)>()
+			},
+			{
+				{chaiscript::fun(&glm::vec4::x), "x"},
+				{chaiscript::fun(&glm::vec4::y), "y"},
+				{chaiscript::fun(&glm::vec4::z), "z"},
+				{chaiscript::fun(&glm::vec4::w), "w"},
+			}
+			);
 
 		chaiscript::utility::add_class<e2::GameContext>(*m_scriptModule,
 			"GameContext",
@@ -353,6 +430,19 @@ void e2::Game::initializeScriptEngine()
 			{chaiscript::fun(&GameContext::game), "game"},
 			{chaiscript::fun(&GameContext::hexGrid), "hexGrid"},
 			{chaiscript::fun(&GameContext::gameSession), "gameSession"},
+		}
+		);
+
+		chaiscript::utility::add_class<e2::TileData>(*m_scriptModule,
+			"TileData",
+			{ },
+		{
+			{chaiscript::fun(&e2::TileData::empireId), "empireId"},
+			{chaiscript::fun(&e2::TileData::getAbundanceAsFloat), "getAbundance"},
+			{chaiscript::fun(&e2::TileData::getWoodAbundanceAsFloat), "getWoodAbundance"},
+			{chaiscript::fun(&e2::TileData::isForested), "isForested"},
+			{chaiscript::fun(&e2::TileData::hasResource), "hasResource"},
+
 		}
 		);
 
@@ -372,47 +462,168 @@ void e2::Game::initializeScriptEngine()
 		}
 		);
 
+
+
+
+		chaiscript::utility::add_class<e2::EntitySpecification>(*m_scriptModule,
+			"EntitySpecification",
+			{ },
+		{
+			{chaiscript::fun(&e2::EntitySpecification::attackPoints), "attackPoints"},
+			{chaiscript::fun(&e2::EntitySpecification::attackStrength), "attackStrength"},
+			{chaiscript::fun(&e2::EntitySpecification::buildPoints), "buildPoints"},
+			{chaiscript::fun(&e2::EntitySpecification::buildTurns), "buildTurns"},
+			{chaiscript::fun(&e2::EntitySpecification::defensiveModifier), "defensiveModifier"},
+			{chaiscript::fun(&e2::EntitySpecification::displayName), "displayName"},
+			{chaiscript::fun(&e2::EntitySpecification::id), "id"},
+			{chaiscript::fun(&e2::EntitySpecification::layerIndex), "layerIndex"},
+			{chaiscript::fun(&e2::EntitySpecification::maxHealth), "maxHealth"},
+			{chaiscript::fun(&e2::EntitySpecification::meshHeightOffset), "meshHeightOffset"},
+			{chaiscript::fun(&e2::EntitySpecification::meshScale), "meshScale"},
+			{chaiscript::fun(&e2::EntitySpecification::movePoints), "movePoints"},
+			{chaiscript::fun(&e2::EntitySpecification::moveSpeed), "moveSpeed"},
+			{chaiscript::fun(&e2::EntitySpecification::moveType), "moveType"},
+			{chaiscript::fun(&e2::EntitySpecification::retaliatoryModifier), "retaliatoryModifier"},
+			{chaiscript::fun(&e2::EntitySpecification::sightRange), "sightRange"},
+		}
+		);
+
+		chaiscript::utility::add_class<e2::UnitBuildResult>(*m_scriptModule,
+			"UnitBuildResult",
+			{ },
+		{
+			{chaiscript::fun(&e2::UnitBuildResult::buildMessage), "buildMessage"},
+			{chaiscript::fun(&e2::UnitBuildResult::didSpawn), "didSpawn"},
+			{chaiscript::fun(&e2::UnitBuildResult::spawnLocation), "spawnLocation"}
+		}
+		);
+
+		chaiscript::utility::add_class<e2::UnitBuildAction>(*m_scriptModule,
+			"UnitBuildAction",
+			{ },
+		{
+			{chaiscript::fun(&e2::UnitBuildAction::buildTurnsLeft), "buildTurnsLeft"},
+			{chaiscript::fun(&e2::UnitBuildAction::totalBuilt), "totalBuilt"},
+			{chaiscript::fun(&e2::UnitBuildAction::turnLastBuilt), "turnLastBuilt"},
+			{chaiscript::fun(&e2::UnitBuildAction::tick), "tick"},
+		}
+		);
+
+		chaiscript::utility::add_class<e2::GameEntity>(*m_scriptModule,
+			"Entity",
+			{ },
+		{
+			{chaiscript::fun(&e2::GameEntity::attackPointsLeft), "attackPointsLeft"},
+			{chaiscript::fun(&e2::GameEntity::buildPointsLeft), "buildPointsLeft"},
+			{chaiscript::fun(&e2::GameEntity::movePointsLeft), "movePointsLeft"},
+			{chaiscript::fun(&e2::GameEntity::empireId), "empireId"},
+			{chaiscript::fun(&e2::GameEntity::health), "health"},
+			{chaiscript::fun(&e2::GameEntity::tileIndex), "tileIndex"},
+			{chaiscript::fun(&e2::GameEntity::inView), "inView"},
+			{chaiscript::fun(&e2::GameEntity::meshPosition), "meshPosition"},
+			{chaiscript::fun(&e2::GameEntity::meshRotation), "meshRotation"},
+			{chaiscript::fun(&e2::GameEntity::meshTargetRotation), "meshTargetRotation"},
+			{chaiscript::fun(&e2::GameEntity::specification), "specification"},
+			{chaiscript::fun(&e2::GameEntity::isLocal), "isLocal"},
+			{chaiscript::fun(&e2::GameEntity::createBuildAction), "createBuildAction"},
+			{chaiscript::fun(&e2::GameEntity::canBuild), "canBuild"},
+			{chaiscript::fun(&e2::GameEntity::meshPlanarCoords), "meshPlanarCoords"},
+			{chaiscript::fun(&e2::GameEntity::playAction), "playAction"},
+			{chaiscript::fun(&e2::GameEntity::setPose), "setPose"},
+		}
+		);
+
 		chaiscript::utility::add_class<e2::Game>(*m_scriptModule,
 			"Game",
 			{ },
-		{
-			{chaiscript::fun(&Game::spawnHitLabel), "spawnHitLabel"},
-			{chaiscript::fun(&Game::discoverEmpire), "discoverEmpire"},
-			{chaiscript::fun(&Game::turn), "turn"},
-			{chaiscript::fun(&Game::timeDelta), "timeDelta"},
-			{chaiscript::fun(&Game::worldToPixels), "worldToPixels"},
-			{chaiscript::fun(&Game::pauseWorldStreaming), "pauseWorldStreaming"},
-			{chaiscript::fun(&Game::resumeWorldStreaming), "resumeWorldStreaming"},
-			{chaiscript::fun(&Game::forceStreamLocation), "forceStreamLocation"},
-			{chaiscript::fun(&Game::loadGame), "loadGame"},
-			{chaiscript::fun(&Game::saveGame), "saveGame"},
-			{chaiscript::fun(&Game::exitToMenu), "exitToMenu"},
-			{chaiscript::fun(&Game::spawnEmpire), "spawnEmpire"},
-			{chaiscript::fun(&Game::spawnAIEmpire), "spawnAIEmpire"},
-			{chaiscript::fun(&Game::localEmpire), "localEmpire"},
-			{chaiscript::fun(&Game::nomadEmpire), "nomadEmpire"},
-			{chaiscript::fun(&Game::empireById), "empireById"},
-			{chaiscript::fun(&Game::destroyEmpire), "destroyEmpire"},
-			{chaiscript::fun(&Game::harvestWood), "harvestWood"},
-			{chaiscript::fun(&Game::removeWood), "removeWood"},
-			{chaiscript::fun(&Game::view), "view"},
-			{chaiscript::fun(&Game::viewPoints), "viewPoints"},
-			{chaiscript::fun(&Game::applyDamage), "applyDamage"},
-			{chaiscript::fun(&Game::selectEntity), "selectEntity"},
-			{chaiscript::fun(&Game::deselectEntity), "deselectEntity"},
-			{chaiscript::fun(&Game::moveSelectedEntityTo), "moveSelectedEntityTo"},
-			{chaiscript::fun(&Game::beginCustomAction), "beginCustomEntityAction"},
-			{chaiscript::fun(&Game::endCustomAction), "endCustomEntityAction"},
-			{chaiscript::fun(&Game::beginEntityTargeting), "beginEntityTargeting"},
-			{chaiscript::fun(&Game::endEntityTargeting), "endEntityTargeting"},
-			{chaiscript::fun(&Game::spawnEntity), "spawnEntity"},
-			{chaiscript::fun(&Game::queueDestroyEntity), "destroyEntity"},
-			{chaiscript::fun(&Game::entityAtHex), "entityAtHex"}
-		}
+			{
+				{chaiscript::fun(&Game::spawnHitLabel), "spawnHitLabel"},
+				{chaiscript::fun(&Game::discoverEmpire), "discoverEmpire"},
+				{chaiscript::fun(&Game::turn), "turn"},
+				{chaiscript::fun(&Game::timeDelta), "timeDelta"},
+				{chaiscript::fun(&Game::worldToPixels), "worldToPixels"},
+				{chaiscript::fun(&Game::pauseWorldStreaming), "pauseWorldStreaming"},
+				{chaiscript::fun(&Game::resumeWorldStreaming), "resumeWorldStreaming"},
+				{chaiscript::fun(&Game::forceStreamLocation), "forceStreamLocation"},
+				{chaiscript::fun(&Game::loadGame), "loadGame"},
+				{chaiscript::fun(&Game::saveGame), "saveGame"},
+				{chaiscript::fun(&Game::exitToMenu), "exitToMenu"},
+				{chaiscript::fun(&Game::spawnEmpire), "spawnEmpire"},
+				{chaiscript::fun(&Game::spawnAIEmpire), "spawnAIEmpire"},
+				{chaiscript::fun(&Game::localEmpire), "localEmpire"},
+				{chaiscript::fun(&Game::nomadEmpire), "nomadEmpire"},
+				{chaiscript::fun(&Game::empireById), "empireById"},
+				{chaiscript::fun(&Game::destroyEmpire), "destroyEmpire"},
+				{chaiscript::fun(&Game::harvestWood), "harvestWood"},
+				{chaiscript::fun(&Game::removeWood), "removeWood"},
+				{chaiscript::fun(&Game::view), "view"},
+				{chaiscript::fun(&Game::viewPoints), "viewPoints"},
+				{chaiscript::fun(&Game::applyDamage), "applyDamage"},
+				{chaiscript::fun(&Game::selectEntity), "selectEntity"},
+				{chaiscript::fun(&Game::deselectEntity), "deselectEntity"},
+				{chaiscript::fun(&Game::moveSelectedEntityTo), "moveSelectedEntityTo"},
+				{chaiscript::fun(&Game::beginCustomAction), "beginCustomAction"},
+				{chaiscript::fun(&Game::endCustomAction), "endCustomAction"},
+				{chaiscript::fun(&Game::beginTargeting), "beginTargeting"},
+				{chaiscript::fun(&Game::endTargeting), "endTargeting"},
+				{chaiscript::fun(&Game::spawnEntity), "spawnEntity"},
+				{chaiscript::fun(&Game::queueDestroyEntity), "destroyEntity"},
+				{chaiscript::fun(&Game::entityAtHex), "entityAtHex"}
+			}
 		);
 
 		m_scriptModule->add(chaiscript::base_class<GameContext, Game>());
 
+		/*
+		chaiscript::utility::add_class<e2::FontFace>(*m_scriptModule,
+			"FontFace",
+			{
+				{e2::FontFace::Serif, "Serif"},
+				{e2::FontFace::Sans, "Sans"},
+				{e2::FontFace::Monospace, "Monospace"},
+			}
+		);*/
+
+		/*chaiscript::utility::add_class<e2::UITextAlign>(*m_scriptModule,
+			"UITextAlign",
+			{
+				{e2::UITextAlign::Begin, "Begin"},
+				{e2::UITextAlign::End, "End"},
+				{e2::UITextAlign::Middle, "Middle"},
+			}
+		);*/
+
+		chaiscript::utility::add_class<e2::UIContext>(*m_scriptModule,
+			"UIContext",
+			{ },
+			{
+				{chaiscript::fun(&UIContext::beginStackV), "beginStackV"},
+				{chaiscript::fun(&UIContext::endStackV), "endStackV"},
+				{chaiscript::fun(&UIContext::beginStackH), "beginStackH"},
+				{chaiscript::fun(&UIContext::endStackH), "endStackH"},
+				{chaiscript::fun(&UIContext::beginFlexH), "beginFlexH"},
+				{chaiscript::fun(&UIContext::endFlexH), "endFlexH"},
+				{chaiscript::fun(&UIContext::beginFlexV), "beginFlexV"},
+				{chaiscript::fun(&UIContext::endFlexV), "endFlexV"},
+				{chaiscript::fun(&UIContext::flexHSlider), "flexHSlider"},
+				{chaiscript::fun(&UIContext::flexVSlider), "flexVSlider"},
+				{chaiscript::fun(&UIContext::beginWrap), "beginWrap"},
+				{chaiscript::fun(&UIContext::endWrap), "endWrap"},
+				{chaiscript::fun(&UIContext::button), "button"},
+				{chaiscript::fun(&UIContext::checkbox), "checkbox"},
+				{chaiscript::fun(&UIContext::radio), "radio"},
+				{chaiscript::fun(&UIContext::inputText), "inputText"},
+				{chaiscript::fun(&UIContext::sliderInt), "sliderInt"},
+				{chaiscript::fun(&UIContext::sliderFloat), "sliderFloat"},
+				{chaiscript::fun(&UIContext::gameLabel), "gameLabel"},
+				{chaiscript::fun(&UIContext::calculateSDFTextWidth), "calculateSDFTextWidth"},
+				{chaiscript::fun(&UIContext::calculateTextWidth), "calculateTextWidth"},
+				{chaiscript::fun(&UIContext::drawSDFText), "drawSDFText"},
+				{chaiscript::fun(&UIContext::drawRasterText), "drawRasterText"},
+				{chaiscript::fun(&UIContext::drawQuad), "drawQuad"},
+				{chaiscript::fun(&UIContext::drawTexturedQuad), "drawTexturedQuad"},
+			}
+		);
 
 		chaiscript::utility::add_class<e2::EntityScriptInterface>(*m_scriptModule,
 			"EntityScript",
@@ -439,6 +650,46 @@ void e2::Game::initializeScriptEngine()
 
 		m_scriptEngine = e2::create<chaiscript::ChaiScript>();
 		m_scriptEngine->add(m_scriptModule);
+
+/*
+		chaiscript::utility::add_class<e2::EntityLayerIndex>(*m_scriptModule,
+			"EntityLayerIndex",
+			{
+				{e2::EntityLayerIndex::Unit, "Unit"},
+				{e2::EntityLayerIndex::Structure, "Structure"},
+				{e2::EntityLayerIndex::Air, "Air"},
+			}
+		);
+
+		chaiscript::utility::add_class<e2::EntityMoveType>(*m_scriptModule,
+			"EntityMoveType",
+			{
+				{e2::EntityMoveType::Static, "Static"},
+				{e2::EntityMoveType::Linear, "Linear"},
+				{e2::EntityMoveType::Smooth, "Smooth"},
+			}
+		);
+*/
+
+
+		m_scriptEngine->add_global_const(chaiscript::const_var(e2::EntityLayerIndex(e2::EntityLayerIndex::Unit)), "Unit");
+		m_scriptEngine->add_global_const(chaiscript::const_var(e2::EntityLayerIndex(e2::EntityLayerIndex::Structure)), "Structure");
+		m_scriptEngine->add_global_const(chaiscript::const_var(e2::EntityLayerIndex(e2::EntityLayerIndex::Air)), "Air)");
+
+		m_scriptEngine->add_global_const(chaiscript::const_var(e2::EntityMoveType(e2::EntityMoveType::Static)), "Static");
+		m_scriptEngine->add_global_const(chaiscript::const_var(e2::EntityMoveType(e2::EntityMoveType::Linear)), "Linear");
+		m_scriptEngine->add_global_const(chaiscript::const_var(e2::EntityMoveType(e2::EntityMoveType::Smooth)), "Smooth)");
+
+
+
+
+		m_scriptEngine->add_global_const(chaiscript::const_var(e2::FontFace(e2::FontFace::Sans)), "Sans");
+		m_scriptEngine->add_global_const(chaiscript::const_var(e2::FontFace(e2::FontFace::Serif)), "Serif");
+		m_scriptEngine->add_global_const(chaiscript::const_var(e2::FontFace(e2::FontFace::Monospace)), "Monospace");
+
+		m_scriptEngine->add_global_const(chaiscript::const_var(e2::UITextAlign(e2::UITextAlign::Begin)), "Begin");
+		m_scriptEngine->add_global_const(chaiscript::const_var(e2::UITextAlign(e2::UITextAlign::End)), "End");
+		m_scriptEngine->add_global_const(chaiscript::const_var(e2::UITextAlign(e2::UITextAlign::Middle)), "Middle");
 
 		m_scriptEngine->add_global(chaiscript::var(this), "game");
 	}
@@ -770,9 +1021,9 @@ void e2::Game::updateGame(double seconds)
 	e2::Hex newHex = e2::Hex(m_cursorPlane);
 	m_hexChanged = newHex != m_prevCursorHex;
 	m_prevCursorHex = m_cursorHex;
-	m_cursorHex = newHex;
+	m_cursorHex = newHex.offsetCoords();
 
-	m_cursorTile = m_hexGrid->getExistingTileData(m_cursorHex.offsetCoords());
+	m_cursorTile = m_hexGrid->getExistingTileData(m_cursorHex);
 
 	constexpr float invisibleChunkLifetime = 3.0f;
 
@@ -1138,7 +1389,7 @@ void e2::Game::updateMenu(double seconds)
 		discoverEmpire(m_nomadEmpireId);
 		m_nomadEmpire->ai = e2::create<e2::NomadAI>(this, m_nomadEmpireId);
 
-		spawnEntity("mob", m_startLocation, m_localEmpireId);
+		spawnEntity("mobile_mob", m_startLocation, m_localEmpireId);
 
 	}
 	if (m_haveStreamedStart)
@@ -1214,13 +1465,12 @@ bool e2::Game::findStartLocation(glm::ivec2 const& offset, glm::ivec2 const& ran
 
 		attemptedStartLocations.insert(startLocation);
 
-		e2::Hex startHex(startLocation);
-		e2::TileData startTile = m_hexGrid->getCalculatedTileData(startHex);
+		e2::TileData startTile = m_hexGrid->getCalculatedTileData(startLocation);
 		if (!startTile.isPassable(e2::PassableFlags::Land))
 			continue;
 
 		constexpr bool ignoreVisibility = true;
-		auto as = e2::create<e2::PathFindingAS>(this, startHex, 64, ignoreVisibility, e2::PassableFlags::Land);
+		auto as = e2::create<e2::PathFindingAS>(this, e2::Hex(startLocation), 64, ignoreVisibility, e2::PassableFlags::Land);
 		uint64_t numWalkableHexes = as->hexIndex.size();
 		e2::destroy(as);
 
@@ -1307,7 +1557,7 @@ void e2::Game::updateGameState()
 		else if (m_turnState == TurnState::UnitAction_Move)
 			updateUnitMove();
 		else if (m_turnState == TurnState::EntityAction_Target)
-			updateEntityTarget();
+			updateTarget();
 		else if (m_turnState == TurnState::EntityAction_Generic)
 			updateCustomAction();
 			
@@ -1376,17 +1626,17 @@ void e2::Game::updateTurnLocal()
 				spawnEntity("cb90", m_cursorHex, m_localEmpireId);
 			return;
 		}
-		e2::GameEntity* unitAtHex = entityAtHex(e2::EntityLayerIndex::Unit, m_cursorHex.offsetCoords());
+		e2::GameEntity* unitAtHex = entityAtHex(e2::EntityLayerIndex::Unit, m_cursorHex);
 		if (unitAtHex && unitAtHex->empireId != m_localEmpireId)
 			unitAtHex = nullptr;
 		bool unitSelected = m_selectedEntity && unitAtHex == m_selectedEntity;
 
-		e2::GameEntity* structureAtHex = entityAtHex(e2::EntityLayerIndex::Structure, m_cursorHex.offsetCoords());
+		e2::GameEntity* structureAtHex = entityAtHex(e2::EntityLayerIndex::Structure, m_cursorHex);
 		if (structureAtHex && structureAtHex->empireId != m_localEmpireId)
 			structureAtHex = nullptr;
 		bool structureSelected = m_selectedEntity && structureAtHex == m_selectedEntity;
 
-		e2::GameEntity* airUnitAtHex = entityAtHex(e2::EntityLayerIndex::Air, m_cursorHex.offsetCoords());
+		e2::GameEntity* airUnitAtHex = entityAtHex(e2::EntityLayerIndex::Air, m_cursorHex);
 		if (airUnitAtHex && airUnitAtHex->empireId != m_localEmpireId )
 			airUnitAtHex = nullptr;
 		bool airUnitSelected = m_selectedEntity && airUnitAtHex == m_selectedEntity;
@@ -1620,7 +1870,7 @@ void e2::Game::updateUnitMove()
 	}
 }
 
-void e2::Game::updateEntityTarget()
+void e2::Game::updateTarget()
 {
 	e2::GameSession* session = gameSession();
 	e2::Renderer* renderer = session->renderer();
@@ -1644,7 +1894,7 @@ void e2::Game::updateEntityTarget()
 }
 
 
-e2::GameEntity* e2::Game::spawnEntity(e2::Name entityId, e2::Hex const& location, EmpireId empire)
+e2::GameEntity* e2::Game::spawnEntity(e2::Name entityId, glm::ivec2 const& location, EmpireId empire)
 {
 	e2::EntitySpecification* spec = EntitySpecification::specificationById(entityId);
 	if (!spec)
@@ -1669,7 +1919,7 @@ e2::GameEntity* e2::Game::spawnEntity(e2::Name entityId, e2::Hex const& location
 	}
 
 	// post construct since we created it dynamically
-	asEntity->postConstruct(this, spec, location.offsetCoords(), empire);
+	asEntity->postConstruct(this, spec, location, empire);
 
 	// initialize it (will create mesh proxies etc)
 	asEntity->initialize();
@@ -2278,7 +2528,7 @@ void e2::Game::deselectEntity()
 	m_selectedEntity = nullptr;
 }
 
-void e2::Game::moveSelectedEntityTo(e2::Hex const& to)
+void e2::Game::moveSelectedEntityTo(glm::ivec2 const& to)
 {
 	if (m_state != GameState::Turn || m_turnState != TurnState::Unlocked || !m_selectedEntity)
 		return;
@@ -2287,7 +2537,7 @@ void e2::Game::moveSelectedEntityTo(e2::Hex const& to)
 		return;
 
 
-	if (to.offsetCoords() == m_selectedEntity->tileIndex)
+	if (to == m_selectedEntity->tileIndex)
 		return;
 
 	m_unitMovePath = m_unitAS->find(to);
@@ -2326,13 +2576,13 @@ void e2::Game::updateCustomAction()
 	m_selectedEntity->updateCustomAction(m_timeDelta);
 }
 
-void e2::Game::beginEntityTargeting()
+void e2::Game::beginTargeting()
 {
 	if (m_turnState == TurnState::Unlocked)
 		m_turnState = TurnState::EntityAction_Target;
 }
 
-void e2::Game::endEntityTargeting()
+void e2::Game::endTargeting()
 {
 	if (m_turnState == TurnState::EntityAction_Target)
 		m_turnState = TurnState::Unlocked;
@@ -2673,7 +2923,7 @@ e2::PathFindingAS::PathFindingAS(e2::GameEntity* entity)
 				continue;
 
 			// ignore hexes that are occupied by unpassable biome
-			e2::TileData tile = grid->getCalculatedTileData(n);
+			e2::TileData tile = grid->getCalculatedTileData(coords);
 			if (!tile.isPassable(entity->specification->passableFlags))
 				continue;
 
@@ -2739,7 +2989,7 @@ e2::PathFindingAS::PathFindingAS(e2::GameContext* ctx, e2::Hex const& start, uin
 				continue;
 
 			// ignore hexes that are occupied by unpassable biome
-			e2::TileData tile = ctx->game()->hexGrid()->getCalculatedTileData(n);
+			e2::TileData tile = ctx->game()->hexGrid()->getCalculatedTileData(coords);
 			if (!tile.isPassable(passableFlags))
 				continue;
 

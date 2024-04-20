@@ -1,0 +1,36 @@
+
+{
+    "entities":[
+        {
+            "id": "mobile_mob",
+            "typeName": "e2::GameEntity",
+            "displayName": "Mobile M.O.B",
+            "passableFlags": ["land"],
+            "moveType": "smooth",
+            "sightRange": 3,
+            "movePoints": 3,
+            "attackPoints": 0,
+            "buildPoints": 0,
+            "attackStrength": 0.0,
+            "defensiveStrength": 1000.0,
+            "meshScale": [1.0, 1.0, 1.0],
+            "script": "data/entities/mobile_mob.chai",
+            "mesh": "assets/vehicles/SM_MobileMob.e2a",
+            "skeleton": "",
+            "poses": [
+
+            ],
+            "actions": [
+
+            ],
+            "buildTurns": 50,
+            "upkeep": {
+                "gold": 0.0
+            },
+            "cost": {
+                "gold": 5000.0
+            }
+        }
+    ]
+
+}

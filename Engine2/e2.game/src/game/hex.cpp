@@ -170,7 +170,7 @@ void e2::HexGrid::saveToBuffer(e2::Buffer& toBuffer)
 	toBuffer << uint64_t(m_tileIndex.size());
 	for (auto& [hex, ind]: m_tileIndex)
 	{
-		toBuffer << uint64_t(ind) << hex.offsetCoords();
+		toBuffer << uint64_t(ind) << hex;
 	}
 
 	toBuffer << m_worldBounds;
@@ -226,7 +226,7 @@ void e2::HexGrid::loadFromBuffer(e2::Buffer& fromBuffer)
 		glm::ivec2 hex;
 		uint64_t ind;
 		fromBuffer >> ind >> hex;
-		m_tileIndex[e2::Hex(hex)] = ind;
+		m_tileIndex[hex] = ind;
 	}
 
 
@@ -280,7 +280,7 @@ namespace
 			auto finder = tileCache.find(offsetCoords);
 			if (finder == tileCache.end())
 			{
-				e2::TileData newTileData = grid->getCalculatedTileData(e2::Hex(offsetCoords));
+				e2::TileData newTileData = grid->getCalculatedTileData(offsetCoords);
 				tileCache[offsetCoords] = newTileData;
 				return newTileData;
 			}
@@ -969,11 +969,11 @@ e2::MeshPtr e2::HexGrid::getForestMeshForFlags(e2::TileFlags flags)
 
 }
 
-e2::TileData e2::HexGrid::getCalculatedTileData(Hex const& hex)
+e2::TileData e2::HexGrid::getCalculatedTileData(glm::ivec2 const& hex)
 {
 	TileData newTileData;
 
-	glm::vec2 planarCoords = hex.planarCoords();
+	glm::vec2 planarCoords = e2::Hex(hex).planarCoords();
 	float baseHeight = calculateBaseHeight(planarCoords);
 	calculateBiome(planarCoords, newTileData.flags);
 	calculateFeaturesAndWater(planarCoords, baseHeight, newTileData.flags);
@@ -981,7 +981,7 @@ e2::TileData e2::HexGrid::getCalculatedTileData(Hex const& hex)
 
 	newTileData.forestMesh = getForestMeshForFlags(newTileData.flags);
 
-	e2::GameEntity* existingStructure = game()->entityAtHex(EntityLayerIndex::Structure, hex.offsetCoords());
+	e2::GameEntity* existingStructure = game()->entityAtHex(EntityLayerIndex::Structure, hex);
 	if (existingStructure)
 	{
 		newTileData.empireId = existingStructure->empireId;
@@ -990,16 +990,16 @@ e2::TileData e2::HexGrid::getCalculatedTileData(Hex const& hex)
 	return newTileData;
 }
 
-e2::TileData e2::HexGrid::getTileData(Hex const& hex)
+e2::TileData e2::HexGrid::getTileData(glm::ivec2 const& hex)
 {
-	e2::TileData* src = getExistingTileData(hex.offsetCoords());
+	e2::TileData* src = getExistingTileData(hex);
 	if (src)
 		return *src;
 
 	return getCalculatedTileData(hex);
 }
 
-e2::MeshProxy* e2::HexGrid::createForestProxyForTile(e2::TileData* tileData, e2::Hex const& hex)
+e2::MeshProxy* e2::HexGrid::createForestProxyForTile(e2::TileData* tileData, glm::ivec2 const& hex)
 {
 	if (!tileData)
 		return nullptr;
@@ -1010,7 +1010,7 @@ e2::MeshProxy* e2::HexGrid::createForestProxyForTile(e2::TileData* tileData, e2:
 	if (!treeConf.mesh)
 		return nullptr;
 
-	glm::vec3 meshOffset = hex.localCoords();
+	glm::vec3 meshOffset = e2::Hex(hex).localCoords();
 
 	e2::MeshProxy* newMeshProxy = e2::create<e2::MeshProxy>(gameSession(), treeConf);
 	newMeshProxy->modelMatrix = glm::translate(glm::mat4(1.0f), meshOffset);
@@ -1020,7 +1020,7 @@ e2::MeshProxy* e2::HexGrid::createForestProxyForTile(e2::TileData* tileData, e2:
 	return newMeshProxy;
 }
 
-size_t e2::HexGrid::discover(Hex hex)
+size_t e2::HexGrid::discover(glm::ivec2 const& hex)
 {
 	// there are no checks to see if hex is already discovered, use with care!! 
 #if defined(E2_DEVELOPMENT)
@@ -1033,7 +1033,7 @@ size_t e2::HexGrid::discover(Hex hex)
 	m_tileVisibility.push_back(0);
 	m_tileIndex[hex] = m_tiles.size() - 1;
 
-	glm::ivec2 chunkIndex = chunkIndexFromPlanarCoords(hex.planarCoords());
+	glm::ivec2 chunkIndex = chunkIndexFromPlanarCoords(e2::Hex(hex).planarCoords());
 	auto chunkFinder = m_discoveredChunks.find(chunkIndex);
 	if (chunkFinder == m_discoveredChunks.end())
 	{
@@ -1059,7 +1059,7 @@ size_t e2::HexGrid::discover(Hex hex)
 	return m_tiles.size() - 1;
 }
 
-size_t e2::HexGrid::getTileIndexFromHex(Hex hex)
+size_t e2::HexGrid::getTileIndexFromHex(glm::ivec2 const& hex)
 {
 	size_t tileIndex = 0;
 
@@ -2094,7 +2094,7 @@ void e2::HexGrid::clearVisibility()
 
 void e2::HexGrid::flagVisible(glm::ivec2 const& v, bool onlyDiscover)
 {
-	int32_t tileIndex = (int32_t)getTileIndexFromHex(e2::Hex(v));
+	int32_t tileIndex = (int32_t)getTileIndexFromHex(v);
 
 	if(!onlyDiscover)
 		m_tileVisibility[tileIndex] = m_tileVisibility[tileIndex]  + 1;
@@ -2287,7 +2287,7 @@ bool e2::ChunkLoadTask::execute()
 
 			shaderData.grid = m_grid;
 			shaderData.hex = e2::Hex(m_chunkIndex * glm::ivec2(e2::hexChunkResolution) + glm::ivec2(x, y));
-			shaderData.tileData = m_grid->getCalculatedTileData(shaderData.hex);
+			shaderData.tileData = m_grid->getCalculatedTileData(shaderData.hex.offsetCoords());
 
 			if ((shaderData.tileData.flags & e2::TileFlags::FeatureMountains) != e2::TileFlags::FeatureNone)
 			{
@@ -2434,10 +2434,10 @@ void e2::HexGrid::refreshChunkMeshes(e2::ChunkState* state)
 			glm::vec3 tileOffset = e2::Hex(glm::ivec2(x, y)).localCoords();
 			glm::mat4 transform = glm::translate(glm::identity<glm::mat4>(), tileOffset);
 
-			e2::Hex tileHex = e2::Hex(state->chunkIndex * glm::ivec2(e2::hexChunkResolution) + glm::ivec2(x, y));
+			glm::ivec2 tileHex = state->chunkIndex * glm::ivec2(e2::hexChunkResolution) + glm::ivec2(x, y);
 
 			// get real data if we have it, otherwise calculate 
-			e2::TileData* realTileData = getExistingTileData(tileHex.offsetCoords());
+			e2::TileData* realTileData = getExistingTileData(tileHex);
 			if (realTileData)
 			{
 				if (realTileData->forestProxy)
@@ -2572,9 +2572,19 @@ e2::TileFlags e2::TileData::getWoodAbundance()
 	return (flags & e2::TileFlags::WoodAbundanceMask);
 }
 
+bool e2::TileData::isForested()
+{
+	return (flags & TileFlags::FeatureForest) != TileFlags::FeatureNone;
+}
+
+bool e2::TileData::hasResource()
+{
+	return (flags & TileFlags::ResourceMask) != TileFlags::ResourceNone;
+}
+
 float e2::TileData::getAbundanceAsFloat()
 {
-	switch (getAbundance())
+	switch (getAbundance()) 
 	{
 	case TileFlags::Abundance1:
 		return 1.0f;

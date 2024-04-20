@@ -1,0 +1,37 @@
+var mobile_mobScript = EntityScript();
+
+mobile_mobScript.updateCustomAction = fun(entity, ui){
+    // uncomment when we have animation asset for this action
+    //if(!entity.actionPlaying(Name("deploying")))
+    //{
+        game.spawnEntity(Name("mob"), entity.tileIndex, entity.empireId);
+        game.endCustomAction();
+        game.destroyEntity(entity);
+    //}
+}
+
+mobile_mobScript.drawUI = fun(entity, ui){
+    ui.beginStackV(Name("mobUiStackV"), vec2(0.0, 0.0));
+    ui.gameLabel("**" + entity.specification.displayName + "**", 12, Middle);
+    ui.gameLabel("*Movement points left:* " + to_string(entity.movePointsLeft), 11, Begin);
+
+    var tileData = game.hexGrid().getExistingTileData(entity.tileIndex);
+    if(!tileData.is_var_null())
+    {
+        var isForested = tileData.isForested();
+        var hasResource = tileData.hasResource();
+        var hasStructure = !game.entityAtHex(Structure, entity.tileIndex).is_var_null();
+        var canBuild = !hasStructure && !hasResource && !isForested;
+
+        if(canBuild && ui.button(Name("deploy"), "*Deploy M.O.B*"))
+        {
+            // uncomment once we have animation
+            // entity.playAction(Name("deploying"));
+            game.beginCustomAction();
+        }
+    }
+
+    ui.endStackV();
+}
+
+mobile_mobScript;

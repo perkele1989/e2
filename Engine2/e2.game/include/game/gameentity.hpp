@@ -50,7 +50,7 @@ namespace e2
 	using scriptFunc_grugRelevant = std::function<bool(e2::GameEntity*)>;
 	using scriptFunc_fiscal = std::function<void(e2::GameEntity*, e2::ResourceTable&)>;
 	using scriptFunc_onHit = std::function<void(e2::GameEntity*, e2::GameEntity*, float)>;
-	using scriptFunc_onTargetChanged = std::function<void(e2::GameEntity*, e2::Hex const&)>;
+	using scriptFunc_onTargetChanged = std::function<void(e2::GameEntity*, glm::ivec2 const&)>;
 	using scriptFunc_onTargetClicked = std::function<void(e2::GameEntity*)>;
 	using scriptFunc_updateCustomAction = std::function<void(e2::GameEntity*, double)>;
 	using scriptFunc_onTurnStart = std::function<void(e2::GameEntity*)>;
@@ -62,19 +62,46 @@ namespace e2
 	{
 		EntityScriptInterface() = default;
 
+		void invokeDrawUI(e2::GameEntity* entity, e2::UIContext* ui);
 		scriptFunc_drawUI drawUI;
+
+		void invokeUpdateAnimation(e2::GameEntity* entity, double seconds);
 		scriptFunc_updateAnimation updateAnimation;
+
+		bool invokeGrugRelevant(e2::GameEntity* entity);
 		scriptFunc_grugRelevant grugRelevant;
+
+		bool invokeGrugTick(e2::GameEntity* entity, double seconds);
 		scriptFunc_grugTick grugTick;
+
+		void invokeCollectRevenue(e2::GameEntity* entity, e2::ResourceTable &outTable);
 		scriptFunc_fiscal collectRevenue;
+
+		void invokeCollectExpenditure(e2::GameEntity* entity, e2::ResourceTable& outTable);
 		scriptFunc_fiscal collectExpenditure;
+
+		void invokeOnHit(e2::GameEntity* entity, e2::GameEntity* instigator, float dmg);
 		scriptFunc_onHit onHit;
+
+		void invokeOnTargetChanged(e2::GameEntity* entity, glm::ivec2 const& hex);
 		scriptFunc_onTargetChanged onTargetChanged;
+
+		void invokeOnTargetClicked(e2::GameEntity* entity);
 		scriptFunc_onTargetClicked onTargetClicked;
+
+		void invokeUpdateCustomAction(e2::GameEntity* entity, double seconds);
 		scriptFunc_updateCustomAction updateCustomAction;
+
+		void invokeOnTurnStart(e2::GameEntity* entity);
 		scriptFunc_onTurnStart onTurnStart;
+
+		void invokeOnTurnEnd(e2::GameEntity* entity);
 		scriptFunc_onTurnEnd onTurnEnd;
+
+		void invokeOnBeginMove(e2::GameEntity* entity);
 		scriptFunc_onBeginMove onBeginMove;
+
+		void invokeOnEndMove(e2::GameEntity* entity);
 		scriptFunc_onEndMove onEndMove;
 	};
 
@@ -171,7 +198,7 @@ namespace e2
 	{
 		std::string buildMessage;
 		bool didSpawn{};
-		e2::Hex spawnLocation;
+		glm::ivec2 spawnLocation;
 	};
 
 	struct UnitBuildAction
@@ -260,7 +287,7 @@ namespace e2
 
 		virtual void onHit(e2::GameEntity* instigator, float damage);
 
-		virtual void onTargetChanged(e2::Hex const& location);
+		virtual void onTargetChanged(glm::ivec2 const& location);
 		virtual void onTargetClicked();
 
 		virtual void updateCustomAction(double seconds);
@@ -315,8 +342,8 @@ namespace e2
 		void setPose(e2::Name poseName);
 		void playAction(e2::Name actionName);
 
-		void setPose(e2::Pose* pose, double lerpTime);
-		void playAction(e2::AnimationPose* anim, double blendIn = 0.2f, double blendOut = 0.2f);
+		void setPose2(e2::Pose* pose, double lerpTime);
+		void playAction2(e2::AnimationPose* anim, double blendIn = 0.2f, double blendOut = 0.2f);
 
 		virtual e2::Game* game() override;
 

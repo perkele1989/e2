@@ -228,9 +228,6 @@ namespace e2
 		void beginWrap(e2::Name id);
 		void endWrap();
 
-		// Implement these at some point 
-		void beginTable(e2::Name id, float* columnSizes, uint32_t numColumns);
-		void endTable();
 
 
 

@@ -197,8 +197,8 @@ namespace e2
 		glm::vec2 m_cursorUnit; // mouse position scaled between 0.0 - 1.0
 		glm::vec2 m_cursorNdc; // mouse position scaled between -1.0 and 1.0
 		glm::vec2 m_cursorPlane; // mouse position as projected on to the world xz plane
-		e2::Hex m_cursorHex; // mouse position as projected upon a hex
-		e2::Hex m_prevCursorHex;
+		glm::ivec2 m_cursorHex; // mouse position as projected upon a hex
+		glm::ivec2 m_prevCursorHex;
 		e2::TileData* m_cursorTile{};
 		bool m_hexChanged{};
 
@@ -262,18 +262,18 @@ namespace e2
 		void selectEntity(e2::GameEntity* entity);
 		void deselectEntity();
 		
-		void moveSelectedEntityTo(e2::Hex const& to);
+		void moveSelectedEntityTo(glm::ivec2 const& to);
 		void updateUnitMove();
 
 		void beginCustomAction();
 		void endCustomAction();
 		void updateCustomAction();
 
-		void beginEntityTargeting();
-		void endEntityTargeting();
-		void updateEntityTarget();
+		void beginTargeting();
+		void endTargeting();
+		void updateTarget();
 		
-		e2::GameEntity* spawnEntity(e2::Name entityId, e2::Hex const& location, EmpireId empire);
+		e2::GameEntity* spawnEntity(e2::Name entityId, glm::ivec2 const& location, EmpireId empire);
 		void destroyEntity(e2::GameEntity* entity);
 		void queueDestroyEntity(e2::GameEntity* entity);
 

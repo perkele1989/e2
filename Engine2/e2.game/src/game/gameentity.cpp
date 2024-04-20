@@ -85,7 +85,7 @@ void e2::GameEntity::updateAnimation(double seconds)
 
 	if (specification->scriptInterface.updateAnimation)
 	{
-		specification->scriptInterface.updateAnimation(this, seconds);
+		specification->scriptInterface.invokeUpdateAnimation(this, seconds);
 	}
 
 }
@@ -96,7 +96,7 @@ void e2::GameEntity::updateCustomAction(double seconds)
 {
 	if (specification->scriptInterface.updateCustomAction)
 	{
-		specification->scriptInterface.updateCustomAction(this, seconds);
+		specification->scriptInterface.invokeUpdateCustomAction(this, seconds);
 		return;
 	}
 }
@@ -105,7 +105,7 @@ void e2::GameEntity::collectRevenue(ResourceTable& outRevenueTable)
 {
 	if (specification->scriptInterface.collectRevenue)
 	{
-		return specification->scriptInterface.collectRevenue(this, outRevenueTable);
+		return specification->scriptInterface.invokeCollectRevenue(this, outRevenueTable);
 	}
 }
 
@@ -113,7 +113,7 @@ void e2::GameEntity::collectExpenditure(ResourceTable& outExpenditureTable)
 {
 	if (specification->scriptInterface.collectExpenditure)
 	{
-		return specification->scriptInterface.collectExpenditure(this, outExpenditureTable);
+		return specification->scriptInterface.invokeCollectExpenditure(this, outExpenditureTable);
 	}
 }
 
@@ -156,7 +156,7 @@ void e2::GameEntity::onHit(e2::GameEntity* instigator, float damage)
 {
 	if (specification->scriptInterface.onHit)
 	{
-		specification->scriptInterface.onHit(this, instigator, damage);
+		specification->scriptInterface.invokeOnHit(this, instigator, damage);
 		return;
 	}
 
@@ -165,11 +165,11 @@ void e2::GameEntity::onHit(e2::GameEntity* instigator, float damage)
 		game()->queueDestroyEntity(this);
 }
 
-void e2::GameEntity::onTargetChanged(e2::Hex const& location)
+void e2::GameEntity::onTargetChanged(glm::ivec2 const& location)
 {
 	if (specification->scriptInterface.onTargetChanged)
 	{
-		specification->scriptInterface.onTargetChanged(this, location);
+		specification->scriptInterface.invokeOnTargetChanged(this, location);
 		return;
 	}
 }
@@ -178,7 +178,7 @@ void e2::GameEntity::onTargetClicked()
 {
 	if (specification->scriptInterface.onTargetClicked)
 	{
-		specification->scriptInterface.onTargetClicked(this);
+		specification->scriptInterface.invokeOnTargetClicked(this);
 		return;
 	}
 }
@@ -248,7 +248,7 @@ void e2::GameEntity::drawUI(e2::UIContext* ctx)
 	// if this function was overridden via script, invoke that instead
 	if (specification->scriptInterface.drawUI)
 	{
-		specification->scriptInterface.drawUI(this, ctx);
+		specification->scriptInterface.invokeDrawUI(this, ctx); 
 		return;
 	}
 
@@ -279,7 +279,7 @@ bool e2::GameEntity::grugRelevant()
 {
 	if (specification->scriptInterface.grugRelevant)
 	{
-		return specification->scriptInterface.grugRelevant(this);
+		return specification->scriptInterface.invokeGrugRelevant(this);
 	}
 
 
@@ -290,7 +290,7 @@ bool e2::GameEntity::grugTick(double seconds)
 {
 	if (specification->scriptInterface.grugTick)
 	{
-		return specification->scriptInterface.grugTick(this, seconds);
+		return specification->scriptInterface.invokeGrugTick(this, seconds);
 	}
 
 	return false;
@@ -354,7 +354,7 @@ void e2::GameEntity::destroyProxy()
 }
 
 
-void e2::GameEntity::setPose(e2::Pose* pose, double lerpTime)
+void e2::GameEntity::setPose2(e2::Pose* pose, double lerpTime)
 {
 	if (!skinProxy)
 		return;
@@ -382,10 +382,10 @@ void e2::GameEntity::playAction(e2::Name actionName)
 	if (!action)
 		return;
 
-	playAction(action->pose, action->blendInTime, action->blendOutTime);
+	playAction2(action->pose, action->blendInTime, action->blendOutTime);
 }
 
-void e2::GameEntity::playAction(e2::AnimationPose* anim, double blendIn /*= 0.2f*/, double blendOut /*= 0.2f*/)
+void e2::GameEntity::playAction2(e2::AnimationPose* anim, double blendIn /*= 0.2f*/, double blendOut /*= 0.2f*/)
 {
 	if (!skinProxy)
 		return;
@@ -415,7 +415,7 @@ void e2::GameEntity::setPose(e2::Name poseName)
 	if (!pose)
 		return;
 
-	setPose(pose->pose, pose->blendTime);
+	setPose2(pose->pose, pose->blendTime);
 }
 
 void e2::GameEntity::spreadVisibility()
@@ -444,7 +444,7 @@ void e2::GameEntity::onTurnEnd()
 {
 	if (specification->scriptInterface.onTurnEnd)
 	{
-		specification->scriptInterface.onTurnEnd(this);
+		specification->scriptInterface.invokeOnTurnEnd(this);
 	}
 }
 
@@ -469,7 +469,7 @@ void e2::GameEntity::onTurnStart()
 
 	if (specification->scriptInterface.onTurnStart)
 	{
-		specification->scriptInterface.onTurnStart(this);
+		specification->scriptInterface.invokeOnTurnStart(this);
 	}
 }
 
@@ -478,7 +478,7 @@ void e2::GameEntity::onBeginMove()
 {
 	if (specification->scriptInterface.onBeginMove)
 	{
-		specification->scriptInterface.onBeginMove(this);
+		specification->scriptInterface.invokeOnBeginMove(this);
 		return;
 	}
 
@@ -489,7 +489,7 @@ void e2::GameEntity::onEndMove()
 {
 	if (specification->scriptInterface.onEndMove)
 	{
-		specification->scriptInterface.onEndMove(this);
+		specification->scriptInterface.invokeOnEndMove(this);
 		return;
 	}
 
@@ -560,7 +560,7 @@ e2::UnitBuildResult e2::UnitBuildAction::tick()
 			for (e2::Hex& n : e2::Hex(owner->tileIndex).neighbours())
 			{
 				slotToUse = n.offsetCoords();
-				bool extraSlotFree = game->entityAtHex(e2::EntityLayerIndex::Unit, n.offsetCoords()) == nullptr && game->hexGrid()->getCalculatedTileData(n).isPassable(specification->passableFlags);
+				bool extraSlotFree = game->entityAtHex(e2::EntityLayerIndex::Unit, slotToUse) == nullptr && game->hexGrid()->getCalculatedTileData(slotToUse).isPassable(specification->passableFlags);
 
 				if (extraSlotFree)
 				{
@@ -580,7 +580,7 @@ e2::UnitBuildResult e2::UnitBuildAction::tick()
 
 			totalBuilt++;
 			result.didSpawn = true;
-			result.spawnLocation = e2::Hex(slotToUse);
+			result.spawnLocation = slotToUse;
 
 			game->spawnEntity(specification->id, result.spawnLocation, owner->empireId);
 
@@ -602,7 +602,6 @@ namespace
 
 void e2::EntitySpecification::initializeSpecifications(e2::GameContext* ctx)
 {
-	std::filesystem::recursive_directory_iterator;
 	for (const std::filesystem::directory_entry& entry : std::filesystem::recursive_directory_iterator("data/entities/"))
 	{
 		if (!entry.is_regular_file())
@@ -903,4 +902,331 @@ e2::EntitySpecification* e2::EntitySpecification::specification(size_t index)
 size_t e2::EntitySpecification::specificationCount()
 {
 	return ::specifications.size();
+}
+
+void e2::EntityScriptInterface::invokeDrawUI(e2::GameEntity* entity, e2::UIContext* ui)
+{
+	if (drawUI)
+	{
+		try
+		{
+			drawUI(entity, ui);
+		}
+		catch (chaiscript::exception::eval_error& e)
+		{
+			LogError("chai: evaluation failed: {}", e.pretty_print());
+		}
+		catch (chaiscript::exception::bad_boxed_cast& e)
+		{
+			LogError("chai: casting return-type from script to native failed: {}", e.what());
+		}
+		catch (std::exception& e)
+		{
+			LogError("{}", e.what());
+		}
+	}
+}
+
+void e2::EntityScriptInterface::invokeUpdateAnimation(e2::GameEntity* entity, double seconds)
+{
+	if (updateAnimation)
+	{
+		try
+		{
+			updateAnimation(entity, seconds);
+		}
+		catch (chaiscript::exception::eval_error& e)
+		{
+			LogError("chai: evaluation failed: {}", e.pretty_print());
+		}
+		catch (chaiscript::exception::bad_boxed_cast& e)
+		{
+			LogError("chai: casting return-type from script to native failed: {}", e.what());
+		}
+		catch (std::exception& e)
+		{
+			LogError("{}", e.what());
+		}
+	}
+}
+
+bool e2::EntityScriptInterface::invokeGrugRelevant(e2::GameEntity* entity)
+{
+	bool returnValue = false;
+	if (grugRelevant)
+	{
+		try
+		{
+			returnValue = grugRelevant(entity);
+		}
+		catch (chaiscript::exception::eval_error& e)
+		{
+			LogError("chai: evaluation failed: {}", e.pretty_print());
+		}
+		catch (chaiscript::exception::bad_boxed_cast& e)
+		{
+			LogError("chai: casting return-type from script to native failed: {}", e.what());
+		}
+		catch (std::exception& e)
+		{
+			LogError("{}", e.what());
+		}
+	}
+
+	return returnValue;
+}
+
+bool e2::EntityScriptInterface::invokeGrugTick(e2::GameEntity* entity, double seconds)
+{
+	bool returnValue = false;
+	if (grugTick)
+	{
+		try
+		{
+			returnValue = grugTick(entity, seconds);
+		}
+		catch (chaiscript::exception::eval_error& e)
+		{
+			LogError("chai: evaluation failed: {}", e.pretty_print());
+		}
+		catch (chaiscript::exception::bad_boxed_cast& e)
+		{
+			LogError("chai: casting return-type from script to native failed: {}", e.what());
+		}
+		catch (std::exception& e)
+		{
+			LogError("{}", e.what());
+		}
+	}
+	return returnValue;
+}
+
+void e2::EntityScriptInterface::invokeCollectRevenue(e2::GameEntity* entity, e2::ResourceTable &outTable)
+{
+	if (collectRevenue)
+	{
+		try
+		{
+			collectRevenue(entity, outTable);
+		}
+		catch (chaiscript::exception::eval_error& e)
+		{
+			LogError("chai: evaluation failed: {}", e.pretty_print());
+		}
+		catch (chaiscript::exception::bad_boxed_cast& e)
+		{
+			LogError("chai: casting return-type from script to native failed: {}", e.what());
+		}
+		catch (std::exception& e)
+		{
+			LogError("{}", e.what());
+		}
+	}
+}
+
+void e2::EntityScriptInterface::invokeCollectExpenditure(e2::GameEntity* entity, e2::ResourceTable& outTable)
+{
+	if (collectExpenditure)
+	{
+		try
+		{
+			collectExpenditure(entity, outTable);
+		}
+		catch (chaiscript::exception::eval_error& e)
+		{
+			LogError("chai: evaluation failed: {}", e.pretty_print());
+		}
+		catch (chaiscript::exception::bad_boxed_cast& e)
+		{
+			LogError("chai: casting return-type from script to native failed: {}", e.what());
+		}
+		catch (std::exception& e)
+		{
+			LogError("{}", e.what());
+		}
+	}
+}
+
+void e2::EntityScriptInterface::invokeOnHit(e2::GameEntity* entity, e2::GameEntity* instigator, float dmg)
+{
+	if (onHit)
+	{
+		try
+		{
+			onHit(entity, instigator, dmg);
+		}
+		catch (chaiscript::exception::eval_error& e)
+		{
+			LogError("chai: evaluation failed: {}", e.pretty_print());
+		}
+		catch (chaiscript::exception::bad_boxed_cast& e)
+		{
+			LogError("chai: casting return-type from script to native failed: {}", e.what());
+		}
+		catch (std::exception& e)
+		{
+			LogError("{}", e.what());
+		}
+	}
+}
+
+void e2::EntityScriptInterface::invokeOnTargetChanged(e2::GameEntity* entity, glm::ivec2 const& hex)
+{
+	if (onTargetChanged)
+	{
+		try
+		{
+			onTargetChanged(entity, hex);
+		}
+		catch (chaiscript::exception::eval_error& e)
+		{
+			LogError("chai: evaluation failed: {}", e.pretty_print());
+		}
+		catch (chaiscript::exception::bad_boxed_cast& e)
+		{
+			LogError("chai: casting return-type from script to native failed: {}", e.what());
+		}
+		catch (std::exception& e)
+		{
+			LogError("{}", e.what());
+		}
+	}
+}
+
+void e2::EntityScriptInterface::invokeOnTargetClicked(e2::GameEntity* entity)
+{
+	if (onTargetClicked)
+	{
+		try
+		{
+			onTargetClicked(entity);
+		}
+		catch (chaiscript::exception::eval_error& e)
+		{
+			LogError("chai: evaluation failed: {}", e.pretty_print());
+		}
+		catch (chaiscript::exception::bad_boxed_cast& e)
+		{
+			LogError("chai: casting return-type from script to native failed: {}", e.what());
+		}
+		catch (std::exception& e)
+		{
+			LogError("{}", e.what());
+		}
+	}
+}
+
+void e2::EntityScriptInterface::invokeUpdateCustomAction(e2::GameEntity* entity, double seconds)
+{
+	if (updateCustomAction)
+	{
+		try
+		{
+			updateCustomAction(entity, seconds);
+		}
+		catch (chaiscript::exception::eval_error& e)
+		{
+			LogError("chai: evaluation failed: {}", e.pretty_print());
+		}
+		catch (chaiscript::exception::bad_boxed_cast& e)
+		{
+			LogError("chai: casting return-type from script to native failed: {}", e.what());
+		}
+		catch (std::exception& e)
+		{
+			LogError("{}", e.what());
+		}
+	}
+}
+
+void e2::EntityScriptInterface::invokeOnTurnStart(e2::GameEntity* entity)
+{
+	if (onTurnStart)
+	{
+		try
+		{
+			onTurnStart(entity);
+		}
+		catch (chaiscript::exception::eval_error& e)
+		{
+			LogError("chai: evaluation failed: {}", e.pretty_print());
+		}
+		catch (chaiscript::exception::bad_boxed_cast& e)
+		{
+			LogError("chai: casting return-type from script to native failed: {}", e.what());
+		}
+		catch (std::exception& e)
+		{
+			LogError("{}", e.what());
+		}
+	}
+}
+
+void e2::EntityScriptInterface::invokeOnTurnEnd(e2::GameEntity* entity)
+{
+	if (onTurnEnd)
+	{
+		try
+		{
+			onTurnEnd(entity);
+		}
+		catch (chaiscript::exception::eval_error& e)
+		{
+			LogError("chai: evaluation failed: {}", e.pretty_print());
+		}
+		catch (chaiscript::exception::bad_boxed_cast& e)
+		{
+			LogError("chai: casting return-type from script to native failed: {}", e.what());
+		}
+		catch (std::exception& e)
+		{
+			LogError("{}", e.what());
+		}
+	}
+}
+
+void e2::EntityScriptInterface::invokeOnBeginMove(e2::GameEntity* entity)
+{
+	if (onBeginMove)
+	{
+		try
+		{
+			onBeginMove(entity);
+		}
+		catch (chaiscript::exception::eval_error& e)
+		{
+			LogError("chai: evaluation failed: {}", e.pretty_print());
+		}
+		catch (chaiscript::exception::bad_boxed_cast& e)
+		{
+			LogError("chai: casting return-type from script to native failed: {}", e.what());
+		}
+		catch (std::exception& e)
+		{
+			LogError("{}", e.what());
+		}
+	}
+}
+
+void e2::EntityScriptInterface::invokeOnEndMove(e2::GameEntity* entity)
+{
+	if (onEndMove)
+	{
+		try
+		{
+			onEndMove(entity);
+		}
+		catch (chaiscript::exception::eval_error& e)
+		{
+			LogError("chai: evaluation failed: {}", e.pretty_print());
+		}
+		catch (chaiscript::exception::bad_boxed_cast& e)
+		{
+			LogError("chai: casting return-type from script to native failed: {}", e.what());
+		}
+		catch (std::exception& e)
+		{
+			LogError("{}", e.what());
+		}
+	}
 }

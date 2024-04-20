@@ -91,6 +91,9 @@ namespace e2
 
 		TileFlags getWoodAbundance();
 
+		bool isForested();
+		bool hasResource();
+
 		float getAbundanceAsFloat();
 		float getWoodAbundanceAsFloat();
 
@@ -369,15 +372,15 @@ namespace e2
 		TileData& getTileFromIndex(size_t index);
 
 		/** Discovers the given hex, and returns its new array index (WARNING: This doesnt check if it already exists!) */
-		size_t discover(Hex hex);
+		size_t discover(glm::ivec2 const& hex);
 
 		/** Retrieves array index to the given tile, discovers it if necessary */
-		size_t getTileIndexFromHex(Hex hex);
+		size_t getTileIndexFromHex(glm::ivec2 const &hex);
 
 		/** Retrieves tile data for the given hex, if it exists. Otherwise returns null */
 		e2::TileData* getExistingTileData(glm::ivec2 const& hex);
-		e2::TileData getCalculatedTileData(Hex const& hex);
-		e2::TileData getTileData(Hex const& hex);
+		e2::TileData getCalculatedTileData(glm::ivec2 const& hex);
+		e2::TileData getTileData(glm::ivec2 const& hex);
 		/// Tiles End
 
 		/// ProcGen Begin
@@ -398,7 +401,7 @@ namespace e2
 
 
 
-		e2::MeshProxy* createForestProxyForTile(e2::TileData* tileData, e2::Hex const& hex);
+		e2::MeshProxy* createForestProxyForTile(e2::TileData* tileData, glm::ivec2 const& hex);
 		static float sampleSimplex(glm::vec2 const& position);
 
 		
@@ -454,7 +457,7 @@ namespace e2
 		// list of discovered tiles 
 		std::vector<TileData> m_tiles;
 		std::vector<int32_t> m_tileVisibility;
-		std::unordered_map<Hex, size_t> m_tileIndex;
+		std::unordered_map<glm::ivec2, size_t> m_tileIndex;
 
 
 
