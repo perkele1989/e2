@@ -1,0 +1,114 @@
+
+{
+    "entities":[
+
+        {
+            "id": "engineer",
+            "typeName": "e2::GameEntity",
+            "displayName": "Engineer",
+            "passableFlags": ["land"],
+            "moveType": "smooth",
+            "sightRange": 3,
+            "movePoints": 3,
+            "attackPoints": 0,
+            "buildPoints": 1,
+            "attackStrength": 0.0,
+            "defensiveStrength": 25.0,
+            "meshScale": [0.005, -0.005, -0.005],
+            "mesh": "assets/characters/SM_Engineer.e2a",
+            "skeleton": "assets/characters/SK_Engineer.e2a",
+            "poses": [
+                {
+                    "name": "idle",
+                    "asset": "assets/characters/A_EngineerIdle.e2a",
+                    "blendTime": 0.5 
+                },
+                {
+                    "name": "move",
+                    "asset": "assets/characters/A_EngineerRun.e2a",
+                    "blendTime": 0.15
+                }
+            ],
+            "actions": [
+                {
+                    "name": "build",
+                    "asset": "assets/characters/A_EngineerBuild.e2a",
+                    "blendInTime": 0.25,
+                    "blendOutTime": 0.5
+                },
+                {
+                    "name": "die",
+                    "asset": "assets/characters/A_EngineerDie.e2a",
+                    "blendInTime": 0.25,
+                    "blendOutTime": 0.0
+                }
+            ],
+            "buildTurns": 3,
+            "upkeep": {
+                "gold": 0.25
+            },
+            "cost": {
+                "gold": 2.0
+            }
+        },
+        {
+            "id": "grunt",
+            "typeName": "e2::GameEntity",
+            "displayName": "Grunt",
+            "layerIndex": "unit",
+            "passableFlags": ["land"],
+            "moveType": "smooth",
+            "sightRange": 5,
+            "movePoints": 5,
+            "attackPoints": 1,
+            "buildPoints": 0,
+            "attackStrength": 100.0,
+            "defensiveStrength": 100.0,
+            "meshScale": [0.005, -0.005, -0.005],
+            "mesh": "assets/characters/SM_Soldier.e2a",
+            "skeleton": "assets/characters/SK_Soldier.e2a",
+
+            "poses": [
+                {
+                    "name": "idle",
+                    "asset": "assets/characters/A_SoldierIdle.e2a",
+                    "blendTime": 0.5 
+                },
+                {
+                    "name": "move",
+                    "asset": "assets/characters/A_SoldierRun.e2a",
+                    "blendTime": 0.15
+
+                }
+            ],
+            "actions": [
+                {
+                    "name": "hit",
+                    "asset": "assets/characters/A_SoldierHit.e2a",
+                    "blendInTime": 0.05,
+                    "blendOutTime": 0.1
+                },
+                {
+                    "name": "die",
+                    "asset": "assets/characters/A_SoldierDie.e2a",
+                    "blendInTime": 0.25,
+                    "blendOutTime": 0.0
+                },
+                {
+                    "name": "fire",
+                    "asset": "assets/characters/A_SoldierFire.e2a",
+                    "blendInTime": 0.1,
+                    "blendOutTime": 0.2
+                }
+            ],
+            "buildTurns": 4,
+            "upkeep": {
+                "gold": 1.0
+            },
+            "cost": {
+                "gold": 4.0
+            }
+        }
+    ]
+
+}

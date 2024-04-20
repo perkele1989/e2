@@ -334,7 +334,11 @@ e2::Buffer& e2::Buffer::operator<<(glm::uvec2 const& value)
 
 e2::Buffer& e2::Buffer::operator>>(e2::Data& value)
 {
-	value.read(*this);
+	if (!value.read(*this))
+	{
+		LogError("failed to read data");
+	}
+
 	return *this;
 }
 

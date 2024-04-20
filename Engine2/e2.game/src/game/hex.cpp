@@ -280,7 +280,7 @@ namespace
 			auto finder = tileCache.find(offsetCoords);
 			if (finder == tileCache.end())
 			{
-				e2::TileData newTileData = grid->calculateTileDataForHex(e2::Hex(offsetCoords));
+				e2::TileData newTileData = grid->getCalculatedTileData(e2::Hex(offsetCoords));
 				tileCache[offsetCoords] = newTileData;
 				return newTileData;
 			}
@@ -969,7 +969,7 @@ e2::MeshPtr e2::HexGrid::getForestMeshForFlags(e2::TileFlags flags)
 
 }
 
-e2::TileData e2::HexGrid::calculateTileDataForHex(Hex const& hex)
+e2::TileData e2::HexGrid::getCalculatedTileData(Hex const& hex)
 {
 	TileData newTileData;
 
@@ -981,13 +981,22 @@ e2::TileData e2::HexGrid::calculateTileDataForHex(Hex const& hex)
 
 	newTileData.forestMesh = getForestMeshForFlags(newTileData.flags);
 
-	e2::GameStructure* existingStructure = game()->structureAtHex(hex.offsetCoords());
+	e2::GameEntity* existingStructure = game()->entityAtHex(EntityLayerIndex::Structure, hex.offsetCoords());
 	if (existingStructure)
 	{
 		newTileData.empireId = existingStructure->empireId;
 	}
 
 	return newTileData;
+}
+
+e2::TileData e2::HexGrid::getTileData(Hex const& hex)
+{
+	e2::TileData* src = getExistingTileData(hex.offsetCoords());
+	if (src)
+		return *src;
+
+	return getCalculatedTileData(hex);
 }
 
 e2::MeshProxy* e2::HexGrid::createForestProxyForTile(e2::TileData* tileData, e2::Hex const& hex)
@@ -1020,7 +1029,7 @@ size_t e2::HexGrid::discover(Hex hex)
 		LogError("DISCOVERING ALREADY DISCOVERED TILE, EXPECT BREAKAGE");
 	}
 #endif
-	m_tiles.push_back(calculateTileDataForHex(hex));
+	m_tiles.push_back(getCalculatedTileData(hex));
 	m_tileVisibility.push_back(0);
 	m_tileIndex[hex] = m_tiles.size() - 1;
 
@@ -1067,7 +1076,7 @@ size_t e2::HexGrid::getTileIndexFromHex(Hex hex)
 	return tileIndex;
 }
 
-e2::TileData* e2::HexGrid::getTileData(glm::ivec2 const& hex)
+e2::TileData* e2::HexGrid::getExistingTileData(glm::ivec2 const& hex)
 {
 	auto finder = m_tileIndex.find(hex);
 	if (finder == m_tileIndex.end())
@@ -1623,7 +1632,7 @@ void e2::HexGrid::renderFogOfWar()
 	// base
 	for (glm::ivec2 const& hexIndex : m_outlineTiles)
 	{
-		//e2::TileData* td = getTileData(hexIndex);
+		//e2::TileData* td = getExistingTileData(hexIndex);
 		glm::vec3 worldOffset = e2::Hex(hexIndex).localCoords();
 		//if (td && td->getWater() != e2::TileFlags::WaterNone)
 		//	worldOffset.y += 0.1f;
@@ -1642,7 +1651,7 @@ void e2::HexGrid::renderFogOfWar()
 	// subtractive
 	for (glm::ivec2 const& hexIndex : m_outlineTiles)
 	{
-		//e2::TileData* td = getTileData(hexIndex);
+		//e2::TileData* td = getExistingTileData(hexIndex);
 		glm::vec3 worldOffset = e2::Hex(hexIndex).localCoords();
 
 		//if (td && td->getWater() != e2::TileFlags::WaterNone)
@@ -1847,33 +1856,24 @@ void e2::HexGrid::renderFogOfWar()
 	e2::GameEmpire* localEmpire = game()->localEmpire();
 	if (localEmpire)
 	{
-		for (e2::GameUnit* unit : localEmpire->units)
+		for (e2::GameEntity* entity: localEmpire->entities)
 		{
-			glm::vec2 planarUnitPosition = unit->planarCoords();
+			glm::vec2 planarUnitPosition = entity->meshPlanarCoords();
 
 			glm::vec2 unitPosNormalized = (planarUnitPosition - worldOffset) / worldSize;
 			glm::vec2 unitPosPixels = unitPosNormalized * glm::vec2(m_minimapSize);
 
-			unitConstants.quadPosition = unitPosPixels - glm::vec2(1.5f, 1.5f);
+			if (entity->specification->layerIndex == EntityLayerIndex::Structure)
+				unitConstants.quadSize = { 6.0f, 6.0f };
+			else 
+				unitConstants.quadSize = { 3.0f, 3.0f };
+
+			unitConstants.quadPosition = unitPosPixels - (unitConstants.quadSize / 2.0f);
 			buff->pushConstants(ui->quadPipeline.layout, 0, sizeof(e2::UIQuadPushConstants), reinterpret_cast<uint8_t*>(&unitConstants));
 
 			buff->draw(6, 1);
 		}
 
-		unitConstants.quadSize = { 6.0f, 6.0f };
-
-		for (e2::GameStructure* structure : game()->localEmpire()->structures)
-		{
-			glm::vec2 planarUnitPosition = structure->planarCoords();
-
-			glm::vec2 unitPosNormalized = (planarUnitPosition - worldOffset) / worldSize;
-			glm::vec2 unitPosPixels = unitPosNormalized * glm::vec2(m_minimapSize);
-
-			unitConstants.quadPosition = unitPosPixels - glm::vec2(3.0f, 3.0f);
-			buff->pushConstants(ui->quadPipeline.layout, 0, sizeof(e2::UIQuadPushConstants), reinterpret_cast<uint8_t*>(&unitConstants));
-
-			buff->draw(6, 1);
-		}
 	}
 
 
@@ -2287,7 +2287,7 @@ bool e2::ChunkLoadTask::execute()
 
 			shaderData.grid = m_grid;
 			shaderData.hex = e2::Hex(m_chunkIndex * glm::ivec2(e2::hexChunkResolution) + glm::ivec2(x, y));
-			shaderData.tileData = m_grid->calculateTileDataForHex(shaderData.hex);
+			shaderData.tileData = m_grid->getCalculatedTileData(shaderData.hex);
 
 			if ((shaderData.tileData.flags & e2::TileFlags::FeatureMountains) != e2::TileFlags::FeatureNone)
 			{
@@ -2404,7 +2404,7 @@ void e2::HexGrid::popOutChunk(e2::ChunkState* state)
 				e2::Hex tileHex = e2::Hex(state->chunkIndex * glm::ivec2(e2::hexChunkResolution) + glm::ivec2(x, y));
 
 				// get real data if we have it, otherwise calculate 
-				e2::TileData* realTileData = getTileData(tileHex.offsetCoords());
+				e2::TileData* realTileData = getExistingTileData(tileHex.offsetCoords());
 				if (realTileData)
 				{
 					if (realTileData->forestProxy)
@@ -2437,7 +2437,7 @@ void e2::HexGrid::refreshChunkMeshes(e2::ChunkState* state)
 			e2::Hex tileHex = e2::Hex(state->chunkIndex * glm::ivec2(e2::hexChunkResolution) + glm::ivec2(x, y));
 
 			// get real data if we have it, otherwise calculate 
-			e2::TileData* realTileData = getTileData(tileHex.offsetCoords());
+			e2::TileData* realTileData = getExistingTileData(tileHex.offsetCoords());
 			if (realTileData)
 			{
 				if (realTileData->forestProxy)
@@ -2447,7 +2447,7 @@ void e2::HexGrid::refreshChunkMeshes(e2::ChunkState* state)
 			}
 			else
 			{
-				e2::TileData tileData = calculateTileDataForHex(tileHex);
+				e2::TileData tileData = getCalculatedTileData(tileHex);
 
 				e2::MeshProxy* newForestProxy = createForestProxyForTile(&tileData, tileHex);
 				if (newForestProxy)
@@ -2526,11 +2526,9 @@ bool e2::TileData::isPassable(PassableFlags passableFlags)
 	if (waterLevelLand)
 	{
 		if (isMountain)
-		{
-			return canPassMountain && canPassLand;
-		}
-
-		return canPassLand;
+			return canPassMountain;
+		else 
+			return canPassLand;
 	}
 	else if (waterLevelShallow)
 	{

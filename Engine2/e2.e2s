@@ -9,16 +9,19 @@
             "public": {
                 "defines": {
                     "GLM_FORCE_DEPTH_ZERO_TO_ONE": "1",
-                    "GLM_ENABLE_EXPERIMENTAL": "1"
+                    "GLM_ENABLE_EXPERIMENTAL": "1",
+                    "NOMINMAX": "1"
                 },
                 "defines-profile": {
                     "GLM_FORCE_DEPTH_ZERO_TO_ONE": "1",
-                    "GLM_ENABLE_EXPERIMENTAL": "1"
+                    "GLM_ENABLE_EXPERIMENTAL": "1",
+                    "NOMINMAX": "1"
                 },
                 "defines-devel": {
                     "GLM_FORCE_DEPTH_ZERO_TO_ONE": "1",
                     "GLM_ENABLE_EXPERIMENTAL": "1",
-                    "E2_DEVELOPMENT": "true"
+                    "E2_DEVELOPMENT": "true",
+                    "NOMINMAX": "1"
                 },
                 "dependencies": [ "glm.core", "glfw.core" ],
                 "include-paths": [ "e2.core/include", "!%VULKAN_SDK%/Include" ]
@@ -26,15 +29,18 @@
             "private": {
                 "defines": { 
                     "E2_BUILD": "true",
-                    "VK_USE_PLATFORM_WIN32_KHR": "true"
+                    "VK_USE_PLATFORM_WIN32_KHR": "true",
+                    "NOMINMAX": "1"
                 },
                 "defines-profile": { 
                     "E2_BUILD": "true",
-                    "VK_USE_PLATFORM_WIN32_KHR": "true"
+                    "VK_USE_PLATFORM_WIN32_KHR": "true",
+                    "NOMINMAX": "1"
                 },
                 "defines-devel": { 
                     "E2_BUILD": "true",
-                    "VK_USE_PLATFORM_WIN32_KHR": "true"
+                    "VK_USE_PLATFORM_WIN32_KHR": "true",
+                    "NOMINMAX": "1"
                 },
                 "include-paths": [ "e2.core/private" ],
                 "dependencies": [ "libshaderc.core", "fmod.core" ]
@@ -86,16 +92,19 @@
             "reflection": "enabled",
             "source-paths": ["e2.game/src"],
             "private": {
-                "dependencies": ["e2.core"],
+                "dependencies": ["e2.core", "chaiscript.core"],
                 "include-paths": ["e2.game/include"],
                 "defines": {
-                    "GLM_ENABLE_EXPERIMENTAL": "1"
+                    "GLM_ENABLE_EXPERIMENTAL": "1",
+                    "NOMINMAX": "1"
                 },
                 "defines-profile": {
-                    "GLM_ENABLE_EXPERIMENTAL": "1"
+                    "GLM_ENABLE_EXPERIMENTAL": "1",
+                    "NOMINMAX": "1"
                 },
                 "defines-devel": {
-                    "GLM_ENABLE_EXPERIMENTAL": "1"
+                    "GLM_ENABLE_EXPERIMENTAL": "1",
+                    "NOMINMAX": "1"
                 }
             }
         }

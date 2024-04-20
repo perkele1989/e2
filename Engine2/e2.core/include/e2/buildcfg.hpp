@@ -91,8 +91,8 @@ namespace e2
 	/** The maximum number of dependencies an asset can have. Be careful when changing this in an active project. Hard limit at 255 as we use 8-bit integers to index asset deps arrays. */
 	constexpr uint32_t maxNumAssetDependencies = 16;
 
-	/** The maximum number of concurrently loaded mesh assets we support. */
-	constexpr uint32_t maxNumMeshAssets = 256;
+	/** The maximum number of concurrently loaded (or generated!) mesh assets we support. */
+	constexpr uint32_t maxNumMeshAssets = 2048;
 
 
 	/** The maximum number of concurrently loaded skeleton assets we support. */
@@ -187,7 +187,7 @@ namespace e2
 
 	constexpr uint32_t maxVkPipelines = 8192;
 
-	constexpr uint32_t maxVkDataBuffers = 1024;
+	constexpr uint32_t maxVkDataBuffers = 4096;
 
 	constexpr uint32_t maxVkDescriptorSetLayouts = 256;
 

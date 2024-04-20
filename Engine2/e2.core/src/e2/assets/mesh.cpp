@@ -329,7 +329,11 @@ e2::Skeleton::Skeleton()
 
 e2::Skeleton::~Skeleton()
 {
-
+	for (auto& [uuid, binding] : m_animationBindings)
+	{
+		e2::destroy(binding);
+	}
+	m_animationBindings.clear();
 }
 
 void e2::Skeleton::write(Buffer& destination) const
@@ -421,6 +425,34 @@ e2::Bone* e2::Skeleton::rootBoneById(uint32_t rootId)
 glm::mat4 const& e2::Skeleton::inverseTransform()
 {
 	return m_inverseTransform;
+}
+
+e2::AnimationBinding* e2::Skeleton::getOrCreateBinding(e2::Ptr<Animation> anim)
+{
+	auto finder = m_animationBindings.find(anim->uuid);
+	if (finder == m_animationBindings.end())
+	{
+		e2::AnimationBinding* newBinding = e2::create<e2::AnimationBinding>();
+
+		newBinding->rotationTracks.resize(numBones(), {});
+		newBinding->translationTracks.resize(numBones(), {});
+
+		for (uint32_t boneId = 0; boneId < numBones(); boneId++)
+		{
+			e2::Bone* bone = boneById(boneId);
+
+			e2::Name trackName_pos = std::format("{}.position", bone->name.cstring());
+			newBinding->translationTracks[boneId] = anim->trackByName(trackName_pos, e2::AnimationType::Vec3);
+
+			e2::Name trackName_rot = std::format("{}.rotation", bone->name.cstring());
+			newBinding->rotationTracks[boneId] = anim->trackByName(trackName_rot, e2::AnimationType::Quat);
+		}
+
+		m_animationBindings[anim->uuid] = newBinding;
+		return newBinding;
+	}
+
+	return finder->second;
 }
 
 e2::Animation::~Animation()
@@ -641,11 +673,16 @@ e2::Engine* e2::Pose::engine()
 	return m_skeleton->engine();
 }
 
+void e2::Pose::updateAnimation(double timeDelta, bool onlyTickTime)
+{
+
+}
+
 void e2::Pose::updateSkin()
 {
 	E2_PROFILE_SCOPE(Animation);
 
-	// these are sorted by hierarchy so fine to just do them linearly
+	// these are pre-sorted by hierarchy so fine to just do them linearly
 	glm::mat4 identityTransform = glm::identity<glm::mat4>();
 
 	for (uint32_t id = 0; id < m_skeleton->numBones(); id++)
@@ -662,40 +699,6 @@ void e2::Pose::updateSkin()
 		poseBone->cachedSkinTransform = poseBone->cachedGlobalTransform * bone->bindMatrix;
 		m_skin[id] = poseBone->cachedSkinTransform;
 	}
-
-	/*
-	struct WorkChunk
-	{
-		glm::mat4 parentTransform;
-		e2::Bone* bone{};
-	};
-
-	std::queue<WorkChunk> chunks;
-
-	glm::mat4 identityTransform = glm::identity<glm::mat4>();
-	for (uint32_t id = 0; id < m_skeleton->numRootBones(); id++)
-	{
-		chunks.push({ identityTransform, m_skeleton->rootBoneById(id) });
-	}
-
-	while (!chunks.empty())
-	{
-		WorkChunk chunk = chunks.front();
-		chunks.pop();
-
-		e2::PoseBone* poseBone = &m_poseBones[chunk.bone->index];
-
-		poseBone->cachedGlobalTransform = chunk.parentTransform * poseBone->localTransform;
-		poseBone->cachedSkinTransform = poseBone->cachedGlobalTransform * chunk.bone->bindMatrix;
-
-		m_skin[chunk.bone->index] = poseBone->cachedSkinTransform;
-
-		for (e2::Bone* child : chunk.bone->children)
-		{
-			chunks.push({ poseBone->cachedGlobalTransform, child });
-		}
-	}
-	*/
 }
 
 void e2::Pose::applyBindPose()
@@ -777,7 +780,7 @@ void e2::Pose::blendWith(Pose* b, double alpha)
 	applyBlend(this, b, alpha);
 }
 
-void e2::Pose::applyAnimation(e2::Ptr<e2::Animation> anim, double time)
+/*void e2::Pose::applyAnimation(e2::Ptr<e2::Animation> anim, double time)
 {
 	E2_PROFILE_SCOPE(Animation);
 	for (uint32_t boneId = 0; boneId < m_poseBones.size(); boneId++)
@@ -805,7 +808,7 @@ void e2::Pose::applyAnimation(e2::Ptr<e2::Animation> anim, double time)
 
 		poseBone->localTransform = recompose(translation, scale, skew, perspective, rotation);
 	}
-}
+}*/
 
 e2::StackVector<glm::mat4, e2::maxNumSkeletonBones> const& e2::Pose::skin()
 {
@@ -831,20 +834,7 @@ e2::AnimationPose::AnimationPose(e2::Ptr<e2::Skeleton> skeleton, e2::Ptr<e2::Ani
 	, m_loop(loop)
 	, m_playing(true)
 {
-	m_rotationTracks.resize(skeleton->numBones());
-	m_translationTracks.resize(skeleton->numBones());
-
-	for (uint32_t boneId = 0; boneId < m_poseBones.size(); boneId++)
-	{
-		e2::PoseBone* poseBone = &m_poseBones[boneId];
-		e2::Bone* bone = m_skeleton->boneById(boneId);
-
-		e2::Name trackName_pos = std::format("{}.position", bone->name.cstring());
-		m_translationTracks[boneId] = m_animation->trackByName(trackName_pos, e2::AnimationType::Vec3);
-
-		e2::Name trackName_rot = std::format("{}.rotation", bone->name.cstring());
-		m_rotationTracks[boneId] = m_animation->trackByName(trackName_rot, e2::AnimationType::Quat);
-	}
+	m_binding = skeleton->getOrCreateBinding(animation);
 }
 
 e2::AnimationPose::~AnimationPose()
@@ -880,8 +870,8 @@ void e2::AnimationPose::updateAnimation(double timeDelta, bool onlyTickTime)
 		e2::PoseBone* poseBone = &m_poseBones[boneId];
 		e2::Bone* bone = poseBone->assetBone; // m_skeleton->boneById(boneId);
 
-		e2::AnimationTrack* posTrack = m_translationTracks[boneId];
-		e2::AnimationTrack* rotTrack = m_rotationTracks[boneId];
+		e2::AnimationTrack* posTrack = m_binding->translationTracks[boneId];
+		e2::AnimationTrack* rotTrack = m_binding->rotationTracks[boneId];
 
 		//poseBone->localTransform = poseBone->assetBone->localTransform;
 

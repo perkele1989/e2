@@ -562,6 +562,11 @@ bool e2::Type::inherits(e2::Name baseType, bool includeAncestors /*= true*/)
 	}
 }
 
+bool e2::Type::inheritsOrIs(e2::Name baseType, bool includeAncestors /*= true*/)
+{
+	return baseType == fqn || inherits(baseType, includeAncestors);
+}
+
 std::set<e2::Type*> e2::Type::findChildTypes()
 {
 	std::set<e2::Type*> returner;
@@ -622,7 +627,7 @@ e2::ManagedObject::~ManagedObject()
 namespace
 {
 	uint8_t internalFrameIndex = 0;
-	e2::StackVector<e2::Ptr<e2::ManagedObject>, 1024> keptAround[4];
+	e2::StackVector<e2::Ptr<e2::ManagedObject>, 16384> keptAround[4];
 }
 
 

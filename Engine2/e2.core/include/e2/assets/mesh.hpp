@@ -29,37 +29,6 @@ namespace e2
 
 	};
 
-	/** @tags(dynamic, arena, arenaSize=e2::maxNumSkeletonAssets) */
-	class E2_API Skeleton : public e2::Asset
-	{
-		ObjectDeclaration();
-	public:
-		Skeleton();
-		virtual ~Skeleton();
-
-		virtual void write(Buffer& destination) const override;
-		virtual bool read(Buffer& source) override;
-
-		e2::Bone* boneByName(e2::Name name);
-		uint32_t numBones();
-		e2::Bone* boneById(uint32_t id);
-
-		uint32_t numRootBones();
-		e2::Bone* rootBoneById(uint32_t rootId);
-
-		glm::mat4 const& inverseTransform();
-
-	protected:
-		glm::mat4 m_inverseTransform;
-		e2::StackVector<e2::Bone, maxNumSkeletonBones> m_bones;
-		e2::StackVector<e2::Bone*, maxNumRootBones> m_roots;
-
-		std::unordered_map<e2::Name, e2::Bone*> m_boneMap;
-	};
-
-
-
-
 
 
 
@@ -126,6 +95,55 @@ namespace e2
 		std::vector<e2::AnimationTrack> m_tracks;
 	};
 
+
+	/** @tags(arena, arenaSize=1024)*/
+	struct E2_API AnimationBinding
+	{
+		std::vector<e2::AnimationTrack*> translationTracks;
+		std::vector<e2::AnimationTrack*> rotationTracks;
+	};
+
+	class Animation;
+
+	/** @tags(dynamic, arena, arenaSize=e2::maxNumSkeletonAssets) */
+	class E2_API Skeleton : public e2::Asset
+	{
+		ObjectDeclaration();
+	public:
+		Skeleton();
+		virtual ~Skeleton();
+
+		virtual void write(Buffer& destination) const override;
+		virtual bool read(Buffer& source) override;
+
+		e2::Bone* boneByName(e2::Name name);
+		uint32_t numBones();
+		e2::Bone* boneById(uint32_t id);
+
+		uint32_t numRootBones();
+		e2::Bone* rootBoneById(uint32_t rootId);
+
+		glm::mat4 const& inverseTransform();
+
+		e2::AnimationBinding* getOrCreateBinding(e2::Ptr<Animation> anim);
+
+	protected:
+		glm::mat4 m_inverseTransform;
+		e2::StackVector<e2::Bone, maxNumSkeletonBones> m_bones;
+		e2::StackVector<e2::Bone*, maxNumRootBones> m_roots;
+
+		std::unordered_map<e2::Name, e2::Bone*> m_boneMap;
+		std::unordered_map<e2::UUID, e2::AnimationBinding*> m_animationBindings;
+	};
+
+
+
+
+
+
+
+
+
 	struct PoseBone
 	{
 		e2::Bone* assetBone{};
@@ -138,27 +156,18 @@ namespace e2
 
 	};
 
-
-	/*
-	
-	struct E2_API BoneMask
-	{
-	public:
-		BoneMask(e2::Ptr<e2::Skeleton> skeleton, );
-		e2::StackVector<uint32_t, e2::maxNumBonesInMask> boneIds;
-	};*/
-
-
-	/** @tags(arena, arenaSize=4096) */
 	class E2_API Pose : public e2::Object, public e2::Context
 	{
 		ObjectDeclaration();
 	public:
 		/** initialize pose from skeleton */
+		Pose() = default;
 		Pose(e2::Ptr<e2::Skeleton> skeleton);
 		virtual ~Pose();
 
 		virtual Engine* engine() override;
+
+		virtual void updateAnimation(double timeDelta, bool onlyTickTime);
 
 		void updateSkin();
 
@@ -176,8 +185,9 @@ namespace e2
 		/** 
 		 * Apply the given animation to this pose, at the given time in seconds
 		 * Ignores any bones not driven by animation
+		 * SLOW
 		 */
-		void applyAnimation(e2::Ptr<e2::Animation> anim, double time);
+		//void applyAnimation(e2::Ptr<e2::Animation> anim, double time);
 
 		e2::StackVector<glm::mat4, e2::maxNumSkeletonBones> const& skin();
 		e2::Ptr<e2::Skeleton> skeleton();
@@ -190,16 +200,16 @@ namespace e2
 		e2::StackVector<glm::mat4, e2::maxNumSkeletonBones> m_skin;
 	};
 
-
-	/** @tags(arena, arenaSize=16384) */
+	/** @tags(arena, arenaSize=1024) */
 	class E2_API AnimationPose : public e2::Pose
 	{
 		ObjectDeclaration();
 	public:
+		AnimationPose() = default;
 		AnimationPose(e2::Ptr<e2::Skeleton> skeleton, e2::Ptr<e2::Animation> animation, bool loop);
 		virtual ~AnimationPose();
 
-		void updateAnimation(double timeDelta, bool onlyTickTime);
+		virtual void updateAnimation(double timeDelta, bool onlyTickTime) override;
 
 		void pause()
 		{
@@ -246,10 +256,7 @@ namespace e2
 
 	protected:
 		e2::Ptr<e2::Animation> m_animation;
-
-		e2::StackVector<e2::AnimationTrack*, e2::maxNumSkeletonBones> m_translationTracks;
-		e2::StackVector<e2::AnimationTrack*, e2::maxNumSkeletonBones> m_rotationTracks;
-
+		e2::AnimationBinding* m_binding{};
 
 		bool m_loop{};
 		bool m_playing{};

@@ -1,0 +1,7 @@
+var gruntScript = EntityScript();
+
+gruntScript.onTurnStart = fun(entity){
+    print("scripted start for grutn!");
+};
+
+gruntScript;

@@ -1,0 +1,7 @@
+var engineerScript = EntityScript();
+
+engineerScript.onTurnStart = fun(entity){
+    print("scripted start for engineer!");
+};
+
+engineerScript;

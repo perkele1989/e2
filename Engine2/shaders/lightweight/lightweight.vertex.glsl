@@ -57,13 +57,10 @@ void main()
 
 #if defined(Renderer_Skin) && defined(Vertex_Bones)
 
-	vec4 weights = normalize(vertexWeights);
-	weights = vertexWeights;
-
-	mat4 animationTransform = skin.skinMatrices[vertexIds.x] * weights.x; 
-	animationTransform += skin.skinMatrices[vertexIds.y] * weights.y; 
-	animationTransform += skin.skinMatrices[vertexIds.z] * weights.z; 
-	animationTransform += skin.skinMatrices[vertexIds.w] * weights.w; 
+	mat4 animationTransform = skin.skinMatrices[vertexIds.x] * vertexWeights.x; 
+	animationTransform += skin.skinMatrices[vertexIds.y] * vertexWeights.y; 
+	animationTransform += skin.skinMatrices[vertexIds.z] * vertexWeights.z; 
+	animationTransform += skin.skinMatrices[vertexIds.w] * vertexWeights.w; 
 
 	animatedVertexPosition =  animationTransform * animatedVertexPosition;
 	animatedVertexNormal = animationTransform * animatedVertexNormal;

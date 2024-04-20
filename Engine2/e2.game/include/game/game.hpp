@@ -8,88 +8,15 @@
 #include "game/hex.hpp"
 #include "game/gamecontext.hpp"
 #include "game/resources.hpp"
-#include "game/gameunit.hpp"
+#include "game/gameentity.hpp"
 #include "game/empire.hpp"
 #include "game/shared.hpp"
 
+#include <chaiscript/chaiscript.hpp>
 
 namespace e2
 {
 
-
-	enum class MainMenuState : uint8_t
-	{
-		Main,
-		Load,
-		Options,
-		Credits
-	};
-
-	enum class InGameMenuState : uint8_t
-	{
-		Main,
-		Save,
-		Load,
-		Options
-	};
-
-	enum class GlobalState : uint8_t
-	{
-		Boot,
-		Menu,
-		Game,
-		InGameMenu
-	};
-
-	enum class CursorMode : uint8_t
-	{
-		Select,
-		UnitMove,
-		UnitAttack
-	};
-
-	enum class GameState : uint8_t
-	{
-		TurnPreparing,
-		Turn,
-		TurnEnding,
-	};
-
-	enum class TurnState : uint8_t
-	{
-		Unlocked,
-		UnitAction_Move,
-		EntityAction_Generic,
-		EntityAction_Target
-	};
-
-	class GameUnit;
-	class GameStructure;
-
-
-
-	enum class AnimationIndex : uint8_t
-	{
-		SoldierIdle = 0,
-		SoldierRun,
-		SoldierFire,
-		SoldierHit,
-		SoldierDie,
-
-		EngineerIdle,
-		EngineerRun,
-		EngineerDie,
-		EngineerBuild,
-
-		CombatBoatIdle,
-		CombatBoatDrive,
-
-		TankIdle,
-		TankDrive,
-		TankFire,
-
-		Count
-	};
 
 	/** @tags(arena, arenaSize=16384) */
 	class PathFindingHex : public e2::Object
@@ -107,14 +34,14 @@ namespace e2
 	};
 
 	/** @tags(arena, arenaSize=4096) */
-	class PathFindingAccelerationStructure : public e2::Object
+	class PathFindingAS : public e2::Object
 	{
 		ObjectDeclaration();
 	public:
-		PathFindingAccelerationStructure();
-		PathFindingAccelerationStructure(e2::GameContext* ctx, e2::Hex const& start, uint64_t range, bool ignoreVisibility = false, e2::PassableFlags passableFlags = PassableFlags::Land);
-		PathFindingAccelerationStructure(e2::GameUnit* unit);
-		~PathFindingAccelerationStructure();
+		PathFindingAS();
+		PathFindingAS(e2::GameContext* ctx, e2::Hex const& start, uint64_t range, bool ignoreVisibility = false, e2::PassableFlags passableFlags = PassableFlags::Land);
+		PathFindingAS(e2::GameEntity* unit);
+		~PathFindingAS();
 
 		std::vector<e2::Hex> find(e2::Hex const& target);
 
@@ -123,21 +50,6 @@ namespace e2
 		
 	};
 
-	struct SaveMeta
-	{
-		bool exists{};
-
-		uint8_t slot{};
-		std::time_t timestamp;
-
-		std::string cachedDisplayName;
-		std::string cachedFileName;
-
-		std::string displayName();
-		std::string fileName();
-	};
-
-	constexpr uint64_t numSaveSlots = 8;
 
 	class Game : public e2::Application, public e2::GameContext
 	{
@@ -163,6 +75,9 @@ namespace e2
 		void exitToMenu();
 
 		void finalizeBoot();
+
+		void initializeScriptEngine();
+		void destroyScriptEngine();
 
 		virtual void initialize() override;
 		virtual void shutdown() override;
@@ -210,6 +125,7 @@ namespace e2
 
 		void drawUI();
 		void drawResourceIcons();
+		void drawHitLabels();
 		void drawStatusUI();
 		void drawUnitUI();
 		void drawMinimapUI();
@@ -218,19 +134,9 @@ namespace e2
 
 		void onNewCursorHex();
 
+		void spawnHitLabel(glm::vec3 const& worldLocation, std::string const& text);
+
 		e2::RenderView calculateRenderView(glm::vec2 const& viewOrigin);
-
-		GameUnit* unitAtHex(glm::ivec2 const& hex);
-		GameStructure* structureAtHex(glm::ivec2 const& hex);
-
-		e2::MeshPtr getEntityMesh(e2::EntityType type);
-		e2::SkeletonPtr getEntitySkeleton(e2::EntityType type);
-
-
-		e2::AnimationPtr getAnimationByIndex(e2::AnimationIndex index)
-		{
-			return m_animationIndex[(uint64_t)index];
-		}
 
 		double timeDelta()
 		{
@@ -240,13 +146,14 @@ namespace e2
 		void discoverEmpire(EmpireId empireId);
 
 
+		inline uint64_t turn() const
+		{
+			return m_turn;
+		}
+
 	protected:
 
 		e2::ALJTicket m_bootTicket;
-
-		e2::StackVector<e2::AnimationPtr, (uint64_t)e2::AnimationIndex::Count> m_animationIndex;
-		e2::StackVector<e2::MeshPtr, size_t(e2::EntityType::Count)> m_entityMeshes;
-		e2::StackVector<e2::SkeletonPtr, size_t(e2::EntityType::Count)> m_entitySkeletons;
 
 		e2::Texture2DPtr m_irradianceMap;
 		e2::Texture2DPtr m_radianceMap;
@@ -311,9 +218,20 @@ namespace e2
 			return m_localEmpire;
 		}
 
+		e2::GameEmpire* nomadEmpire()
+		{
+			return m_nomadEmpire;
+		}
+		
+
+		e2::GameEmpire* empireById(EmpireId id);
+
 	protected:
 		e2::EmpireId m_localEmpireId{};
 		e2::GameEmpire* m_localEmpire{};
+
+		e2::EmpireId m_nomadEmpireId{};
+		e2::GameEmpire* m_nomadEmpire{};
 		e2::StackVector<e2::GameEmpire*, e2::maxNumEmpires> m_empires;
 		std::unordered_set<e2::GameEmpire*> m_aiEmpires;
 
@@ -322,92 +240,8 @@ namespace e2
 
 	public:
 
-		void deselect();
-
-		void applyDamage(e2::GameEntity* entity, e2::GameEntity* instigator, float damage);
-
-		void resolveSelectedUnit();
-		void unresolveSelectedUnit();
-
-		// game units 
-		void selectUnit(e2::GameUnit* unit);
-		void deselectUnit();
-		
-		void moveSelectedUnitTo(e2::Hex const& to);
-		void updateUnitMove();
-
-		void beginCustomEntityAction();
-		void endCustomEntityAction();
-		void updateEntityAction();
-
-		void beginEntityTargeting();
-		void endEntityTargeting();
-		void updateEntityTarget();
-		
-		void postSpawnUnit(e2::GameUnit* unit);
-
-
-		template<typename UnitType, typename... Args>
-		UnitType* spawnUnit(e2::Hex const& location, EmpireId empire, Args... args)
-		{
-			glm::ivec2 coords = location.offsetCoords();
-			if (m_unitIndex.find(coords) != m_unitIndex.end())
-				return nullptr;
-
-
-			UnitType* newUnit = e2::create<UnitType>(this, coords, empire, std::forward<Args>(args)...);
-
-			postSpawnUnit(newUnit);
-
-			return newUnit;
-		}
-
-		void destroyUnit(e2::Hex const& location);
-
-	protected:
-		// move this to empirecontroller (GamePlayer and GameAI)
-		e2::PathFindingAccelerationStructure *m_unitAS;
-		std::vector<e2::Hex> m_unitHoverPath;
-		std::vector<e2::Hex> m_unitMovePath;
-		uint32_t m_unitMoveIndex{};
-		float m_unitMoveDelta{};
-
-		GameUnit* m_selectedUnit{};
-		std::unordered_set<GameUnit*> m_units;
-		std::unordered_map<glm::ivec2, GameUnit*> m_unitIndex;
-
-		std::unordered_set<GameUnit*> m_unitsPendingDestroy;
-
-	public:
-
-		void queueDestroyUnit(e2::GameUnit* unit);
-
-		e2::GameEntity* selectedEntity();
-
-		void harvestWood(e2::Hex const& location, EmpireId empire);
-		void removeWood(e2::Hex const& location);
-
-		void selectStructure(e2::GameStructure* structure);
-		void deselectStructure();
-
-
-		void postSpawnStructure(e2::GameStructure* structure);
-
-		template<typename UnitType, typename... Args>
-		UnitType* spawnStructure(e2::Hex const& location, EmpireId empire, Args... args)
-		{
-			glm::ivec2 coords = location.offsetCoords();
-			if (m_structureIndex.find(coords) != m_structureIndex.end())
-				return nullptr;
-
-			UnitType* newStructure = e2::create<UnitType>(this, coords, empire, std::forward<Args>(args)...);
-			
-			postSpawnStructure(newStructure);
-
-			return newStructure;
-		}
-
-		void destroyStructure(e2::Hex const& location);
+		void harvestWood(glm::ivec2 const& location, EmpireId empire);
+		void removeWood(glm::ivec2 const& location);
 
 		e2::RenderView const& view()
 		{
@@ -419,11 +253,48 @@ namespace e2
 			return m_viewPoints;
 		}
 
-	protected:
-		e2::GameStructure* m_selectedStructure{};
-		std::unordered_set<e2::GameStructure*> m_structures;
-		std::unordered_map<glm::ivec2, e2::GameStructure*> m_structureIndex;
+		void applyDamage(e2::GameEntity* entity, e2::GameEntity* instigator, float damage);
 
+		void resolveSelectedEntity();
+		void unresolveSelectedEntity();
+
+		// game units 
+		void selectEntity(e2::GameEntity* entity);
+		void deselectEntity();
+		
+		void moveSelectedEntityTo(e2::Hex const& to);
+		void updateUnitMove();
+
+		void beginCustomAction();
+		void endCustomAction();
+		void updateCustomAction();
+
+		void beginEntityTargeting();
+		void endEntityTargeting();
+		void updateEntityTarget();
+		
+		e2::GameEntity* spawnEntity(e2::Name entityId, e2::Hex const& location, EmpireId empire);
+		void destroyEntity(e2::GameEntity* entity);
+		void queueDestroyEntity(e2::GameEntity* entity);
+
+		e2::GameEntity* entityAtHex(e2::EntityLayerIndex layerIndex, glm::ivec2 const& hex);
+
+	protected:
+
+		e2::PathFindingAS *m_unitAS;
+		std::vector<e2::Hex> m_unitHoverPath;
+		std::vector<e2::Hex> m_unitMovePath;
+		uint32_t m_unitMoveIndex{};
+		float m_unitMoveDelta{};
+
+		GameEntity* m_selectedEntity{};
+		std::unordered_set<GameEntity*> m_entities;
+		std::array<EntityLayer, size_t(EntityLayerIndex::Count)> m_entityLayers;
+		std::unordered_set<GameEntity*> m_entitiesPendingDestroy;
+
+
+
+	protected:
 
 		// anim stuff 
 		double m_accumulatedAnimationTime{};
@@ -450,9 +321,26 @@ namespace e2
 		float m_altViewYaw = 0.0f;
 		float m_altViewPitch = 0.0f;
 		// end camera stuff
-private:
+
+	public:
+	protected:
+		e2::StackVector<HitLabel, e2::maxNumHitLabels> m_hitLabels;
+		uint32_t m_hitLabelIndex{};
+
+	public:
+		inline chaiscript::ChaiScript* scriptEngine()
+		{
+			return m_scriptEngine;
+		}
+
+	protected:
+		chaiscript::ChaiScript* m_scriptEngine{};
+		chaiscript::ModulePtr m_scriptModule;
 
 	};
+
+
 }
+
 
 #include "game.generated.hpp"

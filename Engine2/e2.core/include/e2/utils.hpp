@@ -350,7 +350,7 @@ namespace e2
 
 		StackVector(std::initializer_list<DataType> initializer)
 		{
-			//static_assert(initializer.size() <= Capacity && "initializer list out of bounds");
+			assert(initializer.size() <= Capacity);
 
 			for (DataType const& item : initializer)
 			{
@@ -486,20 +486,14 @@ namespace e2
 
 		DataType& front()
 		{
-			if (empty())
-			{
-				return m_default;
-			}
-
+			assert(!empty() && "out of range");
+			
 			return m_data[0];
 		}
 
 		DataType& back()
 		{
-			if (empty())
-			{
-				return m_default;
-			}
+			assert(!empty() && "out of range");
 
 			return m_data[m_size - 1];
 		}
@@ -530,26 +524,21 @@ namespace e2
 		}
 
 
-		bool push(DataType&& newData)
+		void push(DataType&& newData)
 		{
-			if (m_size >= Capacity)
-				return false;
+			assert(m_size < Capacity);
 
 			m_data[m_size] = newData;
 
 			m_size++;
 
-			return true;
+			return;
 		}
 
 		DataType& emplace()
 		{
-			static DataType def;
-			if (m_size >= Capacity)
-			{
-				LogError("out of bounds");
-				return def;
-			}
+			assert(m_size < Capacity);
+
 			m_size++;
 			return m_data[m_size - 1];
 		}
@@ -581,29 +570,42 @@ namespace e2
 
 		DataType& operator[](size_t index)
 		{
+			assert((index < Capacity) && "out of bounds");
+
+			// soft bounds check, will not crash but we still want to notify user
 			if (index >= m_size)
 			{
 				LogError("out of bounds");
 			}
+
 			return m_data[index];
 		}
 
 		DataType const& operator[](size_t index) const
 		{
+			assert((index < Capacity) && "out of bounds");
+
+			// soft bounds check, will not crash but we still want to notify user
+			if (index >= m_size)
+			{
+				LogError("out of bounds");
+			}
+
 			return m_data[index];
 		}
 
 		void resize(uint64_t newSize)
 		{
 			if (newSize > Capacity)
+			{
+				LogWarning("new size out of range, capping to capacity {}/{}", newSize, Capacity);
 				newSize = Capacity;
+			}
 
 			m_size = newSize;
 		}
 
 	protected:
-
-		inline static DataType m_default{};
 
 		DataType m_data[Capacity];
 		uint64_t m_size{};
@@ -910,6 +912,7 @@ namespace e2
 		std::set<e2::Name> allBases;
 
 		bool inherits(e2::Name baseType, bool includeAncestors = true);
+		bool inheritsOrIs(e2::Name baseType, bool includeAncestors = true);
 
 		std::set<e2::Type*> findChildTypes();
 

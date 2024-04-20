@@ -375,8 +375,9 @@ namespace e2
 		size_t getTileIndexFromHex(Hex hex);
 
 		/** Retrieves tile data for the given hex, if it exists. Otherwise returns null */
-		e2::TileData* getTileData(glm::ivec2 const& hex);
-
+		e2::TileData* getExistingTileData(glm::ivec2 const& hex);
+		e2::TileData getCalculatedTileData(Hex const& hex);
+		e2::TileData getTileData(Hex const& hex);
 		/// Tiles End
 
 		/// ProcGen Begin
@@ -393,12 +394,13 @@ namespace e2
 
 		e2::MeshPtr getForestMeshForFlags(e2::TileFlags flags);
 
-		e2::TileData calculateTileDataForHex(Hex const& hex);
+		
+
+
 
 		e2::MeshProxy* createForestProxyForTile(e2::TileData* tileData, e2::Hex const& hex);
 		static float sampleSimplex(glm::vec2 const& position);
 
-		static float sampleBaseHeight(glm::vec2 const& position);
 		
 
 

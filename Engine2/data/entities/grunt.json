@@ -1,0 +1,64 @@
+
+{
+    "entities":[
+        {
+            "id": "grunt",
+            "typeName": "e2::GameEntity",
+            "displayName": "Grunt",
+            "layerIndex": "unit",
+            "passableFlags": ["land"],
+            "moveType": "smooth",
+            "sightRange": 5,
+            "movePoints": 5,
+            "attackPoints": 1,
+            "buildPoints": 0,
+            "attackStrength": 100.0,
+            "defensiveStrength": 100.0,
+            "meshScale": [0.005, -0.005, -0.005],
+            "script": "data/entities/grunt.chai",
+            "mesh": "assets/characters/SM_Soldier.e2a",
+            "skeleton": "assets/characters/SK_Soldier.e2a",
+            "poses": [
+                {
+                    "name": "idle",
+                    "asset": "assets/characters/A_SoldierIdle.e2a",
+                    "blendTime": 0.5 
+                },
+                {
+                    "name": "move",
+                    "asset": "assets/characters/A_SoldierRun.e2a",
+                    "blendTime": 0.15
+
+                }
+            ],
+            "actions": [
+                {
+                    "name": "hit",
+                    "asset": "assets/characters/A_SoldierHit.e2a",
+                    "blendInTime": 0.05,
+                    "blendOutTime": 0.1
+                },
+                {
+                    "name": "die",
+                    "asset": "assets/characters/A_SoldierDie.e2a",
+                    "blendInTime": 0.25,
+                    "blendOutTime": 0.0
+                },
+                {
+                    "name": "fire",
+                    "asset": "assets/characters/A_SoldierFire.e2a",
+                    "blendInTime": 0.1,
+                    "blendOutTime": 0.2
+                }
+            ],
+            "buildTurns": 4,
+            "upkeep": {
+                "gold": 1.0
+            },
+            "cost": {
+                "gold": 4.0
+            }
+        }
+    ]
+
+}

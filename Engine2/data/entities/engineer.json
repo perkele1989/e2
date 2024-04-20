@@ -1,0 +1,56 @@
+
+{
+    "entities":[
+        {
+            "id": "engineer",
+            "typeName": "e2::GameEntity",
+            "displayName": "Engineer",
+            "passableFlags": ["land"],
+            "moveType": "smooth",
+            "sightRange": 3,
+            "movePoints": 3,
+            "attackPoints": 0,
+            "buildPoints": 1,
+            "attackStrength": 0.0,
+            "defensiveStrength": 25.0,
+            "meshScale": [0.005, -0.005, -0.005],
+            "script": "data/entities/engineer.chai",
+            "mesh": "assets/characters/SM_Engineer.e2a",
+            "skeleton": "assets/characters/SK_Engineer.e2a",
+            "poses": [
+                {
+                    "name": "idle",
+                    "asset": "assets/characters/A_EngineerIdle.e2a",
+                    "blendTime": 0.5 
+                },
+                {
+                    "name": "move",
+                    "asset": "assets/characters/A_EngineerRun.e2a",
+                    "blendTime": 0.15
+                }
+            ],
+            "actions": [
+                {
+                    "name": "build",
+                    "asset": "assets/characters/A_EngineerBuild.e2a",
+                    "blendInTime": 0.25,
+                    "blendOutTime": 0.5
+                },
+                {
+                    "name": "die",
+                    "asset": "assets/characters/A_EngineerDie.e2a",
+                    "blendInTime": 0.25,
+                    "blendOutTime": 0.0
+                }
+            ],
+            "buildTurns": 3,
+            "upkeep": {
+                "gold": 0.25
+            },
+            "cost": {
+                "gold": 2.0
+            }
+        }
+    ]
+
+}

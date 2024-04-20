@@ -1,6 +1,29 @@
 
 #include "game/resources.hpp"
 
+void e2::ResourceTable::write(e2::Buffer& destination) const
+{
+	destination << wood;
+	destination << stone;
+	destination << metal;
+	destination << gold;
+	destination << oil;
+	destination << uranium;
+	destination << meteorite;
+}
+
+bool e2::ResourceTable::read(e2::Buffer& source)
+{
+	source >> wood;
+	source >> stone;
+	source >> metal;
+	source >> gold;
+	source >> oil;
+	source >> uranium;
+	source >> meteorite;
+	return true;
+}
+
 void e2::ResourceTable::clear()
 {
 	wood = 0.0f;
@@ -50,6 +73,18 @@ e2::ResourceTable& e2::ResourceTable::operator+=(ResourceTable const& other)
 	meteorite += other.meteorite;
 
 	return *this;
+}
+
+void e2::GameResources::write(e2::Buffer& destination) const
+{
+	destination << funds;
+}
+
+bool e2::GameResources::read(e2::Buffer& source)
+{
+	source >> funds;
+
+	return true;
 }
 
 void e2::GameResources::collectRevenue()

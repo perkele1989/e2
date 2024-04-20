@@ -1,6 +1,8 @@
 
 #pragma once 
 
+#include <e2/utils.hpp>
+
 #include <cstdint>
 #include <unordered_set>
 
@@ -9,8 +11,11 @@ namespace e2
 
 	class IFiscalStream;
 
-	struct ResourceTable
+	struct ResourceTable : public e2::Data
 	{
+		virtual void write(e2::Buffer& destination) const override;
+		virtual bool read(e2::Buffer& source) override;
+
 		float wood{};
 		float stone{};
 		float metal{};
@@ -34,8 +39,11 @@ namespace e2
 
 
 
-	struct GameResources
+	struct GameResources : public e2::Data
 	{
+		virtual void write(e2::Buffer& destination) const override;
+		virtual bool read(e2::Buffer& source) override;
+
 		void collectRevenue();
 		void collectExpenditures();
 
