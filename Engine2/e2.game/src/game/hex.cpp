@@ -1334,7 +1334,7 @@ void e2::HexGrid::initializeFogOfWar()
 
 
 	invalidateFogOfWarShaders();
-
+	invalidateFogOfWarRenderTarget({192,108});
 }
 
 void e2::HexGrid::invalidateFogOfWarRenderTarget(glm::uvec2 const& newResolution)
@@ -2344,7 +2344,7 @@ void e2::HexGrid::popInChunk(e2::ChunkState* state)
 		refreshChunkMeshes(state);
 	}
 
-	if (!state->waterProxy && state->hasWaterTile)
+	if (!state->waterProxy /** && state->hasWaterTile */)
 	{
 		e2::MeshProxyConfiguration waterConf;
 		waterConf.mesh = m_waterChunk;

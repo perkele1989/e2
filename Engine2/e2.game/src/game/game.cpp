@@ -929,6 +929,8 @@ void e2::Game::updateInGameMenu(double seconds)
 	m_hexGrid->updateStreaming(m_viewOrigin, m_viewPoints, m_viewVelocity);
 	m_hexGrid->updateWorldBounds();
 	m_hexGrid->renderFogOfWar();
+	e2::ITexture* outlineTextures[2] = { m_hexGrid->outlineTexture(0), m_hexGrid->outlineTexture(1) };
+	m_session->renderer()->setOutlineTextures(outlineTextures);
 
 	// ticking session renders renderer too, and blits it to the UI, so we need to do it precisely here (after rendering fog of war and before rendering UI)
 	m_session->tick(seconds);
@@ -1201,6 +1203,8 @@ void e2::Game::updateMenu(double seconds)
 	m_hexGrid->updateStreaming(m_viewOrigin, m_viewPoints, m_viewVelocity);
 	m_hexGrid->updateWorldBounds();
 	m_hexGrid->renderFogOfWar();
+	e2::ITexture* outlineTextures[2] = { m_hexGrid->outlineTexture(0), m_hexGrid->outlineTexture(1) };
+	m_session->renderer()->setOutlineTextures(outlineTextures);
 
 	// ticking session renders renderer too, and blits it to the UI, so we need to do it precisely here (after rendering fog of war and before rendering UI)
 	m_session->tick(seconds);
