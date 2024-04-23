@@ -10,7 +10,6 @@
             "moveType": "static",
             "sightRange": 2,
             "defensiveStrength": 1000.0,
-            "meshScale": [1.0, 1.0, 1.0],
             "script": "data/entities/mob.chai",
             "mesh": "assets/structures/SM_BuildingPlaceholder.e2a",
             "revenue": {

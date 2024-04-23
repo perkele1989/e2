@@ -355,6 +355,8 @@ namespace e2
 
 		void setPose(e2::Name poseName);
 		void playAction(e2::Name actionName);
+		bool isActionPlaying(e2::Name actionName);
+		bool isAnyActionPlaying();
 
 		void setPose2(e2::Pose* pose, double lerpTime);
 		void playAction2(e2::AnimationPose* anim, double blendIn = 0.2f, double blendOut = 0.2f);

@@ -1,7 +1,229 @@
 var engineerScript = EntityScript();
 
-engineerScript.onTurnStart = fun(entity){
-    print("scripted start for engineer!");
+global ActionType_BuildOnLand = 0;
+global ActionType_BuildOnWater = 1;
+global ActionType_HarvestWood = 2;
+
+class EngineerState 
+{
+    var waterHex;
+    var buildEntityName;
+    var actionType;
+
+    def EngineerState(entity)
+    {
+        this.waterHex = entity.tileIndex;
+        this.actionType = ActionType_BuildOnLand;
+        this.buildEntityName = "";
+    }
+}
+
+engineerScript.createState = fun(entity) {
+    return EngineerState(entity);
+}
+
+
+engineerScript.updateCustomAction = fun(entity, time) {
+    if(!entity.isActionPlaying("build"))
+    {
+        if(entity.scriptState.actionType == ActionType_BuildOnLand)
+        {
+            game.spawnEntity(entity.scriptState.buildEntityName, entity.tileIndex, entity.empireId);
+        }
+        else if(entity.scriptState.actionType == ActionType_BuildOnWater)
+        {
+            game.spawnEntity(entity.scriptState.buildEntityName, entity.scriptState.waterHex, entity.empireId);
+        }
+        else if(entity.scriptState.actionType == ActionType_HarvestWood)
+        {
+            game.harvestWood(entity.tileIndex, entity.empireId);
+        }
+
+        game.endCustomAction();
+    }
 };
+
+engineerScript.drawUI = fun(entity, ui){
+    var tileData = game.hexGrid.getTileData(entity.tileIndex);
+    var resource = tileData.getResource();
+
+    ui.beginStackV("engineerV", vec2(0.0, 0.0))
+
+    ui.gameLabel("**" + entity.specification.displayName + "**", 12, Middle);
+    ui.gameLabel("*Movement points left:* " + to_string(entity.movePointsLeft), 11, Begin);
+    ui.gameLabel("*Build points left:* " + to_string(entity.buildPointsLeft), 11, Begin);
+
+    var hasStructure = !game.entityAtHex(LayerIndex_Structure, entity.tileIndex).is_var_null();
+    var canBuild = !hasStructure && entity.buildPointsLeft > 0;
+    var abundance = tileData.getAbundanceAsFloat();
+    var woodAbundance = tileData.getWoodAbundanceAsFloat();
+    var isForested = tileData.isForested();
+    var hasResource = tileData.hasResource();
+    var hasWaterTile = false;
+
+    var nbList = Hex(entity.tileIndex).neighbours();
+    var numNb = nbList.size();
+
+    for(var i = 0; i < numNb; ++i)
+    {
+        var nb = nbList.at(i);
+        var nbIndex = nb.offsetCoords();
+
+        var nbData = game.hexGrid.getTileData(nbIndex);
+        if(nbData.is_var_null())
+        {
+            continue;
+        }
+
+        if(nbData.isShallowWater())
+        {
+            var nbHasStructure = !game.entityAtHex(LayerIndex_Structure, nbIndex).is_var_null();
+            if(nbHasStructure)
+            {
+                continue;
+            }
+
+            // why cant we just assign it here as usual? chaiscript bug?
+            entity.scriptState.waterHex.x = nbIndex.x;
+            entity.scriptState.waterHex.y = nbIndex.y;
+
+            hasWaterTile = true;
+            break;
+        }
+    }
+
+    if(canBuild)
+    {
+        if(!isForested && !hasResource)
+        {
+            // @todo make all these check if we afford!
+            if(ui.button("wf", "Build War Factory"))
+            {
+                entity.scriptState.buildEntityName = "warfactory";
+                entity.scriptState.actionType = ActionType_BuildOnLand;
+                entity.playAction("build");
+
+                --entity.buildPointsLeft;
+
+                game.beginCustomAction();
+            }
+
+            if(ui.button("brc", "Build Barracks"))
+            {
+                entity.scriptState.buildEntityName = "barracks";
+                entity.scriptState.actionType = ActionType_BuildOnLand;
+                entity.playAction("build");
+
+                --entity.buildPointsLeft;
+
+                game.beginCustomAction();
+            }
+
+            if(ui.button("arb", "Build Airbase"))
+            {
+                entity.scriptState.buildEntityName = "airbase";
+                entity.scriptState.actionType = ActionType_BuildOnLand;
+                entity.playAction("build");
+
+                --entity.buildPointsLeft;
+
+                game.beginCustomAction();
+            }
+        }
+
+        if(hasWaterTile && ui.button("navb", "Build Naval Base"))
+        {
+            entity.scriptState.buildEntityName = "navalbase";
+            entity.scriptState.actionType = ActionType_BuildOnWater;
+            entity.playAction("build");
+
+            --entity.buildPointsLeft;
+
+            game.beginCustomAction();
+        }
+
+        if(isForested)
+        {
+            if(ui.button("hrvst", "Harvest Wood"))
+            {
+                entity.scriptState.actionType = ActionType_HarvestWood;
+                entity.playAction("build");
+
+                --entity.buildPointsLeft;
+
+                game.beginCustomAction();
+            }
+
+            if(ui.button("sawmill", "Build Saw Mill"))
+            {
+                entity.scriptState.buildEntityName = "sawmill";
+                entity.scriptState.actionType = ActionType_BuildOnLand;
+                entity.playAction("build");
+
+                --entity.buildPointsLeft;
+
+                game.beginCustomAction();
+            }
+        }
+
+        if(tileData.hasGold() && ui.button("gldm", "Build Gold Mine"))
+        {
+            entity.scriptState.buildEntityName = "goldmine";
+            entity.scriptState.actionType = ActionType_BuildOnLand;
+            entity.playAction("build");
+
+            --entity.buildPointsLeft;
+
+            game.beginCustomAction();
+        }
+
+        if(tileData.hasOil() && ui.button("gldm", "Build Oil Well"))
+        {
+            entity.scriptState.buildEntityName = "oilwell";
+            entity.scriptState.actionType = ActionType_BuildOnLand;
+            entity.playAction("build");
+
+            --entity.buildPointsLeft;
+
+            game.beginCustomAction();
+        }
+
+        if(tileData.hasOre() && ui.button("orm", "Build Ore Mine"))
+        {
+            entity.scriptState.buildEntityName = "oremine";
+            entity.scriptState.actionType = ActionType_BuildOnLand;
+            entity.playAction("build");
+
+            --entity.buildPointsLeft;
+
+            game.beginCustomAction();
+        }
+
+        if(tileData.hasStone() && ui.button("qrr", "Build Quarry"))
+        {
+            entity.scriptState.buildEntityName = "quarry";
+            entity.scriptState.actionType = ActionType_BuildOnLand;
+            entity.playAction("build");
+
+            --entity.buildPointsLeft;
+
+            game.beginCustomAction();
+        }
+
+        if(tileData.hasUranium() && ui.button("gldm", "Build Uranium Mine"))
+        {
+            entity.scriptState.buildEntityName = "uraniummine";
+            entity.scriptState.actionType = ActionType_BuildOnLand;
+            entity.playAction("build");
+
+            --entity.buildPointsLeft;
+
+            game.beginCustomAction();
+        }
+    }
+
+    ui.endStackV();
+};
+
 
 engineerScript;

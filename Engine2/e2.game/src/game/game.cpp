@@ -358,6 +358,7 @@ void e2::Game::initializeScriptEngine()
 		chaiscript::utility::add_class<glm::ivec2>(*m_scriptModule,
 			"ivec2",
 			{
+				chaiscript::constructor<glm::ivec2(glm::ivec2 const&)>(),
 				chaiscript::constructor<glm::ivec2()>(),
 				chaiscript::constructor<glm::ivec2(int32_t, int32_t)>()
 			},
@@ -371,10 +372,12 @@ void e2::Game::initializeScriptEngine()
 			"Hex",
 			{
 				chaiscript::constructor<e2::Hex()>(),
+				chaiscript::constructor<e2::Hex(e2::Hex const&)>(),
 				chaiscript::constructor<e2::Hex(glm::ivec2 const&)>(),
 				chaiscript::constructor<e2::Hex(glm::vec2 const&)>()
 			},
 			{
+				{chaiscript::fun(&e2::Hex::neighbours), "neighbours"},
 				{chaiscript::fun(&e2::Hex::planarCoords), "planarCoords"},
 				{chaiscript::fun(&e2::Hex::offsetCoords), "offsetCoords"},
 				{chaiscript::fun(&e2::Hex::localCoords), "localCoords"},
@@ -383,6 +386,20 @@ void e2::Game::initializeScriptEngine()
 				{chaiscript::fun(&e2::Hex::z), "z"},
 			}
 			);
+
+		/*
+		e2::StackVector<Hex, 6> 
+		*/
+
+
+		chaiscript::utility::add_class<e2::StackVector<Hex, 6>>(*m_scriptModule,
+			"HexNeighbourList",
+			{ },
+			{
+				{chaiscript::fun(&e2::StackVector<Hex, 6>::size), "size"},
+				{chaiscript::fun(&e2::StackVector<Hex, 6>::at), "at"},
+			}
+		);
 
 		chaiscript::utility::add_class<glm::vec2>(*m_scriptModule,
 			"vec2",
@@ -438,10 +455,27 @@ void e2::Game::initializeScriptEngine()
 			{ },
 		{
 			{chaiscript::fun(&e2::TileData::empireId), "empireId"},
-			{chaiscript::fun(&e2::TileData::getAbundanceAsFloat), "getAbundance"},
-			{chaiscript::fun(&e2::TileData::getWoodAbundanceAsFloat), "getWoodAbundance"},
+			{chaiscript::fun(&e2::TileData::getAbundanceAsFloat), "getAbundanceAsFloat"},
+			{chaiscript::fun(&e2::TileData::getWoodAbundanceAsFloat), "getWoodAbundanceAsFloat"},
 			{chaiscript::fun(&e2::TileData::isForested), "isForested"},
 			{chaiscript::fun(&e2::TileData::hasResource), "hasResource"},
+			{chaiscript::fun(&e2::TileData::isPassable), "isPassable"},
+
+			{chaiscript::fun(&e2::TileData::hasGold), "hasGold"},
+			{chaiscript::fun(&e2::TileData::hasOil), "hasOil"},
+			{chaiscript::fun(&e2::TileData::hasOre), "hasOre"},
+			{chaiscript::fun(&e2::TileData::hasStone), "hasStone"},
+			{chaiscript::fun(&e2::TileData::hasUranium), "hasUranium"},
+
+			{chaiscript::fun(&e2::TileData::isShallowWater), "isShallowWater"},
+			{chaiscript::fun(&e2::TileData::isDeepWater), "isDeepWater"},
+			{chaiscript::fun(&e2::TileData::isLand), "isLand"},
+			{chaiscript::fun(&e2::TileData::getWater), "getWater"},
+			{chaiscript::fun(&e2::TileData::getFeature), "getFeature"},
+			{chaiscript::fun(&e2::TileData::getBiome), "getBiome"},
+			{chaiscript::fun(&e2::TileData::getResource), "getResource"},
+			{chaiscript::fun(&e2::TileData::getAbundance), "getAbundance"},
+			{chaiscript::fun(&e2::TileData::getWoodAbundance), "getWoodAbundance"},
 
 		}
 		);
@@ -535,6 +569,8 @@ void e2::Game::initializeScriptEngine()
 			{chaiscript::fun(&e2::GameEntity::createBuildAction), "createBuildAction"},
 			{chaiscript::fun(&e2::GameEntity::meshPlanarCoords), "meshPlanarCoords"},
 			{chaiscript::fun(&e2::GameEntity::playAction), "playAction"},
+			{chaiscript::fun(&e2::GameEntity::isActionPlaying), "isActionPlaying"},
+			{chaiscript::fun(&e2::GameEntity::isAnyActionPlaying), "isAnyActionPlaying"},
 			{chaiscript::fun(&e2::GameEntity::setPose), "setPose"},
 		}
 		);
@@ -687,11 +723,61 @@ void e2::Game::initializeScriptEngine()
 		m_scriptEngine->add_global_const(chaiscript::const_var(e2::EntityLayerIndex(e2::EntityLayerIndex::Structure)), "Structure");
 		m_scriptEngine->add_global_const(chaiscript::const_var(e2::EntityLayerIndex(e2::EntityLayerIndex::Air)), "Air)");
 
+		m_scriptEngine->add_global_const(chaiscript::const_var(e2::EntityLayerIndex(e2::EntityLayerIndex::Unit)), "LayerIndex_Unit");
+		m_scriptEngine->add_global_const(chaiscript::const_var(e2::EntityLayerIndex(e2::EntityLayerIndex::Structure)), "LayerIndex_Structure");
+		m_scriptEngine->add_global_const(chaiscript::const_var(e2::EntityLayerIndex(e2::EntityLayerIndex::Air)), "LayerIndex_Air)");
+
 		m_scriptEngine->add_global_const(chaiscript::const_var(e2::EntityMoveType(e2::EntityMoveType::Static)), "Static");
 		m_scriptEngine->add_global_const(chaiscript::const_var(e2::EntityMoveType(e2::EntityMoveType::Linear)), "Linear");
 		m_scriptEngine->add_global_const(chaiscript::const_var(e2::EntityMoveType(e2::EntityMoveType::Smooth)), "Smooth)");
+		m_scriptEngine->add_global_const(chaiscript::const_var(e2::EntityMoveType(e2::EntityMoveType::Static)), "MoveType_Static");
+		m_scriptEngine->add_global_const(chaiscript::const_var(e2::EntityMoveType(e2::EntityMoveType::Linear)), "MoveType_Linear");
+		m_scriptEngine->add_global_const(chaiscript::const_var(e2::EntityMoveType(e2::EntityMoveType::Smooth)), "MoveType_Smooth)");
+
+		m_scriptEngine->add_global_const(chaiscript::const_var(e2::TileFlags(e2::TileFlags::None)), "TileFlags_None");
+
+		m_scriptEngine->add_global_const(chaiscript::const_var(e2::TileFlags(e2::TileFlags::BiomeMask)), "TileFlags_BiomeMask");
+		m_scriptEngine->add_global_const(chaiscript::const_var(e2::TileFlags(e2::TileFlags::BiomeGrassland)), "TileFlags_BiomeGrassland");
+		m_scriptEngine->add_global_const(chaiscript::const_var(e2::TileFlags(e2::TileFlags::BiomeDesert)), "TileFlags_BiomeDesert");
+		m_scriptEngine->add_global_const(chaiscript::const_var(e2::TileFlags(e2::TileFlags::BiomeTundra)), "TileFlags_BiomeTundra");
+
+		m_scriptEngine->add_global_const(chaiscript::const_var(e2::TileFlags(e2::TileFlags::FeatureMask)), "TileFlags_FeatureMask");
+		m_scriptEngine->add_global_const(chaiscript::const_var(e2::TileFlags(e2::TileFlags::FeatureNone)), "TileFlags_FeatureNone");
+		m_scriptEngine->add_global_const(chaiscript::const_var(e2::TileFlags(e2::TileFlags::FeatureMountains)), "TileFlags_FeatureMountains");
+		m_scriptEngine->add_global_const(chaiscript::const_var(e2::TileFlags(e2::TileFlags::FeatureForest)), "TileFlags_FeatureForest");
+
+		m_scriptEngine->add_global_const(chaiscript::const_var(e2::TileFlags(e2::TileFlags::WaterMask)), "TileFlags_WaterMask");
+		m_scriptEngine->add_global_const(chaiscript::const_var(e2::TileFlags(e2::TileFlags::WaterNone)), "TileFlags_WaterNone");
+		m_scriptEngine->add_global_const(chaiscript::const_var(e2::TileFlags(e2::TileFlags::WaterShallow)), "TileFlags_WaterShallow");
+		m_scriptEngine->add_global_const(chaiscript::const_var(e2::TileFlags(e2::TileFlags::WaterDeep)), "TileFlags_WaterDeep");
+
+		m_scriptEngine->add_global_const(chaiscript::const_var(e2::TileFlags(e2::TileFlags::ResourceMask)), "TileFlags_ResourceMask");
+		m_scriptEngine->add_global_const(chaiscript::const_var(e2::TileFlags(e2::TileFlags::ResourceNone)), "TileFlags_ResourceNone");
+		m_scriptEngine->add_global_const(chaiscript::const_var(e2::TileFlags(e2::TileFlags::ResourceStone)), "TileFlags_ResourceStone");
+		m_scriptEngine->add_global_const(chaiscript::const_var(e2::TileFlags(e2::TileFlags::ResourceOre)), "TileFlags_ResourceOre");
+		m_scriptEngine->add_global_const(chaiscript::const_var(e2::TileFlags(e2::TileFlags::ResourceGold)), "TileFlags_ResourceGold");
+		m_scriptEngine->add_global_const(chaiscript::const_var(e2::TileFlags(e2::TileFlags::ResourceOil)), "TileFlags_ResourceOil");
+		m_scriptEngine->add_global_const(chaiscript::const_var(e2::TileFlags(e2::TileFlags::ResourceUranium)), "TileFlags_ResourceUranium");
+
+		m_scriptEngine->add_global_const(chaiscript::const_var(e2::TileFlags(e2::TileFlags::AbundanceMask)), "TileFlags_AbundanceMask");
+		m_scriptEngine->add_global_const(chaiscript::const_var(e2::TileFlags(e2::TileFlags::Abundance1)), "TileFlags_Abundance1");
+		m_scriptEngine->add_global_const(chaiscript::const_var(e2::TileFlags(e2::TileFlags::Abundance2)), "TileFlags_Abundance2");
+		m_scriptEngine->add_global_const(chaiscript::const_var(e2::TileFlags(e2::TileFlags::Abundance3)), "TileFlags_Abundance3");
+		m_scriptEngine->add_global_const(chaiscript::const_var(e2::TileFlags(e2::TileFlags::Abundance4)), "TileFlags_Abundance4");
+
+		m_scriptEngine->add_global_const(chaiscript::const_var(e2::TileFlags(e2::TileFlags::WoodAbundanceMask)), "TileFlags_WoodAbundanceMask");
+		m_scriptEngine->add_global_const(chaiscript::const_var(e2::TileFlags(e2::TileFlags::WoodAbundance1)), "TileFlags_WoodAbundance1");
+		m_scriptEngine->add_global_const(chaiscript::const_var(e2::TileFlags(e2::TileFlags::WoodAbundance2)), "TileFlags_WoodAbundance2");
+		m_scriptEngine->add_global_const(chaiscript::const_var(e2::TileFlags(e2::TileFlags::WoodAbundance3)), "TileFlags_WoodAbundance3");
+		m_scriptEngine->add_global_const(chaiscript::const_var(e2::TileFlags(e2::TileFlags::WoodAbundance4)), "TileFlags_WoodAbundance4");
 
 
+		m_scriptEngine->add_global_const(chaiscript::const_var(e2::PassableFlags(e2::PassableFlags::None)),			"PassableFlags_None");
+		m_scriptEngine->add_global_const(chaiscript::const_var(e2::PassableFlags(e2::PassableFlags::Land)),			"PassableFlags_Land");
+		m_scriptEngine->add_global_const(chaiscript::const_var(e2::PassableFlags(e2::PassableFlags::WaterShallow)), "PassableFlags_WaterShallow");
+		m_scriptEngine->add_global_const(chaiscript::const_var(e2::PassableFlags(e2::PassableFlags::WaterDeep)),	"PassableFlags_WaterDeep");
+		m_scriptEngine->add_global_const(chaiscript::const_var(e2::PassableFlags(e2::PassableFlags::Mountain)),		"PassableFlags_Mountain");
+		m_scriptEngine->add_global_const(chaiscript::const_var(e2::PassableFlags(e2::PassableFlags::Air)), "PassableFlags_Air");
 
 
 		m_scriptEngine->add_global_const(chaiscript::const_var(e2::FontFace(e2::FontFace::Sans)), "Sans");

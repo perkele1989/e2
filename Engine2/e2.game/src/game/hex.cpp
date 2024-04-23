@@ -2542,6 +2542,46 @@ bool e2::TileData::isPassable(PassableFlags passableFlags)
 	return false;
 }
 
+bool e2::TileData::isShallowWater()
+{
+	return getWater() == e2::TileFlags::WaterShallow;
+}
+
+bool e2::TileData::isDeepWater()
+{
+	return getWater() == e2::TileFlags::WaterDeep;
+}
+
+bool e2::TileData::isLand()
+{
+	return getWater() == e2::TileFlags::WaterNone;
+}
+
+bool e2::TileData::hasGold()
+{
+	return getResource() == TileFlags::ResourceGold;
+}
+
+bool e2::TileData::hasOil()
+{
+	return getResource() == TileFlags::ResourceOil;
+}
+
+bool e2::TileData::hasOre()
+{
+	return getResource() == TileFlags::ResourceOre;
+}
+
+bool e2::TileData::hasStone()
+{
+	return getResource() == TileFlags::ResourceStone;
+}
+
+bool e2::TileData::hasUranium()
+{
+	return getResource() == TileFlags::ResourceUranium;
+}
+
 e2::TileFlags e2::TileData::getWater()
 {
 	return (flags & e2::TileFlags::WaterMask);

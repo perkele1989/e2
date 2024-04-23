@@ -9,7 +9,7 @@
 #include <e2/dmesh/dmesh.hpp>
 #include <e2/renderer/shadermodels/water.hpp>
 #include <e2/renderer/shadermodels/terrain.hpp>
-#include <e2/renderer/shadermodels/fog.hpp>
+#include <e2/renderer/shadermodels/fog.hpp> 
 
 #include "game/gamecontext.hpp"
 #include "game/shared.hpp"
@@ -78,6 +78,16 @@ namespace e2
 	struct TileData
 	{
 		bool isPassable(PassableFlags passableFlags);
+
+		bool isShallowWater();
+		bool isDeepWater();
+		bool isLand();
+
+		bool hasGold();
+		bool hasOil();
+		bool hasOre();
+		bool hasStone();
+		bool hasUranium();
 
 		TileFlags getWater();
 
@@ -426,7 +436,7 @@ namespace e2
 			return m_terrainMaterial;
 		}
 
-
+		 
 		// fog of war in this function actually means fog of war, outlines and blur 
 		void initializeFogOfWar();
 		void invalidateFogOfWarRenderTarget(glm::uvec2 const& newResolution);

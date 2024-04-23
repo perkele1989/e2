@@ -543,7 +543,7 @@ namespace e2
 			return m_data[m_size - 1];
 		}
 
-		bool pop()
+		bool pop() 
 		{
 			if (empty())
 				return false;
@@ -551,6 +551,19 @@ namespace e2
 			m_size--;
 
 			return true;
+		}
+
+		DataType& at(size_t index)
+		{
+			assert((index < Capacity) && "out of bounds");
+
+			// soft bounds check, will not crash but we still want to notify user
+			if (index >= m_size)
+			{
+				LogError("out of bounds");
+			}
+
+			return m_data[index];
 		}
 
 		inline uint64_t size() const

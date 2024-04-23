@@ -401,6 +401,30 @@ void e2::GameEntity::playAction(e2::Name actionName)
 	playAction2(action->pose, action->blendInTime, action->blendOutTime);
 }
 
+bool e2::GameEntity::isActionPlaying(e2::Name actionName)
+{
+	e2::EntityAnimationAction* action{};
+
+	for (e2::EntityAnimationAction& a : m_animationActions)
+	{
+		if (a.id == actionName)
+		{
+			action = &a;
+			break;
+		}
+	}
+
+	if (!action)
+		return false;
+
+	return m_actionPose && (m_actionPose == action->pose) && m_actionPose->playing();
+}
+
+bool e2::GameEntity::isAnyActionPlaying()
+{
+	return m_actionPose && m_actionPose->playing();
+}
+
 void e2::GameEntity::playAction2(e2::AnimationPose* anim, double blendIn /*= 0.2f*/, double blendOut /*= 0.2f*/)
 {
 	if (!skinProxy)
@@ -1001,6 +1025,14 @@ void e2::EntityScriptInterface::invokeDrawUI(e2::GameEntity* entity, e2::UIConte
 		catch (chaiscript::exception::bad_boxed_cast& e)
 		{
 			LogError("chai: casting return-type from script to native failed: {}", e.what());
+		}
+		catch (chaiscript::exception::arity_error& e)
+		{
+			LogError("chai: arity error: {}", e.what());
+		}
+		catch (chaiscript::exception::guard_error& e)
+		{
+			LogError("chai: guard error: {}", e.what());
 		}
 		catch (std::exception& e)
 		{
