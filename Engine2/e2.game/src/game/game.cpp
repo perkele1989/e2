@@ -513,6 +513,13 @@ void e2::Game::initializeScriptEngine()
 			"Entity",
 			{ },
 		{
+			{chaiscript::fun(&e2::GameEntity::isBuilding), "isBuilding"},
+			{chaiscript::fun(&e2::GameEntity::canBuild), "canBuild"},
+			{chaiscript::fun(&e2::GameEntity::build), "build"},
+			{chaiscript::fun(&e2::GameEntity::cancelBuild), "cancelBuild"},
+			{chaiscript::fun(&e2::GameEntity::buildMessage), "buildMessage"},
+			{chaiscript::fun(&e2::GameEntity::currentlyBuilding), "currentlyBuilding"},
+			{chaiscript::fun(&e2::GameEntity::scriptState), "scriptState"},
 			{chaiscript::fun(&e2::GameEntity::attackPointsLeft), "attackPointsLeft"},
 			{chaiscript::fun(&e2::GameEntity::buildPointsLeft), "buildPointsLeft"},
 			{chaiscript::fun(&e2::GameEntity::movePointsLeft), "movePointsLeft"},
@@ -526,7 +533,6 @@ void e2::Game::initializeScriptEngine()
 			{chaiscript::fun(&e2::GameEntity::specification), "specification"},
 			{chaiscript::fun(&e2::GameEntity::isLocal), "isLocal"},
 			{chaiscript::fun(&e2::GameEntity::createBuildAction), "createBuildAction"},
-			{chaiscript::fun(&e2::GameEntity::canBuild), "canBuild"},
 			{chaiscript::fun(&e2::GameEntity::meshPlanarCoords), "meshPlanarCoords"},
 			{chaiscript::fun(&e2::GameEntity::playAction), "playAction"},
 			{chaiscript::fun(&e2::GameEntity::setPose), "setPose"},
@@ -630,23 +636,28 @@ void e2::Game::initializeScriptEngine()
 			{
 				chaiscript::constructor<EntityScriptInterface()>()
 			},
-		{
-			{chaiscript::fun(&EntityScriptInterface::drawUI), "drawUI"},
-			{chaiscript::fun(&EntityScriptInterface::collectExpenditure), "collectExpenditure"},
-			{chaiscript::fun(&EntityScriptInterface::collectRevenue), "collectRevenue"},
-			{chaiscript::fun(&EntityScriptInterface::grugRelevant), "grugRelevant"},
-			{chaiscript::fun(&EntityScriptInterface::grugTick), "grugTick"},
-			{chaiscript::fun(&EntityScriptInterface::onBeginMove), "onBeginMove"},
-			{chaiscript::fun(&EntityScriptInterface::onEndMove), "onEndMove"},
-			{chaiscript::fun(&EntityScriptInterface::onHit), "onHit"},
-			{chaiscript::fun(&EntityScriptInterface::onTargetChanged), "onTargetChanged"},
-			{chaiscript::fun(&EntityScriptInterface::onTargetClicked), "onTargetClicked"},
-			{chaiscript::fun(&EntityScriptInterface::onTurnEnd), "onTurnEnd"},
-			{chaiscript::fun(&EntityScriptInterface::onTurnStart), "onTurnStart"},
-			{chaiscript::fun(&EntityScriptInterface::updateAnimation), "updateAnimation"},
-			{chaiscript::fun(&EntityScriptInterface::updateCustomAction), "updateCustomAction"}
-		}
+			{
+				{chaiscript::fun(&EntityScriptInterface::createState), "createState"},
+				{chaiscript::fun(&EntityScriptInterface::drawUI), "drawUI"},
+				{chaiscript::fun(&EntityScriptInterface::collectExpenditure), "collectExpenditure"},
+				{chaiscript::fun(&EntityScriptInterface::collectRevenue), "collectRevenue"},
+				{chaiscript::fun(&EntityScriptInterface::grugRelevant), "grugRelevant"},
+				{chaiscript::fun(&EntityScriptInterface::grugTick), "grugTick"},
+				{chaiscript::fun(&EntityScriptInterface::onBeginMove), "onBeginMove"},
+				{chaiscript::fun(&EntityScriptInterface::onEndMove), "onEndMove"},
+				{chaiscript::fun(&EntityScriptInterface::onHit), "onHit"},
+				{chaiscript::fun(&EntityScriptInterface::onTargetChanged), "onTargetChanged"},
+				{chaiscript::fun(&EntityScriptInterface::onTargetClicked), "onTargetClicked"},
+				{chaiscript::fun(&EntityScriptInterface::onTurnEnd), "onTurnEnd"},
+				{chaiscript::fun(&EntityScriptInterface::onTurnStart), "onTurnStart"},
+				{chaiscript::fun(&EntityScriptInterface::updateAnimation), "updateAnimation"},
+				{chaiscript::fun(&EntityScriptInterface::updateCustomAction), "updateCustomAction"}
+			}
 		);
+
+		m_scriptModule->add(chaiscript::type_conversion<e2::Name, std::string>([](const e2::Name& asName) { return asName.cstring(); }));
+		m_scriptModule->add(chaiscript::type_conversion<std::string, e2::Name>([](const std::string & asString) { return e2::Name(asString); }));
+
 
 		m_scriptEngine = e2::create<chaiscript::ChaiScript>();
 		m_scriptEngine->add(m_scriptModule);
@@ -1623,11 +1634,15 @@ void e2::Game::updateTurnLocal()
 		{
 			// ugly line of code, no I wont fix it 
 			bool onLand = m_cursorTile ? m_cursorTile->getWater() == TileFlags::WaterNone : m_hexGrid->getCalculatedTileData(m_cursorHex).getWater() == TileFlags::WaterNone;
+			bool unitSlotTaken = entityAtHex(e2::EntityLayerIndex::Unit, m_cursorHex) != nullptr;
 
-			if (onLand)
-				spawnEntity("grunt", m_cursorHex, m_localEmpireId);
-			else
-				spawnEntity("cb90", m_cursorHex, m_localEmpireId);
+			if (!unitSlotTaken)
+			{
+				if (onLand)
+					spawnEntity("grunt", m_cursorHex, m_localEmpireId);
+				else
+					spawnEntity("cb90", m_cursorHex, m_localEmpireId);
+			}
 			return;
 		}
 		e2::GameEntity* unitAtHex = entityAtHex(e2::EntityLayerIndex::Unit, m_cursorHex);
@@ -1645,8 +1660,10 @@ void e2::Game::updateTurnLocal()
 			airUnitAtHex = nullptr;
 		bool airUnitSelected = m_selectedEntity && airUnitAtHex == m_selectedEntity;
 
-		if (unitAtHex)
+		if (unitAtHex && !unitSelected)
 			selectEntity(unitAtHex);
+		else if (structureAtHex && !structureSelected)
+			selectEntity(structureAtHex);
 		else if (!unitAtHex && !structureAtHex && !airUnitAtHex)
 			deselectEntity();
 	}

@@ -87,7 +87,7 @@ void e2::Engine::run(e2::Application* app)
 	while (m_running)
 	{
 
-		//if (lastFrameStart.durationSince().milliseconds() >= targetMsPerFrame)
+		if (lastFrameStart.durationSince().milliseconds() >= targetMsPerFrame)
 		{
 			deltaTime = lastFrameStart.durationSince().seconds();
 			lastFrameStart = e2::timeNow();

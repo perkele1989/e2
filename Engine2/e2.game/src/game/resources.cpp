@@ -35,6 +35,19 @@ void e2::ResourceTable::clear()
 	meteorite = 0.0f;
 }
 
+e2::ResourceTable e2::ResourceTable::operator*(float v) const
+{
+	ResourceTable table = *this;
+	table.gold *= v;
+	table.metal *= v;
+	table.meteorite *= v;
+	table.oil *= v;
+	table.stone *= v;
+	table.uranium *= v;
+	table.wood *= v;
+	return table;
+}
+
 e2::ResourceTable e2::ResourceTable::operator+(ResourceTable const& other) const
 {
 	ResourceTable table = *this;

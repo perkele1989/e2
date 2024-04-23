@@ -1,0 +1,49 @@
+
+{
+    "entities":[
+        {
+            "id": "cb90",
+            "typeName": "e2::GameEntity",
+            "displayName": "CB-90",
+            "layerIndex": "unit",
+            "passableFlags": ["water"],
+            "moveType": "smooth",
+            "sightRange": 7,
+            "movePoints": 13,
+            "attackPoints": 3,
+            "buildPoints": 0,
+            "attackStrength": 300.0,
+            "defensiveStrength": 150.0,
+            "meshScale": [0.625, -0.625, -0.625],
+            "moveSpeed": 2.8,
+            "meshHeightOffset": -0.15,
+            "script": "data/entities/cb90.chai",
+            "mesh": "assets/vehicles/SM_Boat.e2a",
+            "skeleton": "assets/vehicles/SK_Boat.e2a",
+            "poses": [
+                {
+                    "name": "idle",
+                    "asset": "assets/vehicles/A_BoatIdle.e2a",
+                    "blendTime": 0.5 
+                },
+                {
+                    "name": "move",
+                    "asset": "assets/vehicles/A_BoatDriving.e2a",
+                    "blendTime": 0.15
+
+                }
+            ],
+            "actions": [
+
+            ],
+            "buildTurns": 11,
+            "upkeep": {
+                "gold": 4.0
+            },
+            "cost": {
+                "gold": 10.0
+            }
+        }
+    ]
+
+}

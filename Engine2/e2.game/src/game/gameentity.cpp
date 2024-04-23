@@ -103,10 +103,22 @@ void e2::GameEntity::updateCustomAction(double seconds)
 
 void e2::GameEntity::collectRevenue(ResourceTable& outRevenueTable)
 {
+	// if script specifies this function, run that instead and early return 
 	if (specification->scriptInterface.collectRevenue)
 	{
-		return specification->scriptInterface.invokeCollectRevenue(this, outRevenueTable);
+		specification->scriptInterface.invokeCollectRevenue(this, outRevenueTable);
+		return;
 	}
+
+	// if entity json specifies that revenue is scaled by abundance, then do so
+	float multiplier = 1.0f;
+	if (specification->revenueByAbundance)
+	{
+		multiplier = game()->hexGrid()->getExistingTileData(tileIndex)->getAbundanceAsFloat();
+	}
+
+	// apply revenue scaled by multiplier
+	outRevenueTable += specification->revenue * multiplier;
 }
 
 void e2::GameEntity::collectExpenditure(ResourceTable& outExpenditureTable)
@@ -115,6 +127,8 @@ void e2::GameEntity::collectExpenditure(ResourceTable& outExpenditureTable)
 	{
 		return specification->scriptInterface.invokeCollectExpenditure(this, outExpenditureTable);
 	}
+
+	outExpenditureTable += specification->upkeep;
 }
 
 void e2::GameEntity::initialize()
@@ -241,6 +255,8 @@ void e2::GameEntity::postConstruct(e2::GameContext* ctx, e2::EntitySpecification
 
 		m_animationPoses.push(newPose);
 	}
+
+	scriptState = specification->scriptInterface.invokeCreateState(this);
 }
 
 void e2::GameEntity::drawUI(e2::UIContext* ctx)
@@ -325,6 +341,11 @@ e2::UnitBuildAction e2::GameEntity::createBuildAction(e2::Name unitId)
 	return e2::UnitBuildAction(this, e2::EntitySpecification::specificationById(unitId));
 }
 
+bool e2::GameEntity::isBuilding()
+{
+	return currentlyBuilding;
+}
+
 e2::Game* e2::GameEntity::game()
 {
 	return m_game;
@@ -335,11 +356,6 @@ glm::vec2 e2::GameEntity::meshPlanarCoords()
 	return glm::vec2(meshPosition.x, meshPosition.z);
 }
 
-void e2::GameEntity::buildProxy()
-{
-	
-
-}
 
 void e2::GameEntity::destroyProxy()
 {
@@ -454,17 +470,17 @@ void e2::GameEntity::onTurnStart()
 	attackPointsLeft = specification->attackPoints;
 	buildPointsLeft = specification->buildPoints;
 
-	if (m_currentlyBuilding)
+	if (currentlyBuilding)
 	{
-		e2::UnitBuildResult result = m_currentlyBuilding->tick();
-		m_buildMessage = result.buildMessage;
+		e2::UnitBuildResult result = currentlyBuilding->tick();
+		buildMessage = result.buildMessage;
 		if (result.didSpawn)
-			m_currentlyBuilding = nullptr;
+			currentlyBuilding = nullptr;
 	}
 	else
 	{
-		if(m_buildMessage.size() > 0)
-			m_buildMessage = "";
+		if(buildMessage.size() > 0)
+			buildMessage = "";
 	}
 
 	if (specification->scriptInterface.onTurnStart)
@@ -498,7 +514,7 @@ void e2::GameEntity::onEndMove()
 
 bool e2::GameEntity::canBuild(e2::UnitBuildAction& action)
 {
-	if (m_currentlyBuilding)
+	if (currentlyBuilding)
 		return false;
 
 	e2::GameEmpire* empire = game()->empireById(empireId);
@@ -527,6 +543,21 @@ bool e2::GameEntity::canBuild(e2::UnitBuildAction& action)
 }
 
 
+
+void e2::GameEntity::build(e2::UnitBuildAction& action)
+{
+	if (canBuild(action))
+	{
+		currentlyBuilding = &action;
+		buildMessage = std::format("Building {}, {} turns left.", currentlyBuilding->specification->displayName, currentlyBuilding->buildTurnsLeft);
+	}
+}
+
+void e2::GameEntity::cancelBuild()
+{
+	currentlyBuilding = nullptr;
+	buildMessage = "";
+}
 
 e2::UnitBuildAction::UnitBuildAction(e2::GameEntity* inOwner, e2::EntitySpecification const* spec)
 	: owner(inOwner)
@@ -587,6 +618,10 @@ e2::UnitBuildResult e2::UnitBuildAction::tick()
 			result.buildMessage = std::format("Just finished building {}.", specification->displayName);
 			result.didSpawn = true;
 		}
+	}
+	else
+	{
+		result.buildMessage = std::format("Building {}, {} turns left.", specification->displayName, buildTurnsLeft);
 	}
 
 	return result;
@@ -666,7 +701,9 @@ void e2::EntitySpecification::initializeSpecifications(e2::GameContext* ctx)
 				for (json flag : entity.at("passableFlags"))
 				{
 					std::string flagStr = e2::toLower(flag.template get<std::string>());
-					if (flagStr == "land")
+					if (flagStr == "none")
+						newSpec.passableFlags = e2::PassableFlags::None;
+					else if (flagStr == "land")
 						newSpec.passableFlags |= e2::PassableFlags::Land;
 					else if (flagStr == "watershallow")
 						newSpec.passableFlags |= e2::PassableFlags::WaterShallow;
@@ -764,19 +801,38 @@ void e2::EntitySpecification::initializeSpecifications(e2::GameContext* ctx)
 			{
 				json& cost = entity.at("cost");
 				if (cost.contains("wood"))
-					newSpec.upkeep.wood = cost.at("wood").template get<double>();
+					newSpec.cost.wood = cost.at("wood").template get<double>();
 				if (cost.contains("metal"))
-					newSpec.upkeep.metal = cost.at("metal").template get<double>();
+					newSpec.cost.metal = cost.at("metal").template get<double>();
 				if (cost.contains("gold"))
-					newSpec.upkeep.gold = cost.at("gold").template get<double>();
+					newSpec.cost.gold = cost.at("gold").template get<double>();
 				if (cost.contains("stone"))
-					newSpec.upkeep.stone = cost.at("stone").template get<double>();
+					newSpec.cost.stone = cost.at("stone").template get<double>();
 				if (cost.contains("uranium"))
-					newSpec.upkeep.uranium = cost.at("uranium").template get<double>();
+					newSpec.cost.uranium = cost.at("uranium").template get<double>();
 				if (cost.contains("oil"))
-					newSpec.upkeep.oil = cost.at("oil").template get<double>();
+					newSpec.cost.oil = cost.at("oil").template get<double>();
 				if (cost.contains("meteorite"))
-					newSpec.upkeep.meteorite = cost.at("meteorite").template get<double>();
+					newSpec.cost.meteorite = cost.at("meteorite").template get<double>();
+			}
+
+			if (entity.contains("revenue"))
+			{
+				json& revenue = entity.at("revenue");
+				if (revenue.contains("wood"))
+					newSpec.revenue.wood = revenue.at("wood").template get<double>();
+				if (revenue.contains("metal"))
+					newSpec.revenue.metal = revenue.at("metal").template get<double>();
+				if (revenue.contains("gold"))
+					newSpec.revenue.gold = revenue.at("gold").template get<double>();
+				if (revenue.contains("stone"))
+					newSpec.revenue.stone = revenue.at("stone").template get<double>();
+				if (revenue.contains("uranium"))
+					newSpec.revenue.uranium = revenue.at("uranium").template get<double>();
+				if (revenue.contains("oil"))
+					newSpec.revenue.oil = revenue.at("oil").template get<double>();
+				if (revenue.contains("meteorite"))
+					newSpec.revenue.meteorite = revenue.at("meteorite").template get<double>();
 			}
 
 
@@ -902,6 +958,32 @@ e2::EntitySpecification* e2::EntitySpecification::specification(size_t index)
 size_t e2::EntitySpecification::specificationCount()
 {
 	return ::specifications.size();
+}
+
+chaiscript::Boxed_Value e2::EntityScriptInterface::invokeCreateState(e2::GameEntity* entity)
+{
+	chaiscript::Boxed_Value returnValue;
+	if (createState)
+	{
+		try
+		{
+			returnValue = createState(entity);
+		}
+		catch (chaiscript::exception::eval_error& e)
+		{
+			LogError("chai: evaluation failed: {}", e.pretty_print());
+		}
+		catch (chaiscript::exception::bad_boxed_cast& e)
+		{
+			LogError("chai: casting return-type from script to native failed: {}", e.what());
+		}
+		catch (std::exception& e)
+		{
+			LogError("{}", e.what());
+		}
+	}
+
+	return returnValue;
 }
 
 void e2::EntityScriptInterface::invokeDrawUI(e2::GameEntity* entity, e2::UIContext* ui)

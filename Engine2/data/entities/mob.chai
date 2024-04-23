@@ -1,0 +1,54 @@
+var mobScript = EntityScript();
+
+/** Specify the state type for a M.O.B */
+class MobState 
+{
+    def MobState(entity)
+    {
+        this.engineerBuildAction = entity.createBuildAction("engineer");
+    }
+
+    var engineerBuildAction;
+}
+
+/** Function that creates a state for an entity of this type */
+mobScript.createState = fun(entity){
+    return MobState(entity);
+}
+
+/** Function that renders the UI for an entity of this type */
+mobScript.drawUI = fun(entity, ui){
+    ui.beginStackV("mobUiStackV", vec2(0.0, 0.0));
+    ui.gameLabel("**" + entity.specification.displayName + "**", 12, Middle);
+
+    if(entity.buildMessage.size > 0)
+    {
+        ui.gameLabel(entity.buildMessage, 12.0, Begin);
+    }
+
+    ui.beginStackH("actions", 32.0);
+    if(entity.isBuilding())
+    {
+        if(ui.button("cancel", "Cancel")) 
+        {
+            entity.cancelBuild();
+        }
+    }
+    else 
+    {
+        var canBuildEngineer = entity.canBuild(entity.scriptState.engineerBuildAction);
+        if(canBuildEngineer && ui.button("engineer", "Build Engineer"))
+        {
+            entity.build(entity.scriptState.engineerBuildAction);
+        }
+        else 
+        {
+            ui.gameLabel("Build Engineer (No funds)", 12.0, Begin);
+        }
+    }
+    ui.endStackH();
+
+    ui.endStackV();
+}
+
+mobScript;

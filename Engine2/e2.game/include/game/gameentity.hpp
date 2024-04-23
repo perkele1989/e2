@@ -11,6 +11,7 @@
 
 #include "game/resources.hpp"
 
+#include <chaiscript/chaiscript.hpp>
 #include <string>
 
 
@@ -57,10 +58,14 @@ namespace e2
 	using scriptFunc_onTurnEnd = std::function<void(e2::GameEntity*)>;
 	using scriptFunc_onBeginMove = std::function<void(e2::GameEntity*)>;
 	using scriptFunc_onEndMove = std::function<void(e2::GameEntity*)>;
+	using scriptFunc_createState = std::function<chaiscript::Boxed_Value(e2::GameEntity*)>;
 
 	struct EntityScriptInterface
 	{
 		EntityScriptInterface() = default;
+
+		chaiscript::Boxed_Value invokeCreateState(e2::GameEntity* entity);
+		scriptFunc_createState createState;
 
 		void invokeDrawUI(e2::GameEntity* entity, e2::UIContext* ui);
 		scriptFunc_drawUI drawUI;
@@ -127,13 +132,13 @@ namespace e2
 		EntityLayerIndex layerIndex = EntityLayerIndex::Unit;
 
 		/** The move type for this entity */
-		EntityMoveType moveType{ EntityMoveType::Smooth };
+		EntityMoveType moveType{ EntityMoveType::Static };
 
 		/** The move speed */
 		float moveSpeed{ 1.0f };
 
 		/** The passable flags, i.e. what can this entity traverse. */
-		e2::PassableFlags passableFlags{ e2::PassableFlags::Land };
+		e2::PassableFlags passableFlags{ e2::PassableFlags::None };
 
 		/** Starting max. health */
 		float maxHealth{100.0f};
@@ -145,12 +150,17 @@ namespace e2
 		 * and B will deal max(0, x) where x is:
 		 *	(B.attackStrength * B.retaliatoryModifier) - (A.attackStrength * A.defensiveModifier)
 		 */
-		float attackStrength{ 100.0f };
+		float attackStrength{ 0.0f };
 		float defensiveModifier { 1.0f };
-		float retaliatoryModifier{ 1.0f }; // if >0, this unit will retaliate when attacked, with attackStrength*retaliatoryModifier
+		float retaliatoryModifier{ 0.0f }; // if >0, this unit will retaliate when attacked, with attackStrength*retaliatoryModifier
 
 		/** Sight range */
-		int32_t sightRange{ 5 };
+		int32_t sightRange{ 2 };
+
+		bool revenueByAbundance = false;
+
+		/** Revenue from this entity */
+		ResourceTable revenue;
 
 		/** Upkeep costs */
 		ResourceTable upkeep;
@@ -315,7 +325,10 @@ namespace e2
 		e2::UnitBuildAction createBuildAction(e2::Name unitId);
 
 		/** Returns true if the given action can be built right now */
+		bool isBuilding();
 		bool canBuild(e2::UnitBuildAction& action);
+		void build(e2::UnitBuildAction& action);
+		void cancelBuild();
 
 		/** Updated automatically by the game, if true this entity is in view. */
 		bool inView{};
@@ -338,6 +351,7 @@ namespace e2
 		glm::quat meshTargetRotation{};
 		glm::vec3 meshPosition{};
 
+		chaiscript::Boxed_Value scriptState;
 
 		void setPose(e2::Name poseName);
 		void playAction(e2::Name actionName);
@@ -347,10 +361,12 @@ namespace e2
 
 		virtual e2::Game* game() override;
 
+		std::string buildMessage;
+		e2::UnitBuildAction* currentlyBuilding{};
+
 	protected:
 		e2::Game* m_game{};
 
-		void buildProxy();
 		void destroyProxy();
 
 		//  -- internal animation states
@@ -371,11 +387,6 @@ namespace e2
 		e2::StackVector<EntityAnimationAction, e2::maxNumActionsPerEntity> m_animationActions;
 
 
-		// -- 
-
-		// -- internal build states
-		std::string m_buildMessage;
-		e2::UnitBuildAction* m_currentlyBuilding{};
 	};
 
 	constexpr uint64_t entitySizeBytes = sizeof(e2::GameEntity);

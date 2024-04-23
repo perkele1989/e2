@@ -48,12 +48,6 @@ namespace e2
 	class GameStructure;
 	class EmpireAI;
 
-	using EntityActionTickFunc = void(*)(e2::EmpireAI*, e2::GameEntity*);
-
-	struct EntityAction
-	{
-		EntityActionTickFunc tick{};
-	};
 
 	class EmpireAI : public e2::Object, public e2::GameContext
 	{
@@ -74,10 +68,6 @@ namespace e2
 		e2::GameEntity* currentEntity{};
 		std::unordered_set<e2::GameEntity*> turnEntities;
 
-		void collectEntities();
-
-		EntityAction getActionForEntity(e2::GameEntity* entity);
-
 	protected:
 		e2::Game* m_game{};
 	};
@@ -89,9 +79,6 @@ namespace e2
 		NomadAI();
 		NomadAI(e2::GameContext* ctx, EmpireId empireId);
 		virtual ~NomadAI();
-		virtual void grugBrainWakeUp() override;
-		virtual void grugBrainTick(double seconds) override;
-		virtual void grugBrainGoSleep() override;
 	};
 
 	class CommanderAI : public e2::EmpireAI
@@ -102,7 +89,6 @@ namespace e2
 		CommanderAI(e2::GameContext* ctx, EmpireId empireId);
 		virtual ~CommanderAI(); 
 
-		virtual void grugBrainTick(double seconds) override;
 	};
 
 }

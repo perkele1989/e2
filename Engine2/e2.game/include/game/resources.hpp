@@ -26,6 +26,8 @@ namespace e2
 
 		void clear();
 
+		ResourceTable operator*(float) const;
+
 		ResourceTable operator+(ResourceTable const& other) const;
 
 		ResourceTable operator-(ResourceTable const& other) const;

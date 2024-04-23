@@ -1,0 +1,22 @@
+
+{
+    "entities":[
+        {
+            "id": "oremine",
+            "typeName": "e2::GameEntity",
+            "displayName": "Ore Mine",
+            "layerIndex": "structure",
+            "passableFlags": ["none"],
+            "moveType": "static",
+            "sightRange": 2,
+            "defensiveStrength": 100.0,
+            "meshScale": [1.0, -1.0, -1.0],
+            "mesh": "assets/structures/SM_BuildingPlaceholder.e2a",
+            "revenueByAbundance": true, 
+            "revenue": {
+                "metal": 2
+            }
+        }
+    ]
+
+}

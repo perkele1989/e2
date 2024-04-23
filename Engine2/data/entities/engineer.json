@@ -14,6 +14,7 @@
             "attackStrength": 0.0,
             "defensiveStrength": 25.0,
             "meshScale": [0.005, -0.005, -0.005],
+            "moveSpeed": 2.8,
             "script": "data/entities/engineer.chai",
             "mesh": "assets/characters/SM_Engineer.e2a",
             "skeleton": "assets/characters/SK_Engineer.e2a",

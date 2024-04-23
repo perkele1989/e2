@@ -48,12 +48,37 @@ e2::EmpireAI::~EmpireAI()
 
 void e2::EmpireAI::grugBrainWakeUp()
 {
+	for (e2::GameEntity* ent : empire->entities)
+	{
+		if (ent->grugRelevant())
+		{
+			turnEntities.insert(ent);
+		}
+	}
 
+	if (turnEntities.size() > 0)
+		currentEntity = *turnEntities.begin();
+	else
+		currentEntity = nullptr;
 }
 
 void e2::EmpireAI::grugBrainTick(double seconds)
 {
-	game()->endTurn();
+	if (!currentEntity)
+	{
+		game()->endTurn();
+		return;
+	}
+
+	if (!currentEntity->grugRelevant() || !currentEntity->grugTick(seconds))
+	{
+		turnEntities.erase(currentEntity);
+
+		if (turnEntities.size() > 0)
+			currentEntity = *turnEntities.begin();
+		else
+			currentEntity = nullptr;
+	}
 }
 
 void e2::EmpireAI::grugBrainGoSleep()
@@ -84,20 +109,6 @@ e2::NomadAI::~NomadAI()
 
 }
 
-void e2::NomadAI::grugBrainWakeUp()
-{
-
-}
-
-void e2::NomadAI::grugBrainTick(double seconds)
-{
-
-}
-
-void e2::NomadAI::grugBrainGoSleep()
-{
-
-}
 
 e2::NomadAI::NomadAI(e2::GameContext* ctx, EmpireId empireId)
 	: e2::EmpireAI(ctx, empireId)
@@ -112,11 +123,6 @@ e2::CommanderAI::CommanderAI()
 }
 
 e2::CommanderAI::~CommanderAI()
-{
-
-}
-
-void e2::CommanderAI::grugBrainTick(double seconds)
 {
 
 }

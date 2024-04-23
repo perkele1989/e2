@@ -1,0 +1,22 @@
+
+{
+    "entities":[
+        {
+            "id": "sawmill",
+            "typeName": "e2::GameEntity",
+            "displayName": "Sawmill",
+            "layerIndex": "structure",
+            "passableFlags": ["none"],
+            "moveType": "static",
+            "sightRange": 2,
+            "defensiveStrength": 100.0,
+            "meshScale": [1.0, -1.0, -1.0],
+            "mesh": "assets/environment/SM_SawMill.e2a",
+            "revenueByAbundance": true, 
+            "revenue": {
+                "wood": 2
+            }
+        }
+    ]
+
+}
