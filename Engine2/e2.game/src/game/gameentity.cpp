@@ -60,7 +60,7 @@ void e2::GameEntity::updateAnimation(double seconds)
 
 			if (m_actionPose && m_actionPose->playing())
 			{
-				m_actionPose->updateAnimation(seconds, !inView);
+				m_actionPose->updateAnimation(seconds * m_actionSpeed, !inView);
 
 				double actionCurrentTime = m_actionPose->time();
 				double actionTotalTime = m_actionPose->animation()->timeSeconds();
@@ -241,6 +241,7 @@ void e2::GameEntity::postConstruct(e2::GameContext* ctx, e2::EntitySpecification
 		newAction.pose = e2::create<e2::AnimationPose>(specification->skeletonAsset, action.animationAsset, false);
 		newAction.blendInTime = action.blendInTime;
 		newAction.blendOutTime = action.blendOutTime;
+		newAction.speed = action.speed;
 
 		m_animationActions.push(newAction);
 	}
@@ -398,7 +399,7 @@ void e2::GameEntity::playAction(e2::Name actionName)
 	if (!action)
 		return;
 
-	playAction2(action->pose, action->blendInTime, action->blendOutTime);
+	playAction2(action->pose, action->blendInTime, action->blendOutTime, action->speed);
 }
 
 bool e2::GameEntity::isActionPlaying(e2::Name actionName)
@@ -425,7 +426,7 @@ bool e2::GameEntity::isAnyActionPlaying()
 	return m_actionPose && m_actionPose->playing();
 }
 
-void e2::GameEntity::playAction2(e2::AnimationPose* anim, double blendIn /*= 0.2f*/, double blendOut /*= 0.2f*/)
+void e2::GameEntity::playAction2(e2::AnimationPose* anim, double blendIn /*= 0.2f*/, double blendOut /*= 0.2f*/, double speed)
 {
 	if (!skinProxy)
 		return;
@@ -433,6 +434,7 @@ void e2::GameEntity::playAction2(e2::AnimationPose* anim, double blendIn /*= 0.2
 	m_actionPose = anim;
 	m_actionBlendInTime = blendIn;
 	m_actionBlendOutTime = blendOut;
+	m_actionSpeed = speed;
 
 	m_actionPose->play(false);
 }
@@ -898,6 +900,10 @@ void e2::EntitySpecification::initializeSpecifications(e2::GameContext* ctx)
 					e2::EntityActionSpecification newAction;
 					newAction.blendInTime = action.at("blendInTime").template get<double>();
 					newAction.blendOutTime = action.at("blendOutTime").template get<double>();
+
+					if(action.contains("speed"))
+						newAction.speed = action.at("speed").template get<double>();
+
 					newAction.animationAssetPath = action.at("asset").template get<std::string>();
 
 					std::string actionName = action.at("name").template get<std::string>();

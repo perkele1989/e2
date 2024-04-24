@@ -1,0 +1,21 @@
+
+{
+    "entities":[
+        {
+            "id": "navalbase",
+            "typeName": "e2::GameEntity",
+            "displayName": "Naval Base",
+            "layerIndex": "structure",
+            "passableFlags": ["none"],
+            "moveType": "static",
+            "sightRange": 2,
+            "defensiveStrength": 600.0,
+            "script": "data/entities/navalbase.chai",
+            "mesh": "assets/structures/SM_BuildingPlaceholder.e2a",
+            "revenue": {
+                "gold": 2
+            }
+        }
+    ]
+
+}

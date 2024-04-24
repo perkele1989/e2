@@ -1,0 +1,21 @@
+
+{
+    "entities":[
+        {
+            "id": "warfactory",
+            "typeName": "e2::GameEntity",
+            "displayName": "War Factory",
+            "layerIndex": "structure",
+            "passableFlags": ["none"],
+            "moveType": "static",
+            "sightRange": 2,
+            "defensiveStrength": 600.0,
+            "script": "data/entities/warfactory.chai",
+            "mesh": "assets/structures/SM_BuildingPlaceholder.e2a",
+            "revenue": {
+                "gold": 2
+            }
+        }
+    ]
+
+}

@@ -1,0 +1,54 @@
+var barracksScript = EntityScript();
+
+/** Specify the state type for barracks */
+class BarracksState 
+{
+    def BarracksState(entity)
+    {
+        this.gruntBuildAction = entity.createBuildAction("grunt");
+    }
+
+    var gruntBuildAction;
+}
+
+/** Function that creates a state for an entity of this type */
+barracksScript.createState = fun(entity){
+    return BarracksState(entity);
+}
+
+/** Function that renders the UI for an entity of this type */
+barracksScript.drawUI = fun(entity, ui){
+    ui.beginStackV("mobUiStackV", vec2(0.0, 0.0));
+    ui.gameLabel("**" + entity.specification.displayName + "**", 12, Middle);
+
+    if(entity.buildMessage.size > 0)
+    {
+        ui.gameLabel(entity.buildMessage, 12.0, Begin);
+    }
+
+    ui.beginStackH("actions", 32.0);
+    if(entity.isBuilding())
+    {
+        if(ui.button("cancel", "Cancel")) 
+        {
+            entity.cancelBuild();
+        }
+    }
+    else 
+    {
+        var canBuildGrunt = entity.canBuild(entity.scriptState.gruntBuildAction);
+        if(canBuildGrunt && ui.button("grbnt", "Build Grunt"))
+        {
+            entity.build(entity.scriptState.gruntBuildAction);
+        }
+        else 
+        {
+            ui.gameLabel("Build Grunt (No funds)", 12.0, Begin);
+        }
+    }
+    ui.endStackH();
+
+    ui.endStackV();
+}
+
+barracksScript;

@@ -35,6 +35,7 @@ namespace e2
 		e2::AnimationPtr animationAsset;
 		float blendInTime{ 0.0f };
 		float blendOutTime{ 0.0f };
+		float speed{ 1.0f };
 	};
 
 	enum class EntityMoveType : uint8_t
@@ -247,6 +248,7 @@ namespace e2
 		e2::AnimationPose* pose{};
 		float blendInTime{};
 		float blendOutTime{};
+		float speed{1.0f};
 	};
 
 
@@ -359,7 +361,7 @@ namespace e2
 		bool isAnyActionPlaying();
 
 		void setPose2(e2::Pose* pose, double lerpTime);
-		void playAction2(e2::AnimationPose* anim, double blendIn = 0.2f, double blendOut = 0.2f);
+		void playAction2(e2::AnimationPose* anim, double blendIn = 0.2f, double blendOut = 0.2f, double speed = 1.0);
 
 		virtual e2::Game* game() override;
 
@@ -380,8 +382,9 @@ namespace e2
 		e2::Pose* m_oldPose{};
 
 		e2::AnimationPose* m_actionPose{};
-		double m_actionBlendInTime = 0.2f;
-		double m_actionBlendOutTime = 0.2f;
+		double m_actionBlendInTime = 0.2;
+		double m_actionBlendOutTime = 0.2;
+		double m_actionSpeed = 1.0;
 
 
 

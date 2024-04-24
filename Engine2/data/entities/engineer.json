@@ -35,7 +35,8 @@
                     "name": "build",
                     "asset": "assets/characters/A_EngineerBuild.e2a",
                     "blendInTime": 0.25,
-                    "blendOutTime": 0.5
+                    "blendOutTime": 0.5,
+                    "speed": 4.0
                 },
                 {
                     "name": "die",

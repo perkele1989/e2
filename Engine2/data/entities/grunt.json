@@ -14,6 +14,7 @@
             "buildPoints": 0,
             "attackStrength": 100.0,
             "defensiveStrength": 100.0,
+            "moveSpeed": 2.8,
             "meshScale": [0.005, -0.005, -0.005],
             "script": "data/entities/grunt.chai",
             "mesh": "assets/characters/SM_Soldier.e2a",
