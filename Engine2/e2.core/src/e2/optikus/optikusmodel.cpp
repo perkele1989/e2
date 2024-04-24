@@ -12,7 +12,7 @@ e2::OptikusProxy::~OptikusProxy()
 
 }
 
-void e2::OptikusProxy::bind(e2::ICommandBuffer* buffer, uint8_t frameIndex)
+void e2::OptikusProxy::bind(e2::ICommandBuffer* buffer, uint8_t frameIndex, bool shadows)
 {
 
 }
@@ -42,7 +42,7 @@ e2::MaterialProxy* e2::OptikusModel::createMaterialProxy(e2::Session* session, e
 	return e2::create<e2::OptikusProxy>(session, material);
 }
 
-e2::IPipelineLayout* e2::OptikusModel::getOrCreatePipelineLayout(e2::MeshProxy* proxy, uint8_t submeshIndex)
+e2::IPipelineLayout* e2::OptikusModel::getOrCreatePipelineLayout(e2::MeshProxy* proxy, uint8_t submeshIndex, bool shadows)
 {
 	return nullptr;
 }

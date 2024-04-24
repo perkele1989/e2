@@ -37,7 +37,7 @@ namespace e2
 
 		virtual Engine* engine() override;
 
-		virtual void bind(e2::ICommandBuffer* buffer, uint8_t frameIndex) {};
+		virtual void bind(e2::ICommandBuffer* buffer, uint8_t frameIndex, bool shadows) {};
 
 		virtual void invalidate(uint8_t frameIndex) {};
 		e2::Session* session{};
@@ -131,8 +131,12 @@ namespace e2
 		/** Cache for the pipelines to use for the given submeshes in this proxy. Cached from session. */
 		e2::StackVector<e2::IPipeline*, e2::maxNumSubmeshes> pipelines;
 
+		e2::StackVector<e2::IPipeline*, e2::maxNumSubmeshes> shadowPipelines;
+
 		/** Cache for the pipeline layouts to used for the given submeshes in this proxy. Cached from session. */
 		e2::StackVector<e2::IPipelineLayout*, e2::maxNumSubmeshes> pipelineLayouts;
+
+		e2::StackVector<e2::IPipelineLayout*, e2::maxNumSubmeshes> shadowPipelineLayouts;
 
 		// can be set whenever we bind it at render time if needed
 		e2::SkinProxy* skinProxy{};

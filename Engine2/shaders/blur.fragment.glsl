@@ -1,4 +1,4 @@
-#version 460 core
+#include <shaders/header.glsl>
 
 in vec2 inUv;
 out vec4 outColor;

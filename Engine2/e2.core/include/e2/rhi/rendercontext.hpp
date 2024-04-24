@@ -65,6 +65,8 @@ namespace e2
 
 		virtual e2::ITexture *createTexture(e2::TextureCreateInfo const& createInfo) = 0;
 
+		virtual e2::ISampler* createShadowSampler() = 0;
+
 		virtual e2::ISampler* createSampler(e2::SamplerCreateInfo const& createInfo) = 0;
 
 		virtual e2::IPipeline *createPipeline(e2::PipelineCreateInfo const& createInfo) = 0;

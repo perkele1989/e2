@@ -560,15 +560,19 @@ bool e2::UIContext::sliderFloat(e2::Name id, float& value, float min, float max,
 	drawQuad(widgetState->position, widgetState->size, style.windowFgColor);
 
 	float mouseX = (m_mouseState.relativePosition - widgetState->position).x;
-	float mouseNormalized = mouseX / widgetState->size.x;
+	float mouseNormalized = glm::clamp(mouseX / widgetState->size.x, 0.0f, 1.0f);
+	
+	float valueRange = max - min;
+	float valueBegin = min;
 
 	if (mouseDown)
 	{
-		value = glm::clamp(mouseNormalized * (max - min), min, max);
+		value = valueBegin + valueRange * mouseNormalized;
 	}
 
-	float normalized = (value - min) / (max - min);
-	drawQuad(widgetState->position + glm::vec2(1.0f, 1.0f), glm::vec2( (widgetState->size.x * normalized) - 2.0f, widgetState->size.y - 2.0f ), style.accents[0]);
+	float valueNormalized = (value - valueBegin) / valueRange;
+
+	drawQuad(widgetState->position + glm::vec2(1.0f, 1.0f), glm::vec2( (widgetState->size.x * valueNormalized) - 2.0f, widgetState->size.y - 2.0f ), style.accents[0]);
 
 	drawRasterText(e2::FontFace::Serif, 9, style.windowBgColorInactive, widgetState->position + glm::vec2(0.0f, widgetState->size.y / 2.0f), id.string());
 

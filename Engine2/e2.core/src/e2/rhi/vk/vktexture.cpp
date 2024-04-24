@@ -46,6 +46,14 @@ e2::ISampler_Vk::ISampler_Vk(IRenderContext* context, e2::SamplerCreateInfo cons
 	m_vkHandle = m_renderContextVk->getOrCreateSampler(createInfo.filter, createInfo.wrap);
 }
 
+e2::ISampler_Vk::ISampler_Vk(IRenderContext* context, VkSampler wrap)
+	: e2::ISampler(context, {})
+	, e2::ContextHolder_Vk(context)
+	, m_vkHandle(wrap)
+{
+
+}
+
 e2::ISampler_Vk::~ISampler_Vk()
 {
 

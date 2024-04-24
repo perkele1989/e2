@@ -694,7 +694,7 @@ void e2::IDescriptorSet_Vk::writeTexture(uint32_t binding, e2::ITexture* texture
 		e2::ITexture_Vk* vkTexture = static_cast<e2::ITexture_Vk*>(textures);
 
 		VkDescriptorImageInfo imgInf{};
-		imgInf.imageLayout = VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL;
+		imgInf.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 		imgInf.imageView = vkTexture->m_vkImageView;
 
 		VkWriteDescriptorSet write{ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
@@ -729,7 +729,7 @@ void e2::IDescriptorSet_Vk::writeTexture(uint32_t binding, e2::ITexture* texture
 	{
 		e2::ITexture_Vk* vkTexture = static_cast<e2::ITexture_Vk*>(&textures[i]);
 		::imageInfo.data[i].imageView = vkTexture->m_vkImageView;
-		::imageInfo.data[i].imageLayout = VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL;
+		::imageInfo.data[i].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 	}
 
 	VkWriteDescriptorSet write{ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };

@@ -37,6 +37,7 @@ e2::LightweightModel::~LightweightModel()
 	e2::destroy(m_proxyUniformBuffers[1]);
 	e2::destroy(m_descriptorPool);
 	e2::destroy(m_pipelineLayout);
+	e2::destroy(m_pipelineLayoutShadows);
 	e2::destroy(m_descriptorSetLayout);
 }
 
@@ -64,6 +65,14 @@ void e2::LightweightModel::postConstruct(e2::Context* ctx)
 	};
 	pipelineLayoutCreateInfo.pushConstantSize = sizeof(e2::PushConstantData);
 	m_pipelineLayout = renderContext()->createPipelineLayout(pipelineLayoutCreateInfo);
+
+	e2::PipelineLayoutCreateInfo shadowsLayoutCreateInfo{};
+	shadowsLayoutCreateInfo.sets = {
+		renderManager()->modelSetLayout()
+	};
+	shadowsLayoutCreateInfo.pushConstantSize = sizeof(e2::ShadowPushConstantData);
+
+	m_pipelineLayoutShadows = renderContext()->createPipelineLayout(shadowsLayoutCreateInfo);
 
 	//m_pipelineCache.reserve(128);
 
@@ -134,9 +143,12 @@ e2::MaterialProxy* e2::LightweightModel::createMaterialProxy(e2::Session* sessio
 	return newProxy;
 }
 
-e2::IPipelineLayout* e2::LightweightModel::getOrCreatePipelineLayout(e2::MeshProxy* proxy, uint8_t submeshIndex)
+e2::IPipelineLayout* e2::LightweightModel::getOrCreatePipelineLayout(e2::MeshProxy* proxy, uint8_t submeshIndex, bool shadows)
 {
-	return m_pipelineLayout;
+	if (shadows)
+		return m_pipelineLayoutShadows;
+	else 
+		return m_pipelineLayout;
 }
 
 e2::IPipeline* e2::LightweightModel::getOrCreatePipeline(e2::MeshProxy* proxy, uint8_t submeshIndex, e2::RendererFlags rendererFlags)
@@ -217,7 +229,8 @@ e2::IPipeline* e2::LightweightModel::getOrCreatePipeline(e2::MeshProxy* proxy, u
 
 	e2::applyVertexAttributeDefines(spec.attributeFlags, shaderInfo);
 
-	if ((lwFlags & e2::LightweightFlags::Shadow) == e2::LightweightFlags::Shadow)
+	bool shadows = (lwFlags & e2::LightweightFlags::Shadow) == e2::LightweightFlags::Shadow;
+	if (shadows)
 		shaderInfo.defines.push({ "Renderer_Shadow", "1" });
 
 	if ((lwFlags & e2::LightweightFlags::Skin) == e2::LightweightFlags::Skin)
@@ -252,9 +265,18 @@ e2::IPipeline* e2::LightweightModel::getOrCreatePipeline(e2::MeshProxy* proxy, u
 	if (newEntry.vertexShader && newEntry.fragmentShader && newEntry.vertexShader->valid() && newEntry.fragmentShader->valid())
 	{
 		e2::PipelineCreateInfo pipelineInfo;
-		pipelineInfo.layout = m_pipelineLayout;
+		if(shadows)
+			pipelineInfo.layout = m_pipelineLayoutShadows;
+		else 
+			pipelineInfo.layout = m_pipelineLayout;
+
 		pipelineInfo.shaders = { newEntry.vertexShader, newEntry.fragmentShader };
-		pipelineInfo.colorFormats = { e2::TextureFormat::RGBA8, e2::TextureFormat::RGBA32 };
+
+		if(shadows)
+			pipelineInfo.colorFormats = { };
+		else 
+			pipelineInfo.colorFormats = { e2::TextureFormat::RGBA8, e2::TextureFormat::RGBA32 };
+
 		pipelineInfo.depthFormat = { e2::TextureFormat::D32 };
 		newEntry.pipeline = renderContext()->createPipeline(pipelineInfo);
 	}
@@ -266,6 +288,11 @@ e2::IPipeline* e2::LightweightModel::getOrCreatePipeline(e2::MeshProxy* proxy, u
 
 	m_pipelineCache[uint16_t(lwFlags)] = newEntry;
 	return newEntry.pipeline;
+}
+
+bool e2::LightweightModel::supportsShadows()
+{
+	return true;
 }
 
 void e2::LightweightModel::invalidatePipelines()
@@ -318,9 +345,10 @@ e2::LightweightProxy::~LightweightProxy()
 	e2::destroy(sets[1]);
 }
 
-void e2::LightweightProxy::bind(e2::ICommandBuffer* buffer, uint8_t frameIndex)
+void e2::LightweightProxy::bind(e2::ICommandBuffer* buffer, uint8_t frameIndex, bool shadows)
 {
-	buffer->bindDescriptorSet(model->m_pipelineLayout, 2, sets[frameIndex]);
+	if(!shadows)
+		buffer->bindDescriptorSet(model->m_pipelineLayout, 2, sets[frameIndex]);
 }
 
 void e2::LightweightProxy::invalidate(uint8_t frameIndex)

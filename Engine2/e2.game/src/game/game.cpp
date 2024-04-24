@@ -942,6 +942,13 @@ void e2::Game::update(double seconds)
 	e2::Renderer* renderer = session->renderer();
 	e2::UIContext* ui = session->uiContext();
 
+	glm::quat sunRot = glm::identity<glm::quat>();
+
+	sunRot = glm::rotate(sunRot, glm::radians(m_sunAngleA), e2::worldUpf());
+	sunRot = glm::rotate(sunRot, glm::radians(m_sunAngleB), e2::worldRightf());
+
+	renderer->setSun(sunRot, { 1.0f, 0.9f, 0.85f }, 1.0f);
+
 	if (m_globalState == GlobalState::Boot)
 	{
 		m_session->tick(seconds);
@@ -2350,6 +2357,11 @@ void e2::Game::drawUnitUI()
 	if (m_selectedEntity && m_turnState == TurnState::Unlocked)
 		m_selectedEntity->drawUI(ui);
 
+	ui->beginStackV("sad");
+	ui->sliderFloat("angleA", m_sunAngleA, -180.0f, 180.0f);
+	ui->sliderFloat("angleB", m_sunAngleB, 0.0f, 90.0f);
+	ui->endStackV();
+
 	ui->popFixedPanel();
 
 
@@ -2419,6 +2431,10 @@ void e2::Game::drawDebugUI()
 	ui->drawRasterText(e2::FontFace::Monospace, 14, 0xFFFFFFFF, { xOffset, yOffset + (18.0f * 7.0f) }, std::format("^9Jobs in flight: {}", m_hexGrid->numJobsInFlight()));
 	ui->drawRasterText(e2::FontFace::Monospace, 14, 0xFFFFFFFF, { xOffset, yOffset + (18.0f * 8.0f) }, std::format("^2View Origin: {}", m_viewOrigin));
 	ui->drawRasterText(e2::FontFace::Monospace, 14, 0xFFFFFFFF, { xOffset, yOffset + (18.0f * 9.0f) }, std::format("^3View Velocity: {}", m_viewVelocity));
+
+
+
+	ui->drawTexturedQuad({ xOffset, yOffset + 18.0f * 11.0f }, { 384.f, 384.f }, 0xFFFFFFFF, renderer->shadowTarget());
 #endif
 }
 

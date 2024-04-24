@@ -1,4 +1,4 @@
-#version 460 core
+#include <shaders/header.glsl>
 
 // Vertex attributes 
 in vec4 vertexPosition;
@@ -27,6 +27,7 @@ in uvec4 vertexIds;
 
 // Fragment attributes
 
+#if !defined(Renderer_Shadow)
 out vec4 fragmentPosition;
 
 #if defined(Vertex_TexCoords01)
@@ -45,15 +46,19 @@ out vec4 fragmentTangent;
 #if defined(Vertex_Color)
 out vec4 fragmentColor;
 #endif
+#endif
 
 #include <shaders/lightweight/lightweight.common.glsl>
 
 void main()
 {
 	vec4 animatedVertexPosition = vec4(vertexPosition.xyz, 1.0);
+
+#if !defined(Renderer_Shadow)
 	vec4 animatedVertexNormal = vec4(vertexNormal.xyz, 0.0);
 	vec4 animatedVertexTangent = vec4(vertexTangent.xyz, 0.0);
 	float tangentSign = vertexTangent.w;
+#endif
 
 #if defined(Renderer_Skin) && defined(Vertex_Bones)
 
@@ -63,15 +68,23 @@ void main()
 	animationTransform += skin.skinMatrices[vertexIds.w] * vertexWeights.w; 
 
 	animatedVertexPosition =  animationTransform * animatedVertexPosition;
+
+#if !defined(Renderer_Shadow)
 	animatedVertexNormal = animationTransform * animatedVertexNormal;
 	animatedVertexTangent = animationTransform *animatedVertexTangent;
+#endif
 
 	animatedVertexPosition.xyz /= animatedVertexPosition.w;
 	animatedVertexPosition.w = 1.0;
 #endif 
 
+#if !defined(Renderer_Shadow)
 	gl_Position = renderer.projectionMatrix * renderer.viewMatrix * mesh.modelMatrix * animatedVertexPosition;
+#else 
+	gl_Position = shadowViewProjection * mesh.modelMatrix * animatedVertexPosition;
+#endif
 
+#if !defined(Renderer_Shadow)
 	fragmentPosition = mesh.modelMatrix * animatedVertexPosition;
 #if defined(Vertex_Normals)
 
@@ -91,5 +104,6 @@ void main()
 
 #if defined(Vertex_Color)
 	fragmentColor = vertexColor;
+#endif
 #endif
 }

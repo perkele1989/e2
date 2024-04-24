@@ -1,23 +1,35 @@
-#version 460 core
+#include <shaders/header.glsl>
 
 // Fragment attributes
 
+#if !defined(Renderer_Shadow)
 in vec4 fragmentPosition;
-
 in vec3 fragmentNormal;
 in vec4 fragmentTangent;
 in vec4 fragmentColor;
+#endif
 
+#if !defined(Renderer_Shadow)
 // Out color
 out vec4 outColor;
 out vec4 outPosition;
+#endif
 
 #include <shaders/terrain/terrain.common.glsl>
 
+
+
+
 void main()
 {
+#if !defined(Renderer_Shadow)
+	vec4 fragPosWS = fragmentPosition;
+	fragPosWS.xyz /= fragPosWS.w;
+
 	outPosition = fragmentPosition;
 	outColor = vec4(1.0, 1.0, 1.0, 1.0);
+
+	//float shadows = calcShadow(fragPosWS);
 
 	float texScaleMountains = 0.1;
 	float texScaleFields = 0.5;
@@ -104,7 +116,7 @@ void main()
 	float metalness = (1.0 - waterLineCoeff) * 0.1;
 
 	outColor.rgb =  vec3(0.0);
-	outColor.rgb += getSunColor(finalNormal, albedo);
+	outColor.rgb += getSunColor(fragPosWS.xyz, finalNormal, albedo);
 	outColor.rgb += getIblColor(fragmentPosition.xyz, albedo, finalNormal, roughness, metalness, viewVector);
 
 	float rimHeightCoeff = smoothstep(0.1, 1.0, -fragmentPosition.y);
@@ -115,11 +127,18 @@ void main()
 
 	outColor.rgb = mix(outColor.rgb, outline.rgb, outline.a);
 
+
+	//float ndotl = max(0.0, dot(fragNormal, -normalize(renderer.sun1.xyz)));
+	//outColor.rgb = vec3(ndotl);
+	//outColor.rgb = vec3(shadows) * 0.75 + vec3(ndotl) * 0.25;
+	//outColor.rgb = vec3(shadows);
+
 	// debug norm
 	//outColor.rgb = clamp(vec3(finalNormal.x, finalNormal.z, -finalNormal.y) * 0.5 + 0.5, vec3(0.0), vec3(1.0));
 
 	float gridCoeff2 = smoothstep(0.92, 0.95, fragmentColor.a);
 	gridCoeff2 *= 0.1;
 	//outColor.rgb = mix(outColor.rgb, vec3(0.0), gridCoeff2);
+#endif
 
 }

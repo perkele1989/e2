@@ -157,6 +157,9 @@ uint32_t e2::Session::registerMeshProxy(e2::MeshProxy* proxy)
 		e2::RenderLayer layer = shaderModel->renderLayer();
 
 		m_submeshIndex[layer].insert({ proxy, i });
+
+		if(shaderModel->supportsShadows())
+			m_shadowSubmeshes.insert({ proxy, i });
 	}
 
 	return m_modelIds.create();
@@ -173,6 +176,7 @@ void e2::Session::unregisterMeshProxy(e2::MeshProxy* proxy)
 
 
 		m_submeshIndex[layer].erase({ proxy, i });
+		m_shadowSubmeshes.erase({ proxy, i });
 	}
 }
 
@@ -212,6 +216,11 @@ std::map<e2::RenderLayer, std::unordered_set<e2::MeshProxySubmesh>> const& e2::S
 	return m_submeshIndex;
 }
 
+
+std::unordered_set<e2::MeshProxySubmesh> const& e2::Session::shadowSubmeshes() const
+{
+	return m_shadowSubmeshes;
+}
 
 e2::IDescriptorSet* e2::Session::getModelSet(uint8_t frameIndex)
 {

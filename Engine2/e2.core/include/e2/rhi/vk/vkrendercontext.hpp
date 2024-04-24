@@ -65,6 +65,8 @@ namespace e2
 
 		virtual e2::ITexture* createTexture(e2::TextureCreateInfo const& createInfo) override;
 
+		virtual e2::ISampler* createShadowSampler() override;
+
 		virtual e2::ISampler* createSampler(e2::SamplerCreateInfo const& createInfo) override;
 
 		virtual e2::IPipeline* createPipeline(e2::PipelineCreateInfo const& createInfo) override;
@@ -126,7 +128,7 @@ namespace e2
 		VkThreadLocals & getThreadLocals();
 
 		
-
+		VkSampler getInternalShadowSampler();
 		VkSampler getOrCreateSampler(e2::SamplerFilter filter, e2::SamplerWrap wrap);
 
 		void vkCmdTransitionImage(VkCommandBuffer buffer, VkImage image, uint32_t mips, uint32_t mipOffset, uint32_t layers, VkImageAspectFlags aspectFlags, VkImageLayout from, VkImageLayout to,
@@ -149,6 +151,7 @@ namespace e2
 
 		e2::StackVector<VkThreadLocals, e2::maxPersistentThreads> m_threadLocals;
 		e2::StackVector<VkSampler, 16> m_samplerCache;
+		VkSampler m_shadowSampler{};
 
 		void transientPrepare(bool blocking, e2::VkThreadLocals &threadLocals);
 		void transientFinalize(bool blocking, e2::VkThreadLocals &threadLocals);

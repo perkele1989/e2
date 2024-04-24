@@ -51,12 +51,14 @@ namespace e2
 
 		virtual e2::MaterialProxy* createMaterialProxy(e2::Session* session, e2::MaterialPtr material) = 0;
 
-		virtual e2::IPipelineLayout* getOrCreatePipelineLayout(e2::MeshProxy* proxy, uint8_t submeshIndex) = 0;
+		virtual e2::IPipelineLayout* getOrCreatePipelineLayout(e2::MeshProxy* proxy, uint8_t submeshIndex, bool shadows) = 0;
 		virtual e2::IPipeline* getOrCreatePipeline(e2::MeshProxy* proxy, uint8_t submeshIndex, e2::RendererFlags rendererFlags) = 0;
 
 		virtual e2::RenderLayer renderLayer();
 
 		virtual void invalidatePipelines()=0;
+
+		virtual bool supportsShadows();
 
 	protected:
 		e2::Engine* m_engine{};

@@ -88,13 +88,28 @@ void e2::MeshProxy::invalidatePipeline()
 		disable();
 
 	pipelineLayouts.resize(asset->submeshCount());
+	shadowPipelineLayouts.resize(asset->submeshCount());
 	pipelines.resize(asset->submeshCount());
+	shadowPipelines.resize(asset->submeshCount());
+
+
 	for (uint8_t submeshIndex = 0; submeshIndex < asset->submeshCount(); submeshIndex++)
 	{
 		e2::ShaderModel* model = materialProxies[submeshIndex]->asset->model();
-		pipelineLayouts[submeshIndex] = model->getOrCreatePipelineLayout(this, submeshIndex);
-
+		pipelineLayouts[submeshIndex] = model->getOrCreatePipelineLayout(this, submeshIndex, false);
 		pipelines[submeshIndex] = model->getOrCreatePipeline(this, submeshIndex, skinProxy ? RendererFlags::Skin : e2::RendererFlags::None);
+
+		if (model->supportsShadows())
+		{
+			shadowPipelineLayouts[submeshIndex] = model->getOrCreatePipelineLayout(this, submeshIndex, true);
+			shadowPipelines[submeshIndex] = model->getOrCreatePipeline(this, submeshIndex, skinProxy ? RendererFlags::Skin | RendererFlags::Shadow: e2::RendererFlags::Shadow);
+		}
+		else
+		{
+			shadowPipelineLayouts[submeshIndex] = nullptr;
+			shadowPipelines[submeshIndex] = nullptr;
+		}
+
 	}
 
 	if (wasEnabled)

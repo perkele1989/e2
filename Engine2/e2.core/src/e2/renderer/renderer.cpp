@@ -34,6 +34,8 @@ static char const* lineVertexSource = R"SRC(
 // Begin Set0: Renderer
 layout(set = 0, binding = 0) uniform RendererData
 {
+    mat4 shadowView;
+    mat4 shadowProjection;
     mat4 viewMatrix;
     mat4 projectionMatrix;
     vec4 time; // t, sin(t), cos(t), tan(t)
@@ -56,6 +58,10 @@ layout(set = 0, binding = 8) uniform texture2D frontBufferPosition;
 layout(set = 0, binding = 9) uniform texture2D frontBufferDepth;
 
 layout(set = 0, binding = 10) uniform texture2D outlineTexture;
+
+layout(set = 0, binding = 11) uniform texture2D shadowMap;
+layout(set = 0, binding = 12) uniform sampler shadowSampler;
+
 // End Set0
 
 	void main()
@@ -80,9 +86,15 @@ static char const* lineFragmentSource = R"SRC(
 // Begin Set0: Renderer
 layout(set = 0, binding = 0) uniform RendererData
 {
+    mat4 shadowView;
+    mat4 shadowProjection;
     mat4 viewMatrix;
     mat4 projectionMatrix;
     vec4 time; // t, sin(t), cos(t), tan(t)
+    vec4 sun1; // sun dir.xyz, ???
+    vec4 sun2; // sun color.rgb, sun strength
+    vec4 ibl1; // ibl strength, ??, ?? ,??
+    vec4 cameraPosition; // pos.xyz, ??
 } renderer;
 
 layout(set = 0, binding = 1) uniform sampler clampSampler;
@@ -96,6 +108,11 @@ layout(set = 0, binding = 6) uniform texture2D radianceCube;
 layout(set = 0, binding = 7) uniform texture2D frontBufferColor;
 layout(set = 0, binding = 8) uniform texture2D frontBufferPosition;
 layout(set = 0, binding = 9) uniform texture2D frontBufferDepth;
+
+layout(set = 0, binding = 10) uniform texture2D outlineTexture;
+
+layout(set = 0, binding = 11) uniform texture2D shadowMap;
+layout(set = 0, binding = 12) uniform sampler shadowSampler;
 // End Set0
 
 	out vec4 outColor;
@@ -214,7 +231,32 @@ e2::Renderer::Renderer(e2::Session* session, glm::uvec2 const& resolution)
 		m_renderBuffers[i].sets[1]->writeTexture(9, m_renderBuffers[other_i].depthTexture);
 	}
 
+	// setup shadow buffers 
+	constexpr uint32_t shadowMapResolution = 2048;
+	{
+		e2::TextureCreateInfo textureCreateInfo{};
+		textureCreateInfo.resolution.x = shadowMapResolution;
+		textureCreateInfo.resolution.y = shadowMapResolution;
+		textureCreateInfo.resolution.z = 1;
+		textureCreateInfo.mips = 1;
+		textureCreateInfo.arrayLayers = 1;
+		textureCreateInfo.type = TextureType::Texture2D;
+		textureCreateInfo.format = TextureFormat::D32;
 
+		textureCreateInfo.initialLayout = TextureLayout::ShaderRead; // we use shader read as default for this, and then swithc when rendering
+		m_shadowBuffer.depthTexture = renderContext()->createTexture(textureCreateInfo);
+
+		e2::RenderTargetCreateInfo renderTargetInfo{};
+		renderTargetInfo.areaExtent = { shadowMapResolution , shadowMapResolution };
+
+		renderTargetInfo.depthAttachment.target = m_shadowBuffer.depthTexture;
+		renderTargetInfo.depthAttachment.clearMethod = ClearMethod::DepthStencil;
+		renderTargetInfo.depthAttachment.clearValue.depth = 1.0f;
+		renderTargetInfo.depthAttachment.loadOperation = LoadOperation::Load;
+		renderTargetInfo.depthAttachment.storeOperation = StoreOperation::Store;
+		
+		m_shadowBuffer.renderTarget = renderContext()->createRenderTarget(renderTargetInfo);
+	}
 
 
 	m_defaultSettings.frontFace = FrontFace::CCW;
@@ -249,6 +291,10 @@ e2::Renderer::~Renderer()
 	e2::discard(m_linePipeline);
 	e2::discard(m_lineVertexShader);
 	e2::discard(m_lineFragmentShader);
+
+	e2::discard(m_shadowBuffer.renderTarget);
+	e2::discard(m_shadowBuffer.depthTexture);
+
 	e2::discard(m_rendererBuffers[0]);
 	e2::discard(m_rendererBuffers[1]);
 	e2::discard(m_renderBuffers[0].renderTarget);
@@ -273,30 +319,68 @@ e2::Engine* e2::Renderer::engine()
 	return m_session->engine();
 }
 
-void e2::Renderer::recordFrame(double deltaTime)
+void e2::Renderer::prepareFrame(double deltaTime)
 {
 	uint8_t frameIndex = renderManager()->frameIndex();
-	e2::ICommandBuffer* buff = m_commandBuffers[frameIndex];
-
-	e2::IDescriptorSet* modelSet = m_session->getModelSet(frameIndex);
-
-	std::map<e2::RenderLayer, std::unordered_set<MeshProxySubmesh>> const& submeshIndex = m_session->submeshIndex();
-
-	m_rendererData.projectionMatrix = m_view.calculateProjectionMatrix(m_resolution);
-	m_rendererData.viewMatrix = m_view.calculateViewMatrix(); 
 	
 	m_rendererData.time.x += (float)deltaTime;
 	m_rendererData.time.y = glm::sin((float)m_rendererData.time.x);
 	m_rendererData.time.z = glm::cos((float)m_rendererData.time.x);
 	m_rendererData.time.w = glm::tan((float)m_rendererData.time.x);
 
-	m_rendererData.sun1 = glm::vec4(m_sunDirection, 0.0f);
+	m_rendererData.sun1 = glm::vec4(m_sunRotation * e2::worldForwardf(), 0.0f);
 	m_rendererData.sun2 = glm::vec4(m_sunColor, m_sunStrength);
 
 	m_rendererData.ibl1 = glm::vec4(m_iblStrength, 0.0f, 0.0f, 0.0f);
 	m_rendererData.cameraPosition = glm::vec4(glm::vec3(m_view.origin), 0.0f);
-	
+
+	m_rendererData.projectionMatrix = m_view.calculateProjectionMatrix(m_resolution);
+	m_rendererData.viewMatrix = m_view.calculateViewMatrix();
+
+	// calculate shadow matrices 
+	{
+		float yMin = m_view.origin.y;
+		float yMax = 5.0f; // 5 meter below ground seems decent
+		e2::Aabb2D planarAabb = m_viewPoints.toAabb();
+		e2::Aabb3D worldAabb(planarAabb, yMin, yMax);
+		//e2::Aabb3D worldAabb(planarAabb, 0.0f, 0.0f);
+
+		e2::StackVector<glm::vec3, 8> worldPoints = worldAabb.points();
+
+		// Get frustum center
+		glm::vec3 frustumCenter = glm::vec3(0.0f);
+		for (uint32_t j = 0; j < 8; j++) {
+			frustumCenter += worldPoints[j];
+		}
+		frustumCenter /= 8.0f;
+
+		float radius = 0.0f;
+		for (uint32_t j = 0; j < 8; j++) {
+			float distance = glm::length(worldPoints[j] - frustumCenter);
+			radius = glm::max(radius, distance);
+		}
+		// why this?
+		radius = std::ceil(radius * 16.0f) / 16.0f;
+
+		
+		glm::vec3 origin = frustumCenter + (m_sunRotation * e2::worldForwardf()) * -radius;
+		glm::mat4 translateMatrix = glm::translate(glm::identity<glm::mat4>(), origin);
+		glm::mat4 rotateMatrix = glm::toMat4(m_sunRotation);
+		m_rendererData.shadowView = glm::inverse(translateMatrix * rotateMatrix);
+		
+
+		//m_rendererData.shadowView= glm::lookAt(frustumCenter + m_sunDirection * radius, frustumCenter, e2::worldUpf());
+
+		m_rendererData.shadowProjection = glm::ortho(-radius, radius, -radius, radius, 0.000f, radius*2.0f);
+	}
+
+
 	m_rendererBuffers[frameIndex]->upload(reinterpret_cast<uint8_t const*>(&m_rendererData), sizeof(RendererData), 0, 0);
+
+	m_renderBuffers[0].sets[frameIndex]->writeTexture(11, m_shadowBuffer.depthTexture);
+	m_renderBuffers[1].sets[frameIndex]->writeTexture(11, m_shadowBuffer.depthTexture);
+	m_renderBuffers[0].sets[frameIndex]->writeSampler(12, renderManager()->shadowSampler());
+	m_renderBuffers[1].sets[frameIndex]->writeSampler(12, renderManager()->shadowSampler());
 
 	if (m_irradiance)
 	{
@@ -315,200 +399,292 @@ void e2::Renderer::recordFrame(double deltaTime)
 		m_renderBuffers[0].sets[frameIndex]->writeTexture(10, m_outlineTextures[frameIndex]);
 		m_renderBuffers[1].sets[frameIndex]->writeTexture(10, m_outlineTextures[frameIndex]);
 	}
+}
+
+void e2::Renderer::recordShadows(double deltaTime, e2::ICommandBuffer* buff)
+{
+	uint8_t frameIndex = renderManager()->frameIndex();
+	e2::IDescriptorSet* modelSet = m_session->getModelSet(frameIndex);
+	std::unordered_set<MeshProxySubmesh> const& shadowSubmeshes = m_session->shadowSubmeshes();
+
+
+	e2::ShadowPushConstantData shadowPushConstantData;
+	shadowPushConstantData.shadowViewProjection = m_rendererData.shadowProjection * m_rendererData.shadowView;
+
+
+	buff->useAsDepthAttachment(m_shadowBuffer.depthTexture);
+	buff->beginRender(m_shadowBuffer.renderTarget);
+	buff->clearDepth(1.0f);
+	buff->endRender();
+
+
+
+	// Setup render target states
+	buff->beginRender(m_shadowBuffer.renderTarget);
+
+	for (e2::MeshProxySubmesh const& meshProxySubmesh : shadowSubmeshes)
+	{
+		e2::MeshProxy* meshProxy = meshProxySubmesh.proxy;
+		uint8_t submeshIndex = meshProxySubmesh.submesh;
+
+		if (!meshProxy->shadowPipelines[submeshIndex])
+			continue;
+
+		buff->bindPipeline(meshProxy->shadowPipelines[submeshIndex]);
+
+		e2::MeshPtr mesh = meshProxy->asset;
+		e2::IPipelineLayout* shadowPipelineLayout = meshProxy->shadowPipelineLayouts[submeshIndex];
+
+		e2::SubmeshSpecification const& meshSpec = mesh->specification(submeshIndex);
+
+		// Push constant data
+		buff->pushConstants(shadowPipelineLayout, 0, sizeof(e2::ShadowPushConstantData), reinterpret_cast<uint8_t*>(&shadowPushConstantData));
+
+		// Bind vertex states
+		buff->bindVertexLayout(meshSpec.vertexLayout);
+		buff->bindIndexBuffer(meshSpec.indexBuffer);
+		for (uint8_t i = 0; i < meshSpec.vertexAttributes.size(); i++)
+			buff->bindVertexBuffer(i, meshSpec.vertexAttributes[i]);
+
+		uint32_t skinId = meshProxy->skinProxy ? meshProxy->skinProxy->id : 0;
+		// Bind descriptor sets (0 is renderer, 1 is model, 2 is material, 3 is reserved)
+		uint32_t offsets[2] = {
+			renderManager()->paddedBufferSize(sizeof(glm::mat4)) * meshProxy->id,
+			renderManager()->paddedBufferSize(sizeof(glm::mat4) * e2::maxNumSkeletonBones) * skinId
+		};
+
+		buff->bindDescriptorSet(shadowPipelineLayout, 0, modelSet, 2, &offsets[0]);
+	
+		meshProxy->materialProxies[submeshIndex]->bind(buff, frameIndex, true);
+
+		// Issue drawcall
+		buff->draw(meshSpec.indexCount, 1);
+
+	}
+
+	buff->endRender();
+
+	buff->useAsDefault(m_shadowBuffer.depthTexture);
+
+
+}
+
+void e2::Renderer::recordRenderLayers(double deltaTime, e2::ICommandBuffer* buff)
+{
+	uint8_t frameIndex = renderManager()->frameIndex();
+	e2::IDescriptorSet* modelSet = m_session->getModelSet(frameIndex);
+	std::map<e2::RenderLayer, std::unordered_set<MeshProxySubmesh>> const& submeshIndex = m_session->submeshIndex();
+
+	buff->useAsAttachment(m_renderBuffers[0].colorTexture);
+	buff->useAsAttachment(m_renderBuffers[0].positionTexture);
+	buff->useAsDepthAttachment(m_renderBuffers[0].depthTexture);
+	buff->beginRender(m_renderBuffers[0].renderTarget);
+	buff->clearColor(0, glm::vec4(0.0f, 0.0f, 0.0f, 0.0f));
+	buff->clearColor(1, glm::vec4(0.0f, 0.0f, 0.0f, 0.0f));
+	buff->clearDepth(1.0f);
+	buff->endRender();
+	buff->useAsDefault(m_renderBuffers[0].colorTexture);
+	buff->useAsDefault(m_renderBuffers[0].positionTexture);
+	buff->useAsDefault(m_renderBuffers[0].depthTexture);
+
+	buff->useAsAttachment(m_renderBuffers[1].colorTexture);
+	buff->useAsAttachment(m_renderBuffers[1].positionTexture);
+	buff->useAsDepthAttachment(m_renderBuffers[1].depthTexture);
+	buff->beginRender(m_renderBuffers[1].renderTarget);
+	buff->clearColor(0, glm::vec4(0.0f, 0.0f, 0.0f, 0.0f));
+	buff->clearColor(1, glm::vec4(0.0f, 0.0f, 0.0f, 0.0f));
+	buff->clearDepth(1.0f);
+	buff->endRender();
+	buff->useAsDefault(m_renderBuffers[1].colorTexture);
+	buff->useAsDefault(m_renderBuffers[1].positionTexture);
+	buff->useAsDefault(m_renderBuffers[1].depthTexture);
+
+	// iterate all render layers, and render their respective submeshes 
+	for (auto& pair : submeshIndex)
+	{
+		e2::RenderLayer renderLayer = pair.first;
+		std::unordered_set<e2::MeshProxySubmesh> const& submeshSet = pair.second;
+
+		uint8_t frontBuffIndex = frontBuffer();
+		auto& backBuff = m_renderBuffers[m_backBuffer];
+		auto& frontBuff = m_renderBuffers[frontBuffIndex];
+
+		e2::IDescriptorSet* rendererSet = backBuff.sets[frameIndex];
+
+		buff->useAsAttachment(backBuff.colorTexture);
+		buff->useAsAttachment(backBuff.positionTexture);
+		buff->useAsDepthAttachment(backBuff.depthTexture);
+		buff->beginRender(backBuff.renderTarget);
+		buff->clearColor(0, glm::vec4(0.0f, 0.0f, 0.0f, 0.0f));
+		buff->clearColor(1, glm::vec4(0.0f, 0.0f, 0.0f, 0.0f));
+		buff->clearDepth(1.0f);
+		buff->endRender();
+		buff->useAsDefault(backBuff.colorTexture);
+		buff->useAsDefault(backBuff.positionTexture);
+		buff->useAsDefault(backBuff.depthTexture);
+
+		buff->useAsTransferDst(backBuff.colorTexture);
+		buff->useAsTransferSrc(frontBuff.colorTexture);
+		buff->blit(backBuff.colorTexture, frontBuff.colorTexture, 0, 0);
+		buff->useAsDefault(frontBuff.colorTexture);
+		buff->useAsAttachment(backBuff.colorTexture);
+
+		buff->useAsTransferDst(backBuff.positionTexture);
+		buff->useAsTransferSrc(frontBuff.positionTexture);
+		buff->blit(backBuff.positionTexture, frontBuff.positionTexture, 0, 0);
+		buff->useAsDefault(frontBuff.positionTexture);
+		buff->useAsAttachment(backBuff.positionTexture);
+
+		buff->useAsTransferDst(backBuff.depthTexture);
+		buff->useAsTransferSrc(frontBuff.depthTexture);
+		buff->blit(backBuff.depthTexture, frontBuff.depthTexture, 0, 0);
+		buff->useAsDefault(frontBuff.depthTexture);
+		buff->useAsDepthAttachment(backBuff.depthTexture);
+
+		// Setup render target states
+		buff->beginRender(backBuff.renderTarget);
+		for (e2::MeshProxySubmesh const& meshProxySubmesh : submeshSet)
+		{
+			e2::MeshProxy* meshProxy = meshProxySubmesh.proxy;
+			uint8_t submeshIndex = meshProxySubmesh.submesh;
+
+			if (!meshProxy->pipelines[submeshIndex])
+				continue;
+
+			buff->bindPipeline(meshProxy->pipelines[submeshIndex]);
+
+			e2::MeshPtr mesh = meshProxy->asset;
+			e2::IPipelineLayout* pipelineLayout = meshProxy->pipelineLayouts[submeshIndex];
+
+			e2::SubmeshSpecification const& meshSpec = mesh->specification(submeshIndex);
+
+			// Push constant data
+			e2::PushConstantData pushConstantData;
+			pushConstantData.normalMatrix = glm::transpose(glm::inverse(meshProxy->modelMatrix));
+			pushConstantData.resolution = m_resolution;
+			buff->pushConstants(pipelineLayout, 0, sizeof(e2::PushConstantData), reinterpret_cast<uint8_t*>(&pushConstantData));
+
+			// Bind vertex states
+			buff->bindVertexLayout(meshSpec.vertexLayout);
+			buff->bindIndexBuffer(meshSpec.indexBuffer);
+			for (uint8_t i = 0; i < meshSpec.vertexAttributes.size(); i++)
+				buff->bindVertexBuffer(i, meshSpec.vertexAttributes[i]);
+
+			buff->bindDescriptorSet(pipelineLayout, 0, rendererSet);
+
+			//if (meshProxy->skinProxy)
+			{
+				uint32_t skinId = meshProxy->skinProxy ? meshProxy->skinProxy->id : 0;
+				// Bind descriptor sets (0 is renderer, 1 is model, 2 is material, 3 is reserved)
+				uint32_t offsets[2] = {
+					renderManager()->paddedBufferSize(sizeof(glm::mat4)) * meshProxy->id,
+					renderManager()->paddedBufferSize(sizeof(glm::mat4) * e2::maxNumSkeletonBones) * skinId
+				};
+
+				buff->bindDescriptorSet(pipelineLayout, 1, modelSet, 2, &offsets[0]);
+			}
+			/*else
+			{
+				// Bind descriptor sets (0 is renderer, 1 is model, 2 is material, 3 is reserved)
+				uint32_t offsets[1] = {
+					renderManager()->paddedBufferSize(sizeof(glm::mat4)) * meshProxy->id
+				};
+
+				buff->bindDescriptorSet(pipelineLayout, 1, modelSet, 1, &offsets[0]);
+			}
+			*/
+			meshProxy->materialProxies[submeshIndex]->bind(buff, frameIndex, false);
+
+			// Issue drawcall
+			buff->draw(meshSpec.indexCount, 1);
+
+		}
+
+		buff->endRender();
+
+		buff->useAsDefault(backBuff.colorTexture);
+		buff->useAsDefault(backBuff.positionTexture);
+		buff->useAsDefault(backBuff.depthTexture);
+
+		swapRenderBuffers();
+	}
+}
+
+void e2::Renderer::recordDebugLines(double deltaTime, e2::ICommandBuffer* buff)
+{
+	uint8_t frameIndex = renderManager()->frameIndex();
+	e2::IDescriptorSet* modelSet = m_session->getModelSet(frameIndex);
+	std::map<e2::RenderLayer, std::unordered_set<MeshProxySubmesh>> const& submeshIndex = m_session->submeshIndex();
+
+	if (m_debugLines.size() == 0)
+	{
+		//LogWarning("No debug lines");
+	}
+	else
+	{
+		uint8_t frontBuffIndex = frontBuffer();
+		auto& backBuff = m_renderBuffers[m_backBuffer];
+		auto& frontBuff = m_renderBuffers[frontBuffIndex];
+
+		e2::IDescriptorSet* rendererSet = m_renderBuffers[m_backBuffer].sets[frameIndex];
+
+
+		buff->useAsTransferDst(backBuff.colorTexture);
+		buff->useAsTransferSrc(frontBuff.colorTexture);
+		buff->blit(backBuff.colorTexture, frontBuff.colorTexture, 0, 0);
+		buff->useAsDefault(frontBuff.colorTexture);
+		buff->useAsAttachment(backBuff.colorTexture);
+
+		buff->useAsTransferDst(backBuff.depthTexture);
+		buff->useAsTransferSrc(frontBuff.depthTexture);
+		buff->blit(backBuff.depthTexture, frontBuff.depthTexture, 0, 0);
+		buff->useAsDefault(frontBuff.depthTexture);
+		buff->useAsDepthAttachment(backBuff.depthTexture);
+
+
+		// Setup render target states
+		buff->beginRender(backBuff.renderTarget);
+
+
+		buff->setDepthTest(false);
+		buff->bindPipeline(m_linePipeline);
+		buff->nullVertexLayout();
+		buff->bindDescriptorSet(renderManager()->linePipelineLayout(), 0, rendererSet);
+		for (uint32_t i = 0; i < m_debugLines.size(); i++)
+		{
+			glm::vec4 lineConstants[3] = {
+				{m_debugLines[i].color, 1.0f},
+				{m_debugLines[i].start, 1.0f},
+				{m_debugLines[i].end, 1.0f},
+			};
+
+			buff->pushConstants(renderManager()->linePipelineLayout(), 0, sizeof(glm::vec4) * 3, reinterpret_cast<uint8_t*>(&lineConstants[0]));
+			buff->drawNonIndexed(2, 1);
+		}
+
+
+		buff->endRender();
+
+		buff->useAsDefault(backBuff.colorTexture);
+		buff->useAsDefault(backBuff.depthTexture);
+
+		swapRenderBuffers();
+	}
+}
+
+void e2::Renderer::recordFrame(double deltaTime)
+{
+	uint8_t frameIndex = renderManager()->frameIndex();
+	e2::ICommandBuffer* buff = m_commandBuffers[frameIndex];
+
+	prepareFrame(deltaTime);
 
 	// Begin command buffer
 	buff->beginRecord(true, m_defaultSettings);
 	{
-		buff->useAsAttachment(m_renderBuffers[0].colorTexture);
-		buff->useAsAttachment(m_renderBuffers[0].positionTexture);
-		buff->useAsDepthAttachment(m_renderBuffers[0].depthTexture);
-		buff->beginRender(m_renderBuffers[0].renderTarget);
-		buff->clearColor(0, glm::vec4(0.0f, 0.0f, 0.0f, 0.0f));
-		buff->clearColor(1, glm::vec4(0.0f, 0.0f, 0.0f, 0.0f));
-		buff->clearDepth(1.0f);
-		buff->endRender();
-		buff->useAsDefault(m_renderBuffers[0].colorTexture);
-		buff->useAsDefault(m_renderBuffers[0].positionTexture);
-		buff->useAsDefault(m_renderBuffers[0].depthTexture);
-
-		buff->useAsAttachment(m_renderBuffers[1].colorTexture);
-		buff->useAsAttachment(m_renderBuffers[1].positionTexture);
-		buff->useAsDepthAttachment(m_renderBuffers[1].depthTexture);
-		buff->beginRender(m_renderBuffers[1].renderTarget);
-		buff->clearColor(0, glm::vec4(0.0f, 0.0f, 0.0f, 0.0f));
-		buff->clearColor(1, glm::vec4(0.0f, 0.0f, 0.0f, 0.0f));
-		buff->clearDepth(1.0f);
-		buff->endRender();
-		buff->useAsDefault(m_renderBuffers[1].colorTexture);
-		buff->useAsDefault(m_renderBuffers[1].positionTexture);
-		buff->useAsDefault(m_renderBuffers[1].depthTexture);
-
-		// iterate all render layers, and render their respective submeshes 
-		for (auto& pair : submeshIndex)
-		{
-			e2::RenderLayer renderLayer = pair.first;
-			std::unordered_set<e2::MeshProxySubmesh> const& submeshSet = pair.second;
-
-			uint8_t frontBuffIndex = frontBuffer();
-			auto& backBuff = m_renderBuffers[m_backBuffer];
-			auto& frontBuff = m_renderBuffers[frontBuffIndex];
-
-			e2::IDescriptorSet* rendererSet = backBuff.sets[frameIndex];
-
-			buff->useAsAttachment(backBuff.colorTexture);
-			buff->useAsAttachment(backBuff.positionTexture);
-			buff->useAsDepthAttachment(backBuff.depthTexture);
-			buff->beginRender(backBuff.renderTarget);
-			buff->clearColor(0, glm::vec4(0.0f, 0.0f, 0.0f, 0.0f));
-			buff->clearColor(1, glm::vec4(0.0f, 0.0f, 0.0f, 0.0f));
-			buff->clearDepth(1.0f);
-			buff->endRender();
-			buff->useAsDefault(backBuff.colorTexture);
-			buff->useAsDefault(backBuff.positionTexture);
-			buff->useAsDefault(backBuff.depthTexture);
-
-			buff->useAsTransferDst(backBuff.colorTexture);
-			buff->useAsTransferSrc(frontBuff.colorTexture);
-			buff->blit(backBuff.colorTexture, frontBuff.colorTexture, 0, 0);
-			buff->useAsDefault(frontBuff.colorTexture);
-			buff->useAsAttachment(backBuff.colorTexture);
-
-			buff->useAsTransferDst(backBuff.positionTexture);
-			buff->useAsTransferSrc(frontBuff.positionTexture);
-			buff->blit(backBuff.positionTexture, frontBuff.positionTexture, 0, 0);
-			buff->useAsDefault(frontBuff.positionTexture);
-			buff->useAsAttachment(backBuff.positionTexture);
-
-			buff->useAsTransferDst(backBuff.depthTexture);
-			buff->useAsTransferSrc(frontBuff.depthTexture);
-			buff->blit(backBuff.depthTexture, frontBuff.depthTexture, 0, 0);
-			buff->useAsDefault(frontBuff.depthTexture);
-			buff->useAsDepthAttachment(backBuff.depthTexture);
-		
-			// Setup render target states
-			buff->beginRender(backBuff.renderTarget);
-			for (e2::MeshProxySubmesh const& meshProxySubmesh : submeshSet)
-			{
-				e2::MeshProxy* meshProxy = meshProxySubmesh.proxy;
-				uint8_t submeshIndex = meshProxySubmesh.submesh;
-
-				if (!meshProxy->pipelines[submeshIndex])
-					continue;
-
-				buff->bindPipeline(meshProxy->pipelines[submeshIndex]);
-
-				e2::MeshPtr mesh = meshProxy->asset;
-				e2::IPipelineLayout* pipelineLayout = meshProxy->pipelineLayouts[submeshIndex];
-
-				e2::SubmeshSpecification const& meshSpec = mesh->specification(submeshIndex);
-
-				// Push constant data
-				e2::PushConstantData pushConstantData;
-				pushConstantData.normalMatrix = glm::transpose(glm::inverse(meshProxy->modelMatrix));
-				pushConstantData.resolution =m_resolution;
-				buff->pushConstants(pipelineLayout, 0, sizeof(e2::PushConstantData), reinterpret_cast<uint8_t*>(&pushConstantData));
-
-				// Bind vertex states
-				buff->bindVertexLayout(meshSpec.vertexLayout);
-				buff->bindIndexBuffer(meshSpec.indexBuffer);
-				for (uint8_t i = 0; i < meshSpec.vertexAttributes.size(); i++)
-					buff->bindVertexBuffer(i, meshSpec.vertexAttributes[i]);
-
-				buff->bindDescriptorSet(pipelineLayout, 0, rendererSet);
-
-				//if (meshProxy->skinProxy)
-				{
-					uint32_t skinId = meshProxy->skinProxy ? meshProxy->skinProxy->id : 0;
-					// Bind descriptor sets (0 is renderer, 1 is model, 2 is material, 3 is reserved)
-					uint32_t offsets[2] = {
-						renderManager()->paddedBufferSize(sizeof(glm::mat4)) * meshProxy->id,
-						renderManager()->paddedBufferSize(sizeof(glm::mat4) * e2::maxNumSkeletonBones) * skinId
-					};
-
-					buff->bindDescriptorSet(pipelineLayout, 1, modelSet, 2, &offsets[0]);
-				}
-				/*else
-				{
-					// Bind descriptor sets (0 is renderer, 1 is model, 2 is material, 3 is reserved)
-					uint32_t offsets[1] = {
-						renderManager()->paddedBufferSize(sizeof(glm::mat4)) * meshProxy->id
-					};
-
-					buff->bindDescriptorSet(pipelineLayout, 1, modelSet, 1, &offsets[0]);
-				}
-				*/
-				meshProxy->materialProxies[submeshIndex]->bind(buff, frameIndex);
-
-				// Issue drawcall
-				buff->draw(meshSpec.indexCount, 1);
-						
-			}
-			
-			buff->endRender();
-
-			buff->useAsDefault(backBuff.colorTexture);
-			buff->useAsDefault(backBuff.positionTexture);
-			buff->useAsDefault(backBuff.depthTexture);
-
-			swapRenderBuffers();
-		}
-
-
-
-		if (m_debugLines.size() == 0)
-		{
-			//LogWarning("No debug lines");
-		}
-		else
-		{
-			uint8_t frontBuffIndex = frontBuffer();
-			auto& backBuff = m_renderBuffers[m_backBuffer];
-			auto& frontBuff = m_renderBuffers[frontBuffIndex];
-
-			e2::IDescriptorSet* rendererSet = m_renderBuffers[m_backBuffer].sets[frameIndex];
-
-
-			buff->useAsTransferDst(backBuff.colorTexture);
-			buff->useAsTransferSrc(frontBuff.colorTexture);
-			buff->blit(backBuff.colorTexture, frontBuff.colorTexture, 0, 0);
-			buff->useAsDefault(frontBuff.colorTexture);
-			buff->useAsAttachment(backBuff.colorTexture);
-
-			buff->useAsTransferDst(backBuff.depthTexture);
-			buff->useAsTransferSrc(frontBuff.depthTexture);
-			buff->blit(backBuff.depthTexture, frontBuff.depthTexture, 0, 0);
-			buff->useAsDefault(frontBuff.depthTexture);
-			buff->useAsDepthAttachment(backBuff.depthTexture);
-
-
-			// Setup render target states
-			buff->beginRender(backBuff.renderTarget);
-
-
-			buff->setDepthTest(false);
-			buff->bindPipeline(m_linePipeline);
-			buff->nullVertexLayout();
-			buff->bindDescriptorSet(renderManager()->linePipelineLayout(), 0, rendererSet);
-			for (uint32_t i = 0; i < m_debugLines.size(); i++)
-			{
-				glm::vec4 lineConstants[3] = {
-					{m_debugLines[i].color, 1.0f},
-					{m_debugLines[i].start, 1.0f},
-					{m_debugLines[i].end, 1.0f},
-				};
-
-				buff->pushConstants(renderManager()->linePipelineLayout(), 0, sizeof(glm::vec4) * 3, reinterpret_cast<uint8_t*>(&lineConstants[0]));
-				buff->drawNonIndexed(2, 1);
-			}
-
-
-			buff->endRender();
-
-			buff->useAsDefault(backBuff.colorTexture);
-			buff->useAsDefault(backBuff.depthTexture);
-
-			swapRenderBuffers();
-		}
+		recordShadows(deltaTime, buff);
+		recordRenderLayers(deltaTime, buff);
+		recordDebugLines(deltaTime, buff);
 
 		buff->endRecord();
 	}
@@ -595,10 +771,10 @@ void e2::Renderer::setEnvironment(e2::ITexture* irradiance, e2::ITexture* radian
 	m_radiance = radiance;
 }
 
-void e2::Renderer::setSun(glm::vec3 const& dir, glm::vec3 const& color, float strength)
+void e2::Renderer::setSun(glm::quat const& rot, glm::vec3 const& color, float strength)
 {
 	m_sunColor = color;
-	m_sunDirection = glm::normalize(dir);
+	m_sunRotation = rot;
 	m_sunStrength = strength;
 }
 
@@ -672,6 +848,18 @@ e2::ConvexShape2D e2::Viewpoints2D::combine(Viewpoints2D const& other)
 	until endpoint = P[0]      // wrapped around to first hull point
 	
 	*/
+}
+
+e2::StackVector<glm::vec3, 4> e2::Viewpoints2D::worldCorners()
+{
+	e2::StackVector<glm::vec3, 4> returnValue;
+	returnValue.resize(4);
+	for (int i = 0; i < 4; i++)
+	{
+		returnValue[i] = glm::vec3(corners[i].x, 0.0f, corners[i].y);
+	}
+
+	return returnValue;
 }
 
 e2::Viewpoints2D::Viewpoints2D()
@@ -880,4 +1068,61 @@ bool e2::Line2D::intersects(Line2D const& other)
 {
 	return e2::isCounterClockwise(start, other.start, other.end) != e2::isCounterClockwise(end, other.start, other.end)
 		&& e2::isCounterClockwise(start, end, other.start) != e2::isCounterClockwise(start, end, other.end);
+}
+
+e2::Aabb3D::Aabb3D(Aabb2D const& fromPlanar, float yMin, float yMax)
+{
+	min = {fromPlanar.min.x, yMin, fromPlanar.min.y};
+	max = { fromPlanar.max.x, yMax, fromPlanar.max.y };
+}
+
+void e2::Aabb3D::write(Buffer& destination) const
+{
+	destination << min;
+	destination << max;
+}
+
+bool e2::Aabb3D::read(Buffer& source)
+{
+	source >> min;
+	source >> max;
+	return true;
+}
+
+e2::StackVector<glm::vec3, 8> e2::Aabb3D::points()
+{
+	e2::StackVector<glm::vec3, 8> p = {
+		{min.x, min.y, min.z},
+		{min.x, min.y, max.z},
+		{min.x, max.y, min.z},
+		{min.x, max.y, max.z},
+		{max.x, min.y, min.z},
+		{max.x, min.y, max.z},
+		{max.x, max.y, min.z},
+		{max.x, max.y, max.z}
+	};
+
+	return p;
+}
+
+void e2::Aabb3D::push(glm::vec3 const& point)
+{
+	if (point.x < min.x)
+		min.x = point.x;
+	if (point.y < min.y)
+		min.y = point.y;
+	if (point.z < min.z)
+		min.z = point.z;
+
+	if (point.x > max.x)
+		max.x = point.x;
+	if (point.y > max.y)
+		max.y = point.y;
+	if (point.z > max.z)
+		max.z = point.z;
+}
+
+bool e2::Aabb3D::isWithin(glm::vec3 const& point) const
+{
+	return point.x >= min.x && point.x < max.x && point.y >= min.y && point.y < max.y && point.z >= min.z && point.z < max.z;
 }

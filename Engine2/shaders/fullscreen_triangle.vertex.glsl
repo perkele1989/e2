@@ -1,4 +1,4 @@
-#version 460 core
+#include <shaders/header.glsl>
 #define EPSILON 1e-5
 
 out vec2 outUv;

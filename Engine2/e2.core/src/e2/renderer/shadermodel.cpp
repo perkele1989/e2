@@ -31,6 +31,11 @@ e2::RenderLayer e2::ShaderModel::renderLayer()
 	return e2::RenderLayer::Default;
 }
 
+bool e2::ShaderModel::supportsShadows()
+{
+	return false;
+}
+
 bool e2::ShaderModelSpecification::isCompatible(e2::SubmeshSpecification const& mesh)
 {
 	return (requiredAttributes & mesh.attributeFlags) == requiredAttributes;

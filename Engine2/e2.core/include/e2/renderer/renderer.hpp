@@ -33,6 +33,11 @@ namespace e2
 
 	};
 
+	struct E2_API ShadowPushConstantData
+	{
+		glm::mat4 shadowViewProjection;
+	};
+
 	struct E2_API PushConstantData
 	{
 		glm::mat4 normalMatrix;
@@ -41,6 +46,8 @@ namespace e2
 
 	struct E2_API RendererData
 	{
+		alignas(16) glm::mat4 shadowView;
+		alignas(16) glm::mat4 shadowProjection;
 		alignas(16) glm::mat4 viewMatrix;
 		alignas(16) glm::mat4 projectionMatrix;
 		alignas(16) glm::vec4 time; // t, sin(t), cos(t), tan(t)
@@ -48,7 +55,6 @@ namespace e2
 		alignas(16) glm::vec4 sun2; // sun color.rgb, sun strength
 		alignas(16) glm::vec4 ibl1; // ibl strength, ???, ???, ???
 		alignas(16) glm::vec4 cameraPosition;
-		
 	};
 
 	E2_API bool isCounterClockwise(glm::vec2 const& a, glm::vec2 const& b, glm::vec2 const& c);
@@ -60,6 +66,7 @@ namespace e2
 
 		bool intersects(Line2D const& other);
 	};
+
 
 	struct E2_API Aabb2D : public e2::Data
 	{
@@ -75,6 +82,24 @@ namespace e2
 		void push(glm::vec2 const& point);
 
 		bool isWithin(glm::vec2 const& point) const;
+	};
+
+	struct E2_API Aabb3D : public e2::Data
+	{
+
+		Aabb3D(Aabb2D const& fromPlanar, float yMin, float yMax);
+
+		virtual void write(Buffer& destination) const override;
+		virtual bool read(Buffer& source) override;
+
+		glm::vec3 min{};
+		glm::vec3 max{};
+
+		e2::StackVector<glm::vec3, 8> points();
+
+		void push(glm::vec3 const& point);
+
+		bool isWithin(glm::vec3 const& point) const;
 	};
 
 	struct E2_API Ray2D
@@ -96,13 +121,14 @@ namespace e2
 	};
 
 	// A flat frustum, it represents the 4 corners of the camera frustum, projected to the flat xz plane at y=0.0
-	// Can be extended to work as a generic 2D convex hull but we dont need that right now 
 	struct E2_API Viewpoints2D
 	{
 		Viewpoints2D();
 		Viewpoints2D(glm::vec2 const& _resolution, e2::RenderView const& _view);
 
 		ConvexShape2D combine(Viewpoints2D const& other);
+
+		e2::StackVector<glm::vec3, 4> worldCorners();
 
 		union
 		{
@@ -153,10 +179,15 @@ namespace e2
 
 		virtual Engine* engine() override;
 
+		void prepareFrame(double deltaTime);
+
 		// records and queues the current frame
 		void recordFrame(double deltaTime);
 
-		
+		void recordShadows(double deltaTime, e2::ICommandBuffer* buff);
+		void recordRenderLayers(double deltaTime, e2::ICommandBuffer* buff);
+		void recordDebugLines(double deltaTime, e2::ICommandBuffer* buff);
+
 		e2::Session* session() const;
 
 		void setView(e2::RenderView const& renderView);
@@ -164,6 +195,12 @@ namespace e2
 		inline e2::ITexture* colorTarget() const
 		{
 			return m_renderBuffers[frontBuffer()].colorTexture;
+		}
+
+
+		inline e2::ITexture* shadowTarget() const
+		{
+			return m_shadowBuffer.depthTexture;
 		}
 
 		inline glm::uvec2 resolution() const
@@ -182,7 +219,7 @@ namespace e2
 		}
 
 		void setEnvironment(e2::ITexture* irradiance, e2::ITexture* radiance);
-		void setSun(glm::vec3 const& dir, glm::vec3 const& color, float strength);
+		void setSun(glm::quat const& rot, glm::vec3 const& color, float strength);
 
 		void setOutlineTextures(e2::ITexture* textures[2]);
 
@@ -203,6 +240,12 @@ namespace e2
 			e2::IRenderTarget* renderTarget{};
 			e2::Pair<e2::IDescriptorSet*> sets{ nullptr };
 		} m_renderBuffers[2];
+
+		struct
+		{
+			e2::ITexture* depthTexture{};
+			e2::IRenderTarget* renderTarget{};
+		} m_shadowBuffer;
 
 		uint8_t m_backBuffer{};
 
@@ -228,10 +271,10 @@ namespace e2
 
 		e2::ITexture* m_outlineTextures[2];
 
-		float m_iblStrength{ 1.0f };
+		float m_iblStrength{ 0.2f };
 
 		glm::vec3 m_sunColor;
-		glm::vec3 m_sunDirection{};
+		glm::quat m_sunRotation{};
 		float m_sunStrength{ 1.0f };
 
 		// @todo set configurable or just change to dynamic because this is debug shit anyway

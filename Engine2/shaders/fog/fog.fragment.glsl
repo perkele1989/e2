@@ -1,4 +1,4 @@
-#version 460 core
+#include <shaders/header.glsl>
 
 // Fragment attributes
 

@@ -1,7 +1,8 @@
-#version 460 core
+#include <shaders/header.glsl>
 
 // Fragment attributes
 
+#if !defined(Renderer_Shadow)
 in vec4 fragmentPosition;
 
 #if defined(Vertex_TexCoords01)
@@ -25,11 +26,13 @@ in vec4 fragmentColor;
 out vec4 outColor;
 out vec4 outPosition;
 
+#endif
+
 #include <shaders/lightweight/lightweight.common.glsl>
 
 void main()
 {
-
+#if !defined(Renderer_Shadow)
 	outPosition = fragmentPosition;
 	outColor = vec4(1.0, 1.0, 1.0, 1.0);
 
@@ -92,7 +95,7 @@ void main()
 
 	outColor.rgb = vec3(0.0, 0.0, 0.0);
 	outColor.rgb += getIblColor(fragmentPosition.xyz, albedo, worldNormal, roughness, metalness, viewVector);
-	outColor.rgb += getSunColor(worldNormal, albedo);
+	outColor.rgb += getSunColor(fragmentPosition.xyz, worldNormal, albedo);
 	outColor.rgb *= getCloudShadows(fragmentPosition.xyz);
 	//outColor.rgb = mix(outColor.rgb, albedo, 0.95);
 	//outColor.rgb += outColor.rgb * getRimColor(worldNormal, viewVector, vec3(1.0, 1.0, 1.0));
@@ -119,5 +122,5 @@ void main()
 
     
     //outColor.rgb = fogOfWar(outColor.rgb, fragmentPosition.xyz, visibility, renderer.time.x);
-
+#endif
 }

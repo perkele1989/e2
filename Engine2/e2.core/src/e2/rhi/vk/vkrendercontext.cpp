@@ -187,6 +187,11 @@ e2::ITexture* e2::IRenderContext_Vk::createTexture(e2::TextureCreateInfo const& 
 	return e2::create<e2::ITexture_Vk>(this, createInfo);
 }
 
+e2::ISampler* e2::IRenderContext_Vk::createShadowSampler()
+{
+	return e2::create<e2::ISampler_Vk>(this, getInternalShadowSampler());
+}
+
 e2::ISampler* e2::IRenderContext_Vk::createSampler(e2::SamplerCreateInfo const& createInfo)
 {
 	return e2::create<e2::ISampler_Vk>(this, createInfo);
@@ -309,6 +314,35 @@ e2::VkThreadLocals & e2::IRenderContext_Vk::getThreadLocals()
 	}
 
 	return m_threadLocals[info.id];
+}
+
+VkSampler e2::IRenderContext_Vk::getInternalShadowSampler()
+{
+	if (!m_shadowSampler)
+	{
+		VkSamplerCreateInfo createInfo{ VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO };
+		createInfo.anisotropyEnable = VK_TRUE;
+		createInfo.maxAnisotropy = 16.0f;
+		createInfo.borderColor = VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK;
+		createInfo.compareEnable = VK_TRUE;
+		createInfo.compareOp = VK_COMPARE_OP_LESS;
+		createInfo.minLod = 0;
+		createInfo.maxLod = VK_LOD_CLAMP_NONE;
+		createInfo.minFilter = VK_FILTER_LINEAR;
+		createInfo.magFilter = VK_FILTER_LINEAR;
+		createInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+		createInfo.mipLodBias = 0.0f;
+		createInfo.unnormalizedCoordinates = VK_FALSE;
+		createInfo.addressModeU = createInfo.addressModeV = createInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+
+		VkResult result = vkCreateSampler(m_vkDevice, &createInfo, nullptr, &m_shadowSampler);
+		if (result != VK_SUCCESS)
+		{
+			LogError("vkCreateSampler failed: {}", int32_t(result));
+		}
+	}
+
+	return m_shadowSampler;
 }
 
 VkSampler e2::IRenderContext_Vk::getOrCreateSampler(e2::SamplerFilter filter, e2::SamplerWrap wrap)

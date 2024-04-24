@@ -124,6 +124,11 @@ namespace e2
 
 		void invalidatePipelines();
 
+		e2::ISampler* shadowSampler()
+		{
+			return m_shadowSampler;
+		}
+
 	protected:
 
 		std::mutex m_vertexLayoutCacheMutex;
@@ -139,6 +144,7 @@ namespace e2
 
 		e2::IShader* m_fullscreenTriangleShader{};
 
+		e2::ISampler* m_shadowSampler{};
 		e2::Texture2DPtr m_defaultTexture;
 		e2::FontPtr m_defaultFont[size_t(e2::FontFace::Count)];
 		e2::Material* m_defaultMaterial{};

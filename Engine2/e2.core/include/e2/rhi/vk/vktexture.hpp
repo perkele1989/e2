@@ -17,6 +17,7 @@ namespace e2
 		ObjectDeclaration()
 	public:
 		ISampler_Vk(IRenderContext* context, e2::SamplerCreateInfo const& createInfo);
+		ISampler_Vk(IRenderContext* context, VkSampler wrap);
 		virtual ~ISampler_Vk();
 
 		VkSampler m_vkHandle{};

@@ -110,9 +110,12 @@ e2::MaterialProxy* e2::WaterModel::createMaterialProxy(e2::Session* session, e2:
 	return newProxy;
 }
 
-e2::IPipelineLayout* e2::WaterModel::getOrCreatePipelineLayout(e2::MeshProxy* proxy, uint8_t submeshIndex)
+e2::IPipelineLayout* e2::WaterModel::getOrCreatePipelineLayout(e2::MeshProxy* proxy, uint8_t submeshIndex, bool shadows)
 {
-	return m_pipelineLayout;
+	if (shadows)
+		return nullptr;
+	else 
+		return m_pipelineLayout;
 }
 
 e2::IPipeline* e2::WaterModel::getOrCreatePipeline(e2::MeshProxy* proxy, uint8_t submeshIndex, e2::RendererFlags rendererFlags)
@@ -251,9 +254,10 @@ e2::WaterProxy::~WaterProxy()
 	e2::destroy(sets[1]);
 }
 
-void e2::WaterProxy::bind(e2::ICommandBuffer* buffer, uint8_t frameIndex)
+void e2::WaterProxy::bind(e2::ICommandBuffer* buffer, uint8_t frameIndex, bool shadows)
 {
-	buffer->bindDescriptorSet(model->m_pipelineLayout, 2, sets[frameIndex]);
+	if(!shadows)
+		buffer->bindDescriptorSet(model->m_pipelineLayout, 2, sets[frameIndex]);
 }
 
 void e2::WaterProxy::invalidate(uint8_t frameIndex)

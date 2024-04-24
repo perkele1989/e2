@@ -39,6 +39,22 @@ namespace e2
 		bool operator<(const MeshProxySubmesh& rhs) const;
 	};
 
+}
+template <>
+struct std::hash<e2::MeshProxySubmesh>
+{
+	std::size_t operator()(const e2::MeshProxySubmesh& k) const
+	{
+		// @todo use our own hashing here 
+		// e2::hash_combine()
+		std::size_t res = 17;
+		res = res * 31 + std::hash<e2::MeshProxy*>{}(k.proxy);
+		res = res * 31 + std::hash<uint8_t>{}(k.submesh);
+		return res;
+	}
+};
+namespace e2
+{
 	class E2_API Session : public e2::Context
 	{
 	public:
@@ -65,6 +81,7 @@ namespace e2
 		void unregisterSkinProxy(e2::SkinProxy* proxy);
 
 		std::map<e2::RenderLayer, std::unordered_set<MeshProxySubmesh>> const& submeshIndex() const;
+		std::unordered_set<MeshProxySubmesh> const& shadowSubmeshes() const;
 
 		inline e2::World* persistentWorld() const
 		{
@@ -113,22 +130,11 @@ namespace e2
 		/** Submeshes ordered by render layer */
 		std::map<e2::RenderLayer, std::unordered_set<MeshProxySubmesh>> m_submeshIndex;
 
+		std::unordered_set<MeshProxySubmesh> m_shadowSubmeshes;
+
 		std::unordered_set<e2::MaterialProxy*> m_materialProxies;
 
 		std::unordered_map<e2::Material*, e2::MaterialProxy*> m_defaultMaterialProxies;
 	};
 }
 
-template <>
-struct std::hash<e2::MeshProxySubmesh>
-{
-	std::size_t operator()(const e2::MeshProxySubmesh& k) const
-	{
-		// @todo use our own hashing here 
-		// e2::hash_combine()
-		std::size_t res = 17;
-		res = res * 31 + std::hash<e2::MeshProxy*>{}(k.proxy);
-		res = res * 31 + std::hash<uint8_t>{}(k.submesh);
-		return res;
-	}
-};

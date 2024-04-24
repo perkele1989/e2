@@ -65,7 +65,7 @@ namespace e2
 		WaterProxy(e2::Session* inSession, e2::MaterialPtr materialAsset);
 		virtual ~WaterProxy();
 
-		virtual void bind(e2::ICommandBuffer* buffer, uint8_t frameIndex) override;
+		virtual void bind(e2::ICommandBuffer* buffer, uint8_t frameIndex, bool shadows) override;
 		virtual void invalidate(uint8_t frameIndex) override;
 
 		e2::WaterModel* model{};
@@ -93,7 +93,7 @@ namespace e2
 
 		virtual e2::MaterialProxy* createMaterialProxy(e2::Session* session, e2::MaterialPtr material) override;
 
-		virtual e2::IPipelineLayout* getOrCreatePipelineLayout(e2::MeshProxy* proxy, uint8_t submeshIndex) override;
+		virtual e2::IPipelineLayout* getOrCreatePipelineLayout(e2::MeshProxy* proxy, uint8_t submeshIndex, bool shadows) override;
 		virtual e2::IPipeline* getOrCreatePipeline(e2::MeshProxy* proxy, uint8_t submeshIndex, e2::RendererFlags rendererFlags) override;
 
 		e2::IdArena<uint32_t, e2::maxNumWaterProxies> proxyIds;

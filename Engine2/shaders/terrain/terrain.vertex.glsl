@@ -1,4 +1,4 @@
-#version 460 core
+#include <shaders/header.glsl>
 
 // Vertex attributes 
 in vec4 vertexPosition;
@@ -27,19 +27,26 @@ in uvec4 vertexIds;
 
 // Fragment attributes
 
+#if !defined(Renderer_Shadow)
 out vec4 fragmentPosition;
-
 out vec3 fragmentNormal;
 out vec4 fragmentTangent;
 out vec4 fragmentColor;
+#endif
 
 #include <shaders/terrain/terrain.common.glsl>
 
 void main()
 {
-	gl_Position = renderer.projectionMatrix * renderer.viewMatrix * mesh.modelMatrix * vertexPosition;
+#if defined(Renderer_Shadow)
+	gl_Position = shadowViewProjection * mesh.modelMatrix * vertexPosition;
+#else 
+	gl_Position = renderer.projectionMatrix * renderer.viewMatrix * mesh.modelMatrix * vertexPosition;	
+#endif
 
+#if !defined(Renderer_Shadow)
 	fragmentPosition = mesh.modelMatrix * vertexPosition;
+
 #if defined(Vertex_Normals)
 
 	fragmentNormal = normalize(mesh.modelMatrix * normalize(vertexNormal)).xyz;
@@ -48,15 +55,16 @@ void main()
 	//fragmentBitangent = normalize(cross(fragmentNormal.xyz, fragmentTangent.xyz));
 #endif
 
-#if defined(Vertex_TexCoords01)
+#if defined(Vertex_TexCoords01) 
 	fragmentUv01 = vertexUv01;
 #endif
 
-#if defined(Vertex_TexCoords23)
+#if defined(Vertex_TexCoords23) 
 	fragmentUv23 = vertexUv23;
 #endif
 
-#if defined(Vertex_Color)
+#if defined(Vertex_Color) 
 	fragmentColor = vertexColor;
+#endif
 #endif
 }

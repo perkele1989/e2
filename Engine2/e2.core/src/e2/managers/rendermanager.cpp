@@ -214,6 +214,7 @@ void e2::RenderManager::initialize()
 	samplerInfo.wrap = SamplerWrap::Equirect;
 	m_equirectSampler = m_renderContext->createSampler(samplerInfo);
 
+	m_shadowSampler = m_renderContext->createShadowSampler();
 
 	// Create model pool and sets
 	e2::DescriptorPoolCreateInfo modelPoolCreateInfo{};
@@ -229,8 +230,8 @@ void e2::RenderManager::initialize()
 	e2::DescriptorPoolCreateInfo rendererPoolCreateInfo{};
 	rendererPoolCreateInfo.maxSets = 2 * e2::maxNumSessions * e2::maxNumRenderers;
 	rendererPoolCreateInfo.numUniformBuffers = 2 * e2::maxNumSessions * e2::maxNumRenderers;
-	rendererPoolCreateInfo.numSamplers = 2 * e2::maxNumSessions * e2::maxNumRenderers * 3;
-	rendererPoolCreateInfo.numTextures = 2 * e2::maxNumSessions * e2::maxNumRenderers * 6;
+	rendererPoolCreateInfo.numSamplers = 2 * e2::maxNumSessions * e2::maxNumRenderers * 5;
+	rendererPoolCreateInfo.numTextures = 2 * e2::maxNumSessions * e2::maxNumRenderers * 8;
 	m_rendererPool = mainThreadContext()->createDescriptorPool(rendererPoolCreateInfo);
 
 	e2::DescriptorSetLayoutCreateInfo rendererSetLayoutInfo{};
@@ -245,6 +246,8 @@ void e2::RenderManager::initialize()
 	rendererSetLayoutInfo.bindings.push({ e2::DescriptorBindingType::Texture, 1 }); // frontbuffer position
 	rendererSetLayoutInfo.bindings.push({ e2::DescriptorBindingType::Texture, 1 }); // frontbuffer depth
 	rendererSetLayoutInfo.bindings.push({ e2::DescriptorBindingType::Texture, 1 }); // outline texture
+	rendererSetLayoutInfo.bindings.push({ e2::DescriptorBindingType::Texture, 1 }); // shadow map
+	rendererSetLayoutInfo.bindings.push({ e2::DescriptorBindingType::Sampler, 1 }); // shadow sampler
 	m_rendererSetLayout = renderContext()->createDescriptorSetLayout(rendererSetLayoutInfo);
 	
 	e2::PipelineLayoutCreateInfo lineCreateInfo{};
@@ -335,6 +338,7 @@ void e2::RenderManager::shutdown()
 	e2::destroy(m_fullscreenTriangleShader);
 	e2::destroy(m_defaultMaterial);
 
+	e2::destroy(m_shadowSampler);
 	e2::destroy(m_equirectSampler);
 	e2::destroy(m_repeatSampler);
 	e2::destroy(m_clampSampler);

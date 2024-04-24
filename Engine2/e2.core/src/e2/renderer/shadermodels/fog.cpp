@@ -99,7 +99,7 @@ e2::MaterialProxy* e2::FogModel::createMaterialProxy(e2::Session* session, e2::M
 	return newProxy;
 }
 
-e2::IPipelineLayout* e2::FogModel::getOrCreatePipelineLayout(e2::MeshProxy* proxy, uint8_t submeshIndex)
+e2::IPipelineLayout* e2::FogModel::getOrCreatePipelineLayout(e2::MeshProxy* proxy, uint8_t submeshIndex, bool shadows)
 {
 	return m_pipelineLayout;
 }
@@ -237,9 +237,10 @@ e2::FogProxy::~FogProxy()
 	e2::discard(sets[1]);
 }
 
-void e2::FogProxy::bind(e2::ICommandBuffer* buffer, uint8_t frameIndex)
+void e2::FogProxy::bind(e2::ICommandBuffer* buffer, uint8_t frameIndex, bool shadows)
 {
-	buffer->bindDescriptorSet(model->m_pipelineLayout, 2, sets[frameIndex]);
+	if(!shadows)
+		buffer->bindDescriptorSet(model->m_pipelineLayout, 2, sets[frameIndex]);
 }
 
 void e2::FogProxy::invalidate(uint8_t frameIndex)

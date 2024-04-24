@@ -337,6 +337,9 @@ namespace e2
 		chaiscript::ChaiScript* m_scriptEngine{};
 		chaiscript::ModulePtr m_scriptModule;
 
+		float m_sunAngleA{ -57.6f };
+		float m_sunAngleB{ 24.3f };
+
 	};
 
 

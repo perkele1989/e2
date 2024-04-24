@@ -1,3 +1,14 @@
+
+
+#if defined(Renderer_Shadow)
+#define MeshSetIndex 0
+#else 
+#define RendererSetIndex 0
+#define MeshSetIndex 1
+#define MaterialSetIndex 2
+#endif 
+
+#if !defined(Renderer_Shadow)
 // Push constants
 layout(push_constant) uniform ConstantData
 {
@@ -6,8 +17,10 @@ layout(push_constant) uniform ConstantData
 };
 
 // Begin Set0: Renderer
-layout(set = 0, binding = 0) uniform RendererData
+layout(set = RendererSetIndex, binding = 0) uniform RendererData
 {
+    mat4 shadowView;
+    mat4 shadowProjection;
     mat4 viewMatrix;
     mat4 projectionMatrix;
     vec4 time; // t, sin(t), cos(t), tan(t)
@@ -17,27 +30,43 @@ layout(set = 0, binding = 0) uniform RendererData
     vec4 cameraPosition; // pos.xyz, ??
 } renderer;
 
-layout(set = 0, binding = 1) uniform sampler clampSampler;
-layout(set = 0, binding = 2) uniform sampler repeatSampler;
-layout(set = 0, binding = 3) uniform sampler equirectSampler;
-layout(set = 0, binding = 4) uniform texture2D integratedBrdf;
-
-layout(set = 0, binding = 5) uniform texture2D irradianceCube;
-layout(set = 0, binding = 6) uniform texture2D radianceCube;
-
-layout(set = 0, binding = 7) uniform texture2D frontBufferColor;
-layout(set = 0, binding = 8) uniform texture2D frontBufferPosition;
-layout(set = 0, binding = 9) uniform texture2D frontBufferDepth;
-layout(set = 0, binding = 10) uniform texture2D outlineTexture;
+layout(set = RendererSetIndex, binding = 1) uniform sampler clampSampler;
+layout(set = RendererSetIndex, binding = 2) uniform sampler repeatSampler;
+layout(set = RendererSetIndex, binding = 3) uniform sampler equirectSampler;
+layout(set = RendererSetIndex, binding = 4) uniform texture2D integratedBrdf;
+layout(set = RendererSetIndex, binding = 5) uniform texture2D irradianceCube;
+layout(set = RendererSetIndex, binding = 6) uniform texture2D radianceCube;
+layout(set = RendererSetIndex, binding = 7) uniform texture2D frontBufferColor;
+layout(set = RendererSetIndex, binding = 8) uniform texture2D frontBufferPosition;
+layout(set = RendererSetIndex, binding = 9) uniform texture2D frontBufferDepth;
+layout(set = RendererSetIndex, binding = 10) uniform texture2D outlineTexture;
+layout(set = RendererSetIndex, binding = 11) uniform texture2D shadowMap;
+layout(set = RendererSetIndex, binding = 12) uniform sampler shadowSampler;
 // End Set0
+#else 
+// Begin Set0: Shadow Renderer
+// layout(set = 0, binding = 0) uniform ShadowRendererData
+// {
+//     mat4 shadowView;
+//     mat4 shadowProjection;
+// } shadowRenderer;
+
+// Push constants
+layout(push_constant) uniform ShadowConstantData
+{
+    mat4 shadowViewProjection;
+};
+// End Set0
+#endif
+
 
 // Begin Set1: Mesh 
-layout(set = 1, binding = 0) uniform MeshData 
+layout(set = MeshSetIndex, binding = 0) uniform MeshData 
 {
     mat4 modelMatrix;
 } mesh;
 
-layout(set = 1, binding = 1) uniform SkinData 
+layout(set = MeshSetIndex, binding = 1) uniform SkinData 
 {
     mat4 skinMatrices[128]; // @todo make define
 } skin;
@@ -47,21 +76,74 @@ layout(set = 1, binding = 1) uniform SkinData
 #include <shaders/common/utils.glsl>
 
 // specific util functions depending on renderer sets here! 
-
+#if !defined(Renderer_Shadow)
 vec3 getViewVector(vec3 fragPosition)
 {
     vec3 viewVector = normalize(fragPosition - renderer.cameraPosition.xyz);
     return viewVector;
 }
 
-vec3 getSunColor(vec3 fragNormal, vec3 fragAlbedo)
+float calculateSunShadow(vec4 fragPosWS)
 {
-    vec3 ndotl = vec3(clamp(dot(fragNormal, renderer.sun1.xyz), 0.0, 1.0));
-    return ndotl * renderer.sun2.xyz * renderer.sun2.w * fragAlbedo;
+	float returner = 0.0;
+
+	// Multiply this position by the VPMatrix used by the shadow-map-rendering. Also, normalize the perspective by dividing by w
+	vec4 fragPosLS = renderer.shadowProjection * renderer.shadowView * fragPosWS; 
+	fragPosLS.xyz /= fragPosLS.w;
+	
+	// Convert these coordinates from (-1 to 1) range to  (0 to 1) range
+	vec2 shadowUV = fragPosLS.xy * vec2(0.5) + vec2(0.5);
+
+	// Use the (biased) z coordinate as the comparative depth to pass to the texture sampling function.
+	const float bias = 0.002;
+	float depthComp = (fragPosLS.z) - bias;
+	
+	// If the shadow UV is out of bounds, return 1.0. Needed for directional lights
+	if(shadowUV.x < 0 || shadowUV.y < 0 ||shadowUV.x > 1 ||shadowUV.y > 1)
+	{
+		return 1.0;
+	}
+
+	// Prepare sampling
+	
+
+	// singletap
+	//return texture( sampler2DShadow(shadowMap, shadowSampler), vec3(shadowUV.x, shadowUV.y, depthComp));
+
+	// 9-tap shadow sampling
+	const int SHADOWSAMPLES = 9;
+	vec2 sampleOffsets[SHADOWSAMPLES] = vec2[]
+	(
+	vec2(-1.0, -1.0), vec2(0.0, -1.0), vec2(1.0, -1.0),
+	vec2(-1.0, 0.0), vec2(0.0, 0.0), vec2(1.0, 0.0),
+	vec2(-1.0, 1.0), vec2(0.0, 1.0), vec2(1.0, 1.0)
+	);
+
+	ivec2 shadowSize = textureSize(shadowMap, 0);
+	vec2 shadowFragSize = vec2(1.0) / vec2(shadowSize.x, shadowSize.y);
+
+	
+	for(int i = 0; i < SHADOWSAMPLES; i++)
+	{
+		vec2 offsetUV = shadowUV + (sampleOffsets[i] * shadowFragSize);
+		float shadowDepth = texture(sampler2DShadow(shadowMap, shadowSampler), vec3(offsetUV.x, offsetUV.y, depthComp));
+		returner += shadowDepth;
+	}
+	returner /= float(SHADOWSAMPLES);
+	
+	return returner;
+}
+
+vec3 getSunColor(vec3 fragPos, vec3 fragNormal, vec3 fragAlbedo)
+{
+    float shadow = calculateSunShadow(vec4(fragPos, 1.0));
+    vec3 ndotl = vec3(clamp(dot(fragNormal, -renderer.sun1.xyz), 0.0, 1.0));
+    return ndotl * renderer.sun2.xyz * renderer.sun2.w * fragAlbedo * shadow;
 }
 
 vec3 getIblColor(vec3 fragPosition, vec3 fragAlbedo, vec3 fragNormal,float fragRoughness, float fragMetalness, vec3 viewVector)
 {
+    // 0.2
     vec3 reflectionVector = reflect(viewVector, fragNormal);
 	 
 	vec3 F0 = vec3(0.04); 
@@ -75,6 +157,8 @@ vec3 getIblColor(vec3 fragPosition, vec3 fragAlbedo, vec3 fragNormal,float fragR
     vec3 returner = vec3(0.0, 0.0, 0.0);
 	returner += irradiance * diffuseCoeff;
     returner += radiance * specularCoeff * (brdf.x + brdf.y);	
+
+    returner *= renderer.ibl1.x;
 
     return returner;
 }
@@ -95,3 +179,4 @@ float getCloudShadows(vec3 fragPosition)
 	shadowCoeff = smoothstep(0.4, 0.7, shadowCoeff) * 0.5 + 0.5;
     return shadowCoeff;
 }
+#endif

@@ -28,7 +28,10 @@ e2::IPipelineLayout_Vk::IPipelineLayout_Vk(e2::IRenderContext* context, e2::Pipe
 	e2::StackVector<VkDescriptorSetLayout, maxPipelineSets> setLayouts;
 	for (IDescriptorSetLayout* layout : createInfo.sets)
 	{
-		setLayouts.push(static_cast<IDescriptorSetLayout_Vk*>(layout)->m_vkHandle);
+		if (layout)
+			setLayouts.push(static_cast<IDescriptorSetLayout_Vk*>(layout)->m_vkHandle);
+		else
+			setLayouts.push(nullptr);
 	}
 
 	vkCreateInfo.setLayoutCount = (uint32_t)setLayouts.size();
