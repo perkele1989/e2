@@ -40,13 +40,12 @@ void main()
 
 	//vec3 n = vec3(0.0, -1.0, 0.0);
 	
-	vec3 l = normalize(vec3(1.0, -0.5, 1.0));
-	vec3 ndotl = vec3(clamp(dot(n, l), 0.0, 1.0));
+	vec3 l = normalize(renderer.sun1.xyz);
+	vec3 ndotl = vec3(clamp(dot(n, -l), 0.0, 1.0));
+
+	//ndotl = vec3(getSunDelta(fragmentPosition.xyz, n));
 
 	vec3 v = normalize(fragmentPosition.xyz - (inverse(renderer.viewMatrix) * vec4(0.0, 0.0, 0.0, 1.0)).xyz);
-
-
-	float shadowCoeff = 1.0;//getCloudShadows(fragmentPosition.xyz);
 
 
 	vec3 lightWater = vec3(28.0, 200.0, 255.0) / 255.0;
@@ -77,22 +76,18 @@ void main()
 	//float viewDepthCoeffFoam = 1.0;
 
 	vec3 baseColor = mix(shoreDark, lightWater,  pow(h, 1.4) * (ndotl * 0.5 + 0.5) );
-	//vec3 baseColor = shoreDark;
+	
 
 	vec3 dimBaseColor = mix(baseColor * frontBuffer, frontBuffer, 0.2);
 	baseColor = mix(baseColor, dimBaseColor, viewDepthCoeff2*0.75);
-	//baseColor = mix(baseColor, frontBuffer, viewDepthCoeff);
-	
-    //baseColor = mix(baseColor, mix(baseColor, frontBuffer, 0.2), pow(1.0-d, 0.4));
 
 	vec3 foamColor = vec3(0.867, 0.89, 0.9);
 	baseColor = mix(baseColor, foamColor, (pow(viewDepthCoeffFoam, 0.25)*0.75));
 
-	//baseColor = mix(baseColor, foamColor, pow(h, 3.0));
 
+	//baseColor = shoreDark + lightWater * pow(h, 1.4);
 
-
-
+	//baseColor = shoreDark  * (ndotl);
 
 	// basecolor
 	outColor.rgb =  baseColor ;
@@ -102,11 +97,12 @@ void main()
     float reflCoeff = smoothstep(0.0, 0.35, h);
 
 	// fresnel reflection
-	outColor.rgb += hdr * vdotn * 0.15 * reflCoeff ;
+	outColor.rgb += hdr * vdotn * 0.15 * reflCoeff;
 
 
 	float reflCoeff2 = mix(1.0, reflCoeff, vis.w);
 	outColor.rgb += hdr *  0.04 * reflCoeff;
+
 
 	// debug normal 
 	//outColor.rgb = clamp(vec3(n.x, n.z, -n.y) * 0.5 + 0.5, vec3(0.0), vec3(1.0));

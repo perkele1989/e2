@@ -220,6 +220,7 @@ namespace e2
 
 		void setEnvironment(e2::ITexture* irradiance, e2::ITexture* radiance);
 		void setSun(glm::quat const& rot, glm::vec3 const& color, float strength);
+		void setIbl(float iblStrength);
 
 		void setOutlineTextures(e2::ITexture* textures[2]);
 

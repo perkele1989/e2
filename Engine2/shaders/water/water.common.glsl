@@ -81,7 +81,7 @@ vec3 sampleWaterNormal(vec2 position, float time)
     float hU = sampleWaterHeight(position.xy - off.zy, time);
     float hD = sampleWaterHeight(position.xy + off.zy, time);
 
-    vec3 normal = normalize(vec3(hR - hL, -eps2 * 0.2, hD - hU));
+    vec3 normal = -normalize(vec3(hR - hL, eps2 * 0.2, hD - hU));
     //normal.y = 0.0;
     return normal;
 }

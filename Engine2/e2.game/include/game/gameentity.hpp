@@ -66,48 +66,68 @@ namespace e2
 		EntityScriptInterface() = default;
 
 		chaiscript::Boxed_Value invokeCreateState(e2::GameEntity* entity);
-		scriptFunc_createState createState;
-
 		void invokeDrawUI(e2::GameEntity* entity, e2::UIContext* ui);
-		scriptFunc_drawUI drawUI;
-
 		void invokeUpdateAnimation(e2::GameEntity* entity, double seconds);
-		scriptFunc_updateAnimation updateAnimation;
-
 		bool invokeGrugRelevant(e2::GameEntity* entity);
-		scriptFunc_grugRelevant grugRelevant;
-
 		bool invokeGrugTick(e2::GameEntity* entity, double seconds);
-		scriptFunc_grugTick grugTick;
-
 		void invokeCollectRevenue(e2::GameEntity* entity, e2::ResourceTable &outTable);
-		scriptFunc_fiscal collectRevenue;
-
 		void invokeCollectExpenditure(e2::GameEntity* entity, e2::ResourceTable& outTable);
-		scriptFunc_fiscal collectExpenditure;
-
 		void invokeOnHit(e2::GameEntity* entity, e2::GameEntity* instigator, float dmg);
-		scriptFunc_onHit onHit;
-
 		void invokeOnTargetChanged(e2::GameEntity* entity, glm::ivec2 const& hex);
-		scriptFunc_onTargetChanged onTargetChanged;
-
 		void invokeOnTargetClicked(e2::GameEntity* entity);
-		scriptFunc_onTargetClicked onTargetClicked;
-
 		void invokeUpdateCustomAction(e2::GameEntity* entity, double seconds);
-		scriptFunc_updateCustomAction updateCustomAction;
-
 		void invokeOnTurnStart(e2::GameEntity* entity);
-		scriptFunc_onTurnStart onTurnStart;
-
 		void invokeOnTurnEnd(e2::GameEntity* entity);
-		scriptFunc_onTurnEnd onTurnEnd;
-
 		void invokeOnBeginMove(e2::GameEntity* entity);
-		scriptFunc_onBeginMove onBeginMove;
-
 		void invokeOnEndMove(e2::GameEntity* entity);
+
+		void setCreateState(scriptFunc_createState func);
+		void setDrawUI(scriptFunc_drawUI func);
+		void setUpdateAnimation(scriptFunc_updateAnimation func);
+		void setGrugRelevant(scriptFunc_grugRelevant func);
+		void setGrugTick(scriptFunc_grugTick func);
+		void setCollectRevenue(scriptFunc_fiscal func);
+		void setCollectExpenditure(scriptFunc_fiscal func);
+		void setOnHit(scriptFunc_onHit func);
+		void setOnTargetChanged(scriptFunc_onTargetChanged func);
+		void setOnTargetClicked(scriptFunc_onTargetClicked func);
+		void setUpdateCustomAction(scriptFunc_updateCustomAction func);
+		void setOnTurnStart(scriptFunc_onTurnStart func);
+		void setOnTurnEnd(scriptFunc_onTurnEnd func);
+		void setOnBeginMove(scriptFunc_onBeginMove func);
+		void setOnEndMove(scriptFunc_onEndMove func);
+
+		bool hasCreateState();
+		bool hasDrawUI();
+		bool hasUpdateAnimation();
+		bool hasGrugRelevant();
+		bool hasGrugTick();
+		bool hasCollectRevenue();
+		bool hasCollectExpenditure();
+		bool hasOnHit();
+		bool hasOnTargetChanged();
+		bool hasOnTargetClicked();
+		bool hasUpdateCustomAction();
+		bool hasOnTurnStart();
+		bool hasOnTurnEnd();
+		bool hasOnBeginMove();
+		bool hasOnEndMove();
+
+	private:
+		scriptFunc_createState createState;
+		scriptFunc_drawUI drawUI;
+		scriptFunc_updateAnimation updateAnimation;
+		scriptFunc_grugRelevant grugRelevant;
+		scriptFunc_grugTick grugTick;
+		scriptFunc_fiscal collectRevenue;
+		scriptFunc_fiscal collectExpenditure;
+		scriptFunc_onHit onHit;
+		scriptFunc_onTargetChanged onTargetChanged;
+		scriptFunc_onTargetClicked onTargetClicked;
+		scriptFunc_updateCustomAction updateCustomAction;
+		scriptFunc_onTurnStart onTurnStart;
+		scriptFunc_onTurnEnd onTurnEnd;
+		scriptFunc_onBeginMove onBeginMove;
 		scriptFunc_onEndMove onEndMove;
 	};
 

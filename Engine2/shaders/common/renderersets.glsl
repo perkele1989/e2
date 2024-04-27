@@ -134,6 +134,13 @@ float calculateSunShadow(vec4 fragPosWS)
 	return returner;
 }
 
+float getSunDelta(vec3 fragPos, vec3 fragNormal)
+{
+    float shadow = calculateSunShadow(vec4(fragPos, 1.0));
+    float ndotl = clamp(dot(fragNormal, -renderer.sun1.xyz), 0.0, 1.0);
+    return ndotl * shadow;
+}
+
 vec3 getSunColor(vec3 fragPos, vec3 fragNormal, vec3 fragAlbedo)
 {
     float shadow = calculateSunShadow(vec4(fragPos, 1.0));

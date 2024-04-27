@@ -12,12 +12,12 @@ class WarFactoryState
 }
 
 /** Function that creates a state for an entity of this type */
-warfactoryScript.createState = fun(entity){
+warfactoryScript.setCreateState(fun(entity){
     return WarFactoryState(entity);
-}
+});
 
 /** Function that renders the UI for an entity of this type */
-warfactoryScript.drawUI = fun(entity, ui){
+warfactoryScript.setDrawUI(fun(entity, ui){
     ui.beginStackV("mobUiStackV", vec2(0.0, 0.0));
     ui.gameLabel("**" + entity.specification.displayName + "**", 12, Middle);
 
@@ -49,6 +49,6 @@ warfactoryScript.drawUI = fun(entity, ui){
     ui.endStackH();
 
     ui.endStackV();
-}
+});
 
 warfactoryScript;

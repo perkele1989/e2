@@ -1,7 +1,7 @@
 var cb90Script = EntityScript();
 
-cb90Script.onTurnStart = fun(entity){
+cb90Script.setOnTurnStart(fun(entity){
     print("scripted start for cb90!");
-};
+});
 
 cb90Script;

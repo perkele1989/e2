@@ -35,6 +35,12 @@ namespace
 e2::Game::Game(e2::Context* ctx)
 	: e2::Application(ctx)
 {
+	m_empires.resize(e2::maxNumEmpires);
+	for (uint64_t i = 0; uint64_t(i) < e2::maxNumEmpires; i++)
+	{
+		m_empires[i] = nullptr;
+	}
+
 	readAllSaveMetas();
 }
 
@@ -317,11 +323,7 @@ void e2::Game::finalizeBoot()
 	// After this line, we may no longer safely fetch and store loaded assets
 	am->returnALJ(m_bootTicket);
 
-	m_empires.resize(e2::maxNumEmpires);
-	for (EmpireId i = 0; uint64_t(i) < e2::maxNumEmpires - 1; i++)
-	{
-		m_empires[i] = nullptr;
-	}
+
 
 	setupGame();
 
@@ -365,8 +367,10 @@ void e2::Game::initializeScriptEngine()
 			{
 				{chaiscript::fun(&glm::ivec2::x), "x"},
 				{chaiscript::fun(&glm::ivec2::y), "y"},
+				{chaiscript::fun( (glm::ivec2 & (glm::ivec2::*)(const glm::ivec2&)) (&glm::ivec2::operator=) ), "="}
 			}
 			);
+		
 
 		chaiscript::utility::add_class<e2::Hex>(*m_scriptModule,
 			"Hex",
@@ -673,21 +677,53 @@ void e2::Game::initializeScriptEngine()
 				chaiscript::constructor<EntityScriptInterface()>()
 			},
 			{
-				{chaiscript::fun(&EntityScriptInterface::createState), "createState"},
-				{chaiscript::fun(&EntityScriptInterface::drawUI), "drawUI"},
-				{chaiscript::fun(&EntityScriptInterface::collectExpenditure), "collectExpenditure"},
-				{chaiscript::fun(&EntityScriptInterface::collectRevenue), "collectRevenue"},
-				{chaiscript::fun(&EntityScriptInterface::grugRelevant), "grugRelevant"},
-				{chaiscript::fun(&EntityScriptInterface::grugTick), "grugTick"},
-				{chaiscript::fun(&EntityScriptInterface::onBeginMove), "onBeginMove"},
-				{chaiscript::fun(&EntityScriptInterface::onEndMove), "onEndMove"},
-				{chaiscript::fun(&EntityScriptInterface::onHit), "onHit"},
-				{chaiscript::fun(&EntityScriptInterface::onTargetChanged), "onTargetChanged"},
-				{chaiscript::fun(&EntityScriptInterface::onTargetClicked), "onTargetClicked"},
-				{chaiscript::fun(&EntityScriptInterface::onTurnEnd), "onTurnEnd"},
-				{chaiscript::fun(&EntityScriptInterface::onTurnStart), "onTurnStart"},
-				{chaiscript::fun(&EntityScriptInterface::updateAnimation), "updateAnimation"},
-				{chaiscript::fun(&EntityScriptInterface::updateCustomAction), "updateCustomAction"}
+				{chaiscript::fun(&EntityScriptInterface::hasCreateState), "hasCreateState"},
+				{chaiscript::fun(&EntityScriptInterface::hasDrawUI), "hasDrawUI"},
+				{chaiscript::fun(&EntityScriptInterface::hasCollectExpenditure), "hasCollectExpenditure"},
+				{chaiscript::fun(&EntityScriptInterface::hasCollectRevenue), "hasCollectRevenue"},
+				{chaiscript::fun(&EntityScriptInterface::hasGrugRelevant), "hasGrugRelevant"},
+				{chaiscript::fun(&EntityScriptInterface::hasGrugTick), "hasGrugTick"},
+				{chaiscript::fun(&EntityScriptInterface::hasOnBeginMove), "hasOnBeginMove"},
+				{chaiscript::fun(&EntityScriptInterface::hasOnEndMove), "hasOnEndMove"},
+				{chaiscript::fun(&EntityScriptInterface::hasOnHit), "hasOnHit"},
+				{chaiscript::fun(&EntityScriptInterface::hasOnTargetChanged), "hasOnTargetChanged"},
+				{chaiscript::fun(&EntityScriptInterface::hasOnTargetClicked), "hasOnTargetClicked"},
+				{chaiscript::fun(&EntityScriptInterface::hasOnTurnEnd), "hasOnTurnEnd"},
+				{chaiscript::fun(&EntityScriptInterface::hasOnTurnStart), "hasOnTurnStart"},
+				{chaiscript::fun(&EntityScriptInterface::hasUpdateAnimation), "hasUpdateAnimation"},
+				{chaiscript::fun(&EntityScriptInterface::hasUpdateCustomAction), "hasUpdateCustomAction"},
+
+				{chaiscript::fun(&EntityScriptInterface::invokeCreateState), "invokeCreateState"},
+				{chaiscript::fun(&EntityScriptInterface::invokeDrawUI), "invokeDrawUI"},
+				{chaiscript::fun(&EntityScriptInterface::invokeCollectExpenditure), "invokeCollectExpenditure"},
+				{chaiscript::fun(&EntityScriptInterface::invokeCollectRevenue), "invokeCollectRevenue"},
+				{chaiscript::fun(&EntityScriptInterface::invokeGrugRelevant), "invokeGrugRelevant"},
+				{chaiscript::fun(&EntityScriptInterface::invokeGrugTick), "invokeGrugTick"},
+				{chaiscript::fun(&EntityScriptInterface::invokeOnBeginMove), "invokeOnBeginMove"},
+				{chaiscript::fun(&EntityScriptInterface::invokeOnEndMove), "invokeOnEndMove"},
+				{chaiscript::fun(&EntityScriptInterface::invokeOnHit), "invokeOnHit"},
+				{chaiscript::fun(&EntityScriptInterface::invokeOnTargetChanged), "invokeOnTargetChanged"},
+				{chaiscript::fun(&EntityScriptInterface::invokeOnTargetClicked), "invokeOnTargetClicked"},
+				{chaiscript::fun(&EntityScriptInterface::invokeOnTurnEnd), "invokeOnTurnEnd"},
+				{chaiscript::fun(&EntityScriptInterface::invokeOnTurnStart), "invokeOnTurnStart"},
+				{chaiscript::fun(&EntityScriptInterface::invokeUpdateAnimation), "invokeUpdateAnimation"},
+				{chaiscript::fun(&EntityScriptInterface::invokeUpdateCustomAction), "invokeUpdateCustomAction"},
+
+				{chaiscript::fun(&EntityScriptInterface::setCreateState), "setCreateState"},
+				{chaiscript::fun(&EntityScriptInterface::setDrawUI), "setDrawUI"},
+				{chaiscript::fun(&EntityScriptInterface::setCollectExpenditure), "setCollectExpenditure"},
+				{chaiscript::fun(&EntityScriptInterface::setCollectRevenue), "setCollectRevenue"},
+				{chaiscript::fun(&EntityScriptInterface::setGrugRelevant), "setGrugRelevant"},
+				{chaiscript::fun(&EntityScriptInterface::setGrugTick), "setGrugTick"},
+				{chaiscript::fun(&EntityScriptInterface::setOnBeginMove), "setOnBeginMove"},
+				{chaiscript::fun(&EntityScriptInterface::setOnEndMove), "setOnEndMove"},
+				{chaiscript::fun(&EntityScriptInterface::setOnHit), "setOnHit"},
+				{chaiscript::fun(&EntityScriptInterface::setOnTargetChanged), "setOnTargetChanged"},
+				{chaiscript::fun(&EntityScriptInterface::setOnTargetClicked), "setOnTargetClicked"},
+				{chaiscript::fun(&EntityScriptInterface::setOnTurnEnd), "setOnTurnEnd"},
+				{chaiscript::fun(&EntityScriptInterface::setOnTurnStart), "setOnTurnStart"},
+				{chaiscript::fun(&EntityScriptInterface::setUpdateAnimation), "setUpdateAnimation"},
+				{chaiscript::fun(&EntityScriptInterface::setUpdateCustomAction), "setUpdateCustomAction"}
 			}
 		);
 
@@ -947,7 +983,8 @@ void e2::Game::update(double seconds)
 	sunRot = glm::rotate(sunRot, glm::radians(m_sunAngleA), e2::worldUpf());
 	sunRot = glm::rotate(sunRot, glm::radians(m_sunAngleB), e2::worldRightf());
 
-	renderer->setSun(sunRot, { 1.0f, 0.9f, 0.85f }, 1.0f);
+	renderer->setSun(sunRot, { 1.0f, 0.9f, 0.85f }, m_sunStrength);
+	renderer->setIbl(m_iblStrength);
 
 	if (m_globalState == GlobalState::Boot)
 	{
@@ -1647,6 +1684,11 @@ void e2::Game::updateCamera(double seconds)
 
 void e2::Game::updateGameState()
 {
+	if (!m_empires[0] || !m_localEmpire)
+	{
+		return;
+	}
+
 	if (m_state == GameState::TurnPreparing)
 	{
 		// do turn prepare things here , and then move on to turn when done 
@@ -1679,18 +1721,31 @@ void e2::Game::updateGameState()
 		onTurnEndingEnd();
 
 		// flip through to next empire to let the mhave its turn, if it doesnt exist, keep doing it until we find one or we run out
+
 		m_empireTurn++;
-		while (!m_empires[m_empireTurn])
+		if (m_empireTurn >= e2::maxNumEmpires)
 		{
-			if (m_empireTurn < e2::maxNumEmpires - 1)
-				m_empireTurn++;
-			else
+			m_empireTurn = 0;
+			m_turn++;
+		}
+		else
+		{
+			while (m_empireTurn < e2::maxNumEmpires)
+			{
+				if (!m_empires[m_empireTurn])
+				{
+					m_empireTurn++;
+				}
+				else break;
+			}
+
+			if (m_empireTurn >= e2::maxNumEmpires)
 			{
 				m_empireTurn = 0;
 				m_turn++;
-				break;
 			}
 		}
+
 		
 		m_state = GameState::TurnPreparing;
 		onTurnPreparingBegin();
@@ -2082,6 +2137,35 @@ void e2::Game::drawUI()
 		drawMinimapUI();
 
 		drawFinalUI();
+
+		constexpr bool debugShadows = false;
+		if(debugShadows)
+		{
+			glm::vec2 offset{ 384.0f, 24.0f };
+			glm::vec2 size{ 384.0f, 384.0f };
+
+			e2::UIContext* ui = gameSession()->uiContext();
+			auto& mouse = ui->mouseState();
+
+			bool hovered = !m_viewDragging &&
+				(mouse.relativePosition.x > offset.x && mouse.relativePosition.x < offset.x + size.x &&
+					mouse.relativePosition.y > offset.y && mouse.relativePosition.y < offset.y + size.y);
+			if (hovered)
+			{
+				m_uiHovered = true;
+			}
+
+
+
+			ui->pushFixedPanel("envParams", offset, size);
+			ui->beginStackV("envParamStack");
+			ui->sliderFloat("sunAngleA", m_sunAngleA, -180.0f, 180.0f);
+			ui->sliderFloat("sunAngleB", m_sunAngleB, 0.0f, 90.0f);
+			ui->sliderFloat("sunStr", m_sunStrength, 0.0f, 10.0f);
+			ui->sliderFloat("iblStr", m_iblStrength, 0.0f, 10.0f);
+			ui->endStackV();
+			ui->popFixedPanel();
+		}
 	}
 
 	drawDebugUI();
@@ -2357,10 +2441,7 @@ void e2::Game::drawUnitUI()
 	if (m_selectedEntity && m_turnState == TurnState::Unlocked)
 		m_selectedEntity->drawUI(ui);
 
-	ui->beginStackV("sad");
-	ui->sliderFloat("angleA", m_sunAngleA, -180.0f, 180.0f);
-	ui->sliderFloat("angleB", m_sunAngleB, 0.0f, 90.0f);
-	ui->endStackV();
+
 
 	ui->popFixedPanel();
 
@@ -2594,6 +2675,8 @@ void e2::Game::resolveSelectedEntity()
 {
 	if (m_unitAS)
 		e2::destroy(m_unitAS);
+
+	m_unitAS = nullptr;
 
 	if (m_selectedEntity->specification->moveType == EntityMoveType::Static)
 	{

@@ -771,6 +771,11 @@ void e2::Renderer::setEnvironment(e2::ITexture* irradiance, e2::ITexture* radian
 	m_radiance = radiance;
 }
 
+void e2::Renderer::setIbl(float iblStrength)
+{
+	m_iblStrength = iblStrength;
+}
+
 void e2::Renderer::setSun(glm::quat const& rot, glm::vec3 const& color, float strength)
 {
 	m_sunColor = color;

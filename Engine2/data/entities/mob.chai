@@ -12,12 +12,12 @@ class MobState
 }
 
 /** Function that creates a state for an entity of this type */
-mobScript.createState = fun(entity){
+mobScript.setCreateState(fun(entity){
     return MobState(entity);
-}
+});
 
 /** Function that renders the UI for an entity of this type */
-mobScript.drawUI = fun(entity, ui){
+mobScript.setDrawUI(fun(entity, ui){
     ui.beginStackV("mobUiStackV", vec2(0.0, 0.0));
     ui.gameLabel("**" + entity.specification.displayName + "**", 12, Middle);
 
@@ -49,6 +49,6 @@ mobScript.drawUI = fun(entity, ui){
     ui.endStackH();
 
     ui.endStackV();
-}
+});
 
 mobScript;

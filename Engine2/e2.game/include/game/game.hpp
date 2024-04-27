@@ -281,7 +281,7 @@ namespace e2
 
 	protected:
 
-		e2::PathFindingAS *m_unitAS;
+		e2::PathFindingAS* m_unitAS{};
 		std::vector<e2::Hex> m_unitHoverPath;
 		std::vector<e2::Hex> m_unitMovePath;
 		uint32_t m_unitMoveIndex{};
@@ -337,6 +337,8 @@ namespace e2
 		chaiscript::ChaiScript* m_scriptEngine{};
 		chaiscript::ModulePtr m_scriptModule;
 
+		float m_sunStrength{ 1.75f };
+		float m_iblStrength{ 0.3f };
 		float m_sunAngleA{ -57.6f };
 		float m_sunAngleB{ 24.3f };
 

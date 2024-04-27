@@ -501,8 +501,8 @@ namespace e2
 			e2::ITexture* fogOfWarMasks[2] = { nullptr, nullptr };
 			e2::IDescriptorSet* fogOfWarMaskBlurSets[2] = { nullptr, nullptr };
 
-			e2::IRenderTarget* outlineTarget{ nullptr };
-			e2::ITexture* outlineTexture{ nullptr };
+			e2::IRenderTarget* outlineTarget{  };
+			e2::ITexture* outlineTexture{  };
 
 			e2::IRenderTarget* minimapTarget{};
 			e2::ITexture* minimapTexture{};

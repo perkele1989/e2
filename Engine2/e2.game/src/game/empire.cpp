@@ -2,7 +2,7 @@
 #include "game/empire.hpp"
 #include "game/game.hpp"
 
-e2::GameEmpire::GameEmpire(e2::GameContext* ctx, uint8_t _id)
+e2::GameEmpire::GameEmpire(e2::GameContext* ctx, EmpireId _id)
 	: m_game(ctx->game())
 	, id(_id)
 {

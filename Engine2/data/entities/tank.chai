@@ -1,7 +1,7 @@
 var tankScript = EntityScript();
 
-tankScript.onTurnStart = fun(entity){
+tankScript.setOnTurnStart(fun(entity){
     print("scripted start for tank!");
-};
+});
 
 tankScript;

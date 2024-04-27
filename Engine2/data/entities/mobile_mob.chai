@@ -1,6 +1,6 @@
 var mobile_mobScript = EntityScript();
 
-mobile_mobScript.updateCustomAction = fun(entity, ui){
+mobile_mobScript.setUpdateCustomAction(fun(entity, ui){
     // uncomment when we have animation asset for this action
     //if(!entity.actionPlaying(Name("deploying")))
     //{
@@ -8,9 +8,9 @@ mobile_mobScript.updateCustomAction = fun(entity, ui){
         game.endCustomAction();
         game.destroyEntity(entity);
     //}
-}
+});
 
-mobile_mobScript.drawUI = fun(entity, ui){
+mobile_mobScript.setDrawUI(fun(entity, ui){
     ui.beginStackV(Name("mobUiStackV"), vec2(0.0, 0.0));
     ui.gameLabel("**" + entity.specification.displayName + "**", 12, Middle);
     ui.gameLabel("*Movement points left:* " + to_string(entity.movePointsLeft), 11, Begin);
@@ -32,6 +32,6 @@ mobile_mobScript.drawUI = fun(entity, ui){
     }
 
     ui.endStackV();
-}
+});
 
 mobile_mobScript;

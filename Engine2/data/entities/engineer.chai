@@ -18,12 +18,12 @@ class EngineerState
     }
 }
 
-engineerScript.createState = fun(entity) {
+engineerScript.setCreateState(fun(entity) {
     return EngineerState(entity);
-}
+});
 
 
-engineerScript.updateCustomAction = fun(entity, time) {
+engineerScript.setUpdateCustomAction(fun(entity, time) {
     if(!entity.isActionPlaying("build"))
     {
         if(entity.scriptState.actionType == ActionType_BuildOnLand)
@@ -41,9 +41,9 @@ engineerScript.updateCustomAction = fun(entity, time) {
 
         game.endCustomAction();
     }
-};
+});
 
-engineerScript.drawUI = fun(entity, ui){
+engineerScript.setDrawUI(fun(entity, ui){
     var tileData = game.hexGrid.getTileData(entity.tileIndex);
     var resource = tileData.getResource();
 
@@ -83,9 +83,7 @@ engineerScript.drawUI = fun(entity, ui){
                 continue;
             }
 
-            // why cant we just assign it here as usual? chaiscript bug?
-            entity.scriptState.waterHex.x = nbIndex.x;
-            entity.scriptState.waterHex.y = nbIndex.y;
+            entity.scriptState.waterHex = nbIndex;
 
             hasWaterTile = true;
             break;
@@ -223,7 +221,7 @@ engineerScript.drawUI = fun(entity, ui){
     }
 
     ui.endStackV();
-};
+});
 
 
 engineerScript;

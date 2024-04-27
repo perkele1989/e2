@@ -555,7 +555,7 @@ bool e2::UIContext::sliderFloat(e2::Name id, float& value, float min, float max,
 	e2::UIWidgetState* widgetState = reserve(id, minSize);
 
 
-	bool mouseDown = widgetState->active&& widgetState->hovered&& m_mouseState.buttons[0].held;
+	bool mouseDown = widgetState->active && m_mouseState.buttons[0].held;
 
 	drawQuad(widgetState->position, widgetState->size, style.windowFgColor);
 

@@ -9,7 +9,7 @@ namespace e2
 	class GameEntity;
 
     constexpr uint64_t maxNumEmpires = 256;
-    using EmpireId = uint8_t;
+    using EmpireId = uint64_t;
 
 	enum class PassableFlags : uint8_t
 	{

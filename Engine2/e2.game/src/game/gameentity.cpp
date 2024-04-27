@@ -83,7 +83,7 @@ void e2::GameEntity::updateAnimation(double seconds)
 		}
 	}
 
-	if (specification->scriptInterface.updateAnimation)
+	if (specification->scriptInterface.hasUpdateAnimation())
 	{
 		specification->scriptInterface.invokeUpdateAnimation(this, seconds);
 	}
@@ -94,7 +94,7 @@ void e2::GameEntity::updateAnimation(double seconds)
 
 void e2::GameEntity::updateCustomAction(double seconds)
 {
-	if (specification->scriptInterface.updateCustomAction)
+	if (specification->scriptInterface.hasUpdateCustomAction())
 	{
 		specification->scriptInterface.invokeUpdateCustomAction(this, seconds);
 		return;
@@ -104,7 +104,7 @@ void e2::GameEntity::updateCustomAction(double seconds)
 void e2::GameEntity::collectRevenue(ResourceTable& outRevenueTable)
 {
 	// if script specifies this function, run that instead and early return 
-	if (specification->scriptInterface.collectRevenue)
+	if (specification->scriptInterface.hasCollectRevenue())
 	{
 		specification->scriptInterface.invokeCollectRevenue(this, outRevenueTable);
 		return;
@@ -123,7 +123,7 @@ void e2::GameEntity::collectRevenue(ResourceTable& outRevenueTable)
 
 void e2::GameEntity::collectExpenditure(ResourceTable& outExpenditureTable)
 {
-	if (specification->scriptInterface.collectExpenditure)
+	if (specification->scriptInterface.hasCollectExpenditure())
 	{
 		return specification->scriptInterface.invokeCollectExpenditure(this, outExpenditureTable);
 	}
@@ -168,7 +168,7 @@ void e2::GameEntity::initialize()
 
 void e2::GameEntity::onHit(e2::GameEntity* instigator, float damage)
 {
-	if (specification->scriptInterface.onHit)
+	if (specification->scriptInterface.hasOnHit())
 	{
 		specification->scriptInterface.invokeOnHit(this, instigator, damage);
 		return;
@@ -181,7 +181,7 @@ void e2::GameEntity::onHit(e2::GameEntity* instigator, float damage)
 
 void e2::GameEntity::onTargetChanged(glm::ivec2 const& location)
 {
-	if (specification->scriptInterface.onTargetChanged)
+	if (specification->scriptInterface.hasOnTargetChanged())
 	{
 		specification->scriptInterface.invokeOnTargetChanged(this, location);
 		return;
@@ -190,7 +190,7 @@ void e2::GameEntity::onTargetChanged(glm::ivec2 const& location)
 
 void e2::GameEntity::onTargetClicked()
 {
-	if (specification->scriptInterface.onTargetClicked)
+	if (specification->scriptInterface.hasOnTargetClicked())
 	{
 		specification->scriptInterface.invokeOnTargetClicked(this);
 		return;
@@ -257,13 +257,16 @@ void e2::GameEntity::postConstruct(e2::GameContext* ctx, e2::EntitySpecification
 		m_animationPoses.push(newPose);
 	}
 
-	scriptState = specification->scriptInterface.invokeCreateState(this);
+	if (specification->scriptInterface.hasCreateState())
+	{
+		scriptState = specification->scriptInterface.invokeCreateState(this);
+	}
 }
 
 void e2::GameEntity::drawUI(e2::UIContext* ctx)
 {
 	// if this function was overridden via script, invoke that instead
-	if (specification->scriptInterface.drawUI)
+	if (specification->scriptInterface.hasDrawUI())
 	{
 		specification->scriptInterface.invokeDrawUI(this, ctx); 
 		return;
@@ -294,7 +297,7 @@ void e2::GameEntity::readForSave(e2::Buffer& fromBuffer)
 
 bool e2::GameEntity::grugRelevant()
 {
-	if (specification->scriptInterface.grugRelevant)
+	if (specification->scriptInterface.hasGrugRelevant())
 	{
 		return specification->scriptInterface.invokeGrugRelevant(this);
 	}
@@ -305,7 +308,7 @@ bool e2::GameEntity::grugRelevant()
 
 bool e2::GameEntity::grugTick(double seconds)
 {
-	if (specification->scriptInterface.grugTick)
+	if (specification->scriptInterface.hasGrugTick())
 	{
 		return specification->scriptInterface.invokeGrugTick(this, seconds);
 	}
@@ -484,7 +487,7 @@ void e2::GameEntity::rollbackVisibility()
 
 void e2::GameEntity::onTurnEnd()
 {
-	if (specification->scriptInterface.onTurnEnd)
+	if (specification->scriptInterface.hasOnTurnEnd())
 	{
 		specification->scriptInterface.invokeOnTurnEnd(this);
 	}
@@ -509,7 +512,7 @@ void e2::GameEntity::onTurnStart()
 			buildMessage = "";
 	}
 
-	if (specification->scriptInterface.onTurnStart)
+	if (specification->scriptInterface.hasOnTurnStart())
 	{
 		specification->scriptInterface.invokeOnTurnStart(this);
 	}
@@ -518,7 +521,7 @@ void e2::GameEntity::onTurnStart()
 
 void e2::GameEntity::onBeginMove()
 {
-	if (specification->scriptInterface.onBeginMove)
+	if (specification->scriptInterface.hasOnBeginMove())
 	{
 		specification->scriptInterface.invokeOnBeginMove(this);
 		return;
@@ -529,7 +532,7 @@ void e2::GameEntity::onBeginMove()
 
 void e2::GameEntity::onEndMove()
 {
-	if (specification->scriptInterface.onEndMove)
+	if (specification->scriptInterface.hasOnEndMove())
 	{
 		specification->scriptInterface.invokeOnEndMove(this);
 		return;
@@ -766,99 +769,99 @@ void e2::EntitySpecification::initializeSpecifications(e2::GameContext* ctx)
 			}
 
 			if (entity.contains("maxHealth"))
-				newSpec.maxHealth = entity.at("maxHealth").template get<double>();
+				newSpec.maxHealth = entity.at("maxHealth").template get<float>();
 
 			if (entity.contains("moveSpeed"))
-				newSpec.moveSpeed = entity.at("moveSpeed").template get<double>();
+				newSpec.moveSpeed = entity.at("moveSpeed").template get<float>();
 
 			if (entity.contains("movePoints"))
-				newSpec.movePoints = entity.at("movePoints").template get<int64_t>();
+				newSpec.movePoints = entity.at("movePoints").template get<int32_t>();
 
 			if (entity.contains("buildPoints"))
-				newSpec.buildPoints = entity.at("buildPoints").template get<int64_t>();
+				newSpec.buildPoints = entity.at("buildPoints").template get<int32_t>();
 
 			if (entity.contains("attackPoints"))
-				newSpec.attackPoints = entity.at("attackPoints").template get<int64_t>();
+				newSpec.attackPoints = entity.at("attackPoints").template get<int32_t>();
 
 			if (entity.contains("attackStrength"))
-				newSpec.attackStrength = entity.at("attackStrength").template get<double>();
+				newSpec.attackStrength = entity.at("attackStrength").template get<float>();
 
 			if (entity.contains("defensiveModifier"))
-				newSpec.defensiveModifier = entity.at("defensiveModifier").template get<double>();
+				newSpec.defensiveModifier = entity.at("defensiveModifier").template get<float>();
 
 			if (entity.contains("retaliatoryModifier"))
-				newSpec.retaliatoryModifier = entity.at("retaliatoryModifier").template get<double>();
+				newSpec.retaliatoryModifier = entity.at("retaliatoryModifier").template get<float>();
 
 			if (entity.contains("sightRange"))
-				newSpec.sightRange = entity.at("sightRange").template get<int64_t>();
+				newSpec.sightRange = entity.at("sightRange").template get<int32_t>();
 
 			if (entity.contains("meshScale"))
 			{
 				json& meshScale = entity.at("meshScale");
-				newSpec.meshScale = glm::vec3(meshScale[0].template get<double>(), meshScale[1].template get<double>(), meshScale[2].template get<double>());
+				newSpec.meshScale = glm::vec3(meshScale[0].template get<float>(), meshScale[1].template get<float>(), meshScale[2].template get<float>());
 			}
 
 			if (entity.contains("meshHeightOffset"))
-				newSpec.meshHeightOffset = entity.at("meshHeightOffset").template get<double>();
+				newSpec.meshHeightOffset = entity.at("meshHeightOffset").template get<float>();
 
 			if (entity.contains("buildTurns"))
-				newSpec.buildTurns = entity.at("buildTurns").template get<int64_t>();
+				newSpec.buildTurns = entity.at("buildTurns").template get<int32_t>();
 
 			if (entity.contains("upkeep"))
 			{
 				json& upkeep = entity.at("upkeep");
 				if (upkeep.contains("wood"))
-					newSpec.upkeep.wood = upkeep.at("wood").template get<double>();
+					newSpec.upkeep.wood = upkeep.at("wood").template get<float>();
 				if (upkeep.contains("metal"))
-					newSpec.upkeep.metal = upkeep.at("metal").template get<double>();
+					newSpec.upkeep.metal = upkeep.at("metal").template get<float>();
 				if (upkeep.contains("gold"))
-					newSpec.upkeep.gold = upkeep.at("gold").template get<double>();
+					newSpec.upkeep.gold = upkeep.at("gold").template get<float>();
 				if (upkeep.contains("stone"))
-					newSpec.upkeep.stone = upkeep.at("stone").template get<double>();
+					newSpec.upkeep.stone = upkeep.at("stone").template get<float>();
 				if (upkeep.contains("uranium"))
-					newSpec.upkeep.uranium = upkeep.at("uranium").template get<double>();
+					newSpec.upkeep.uranium = upkeep.at("uranium").template get<float>();
 				if (upkeep.contains("oil"))
-					newSpec.upkeep.oil = upkeep.at("oil").template get<double>();
+					newSpec.upkeep.oil = upkeep.at("oil").template get<float>();
 				if (upkeep.contains("meteorite"))
-					newSpec.upkeep.meteorite = upkeep.at("meteorite").template get<double>();
+					newSpec.upkeep.meteorite = upkeep.at("meteorite").template get<float>();
 			}
 
 			if (entity.contains("cost"))
 			{
 				json& cost = entity.at("cost");
 				if (cost.contains("wood"))
-					newSpec.cost.wood = cost.at("wood").template get<double>();
+					newSpec.cost.wood = cost.at("wood").template get<float>();
 				if (cost.contains("metal"))
-					newSpec.cost.metal = cost.at("metal").template get<double>();
+					newSpec.cost.metal = cost.at("metal").template get<float>();
 				if (cost.contains("gold"))
-					newSpec.cost.gold = cost.at("gold").template get<double>();
+					newSpec.cost.gold = cost.at("gold").template get<float>();
 				if (cost.contains("stone"))
-					newSpec.cost.stone = cost.at("stone").template get<double>();
+					newSpec.cost.stone = cost.at("stone").template get<float>();
 				if (cost.contains("uranium"))
-					newSpec.cost.uranium = cost.at("uranium").template get<double>();
+					newSpec.cost.uranium = cost.at("uranium").template get<float>();
 				if (cost.contains("oil"))
-					newSpec.cost.oil = cost.at("oil").template get<double>();
+					newSpec.cost.oil = cost.at("oil").template get<float>();
 				if (cost.contains("meteorite"))
-					newSpec.cost.meteorite = cost.at("meteorite").template get<double>();
+					newSpec.cost.meteorite = cost.at("meteorite").template get<float>();
 			}
 
 			if (entity.contains("revenue"))
 			{
 				json& revenue = entity.at("revenue");
 				if (revenue.contains("wood"))
-					newSpec.revenue.wood = revenue.at("wood").template get<double>();
+					newSpec.revenue.wood = revenue.at("wood").template get<float>();
 				if (revenue.contains("metal"))
-					newSpec.revenue.metal = revenue.at("metal").template get<double>();
+					newSpec.revenue.metal = revenue.at("metal").template get<float>();
 				if (revenue.contains("gold"))
-					newSpec.revenue.gold = revenue.at("gold").template get<double>();
+					newSpec.revenue.gold = revenue.at("gold").template get<float>();
 				if (revenue.contains("stone"))
-					newSpec.revenue.stone = revenue.at("stone").template get<double>();
+					newSpec.revenue.stone = revenue.at("stone").template get<float>();
 				if (revenue.contains("uranium"))
-					newSpec.revenue.uranium = revenue.at("uranium").template get<double>();
+					newSpec.revenue.uranium = revenue.at("uranium").template get<float>();
 				if (revenue.contains("oil"))
-					newSpec.revenue.oil = revenue.at("oil").template get<double>();
+					newSpec.revenue.oil = revenue.at("oil").template get<float>();
 				if (revenue.contains("meteorite"))
-					newSpec.revenue.meteorite = revenue.at("meteorite").template get<double>();
+					newSpec.revenue.meteorite = revenue.at("meteorite").template get<float>();
 			}
 
 
@@ -878,7 +881,7 @@ void e2::EntitySpecification::initializeSpecifications(e2::GameContext* ctx)
 					}
 
 					e2::EntityPoseSpecification newPose;
-					newPose.blendTime = pose.at("blendTime").template get<double>();
+					newPose.blendTime = pose.at("blendTime").template get<float>();
 					newPose.animationAssetPath = pose.at("asset").template get<std::string>();
 
 					std::string poseName = pose.at("name").template get<std::string>();
@@ -898,11 +901,11 @@ void e2::EntitySpecification::initializeSpecifications(e2::GameContext* ctx)
 					}
 
 					e2::EntityActionSpecification newAction;
-					newAction.blendInTime = action.at("blendInTime").template get<double>();
-					newAction.blendOutTime = action.at("blendOutTime").template get<double>();
+					newAction.blendInTime = action.at("blendInTime").template get<float>();
+					newAction.blendOutTime = action.at("blendOutTime").template get<float>();
 
 					if(action.contains("speed"))
-						newAction.speed = action.at("speed").template get<double>();
+						newAction.speed = action.at("speed").template get<float>();
 
 					newAction.animationAssetPath = action.at("asset").template get<std::string>();
 
@@ -1349,4 +1352,154 @@ void e2::EntityScriptInterface::invokeOnEndMove(e2::GameEntity* entity)
 			LogError("{}", e.what());
 		}
 	}
+}
+
+void e2::EntityScriptInterface::setCreateState(scriptFunc_createState func)
+{
+	createState = func;
+}
+
+void e2::EntityScriptInterface::setDrawUI(scriptFunc_drawUI func)
+{
+	drawUI = func;
+}
+
+void e2::EntityScriptInterface::setUpdateAnimation(scriptFunc_updateAnimation func)
+{
+	updateAnimation = func;
+}
+
+void e2::EntityScriptInterface::setGrugRelevant(scriptFunc_grugRelevant func)
+{
+	grugRelevant = func;
+}
+
+void e2::EntityScriptInterface::setGrugTick(scriptFunc_grugTick func)
+{
+	grugTick = func;
+}
+
+void e2::EntityScriptInterface::setCollectRevenue(scriptFunc_fiscal func)
+{
+	collectRevenue = func;
+}
+
+void e2::EntityScriptInterface::setCollectExpenditure(scriptFunc_fiscal func)
+{
+	collectExpenditure = func;
+}
+
+void e2::EntityScriptInterface::setOnHit(scriptFunc_onHit func)
+{
+	onHit = func;
+}
+
+void e2::EntityScriptInterface::setOnTargetChanged(scriptFunc_onTargetChanged func)
+{
+	onTargetChanged = func;
+}
+
+void e2::EntityScriptInterface::setOnTargetClicked(scriptFunc_onTargetClicked func)
+{
+	onTargetClicked = func;
+}
+
+void e2::EntityScriptInterface::setUpdateCustomAction(scriptFunc_updateCustomAction func)
+{
+	updateCustomAction = func;
+}
+
+void e2::EntityScriptInterface::setOnTurnStart(scriptFunc_onTurnStart func)
+{
+	onTurnStart = func;
+}
+
+void e2::EntityScriptInterface::setOnTurnEnd(scriptFunc_onTurnEnd func)
+{
+	onTurnEnd = func;
+}
+
+void e2::EntityScriptInterface::setOnBeginMove(scriptFunc_onBeginMove func)
+{
+	onBeginMove = func;
+}
+
+void e2::EntityScriptInterface::setOnEndMove(scriptFunc_onEndMove func)
+{
+	onEndMove = func;
+}
+
+bool e2::EntityScriptInterface::hasCreateState()
+{
+	return createState != nullptr;
+}
+
+bool e2::EntityScriptInterface::hasDrawUI()
+{
+	return drawUI != nullptr;
+}
+
+bool e2::EntityScriptInterface::hasUpdateAnimation()
+{
+	return updateAnimation != nullptr;
+}
+
+bool e2::EntityScriptInterface::hasGrugRelevant()
+{
+	return grugRelevant != nullptr;
+}
+
+bool e2::EntityScriptInterface::hasGrugTick()
+{
+	return grugTick != nullptr;
+}
+
+bool e2::EntityScriptInterface::hasCollectRevenue()
+{
+	return collectRevenue != nullptr;
+}
+
+bool e2::EntityScriptInterface::hasCollectExpenditure()
+{
+	return collectExpenditure != nullptr;
+}
+
+bool e2::EntityScriptInterface::hasOnHit()
+{
+	return onHit != nullptr;
+}
+
+bool e2::EntityScriptInterface::hasOnTargetChanged()
+{
+	return onTargetChanged != nullptr;
+}
+
+bool e2::EntityScriptInterface::hasOnTargetClicked()
+{
+	return onTargetClicked != nullptr;
+}
+
+bool e2::EntityScriptInterface::hasUpdateCustomAction()
+{
+	return updateCustomAction != nullptr;
+}
+
+bool e2::EntityScriptInterface::hasOnTurnStart()
+{
+	return onTurnStart != nullptr;
+}
+
+bool e2::EntityScriptInterface::hasOnTurnEnd()
+{
+	return onTurnEnd != nullptr;
+}
+
+bool e2::EntityScriptInterface::hasOnBeginMove()
+{
+	return onBeginMove != nullptr;
+}
+
+bool e2::EntityScriptInterface::hasOnEndMove()
+{
+	return onEndMove != nullptr;
 }
