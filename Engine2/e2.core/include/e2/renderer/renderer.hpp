@@ -46,15 +46,15 @@ namespace e2
 
 	struct E2_API RendererData
 	{
-		alignas(16) glm::mat4 shadowView;
-		alignas(16) glm::mat4 shadowProjection;
-		alignas(16) glm::mat4 viewMatrix;
-		alignas(16) glm::mat4 projectionMatrix;
-		alignas(16) glm::vec4 time; // t, sin(t), cos(t), tan(t)
-		alignas(16) glm::vec4 sun1; // sun direction.xyz, ???
-		alignas(16) glm::vec4 sun2; // sun color.rgb, sun strength
-		alignas(16) glm::vec4 ibl1; // ibl strength, ???, ???, ???
-		alignas(16) glm::vec4 cameraPosition;
+		alignas(16) glm::mat4 shadowView{ glm::identity<glm::mat4>() };
+		alignas(16) glm::mat4 shadowProjection{ glm::identity<glm::mat4>() };
+		alignas(16) glm::mat4 viewMatrix{ glm::identity<glm::mat4>() };
+		alignas(16) glm::mat4 projectionMatrix{ glm::identity<glm::mat4>() };
+		alignas(16) glm::vec4 time{0.0f, 0.0f, 0.0f, 0.0f}; // t, sin(t), cos(t), tan(t)
+		alignas(16) glm::vec4 sun1{ 0.0f, 0.0f, 0.0f, 0.0f }; // sun direction.xyz, ???
+		alignas(16) glm::vec4 sun2{ 0.0f, 0.0f, 0.0f, 0.0f }; // sun color.rgb, sun strength
+		alignas(16) glm::vec4 ibl1{ 0.0f, 0.0f, 0.0f, 0.0f }; // ibl strength, ???, ???, ???
+		alignas(16) glm::vec4 cameraPosition{ 0.0f, 0.0f, 0.0f, 0.0f };
 	};
 
 	E2_API bool isCounterClockwise(glm::vec2 const& a, glm::vec2 const& b, glm::vec2 const& c);

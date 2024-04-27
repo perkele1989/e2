@@ -77,6 +77,25 @@ layout(set = MeshSetIndex, binding = 1) uniform SkinData
 
 // specific util functions depending on renderer sets here! 
 #if !defined(Renderer_Shadow)
+
+vec2 getScreenPixelUV(vec2 pixelCoords)
+{
+	return pixelCoords / vec2(resolution.x, resolution.y);
+}
+
+vec3 getFrontColor(vec2 uv)
+{
+	return textureLod(sampler2D(frontBufferColor, clampSampler), uv, 0).xyz;
+}
+
+vec3 getFrontPosition(vec2 uv)
+{
+	vec4 frontPosition = textureLod(sampler2D(frontBufferPosition, clampSampler), uv, 0);
+	return frontPosition.xyz;
+	//return frontPosition.xyz / frontPosition.w;
+}
+
+
 vec3 getViewVector(vec3 fragPosition)
 {
     vec3 viewVector = normalize(fragPosition - renderer.cameraPosition.xyz);

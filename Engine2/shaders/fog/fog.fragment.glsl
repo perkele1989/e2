@@ -12,21 +12,31 @@ out vec4 outPosition;
 
 void main()
 {
+	vec2 screenUv = getScreenPixelUV(gl_FragCoord.xy);
+	vec3 frontColor = getFrontColor(screenUv);
+	vec3 frontPosition = getFrontPosition(screenUv);
+
 	outPosition = fragmentPosition;
-	outColor = vec4(0.0, 0.0, 0.0, 1.0);
+	outColor = vec4(frontColor, 1.0);
 
-	vec3 frontBuffer = textureLod(sampler2D(frontBufferColor, clampSampler), gl_FragCoord.xy / vec2(resolution.x, resolution.y), 0).xyz;
-	outColor.rgb = frontBuffer;
+	vec3 visibility = textureLod(sampler2D(visibilityMask, clampSampler), screenUv, 0).xyz;
 
-	vec3 frontPosition = textureLod(sampler2D(frontBufferPosition, clampSampler), gl_FragCoord.xy / vec2(resolution.x, resolution.y), 0).xyz;
+	outColor.rgb = fogOfWar(outColor.rgb, frontPosition, visibility, renderer.time.x);
 
+	//outColor.rgb = vec3(renderer.time.x);
 
-	vec3 visibility = textureLod(sampler2D(visibilityMask, clampSampler), gl_FragCoord.xy / vec2(resolution.x, resolution.y), 0).xyz;
+	// depth-related artifacts
+	//outColor.rgb = vec3(voronoi2d(frontPosition.xz));
+	//outColor.rgb = vec3(sampleHeight2(frontPosition.xz));
+	//outColor.rgb = vec3(sampleFogHeight(frontPosition.xz, 0.0));
+	//outColor.rgb = sampleFogNormal(frontPosition.xz, 0.0) *0.5 + 0.5; 
 
-	
-    //vec3 visibility = textureLod(sampler2D(visibilityMask, clampSampler), gl_FragCoord.xy / vec2(resolution.x, resolution.y), 0).xyz;
-    //outColor.rgb = fogOfWar(outColor.rgb, fragmentPosition.xyz, visibility, renderer.time.x);
-	outColor.rgb = fogOfWar(outColor.rgb, frontPosition, visibility, renderer.time.x) ;
+	// float h = sampleFogHeight(frontPosition.xz, 0.0);
+	// vec3 n =  sampleFogNormal(frontPosition.xz, 0.0); 
+	// vec3 u = undiscovered(h, n, frontColor, frontPosition, visibility);
+	// vec3 o = outOfSight(h, n, frontColor, frontPosition, visibility);
+	// vec3 fow = mix(u, o, visibility.x);
+	// outColor.rgb = fow;
 
 }
 

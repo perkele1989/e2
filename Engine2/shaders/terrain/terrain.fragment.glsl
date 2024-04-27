@@ -23,8 +23,8 @@ out vec4 outPosition;
 void main()
 {
 #if !defined(Renderer_Shadow)
-	vec4 fragPosWS = fragmentPosition;
-	fragPosWS.xyz /= fragPosWS.w;
+	//vec4 fragPosWS = fragmentPosition;
+	//fragPosWS.xyz /= fragPosWS.w;
 
 	outPosition = fragmentPosition;
 	outColor = vec4(1.0, 1.0, 1.0, 1.0);
@@ -116,7 +116,7 @@ void main()
 	float metalness = (1.0 - waterLineCoeff) * 0.1;
 
 	outColor.rgb =  vec3(0.0);
-	outColor.rgb += getSunColor(fragPosWS.xyz, finalNormal, albedo);
+	outColor.rgb += getSunColor(fragmentPosition.xyz, finalNormal, albedo);
 	outColor.rgb += getIblColor(fragmentPosition.xyz, albedo, finalNormal, roughness, metalness, viewVector);
 
 	float rimHeightCoeff = smoothstep(0.1, 1.0, -fragmentPosition.y);

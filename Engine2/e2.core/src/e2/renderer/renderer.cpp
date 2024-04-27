@@ -284,6 +284,8 @@ e2::Renderer::Renderer(e2::Session* session, glm::uvec2 const& resolution)
 	e2::ITexture* fallback = renderManager()->defaultTexture()->handle();
 	m_outlineTextures[0] = fallback;
 	m_outlineTextures[1] = fallback;
+
+
 }
 
 e2::Renderer::~Renderer()

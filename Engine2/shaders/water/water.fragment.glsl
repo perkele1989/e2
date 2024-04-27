@@ -14,11 +14,13 @@ out vec4 outPosition;
 
 void main()
 {
+	vec2 screenUv = getScreenPixelUV(gl_FragCoord.xy);
+	vec3 frontColor = getFrontColor(screenUv);
+	vec3 frontPosition = getFrontPosition(screenUv);
 
-	vec4 vis = texture(sampler2D(visibilityMask, clampSampler), gl_FragCoord.xy / vec2(resolution.x, resolution.y)).rgba;
-	vec3 frontBuffer = texture(sampler2D(frontBufferColor, clampSampler), gl_FragCoord.xy / vec2(resolution.x, resolution.y)).rgb;
-	vec3 frontPosition = texture(sampler2D(frontBufferPosition, clampSampler), gl_FragCoord.xy / vec2(resolution.x, resolution.y)).xyz;
-	vec4 outline = texture(sampler2D(outlineTexture, clampSampler),  gl_FragCoord.xy / vec2(resolution.x, resolution.y)).rgba;
+	vec4 vis = texture(sampler2D(visibilityMask, clampSampler), screenUv).rgba;
+
+	vec4 outline = texture(sampler2D(outlineTexture, clampSampler),  screenUv).rgba;
 
     float time = renderer.time.x;
 
@@ -78,7 +80,7 @@ void main()
 	vec3 baseColor = mix(shoreDark, lightWater,  pow(h, 1.4) * (ndotl * 0.5 + 0.5) );
 	
 
-	vec3 dimBaseColor = mix(baseColor * frontBuffer, frontBuffer, 0.2);
+	vec3 dimBaseColor = mix(baseColor * frontColor, frontColor, 0.2);
 	baseColor = mix(baseColor, dimBaseColor, viewDepthCoeff2*0.75);
 
 	vec3 foamColor = vec3(0.867, 0.89, 0.9);
