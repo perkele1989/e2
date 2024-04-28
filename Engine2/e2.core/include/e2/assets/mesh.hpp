@@ -254,6 +254,11 @@ namespace e2
 			return m_animation;
 		}
 
+		inline uint32_t frameIndex()
+		{
+			return m_frameIndex;
+		}
+
 	protected:
 		e2::Ptr<e2::Animation> m_animation;
 		e2::AnimationBinding* m_binding{};
@@ -261,6 +266,7 @@ namespace e2
 		bool m_loop{};
 		bool m_playing{};
 		double m_time{};
+		uint32_t m_frameIndex{};
 	};
 
 

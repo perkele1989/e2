@@ -151,6 +151,11 @@ namespace e2
 			return m_turn;
 		}
 
+		inline TurnState getTurnState() const
+		{
+			return m_turnState;
+		}
+
 	protected:
 
 		e2::ALJTicket m_bootTicket;
@@ -259,6 +264,7 @@ namespace e2
 		void unresolveSelectedEntity();
 
 		// game units 
+		e2::GameEntity* getSelectedEntity();
 		void selectEntity(e2::GameEntity* entity);
 		void deselectEntity();
 		
@@ -279,6 +285,8 @@ namespace e2
 
 		e2::GameEntity* entityAtHex(e2::EntityLayerIndex layerIndex, glm::ivec2 const& hex);
 
+		void killEntity(e2::GameEntity* entity);
+
 	protected:
 
 		e2::PathFindingAS* m_unitAS{};
@@ -291,7 +299,7 @@ namespace e2
 		std::unordered_set<GameEntity*> m_entities;
 		std::array<EntityLayer, size_t(EntityLayerIndex::Count)> m_entityLayers;
 		std::unordered_set<GameEntity*> m_entitiesPendingDestroy;
-
+		std::unordered_set<GameEntity*> m_dyingEntities;
 
 
 	protected:

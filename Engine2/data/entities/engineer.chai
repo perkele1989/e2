@@ -1,8 +1,8 @@
 var engineerScript = EntityScript();
 
-global ActionType_BuildOnLand = 0;
-global ActionType_BuildOnWater = 1;
-global ActionType_HarvestWood = 2;
+global EngineerActionType_BuildOnLand = 0;
+global EngineerActionType_BuildOnWater = 1;
+global EngineerActionType_HarvestWood = 2;
 
 class EngineerState 
 {
@@ -13,7 +13,7 @@ class EngineerState
     def EngineerState(entity)
     {
         this.waterHex = entity.tileIndex;
-        this.actionType = ActionType_BuildOnLand;
+        this.actionType = EngineerActionType_BuildOnLand;
         this.buildEntityName = "";
     }
 }
@@ -26,15 +26,15 @@ engineerScript.setCreateState(fun(entity) {
 engineerScript.setUpdateCustomAction(fun(entity, time) {
     if(!entity.isActionPlaying("build"))
     {
-        if(entity.scriptState.actionType == ActionType_BuildOnLand)
+        if(entity.scriptState.actionType == EngineerActionType_BuildOnLand)
         {
             game.spawnEntity(entity.scriptState.buildEntityName, entity.tileIndex, entity.empireId);
         }
-        else if(entity.scriptState.actionType == ActionType_BuildOnWater)
+        else if(entity.scriptState.actionType == EngineerActionType_BuildOnWater)
         {
             game.spawnEntity(entity.scriptState.buildEntityName, entity.scriptState.waterHex, entity.empireId);
         }
-        else if(entity.scriptState.actionType == ActionType_HarvestWood)
+        else if(entity.scriptState.actionType == EngineerActionType_HarvestWood)
         {
             game.harvestWood(entity.tileIndex, entity.empireId);
         }
@@ -98,7 +98,7 @@ engineerScript.setDrawUI(fun(entity, ui){
             if(ui.button("wf", "Build War Factory"))
             {
                 entity.scriptState.buildEntityName = "warfactory";
-                entity.scriptState.actionType = ActionType_BuildOnLand;
+                entity.scriptState.actionType = EngineerActionType_BuildOnLand;
                 entity.playAction("build");
 
                 --entity.buildPointsLeft;
@@ -109,7 +109,7 @@ engineerScript.setDrawUI(fun(entity, ui){
             if(ui.button("brc", "Build Barracks"))
             {
                 entity.scriptState.buildEntityName = "barracks";
-                entity.scriptState.actionType = ActionType_BuildOnLand;
+                entity.scriptState.actionType = EngineerActionType_BuildOnLand;
                 entity.playAction("build");
 
                 --entity.buildPointsLeft;
@@ -120,7 +120,7 @@ engineerScript.setDrawUI(fun(entity, ui){
             if(ui.button("arb", "Build Airbase"))
             {
                 entity.scriptState.buildEntityName = "airbase";
-                entity.scriptState.actionType = ActionType_BuildOnLand;
+                entity.scriptState.actionType = EngineerActionType_BuildOnLand;
                 entity.playAction("build");
 
                 --entity.buildPointsLeft;
@@ -132,7 +132,7 @@ engineerScript.setDrawUI(fun(entity, ui){
         if(hasWaterTile && ui.button("navb", "Build Naval Base"))
         {
             entity.scriptState.buildEntityName = "navalbase";
-            entity.scriptState.actionType = ActionType_BuildOnWater;
+            entity.scriptState.actionType = EngineerActionType_BuildOnWater;
             entity.playAction("build");
 
             --entity.buildPointsLeft;
@@ -144,7 +144,7 @@ engineerScript.setDrawUI(fun(entity, ui){
         {
             if(ui.button("hrvst", "Harvest Wood"))
             {
-                entity.scriptState.actionType = ActionType_HarvestWood;
+                entity.scriptState.actionType = EngineerActionType_HarvestWood;
                 entity.playAction("build");
 
                 --entity.buildPointsLeft;
@@ -155,7 +155,7 @@ engineerScript.setDrawUI(fun(entity, ui){
             if(ui.button("sawmill", "Build Saw Mill"))
             {
                 entity.scriptState.buildEntityName = "sawmill";
-                entity.scriptState.actionType = ActionType_BuildOnLand;
+                entity.scriptState.actionType = EngineerActionType_BuildOnLand;
                 entity.playAction("build");
 
                 --entity.buildPointsLeft;
@@ -167,7 +167,7 @@ engineerScript.setDrawUI(fun(entity, ui){
         if(tileData.hasGold() && ui.button("gldm", "Build Gold Mine"))
         {
             entity.scriptState.buildEntityName = "goldmine";
-            entity.scriptState.actionType = ActionType_BuildOnLand;
+            entity.scriptState.actionType = EngineerActionType_BuildOnLand;
             entity.playAction("build");
 
             --entity.buildPointsLeft;
@@ -178,7 +178,7 @@ engineerScript.setDrawUI(fun(entity, ui){
         if(tileData.hasOil() && ui.button("gldm", "Build Oil Well"))
         {
             entity.scriptState.buildEntityName = "oilwell";
-            entity.scriptState.actionType = ActionType_BuildOnLand;
+            entity.scriptState.actionType = EngineerActionType_BuildOnLand;
             entity.playAction("build");
 
             --entity.buildPointsLeft;
@@ -189,7 +189,7 @@ engineerScript.setDrawUI(fun(entity, ui){
         if(tileData.hasOre() && ui.button("orm", "Build Ore Mine"))
         {
             entity.scriptState.buildEntityName = "oremine";
-            entity.scriptState.actionType = ActionType_BuildOnLand;
+            entity.scriptState.actionType = EngineerActionType_BuildOnLand;
             entity.playAction("build");
 
             --entity.buildPointsLeft;
@@ -200,7 +200,7 @@ engineerScript.setDrawUI(fun(entity, ui){
         if(tileData.hasStone() && ui.button("qrr", "Build Quarry"))
         {
             entity.scriptState.buildEntityName = "quarry";
-            entity.scriptState.actionType = ActionType_BuildOnLand;
+            entity.scriptState.actionType = EngineerActionType_BuildOnLand;
             entity.playAction("build");
 
             --entity.buildPointsLeft;
@@ -211,7 +211,7 @@ engineerScript.setDrawUI(fun(entity, ui){
         if(tileData.hasUranium() && ui.button("gldm", "Build Uranium Mine"))
         {
             entity.scriptState.buildEntityName = "uraniummine";
-            entity.scriptState.actionType = ActionType_BuildOnLand;
+            entity.scriptState.actionType = EngineerActionType_BuildOnLand;
             entity.playAction("build");
 
             --entity.buildPointsLeft;

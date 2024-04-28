@@ -210,6 +210,7 @@ e2::Profiler::Profiler()
 	m_groups[size_t(e2::ProfileGroupId::Default)].displayName = "Default";
 	m_groups[size_t(e2::ProfileGroupId::Animation)].displayName = "Animation";
 	m_groups[size_t(e2::ProfileGroupId::Rendering)].displayName = "Rendering";
+	m_groups[size_t(e2::ProfileGroupId::Scripting)].displayName = "Scripting";
 }
 
 void e2::Profiler::start()

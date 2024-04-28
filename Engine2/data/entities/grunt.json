@@ -12,8 +12,10 @@
             "movePoints": 5,
             "attackPoints": 1,
             "buildPoints": 0,
-            "attackStrength": 100.0,
-            "defensiveStrength": 100.0,
+            "maxHealth": 100.0,
+            "attackStrength": 50.0,
+            "defensiveModifier": 0.25,
+            "retaliatoryModifier": 0.0,
             "moveSpeed": 2.8,
             "meshScale": [0.005, -0.005, -0.005],
             "script": "data/entities/grunt.chai",
@@ -49,7 +51,14 @@
                     "name": "fire",
                     "asset": "assets/characters/A_SoldierFire.e2a",
                     "blendInTime": 0.1,
-                    "blendOutTime": 0.2
+                    "blendOutTime": 0.2,
+                    "triggers":[
+                        {
+                            "id": "shot",
+                            "time": 0.29166667
+                        }
+                    ]
+                    
                 }
             ],
             "buildTurns": 4,

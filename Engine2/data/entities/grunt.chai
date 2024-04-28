@@ -1,7 +1,134 @@
 var gruntScript = EntityScript();
 
+global GruntActionType_None = 0;
+global GruntActionType_Attack = 1;
+
+class GruntState 
+{
+    var actionType;
+    // ivec2 
+    var targetHex;
+
+    def GruntState(entity)
+    {
+        this.actionType = GruntActionType_None;
+    }
+}
+
+gruntScript.setCreateState(fun(entity){
+    return GruntState(entity);
+});
+
+
+
+gruntScript.setOnActionTrigger(fun(entity, action, trigger){
+
+    var targetEntity = game.entityAtHex(LayerIndex_Unit, entity.scriptState.targetHex);
+
+    var isShotTrigger = action == "fire" && trigger == "shot";
+    var isAttacking = entity.scriptState.actionType == GruntActionType_Attack;
+    var isTargetValid = !targetEntity.is_var_null;
+
+    if(isShotTrigger && isAttacking && isTargetValid)
+    {
+
+        var attackMeta = calculateAttackMeta(entity, targetEntity);
+        if(attackMeta.targetDamage > 0.0)
+        {
+            game.applyDamage(targetEntity, entity, attackMeta.targetDamage);
+        }
+
+        if(attackMeta.instigatorDamage > 0.0)
+        {
+            game.applyDamage(entity,targetEntity, attackMeta.instigatorDamage);
+        }
+
+    }
+});
+
+
+gruntScript.setUpdateCustomAction(fun(entity, time) {
+
+    if(entity.health > 0.0)
+    {
+        if(entity.scriptState.actionType == GruntActionType_Attack)
+        {
+            if(!entity.isActionPlaying("fire"))
+            {
+                // @todo move this to an anim event? could probably add it to frame index in the action spec!   
+                entity.scriptState.actionType = GruntActionType_None;
+                game.endCustomAction();
+            }
+
+            return;
+        }
+    }
+    // we probably dont wanna get stuck in an invalid state here, so this line prob doesnt hurt
+    game.endCustomAction();
+});
+
+gruntScript.setOnHit(fun(entity, instigator, damage){
+
+    entity.turnTowards(instigator.tileIndex);
+
+    entity.health -= damage;
+
+    if(entity.health < 0.0)
+    {
+        game.killEntity(entity);
+    }
+    else 
+    {
+        entity.playAction("hit");
+    }
+});
+
+
 gruntScript.setOnTurnStart(fun(entity){
-    print("scripted start for grutn!");
+    
+});
+
+gruntScript.setOnTargetChanged(fun(entity, newTarget){
+    entity.scriptState.targetHex = newTarget;
+});
+
+gruntScript.setOnTargetClicked(fun(entity){
+
+    var targetEntity = game.entityAtHex(LayerIndex_Unit, entity.scriptState.targetHex);
+
+    game.endTargeting();
+
+    if(targetEntity.is_var_null)
+    {
+        return;
+    }
+
+    entity.turnTowards(targetEntity.tileIndex);
+
+    entity.playAction("fire");
+    entity.scriptState.actionType = GruntActionType_Attack;
+    game.beginCustomAction();
+
+});
+
+gruntScript.setDrawUI(fun(entity, ui){
+    ui.beginStackV("gruntV", vec2(0.0, 0.0))
+
+    ui.gameLabel("**" + entity.specification.displayName + "**", 12, Middle);
+    ui.gameLabel("*Movement points left:* " + to_string(entity.movePointsLeft), 11, Begin);
+    ui.gameLabel("*Attack points left:* " + to_string(entity.attackPointsLeft), 11, Begin);
+
+
+    var canAttack = entity.attackPointsLeft > 0;
+    if(canAttack)
+    {
+        if(ui.button("att", "Attack"))
+        {
+            game.beginTargeting();
+        }
+    }
+
+    ui.endStackV();
 });
 
 gruntScript;

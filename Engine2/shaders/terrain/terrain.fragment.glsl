@@ -125,7 +125,7 @@ void main()
 	outColor.rgb *= getCloudShadows(fragmentPosition.xyz);
 
 
-	outColor.rgb = mix(outColor.rgb, outline.rgb, outline.a);
+	//outColor.rgb = mix(outColor.rgb, outline.rgb, outline.a);
 
 
 	//float ndotl = max(0.0, dot(fragNormal, -normalize(renderer.sun1.xyz)));

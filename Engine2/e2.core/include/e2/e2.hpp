@@ -79,7 +79,7 @@ namespace e2
 		Default = 0,
 		Animation,
 		Rendering,
-
+		Scripting,
 		Count
 
 	};

@@ -29,6 +29,11 @@ namespace
 
 	struct FontBuildState
 	{
+		FontBuildState()
+		{
+			nodes.resize(e2::glyphMapResolution);
+		}
+
 		uint32_t currentTexture{};
 		e2::StackVector<FaceBuildState, size_t(e2::FontStyle::Count)> faces;
 		stbrp_context packContext; // make sure to reinit every time we push a texture 

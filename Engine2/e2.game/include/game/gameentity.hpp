@@ -19,6 +19,7 @@ namespace e2
 {
 	class MeshProxy;
 
+	constexpr uint32_t maxNumTriggersPerAction = 4;
 
 	class GameEntity;
 
@@ -29,6 +30,12 @@ namespace e2
 		float blendTime{0.0f};
 	};
 
+	struct EntityActionTriggerSpecification
+	{
+		e2::Name id;
+		double time {};
+	};
+
 	struct EntityActionSpecification
 	{
 		std::string animationAssetPath;
@@ -36,6 +43,9 @@ namespace e2
 		float blendInTime{ 0.0f };
 		float blendOutTime{ 0.0f };
 		float speed{ 1.0f };
+
+		e2::StackVector<e2::EntityActionTriggerSpecification, e2::maxNumTriggersPerAction> triggers;
+
 	};
 
 	enum class EntityMoveType : uint8_t
@@ -47,6 +57,7 @@ namespace e2
 
 
 	using scriptFunc_drawUI = std::function<void(e2::GameEntity*, e2::UIContext*)>;
+	using scriptFunc_update = std::function<void(e2::GameEntity*, double)>;
 	using scriptFunc_updateAnimation = std::function<void(e2::GameEntity*, double)>;
 	using scriptFunc_grugTick = std::function<bool(e2::GameEntity*, double)>;
 	using scriptFunc_grugRelevant = std::function<bool(e2::GameEntity*)>;
@@ -55,6 +66,7 @@ namespace e2
 	using scriptFunc_onTargetChanged = std::function<void(e2::GameEntity*, glm::ivec2 const&)>;
 	using scriptFunc_onTargetClicked = std::function<void(e2::GameEntity*)>;
 	using scriptFunc_updateCustomAction = std::function<void(e2::GameEntity*, double)>;
+	using scriptFunc_onActionTrigger = std::function<void(e2::GameEntity*, std::string, std::string)>;
 	using scriptFunc_onTurnStart = std::function<void(e2::GameEntity*)>;
 	using scriptFunc_onTurnEnd = std::function<void(e2::GameEntity*)>;
 	using scriptFunc_onBeginMove = std::function<void(e2::GameEntity*)>;
@@ -67,6 +79,9 @@ namespace e2
 
 		chaiscript::Boxed_Value invokeCreateState(e2::GameEntity* entity);
 		void invokeDrawUI(e2::GameEntity* entity, e2::UIContext* ui);
+
+		void invokeUpdate(e2::GameEntity* entity, double seconds);
+
 		void invokeUpdateAnimation(e2::GameEntity* entity, double seconds);
 		bool invokeGrugRelevant(e2::GameEntity* entity);
 		bool invokeGrugTick(e2::GameEntity* entity, double seconds);
@@ -76,6 +91,7 @@ namespace e2
 		void invokeOnTargetChanged(e2::GameEntity* entity, glm::ivec2 const& hex);
 		void invokeOnTargetClicked(e2::GameEntity* entity);
 		void invokeUpdateCustomAction(e2::GameEntity* entity, double seconds);
+		void invokeOnActionTrigger(e2::GameEntity* entity, e2::Name action, e2::Name trigger);
 		void invokeOnTurnStart(e2::GameEntity* entity);
 		void invokeOnTurnEnd(e2::GameEntity* entity);
 		void invokeOnBeginMove(e2::GameEntity* entity);
@@ -83,6 +99,7 @@ namespace e2
 
 		void setCreateState(scriptFunc_createState func);
 		void setDrawUI(scriptFunc_drawUI func);
+		void setUpdate(scriptFunc_update func);
 		void setUpdateAnimation(scriptFunc_updateAnimation func);
 		void setGrugRelevant(scriptFunc_grugRelevant func);
 		void setGrugTick(scriptFunc_grugTick func);
@@ -92,12 +109,14 @@ namespace e2
 		void setOnTargetChanged(scriptFunc_onTargetChanged func);
 		void setOnTargetClicked(scriptFunc_onTargetClicked func);
 		void setUpdateCustomAction(scriptFunc_updateCustomAction func);
+		void setOnActionTrigger(scriptFunc_onActionTrigger func);
 		void setOnTurnStart(scriptFunc_onTurnStart func);
 		void setOnTurnEnd(scriptFunc_onTurnEnd func);
 		void setOnBeginMove(scriptFunc_onBeginMove func);
 		void setOnEndMove(scriptFunc_onEndMove func);
 
 		bool hasCreateState();
+		bool hasUpdate();
 		bool hasDrawUI();
 		bool hasUpdateAnimation();
 		bool hasGrugRelevant();
@@ -108,6 +127,7 @@ namespace e2
 		bool hasOnTargetChanged();
 		bool hasOnTargetClicked();
 		bool hasUpdateCustomAction();
+		bool hasOnActionTrigger();
 		bool hasOnTurnStart();
 		bool hasOnTurnEnd();
 		bool hasOnBeginMove();
@@ -117,6 +137,7 @@ namespace e2
 		scriptFunc_createState createState;
 		scriptFunc_drawUI drawUI;
 		scriptFunc_updateAnimation updateAnimation;
+		scriptFunc_update update;
 		scriptFunc_grugRelevant grugRelevant;
 		scriptFunc_grugTick grugTick;
 		scriptFunc_fiscal collectRevenue;
@@ -125,6 +146,7 @@ namespace e2
 		scriptFunc_onTargetChanged onTargetChanged;
 		scriptFunc_onTargetClicked onTargetClicked;
 		scriptFunc_updateCustomAction updateCustomAction;
+		scriptFunc_onActionTrigger onActionTrigger;
 		scriptFunc_onTurnStart onTurnStart;
 		scriptFunc_onTurnEnd onTurnEnd;
 		scriptFunc_onBeginMove onBeginMove;
@@ -262,6 +284,16 @@ namespace e2
 		float blendTime{};
 	};
 
+
+
+	struct EntityAnimationActionTrigger
+	{
+		e2::Name id;
+		double time{};
+
+		bool triggered{};
+	};
+
 	struct EntityAnimationAction
 	{
 		e2::Name id;
@@ -269,6 +301,8 @@ namespace e2
 		float blendInTime{};
 		float blendOutTime{};
 		float speed{1.0f};
+
+		e2::StackVector<e2::EntityAnimationActionTrigger, e2::maxNumTriggersPerAction> triggers;
 	};
 
 
@@ -298,6 +332,9 @@ namespace e2
 		GameEntity();
 		GameEntity(e2::GameContext* ctx, e2::EntitySpecification* spec, glm::ivec2 const& tile, EmpireId empireId);
 		virtual ~GameEntity();
+
+		static bool scriptEqualityPtr(GameEntity* lhs, GameEntity* rhs);
+		static GameEntity* scriptAssignPtr(GameEntity*& lhs, GameEntity* rhs);
 
 		void postConstruct(e2::GameContext* ctx, e2::EntitySpecification* spec, glm::ivec2 const& tile, EmpireId empireId);
 
@@ -329,8 +366,15 @@ namespace e2
 
 		virtual void updateAnimation(double seconds);
 
+		/** WARNING: This is run on EVERY ENTITY EVERY FRAME. DONT put heavy code here!! */
+		virtual void update(double seconds);
+
+		virtual void onActionTrigger(e2::Name action, e2::Name trigger);
+
 		virtual void onBeginMove();
 		virtual void onEndMove();
+
+		void turnTowards(glm::ivec2 hex);
 
 		void spreadVisibility();
 		void rollbackVisibility();
@@ -357,9 +401,6 @@ namespace e2
 
 		glm::ivec2 tileIndex;
 		EmpireId empireId;
-
-		/** Set this to true to flag that this unit will be fully destroyed on next tick */
-		bool dead{};
 
 		float health{};
 		int32_t movePointsLeft{};
@@ -405,8 +446,8 @@ namespace e2
 		double m_actionBlendInTime = 0.2;
 		double m_actionBlendOutTime = 0.2;
 		double m_actionSpeed = 1.0;
-
-
+		double m_lastActionTime = 0.0;
+		e2::EntityAnimationAction* m_currentAction{};
 
 		e2::StackVector<EntityAnimationPose, e2::maxNumPosesPerEntity> m_animationPoses;
 		e2::StackVector<EntityAnimationAction, e2::maxNumActionsPerEntity> m_animationActions;

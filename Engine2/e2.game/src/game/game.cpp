@@ -41,6 +41,12 @@ e2::Game::Game(e2::Context* ctx)
 		m_empires[i] = nullptr;
 	}
 
+	m_hitLabels.resize(e2::maxNumHitLabels);
+	for (uint64_t i = 0; i < maxNumHitLabels; i++)
+	{
+		m_hitLabels[i] = HitLabel();
+	}
+
 	readAllSaveMetas();
 }
 
@@ -551,6 +557,9 @@ void e2::Game::initializeScriptEngine()
 			"Entity",
 			{ },
 		{
+
+			{chaiscript::fun(&e2::GameEntity::scriptEqualityPtr), "=="},
+			{chaiscript::fun(&e2::GameEntity::scriptAssignPtr), "="},
 			{chaiscript::fun(&e2::GameEntity::isBuilding), "isBuilding"},
 			{chaiscript::fun(&e2::GameEntity::canBuild), "canBuild"},
 			{chaiscript::fun(&e2::GameEntity::build), "build"},
@@ -576,6 +585,7 @@ void e2::Game::initializeScriptEngine()
 			{chaiscript::fun(&e2::GameEntity::isActionPlaying), "isActionPlaying"},
 			{chaiscript::fun(&e2::GameEntity::isAnyActionPlaying), "isAnyActionPlaying"},
 			{chaiscript::fun(&e2::GameEntity::setPose), "setPose"},
+			{chaiscript::fun(&e2::GameEntity::turnTowards), "turnTowards"},
 		}
 		);
 
@@ -583,6 +593,7 @@ void e2::Game::initializeScriptEngine()
 			"Game",
 			{ },
 			{
+				{chaiscript::fun(&Game::killEntity), "killEntity"},
 				{chaiscript::fun(&Game::spawnHitLabel), "spawnHitLabel"},
 				{chaiscript::fun(&Game::discoverEmpire), "discoverEmpire"},
 				{chaiscript::fun(&Game::turn), "turn"},
@@ -614,7 +625,9 @@ void e2::Game::initializeScriptEngine()
 				{chaiscript::fun(&Game::endTargeting), "endTargeting"},
 				{chaiscript::fun(&Game::spawnEntity), "spawnEntity"},
 				{chaiscript::fun(&Game::queueDestroyEntity), "destroyEntity"},
-				{chaiscript::fun(&Game::entityAtHex), "entityAtHex"}
+				{chaiscript::fun(&Game::entityAtHex), "entityAtHex"},
+				{chaiscript::fun(&Game::getSelectedEntity), "getSelectedEntity"},
+				{chaiscript::fun(&Game::getTurnState), "getTurnState"}
 			}
 		);
 
@@ -677,6 +690,8 @@ void e2::Game::initializeScriptEngine()
 				chaiscript::constructor<EntityScriptInterface()>()
 			},
 			{
+				{chaiscript::fun(&EntityScriptInterface::hasOnActionTrigger), "hasOnActionTrigger"},
+				{chaiscript::fun(&EntityScriptInterface::hasUpdate), "hasUpdate"},
 				{chaiscript::fun(&EntityScriptInterface::hasCreateState), "hasCreateState"},
 				{chaiscript::fun(&EntityScriptInterface::hasDrawUI), "hasDrawUI"},
 				{chaiscript::fun(&EntityScriptInterface::hasCollectExpenditure), "hasCollectExpenditure"},
@@ -693,6 +708,8 @@ void e2::Game::initializeScriptEngine()
 				{chaiscript::fun(&EntityScriptInterface::hasUpdateAnimation), "hasUpdateAnimation"},
 				{chaiscript::fun(&EntityScriptInterface::hasUpdateCustomAction), "hasUpdateCustomAction"},
 
+				{chaiscript::fun(&EntityScriptInterface::invokeOnActionTrigger), "invokeOnActionTrigger"},
+				{chaiscript::fun(&EntityScriptInterface::invokeUpdate), "invokeUpdate"},
 				{chaiscript::fun(&EntityScriptInterface::invokeCreateState), "invokeCreateState"},
 				{chaiscript::fun(&EntityScriptInterface::invokeDrawUI), "invokeDrawUI"},
 				{chaiscript::fun(&EntityScriptInterface::invokeCollectExpenditure), "invokeCollectExpenditure"},
@@ -709,6 +726,8 @@ void e2::Game::initializeScriptEngine()
 				{chaiscript::fun(&EntityScriptInterface::invokeUpdateAnimation), "invokeUpdateAnimation"},
 				{chaiscript::fun(&EntityScriptInterface::invokeUpdateCustomAction), "invokeUpdateCustomAction"},
 
+				{chaiscript::fun(&EntityScriptInterface::setOnActionTrigger), "setOnActionTrigger"},
+				{chaiscript::fun(&EntityScriptInterface::setUpdate), "setUpdate"},
 				{chaiscript::fun(&EntityScriptInterface::setCreateState), "setCreateState"},
 				{chaiscript::fun(&EntityScriptInterface::setDrawUI), "setDrawUI"},
 				{chaiscript::fun(&EntityScriptInterface::setCollectExpenditure), "setCollectExpenditure"},
@@ -824,6 +843,19 @@ void e2::Game::initializeScriptEngine()
 		m_scriptEngine->add_global_const(chaiscript::const_var(e2::UITextAlign(e2::UITextAlign::End)), "End");
 		m_scriptEngine->add_global_const(chaiscript::const_var(e2::UITextAlign(e2::UITextAlign::Middle)), "Middle");
 
+
+		m_scriptEngine->add_global_const(chaiscript::const_var(e2::TurnState(e2::TurnState::Unlocked)), "Unlocked");
+		m_scriptEngine->add_global_const(chaiscript::const_var(e2::TurnState(e2::TurnState::UnitAction_Move)), "UnitAction_Move");
+		m_scriptEngine->add_global_const(chaiscript::const_var(e2::TurnState(e2::TurnState::EntityAction_Generic)), "EntityAction_Generic");
+		m_scriptEngine->add_global_const(chaiscript::const_var(e2::TurnState(e2::TurnState::EntityAction_Target)), "EntityAction_Target");
+		/*
+		
+				Unlocked,
+		UnitAction_Move,
+		EntityAction_Generic,
+		EntityAction_Target
+		*/
+
 		m_scriptEngine->add_global(chaiscript::var(this), "game");
 	}
 	catch (std::exception& e)
@@ -842,6 +874,23 @@ void e2::Game::initialize()
 	m_session = e2::create<e2::GameSession>(this);
 
 	initializeScriptEngine();
+
+	try
+	{
+		m_scriptEngine->eval_file("data/library.chai");
+	}
+	catch (chaiscript::exception::eval_error& e)
+	{
+		LogError("chai: evaluation failed: {}", e.pretty_print());
+	}
+	catch (chaiscript::exception::bad_boxed_cast& e)
+	{
+		LogError("chai: casting return-type from script to native failed: {}", e.what());
+	}
+	catch (std::exception& e)
+	{
+		LogError("{}", e.what());
+	}
 
 	e2::EntitySpecification::initializeSpecifications(this);
 
@@ -1037,6 +1086,16 @@ void e2::Game::update(double seconds)
 	listenerTransform = listenerTransform * glm::toMat4(view.orientation);
 
 	audioManager()->setListenerTransform(listenerTransform);
+
+	std::unordered_set<e2::GameEntity*> cpy = m_dyingEntities;
+	for (e2::GameEntity* entity : cpy)
+	{
+		if (!entity->isActionPlaying("die"))
+		{
+			m_dyingEntities.erase(entity);
+			game()->queueDestroyEntity(entity);
+		}
+	}
 
 	for (e2::GameEntity* entity : m_entitiesPendingDestroy)
 		destroyEntity(entity);
@@ -1702,6 +1761,7 @@ void e2::Game::updateGameState()
 	}
 	else if (m_state == GameState::Turn)
 	{
+
 		if (m_turnState == TurnState::Unlocked)
 			updateTurn();
 		else if (m_turnState == TurnState::UnitAction_Move)
@@ -2290,7 +2350,7 @@ void e2::Game::drawHitLabels()
 			continue;
 		}
 
-		label.velocity.y += 1000.0f * (float)game()->timeDelta();
+		label.velocity.y += 20.0f * (float)game()->timeDelta();
 
 		label.offset += label.velocity * (float)game()->timeDelta();
 
@@ -2515,7 +2575,7 @@ void e2::Game::drawDebugUI()
 
 
 
-	ui->drawTexturedQuad({ xOffset, yOffset + 18.0f * 11.0f }, { 384.f, 384.f }, 0xFFFFFFFF, renderer->shadowTarget());
+	//ui->drawTexturedQuad({ xOffset, yOffset + 18.0f * 11.0f }, { 384.f, 384.f }, 0xFFFFFFFF, renderer->shadowTarget());
 #endif
 }
 
@@ -2704,6 +2764,11 @@ void e2::Game::resolveSelectedEntity()
 
 void e2::Game::unresolveSelectedEntity()
 {
+	if (m_turnState != TurnState::Unlocked)
+	{
+		m_turnState = TurnState::Unlocked;
+	}
+
 	if (m_unitAS)
 		e2::destroy(m_unitAS);
 	m_unitAS = nullptr;
@@ -2711,11 +2776,18 @@ void e2::Game::unresolveSelectedEntity()
 	m_hexGrid->clearOutline();
 }
 
+e2::GameEntity* e2::Game::getSelectedEntity()
+{
+	return m_selectedEntity;
+}
+
 void e2::Game::selectEntity(e2::GameEntity* entity)
 {
 	if (!entity || entity == m_selectedEntity)
 		return;
 
+	if (m_dyingEntities.contains(entity) || m_entitiesPendingDestroy.contains(entity))
+		return;
 
 	deselectEntity();
 
@@ -2905,7 +2977,17 @@ void e2::Game::destroyEntity(e2::GameEntity* entity)
 		entity->rollbackVisibility();
 
 	if (m_selectedEntity && m_selectedEntity == entity)
+	{
+		if (m_turnState == TurnState::UnitAction_Move)
+		{
+			LogError("We are moving while being destroyed. We can't handle this! Fix!!");
+		}
+
+		m_turnState = TurnState::Unlocked;
+
+
 		deselectEntity();
+	}
 
 	m_entityLayers[size_t(entity->specification->layerIndex)].entityIndex.erase(entity->tileIndex);
 	m_entities.erase(entity);
@@ -2935,6 +3017,24 @@ e2::GameEntity* e2::Game::entityAtHex(e2::EntityLayerIndex layerIndex, glm::ivec
 		return nullptr;
 
 	return finder->second;
+}
+
+void e2::Game::killEntity(e2::GameEntity* entity)
+{
+	if (m_dyingEntities.contains(entity))
+	{
+		return;
+	}
+
+	if (game()->getSelectedEntity() == entity)
+	{
+		game()->deselectEntity();
+	}
+
+	entity->health = 0.0f;
+	entity->playAction("die");
+
+	m_dyingEntities.insert(entity);
 }
 
 void e2::Game::harvestWood(glm::ivec2 const& location, EmpireId empire)
@@ -3301,5 +3401,5 @@ e2::HitLabel::HitLabel(glm::vec3 const& worldOffset, std::string const& inText) 
 {
 	active = true;
 	timeCreated = e2::timeNow();
-	velocity = { 50.0f, -200.0f, 50.0f };
+	velocity = glm::vec3{ 50.0f, -200.0f, 50.0f } * 0.02f;
 }

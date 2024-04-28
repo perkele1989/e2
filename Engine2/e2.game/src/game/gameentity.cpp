@@ -4,6 +4,7 @@
 #include "game/game.hpp"
 #include "e2/game/gamesession.hpp"
 
+#include <e2/e2.hpp>
 #include <e2/utils.hpp>
 #include <e2/transform.hpp>
 #include <glm/gtx/quaternion.hpp>
@@ -13,17 +14,70 @@
 
 #include <fstream>
 
+#define INVOKE_SCRIPT_HANDLE(x, ...) if(x) \
+{\
+try\
+{\
+	x(__VA_ARGS__);\
+}\
+catch (chaiscript::exception::eval_error& e)\
+{\
+	LogError("chai: evaluation failed: {}", e.pretty_print());\
+}\
+catch (chaiscript::exception::bad_boxed_cast& e)\
+{\
+	LogError("chai: casting return-type from script to native failed: {}", e.what());\
+}\
+catch (chaiscript::exception::arity_error& e)\
+{\
+	LogError("chai: arity error: {}", e.what());\
+}\
+catch (chaiscript::exception::guard_error& e)\
+{\
+	LogError("chai: guard error: {}", e.what());\
+}\
+catch (std::exception& e)\
+{\
+	LogError("{}", e.what());\
+}\
+}
+
+#define INVOKE_SCRIPT_HANDLE_WITH_RETURN(t, d, x, ...) \
+t returnValue = d;\
+if(x) \
+{\
+try\
+{\
+	returnValue = x(__VA_ARGS__);\
+}\
+catch (chaiscript::exception::eval_error& e)\
+{\
+	LogError("chai: evaluation failed: {}", e.pretty_print());\
+}\
+catch (chaiscript::exception::bad_boxed_cast& e)\
+{\
+	LogError("chai: casting return-type from script to native failed: {}", e.what());\
+}\
+catch (chaiscript::exception::arity_error& e)\
+{\
+	LogError("chai: arity error: {}", e.what());\
+}\
+catch (chaiscript::exception::guard_error& e)\
+{\
+	LogError("chai: guard error: {}", e.what());\
+}\
+catch (std::exception& e)\
+{\
+	LogError("{}", e.what());\
+}\
+}\
+return returnValue;
+
 using json = nlohmann::json;
 
 
 void e2::GameEntity::updateAnimation(double seconds)
 {
-	if (dead)
-	{
-		game()->queueDestroyEntity(this);
-		return;
-	}
-
 	if (inView && !meshProxy->enabled())
 		meshProxy->enable();
 
@@ -58,16 +112,58 @@ void e2::GameEntity::updateAnimation(double seconds)
 				m_mainPose->applyPose(m_currentPose);
 			}
 
-			if (m_actionPose && m_actionPose->playing())
+			if (m_actionPose)
 			{
-				m_actionPose->updateAnimation(seconds * m_actionSpeed, !inView);
+				if (m_actionPose->playing())
+				{
+					m_actionPose->updateAnimation(seconds * m_actionSpeed, !inView);
 
-				double actionCurrentTime = m_actionPose->time();
-				double actionTotalTime = m_actionPose->animation()->timeSeconds();
-				double blendInCoeff = glm::smoothstep(0.0, m_actionBlendInTime, actionCurrentTime);
-				double blendOutCoeff = 1.0 - glm::smoothstep(actionTotalTime - m_actionBlendOutTime, actionTotalTime, actionCurrentTime);
-				double actionBlendCoeff = blendInCoeff * blendOutCoeff;
-				m_mainPose->blendWith(m_actionPose, actionBlendCoeff);
+					double actionCurrentTime = m_actionPose->time();
+
+					if (m_currentAction)
+					{
+						for (e2::EntityAnimationActionTrigger& trigger : m_currentAction->triggers)
+						{
+							bool triggerInRange = trigger.time <= actionCurrentTime && trigger.time >= m_lastActionTime;
+							if (triggerInRange && !trigger.triggered)
+							{
+								onActionTrigger(m_currentAction->id, trigger.id);
+								trigger.triggered = true;
+							}
+						}
+					}
+
+
+					// 
+					m_lastActionTime = actionCurrentTime;
+
+					double actionTotalTime = m_actionPose->animation()->timeSeconds();
+					double blendInCoeff = glm::smoothstep(0.0, m_actionBlendInTime, actionCurrentTime);
+					double blendOutCoeff = 1.0 - glm::smoothstep(actionTotalTime - m_actionBlendOutTime, actionTotalTime, actionCurrentTime);
+					double actionBlendCoeff = blendInCoeff * blendOutCoeff;
+					m_mainPose->blendWith(m_actionPose, actionBlendCoeff);
+				}
+				else
+				{
+					m_actionPose = nullptr;
+
+					if (m_currentAction)
+					{
+						// trigger any untriggered events (may be last frame or smth)
+						// and then set triggered to false for all of them
+						for (e2::EntityAnimationActionTrigger& trigger : m_currentAction->triggers)
+						{
+							if (!trigger.triggered)
+							{
+								onActionTrigger(m_currentAction->id, trigger.id);
+							}
+
+							trigger.triggered = false;
+						}
+					}
+					m_currentAction = nullptr;
+				}
+
 			}
 
 			m_mainPose->updateSkin();
@@ -91,6 +187,24 @@ void e2::GameEntity::updateAnimation(double seconds)
 }
 
 
+
+void e2::GameEntity::update(double seconds)
+{
+	if (specification->scriptInterface.hasUpdate())
+	{
+		specification->scriptInterface.invokeUpdate(this, seconds);
+		return;
+	}
+}
+
+void e2::GameEntity::onActionTrigger(e2::Name action, e2::Name trigger)
+{
+	if (specification->scriptInterface.hasOnActionTrigger())
+	{
+		specification->scriptInterface.invokeOnActionTrigger(this, action, trigger);
+		return;
+	}
+}
 
 void e2::GameEntity::updateCustomAction(double seconds)
 {
@@ -176,7 +290,7 @@ void e2::GameEntity::onHit(e2::GameEntity* instigator, float damage)
 
 	health -= damage;
 	if (health <= 0.0f)
-		game()->queueDestroyEntity(this);
+		game()->killEntity(this);
 }
 
 void e2::GameEntity::onTargetChanged(glm::ivec2 const& location)
@@ -224,6 +338,17 @@ e2::GameEntity::~GameEntity()
 
 }
 
+bool e2::GameEntity::scriptEqualityPtr(GameEntity* lhs, GameEntity* rhs)
+{
+	return lhs == rhs;
+}
+
+e2::GameEntity* e2::GameEntity::scriptAssignPtr(GameEntity*& lhs, GameEntity* rhs)
+{
+	lhs = rhs;
+	return lhs;
+}
+
 void e2::GameEntity::postConstruct(e2::GameContext* ctx, e2::EntitySpecification* spec, glm::ivec2 const& tile, EmpireId empire)
 {
 	m_game = ctx->game();
@@ -243,6 +368,17 @@ void e2::GameEntity::postConstruct(e2::GameContext* ctx, e2::EntitySpecification
 		newAction.blendOutTime = action.blendOutTime;
 		newAction.speed = action.speed;
 
+		for (e2::EntityActionTriggerSpecification& trigger : action.triggers)
+		{
+			e2::EntityAnimationActionTrigger newTrigger;
+			newTrigger.id = trigger.id;
+			newTrigger.time = trigger.time;
+			newTrigger.triggered = false;
+
+			newAction.triggers.push(newTrigger);
+		}
+		
+
 		m_animationActions.push(newAction);
 	}
 
@@ -256,6 +392,8 @@ void e2::GameEntity::postConstruct(e2::GameContext* ctx, e2::EntitySpecification
 
 		m_animationPoses.push(newPose);
 	}
+
+	health = spec->maxHealth;
 
 	if (specification->scriptInterface.hasCreateState())
 	{
@@ -402,6 +540,8 @@ void e2::GameEntity::playAction(e2::Name actionName)
 	if (!action)
 		return;
 
+	m_currentAction = action;
+
 	playAction2(action->pose, action->blendInTime, action->blendOutTime, action->speed);
 }
 
@@ -539,6 +679,12 @@ void e2::GameEntity::onEndMove()
 	}
 
 	setPose("idle");
+}
+
+void e2::GameEntity::turnTowards(glm::ivec2 hex)
+{	
+	float angle = e2::radiansBetween(e2::Hex(hex).localCoords(), e2::Hex(tileIndex).localCoords());
+	meshTargetRotation = glm::angleAxis(angle, glm::vec3(e2::worldUp()));
 }
 
 bool e2::GameEntity::canBuild(e2::UnitBuildAction& action)
@@ -910,6 +1056,25 @@ void e2::EntitySpecification::initializeSpecifications(e2::GameContext* ctx)
 					newAction.animationAssetPath = action.at("asset").template get<std::string>();
 
 					std::string actionName = action.at("name").template get<std::string>();
+
+					if (action.contains("triggers"))
+					{
+						for (json& trigger : action.at("triggers"))
+						{
+							if (!trigger.contains("id") || !trigger.contains("time"))
+							{
+								LogError("invalid action trigger: id, time required.. ");
+								continue;
+							}
+
+							EntityActionTriggerSpecification newTrigger;
+							newTrigger.id = trigger.at("id").template get<std::string>();
+							newTrigger.time = trigger.at("time").template get<double>();
+
+							newAction.triggers.push(newTrigger);
+						}
+					}
+
 					newSpec.actions[actionName] = newAction;
 				}
 			}
@@ -995,363 +1160,104 @@ size_t e2::EntitySpecification::specificationCount()
 
 chaiscript::Boxed_Value e2::EntityScriptInterface::invokeCreateState(e2::GameEntity* entity)
 {
-	chaiscript::Boxed_Value returnValue;
-	if (createState)
-	{
-		try
-		{
-			returnValue = createState(entity);
-		}
-		catch (chaiscript::exception::eval_error& e)
-		{
-			LogError("chai: evaluation failed: {}", e.pretty_print());
-		}
-		catch (chaiscript::exception::bad_boxed_cast& e)
-		{
-			LogError("chai: casting return-type from script to native failed: {}", e.what());
-		}
-		catch (std::exception& e)
-		{
-			LogError("{}", e.what());
-		}
-	}
-
-	return returnValue;
+	E2_PROFILE_SCOPE_CTX(Scripting, entity->game());
+	INVOKE_SCRIPT_HANDLE_WITH_RETURN(chaiscript::Boxed_Value, {}, createState, entity);
 }
 
 void e2::EntityScriptInterface::invokeDrawUI(e2::GameEntity* entity, e2::UIContext* ui)
 {
-	if (drawUI)
-	{
-		try
-		{
-			drawUI(entity, ui);
-		}
-		catch (chaiscript::exception::eval_error& e)
-		{
-			LogError("chai: evaluation failed: {}", e.pretty_print());
-		}
-		catch (chaiscript::exception::bad_boxed_cast& e)
-		{
-			LogError("chai: casting return-type from script to native failed: {}", e.what());
-		}
-		catch (chaiscript::exception::arity_error& e)
-		{
-			LogError("chai: arity error: {}", e.what());
-		}
-		catch (chaiscript::exception::guard_error& e)
-		{
-			LogError("chai: guard error: {}", e.what());
-		}
-		catch (std::exception& e)
-		{
-			LogError("{}", e.what());
-		}
-	}
+	E2_PROFILE_SCOPE_CTX(Scripting, entity->game());
+	INVOKE_SCRIPT_HANDLE(drawUI, entity, ui);
+}
+
+void e2::EntityScriptInterface::invokeUpdate(e2::GameEntity* entity, double seconds)
+{
+	E2_PROFILE_SCOPE_CTX(Scripting, entity->game());
+	INVOKE_SCRIPT_HANDLE(update, entity, seconds);
 }
 
 void e2::EntityScriptInterface::invokeUpdateAnimation(e2::GameEntity* entity, double seconds)
 {
-	if (updateAnimation)
-	{
-		try
-		{
-			updateAnimation(entity, seconds);
-		}
-		catch (chaiscript::exception::eval_error& e)
-		{
-			LogError("chai: evaluation failed: {}", e.pretty_print());
-		}
-		catch (chaiscript::exception::bad_boxed_cast& e)
-		{
-			LogError("chai: casting return-type from script to native failed: {}", e.what());
-		}
-		catch (std::exception& e)
-		{
-			LogError("{}", e.what());
-		}
-	}
+	E2_PROFILE_SCOPE_CTX(Scripting, entity->game());
+	INVOKE_SCRIPT_HANDLE(updateAnimation, entity, seconds);
 }
 
 bool e2::EntityScriptInterface::invokeGrugRelevant(e2::GameEntity* entity)
 {
-	bool returnValue = false;
-	if (grugRelevant)
-	{
-		try
-		{
-			returnValue = grugRelevant(entity);
-		}
-		catch (chaiscript::exception::eval_error& e)
-		{
-			LogError("chai: evaluation failed: {}", e.pretty_print());
-		}
-		catch (chaiscript::exception::bad_boxed_cast& e)
-		{
-			LogError("chai: casting return-type from script to native failed: {}", e.what());
-		}
-		catch (std::exception& e)
-		{
-			LogError("{}", e.what());
-		}
-	}
-
-	return returnValue;
+	E2_PROFILE_SCOPE_CTX(Scripting, entity->game());
+	INVOKE_SCRIPT_HANDLE_WITH_RETURN(bool, false, grugRelevant, entity);
 }
 
 bool e2::EntityScriptInterface::invokeGrugTick(e2::GameEntity* entity, double seconds)
 {
-	bool returnValue = false;
-	if (grugTick)
-	{
-		try
-		{
-			returnValue = grugTick(entity, seconds);
-		}
-		catch (chaiscript::exception::eval_error& e)
-		{
-			LogError("chai: evaluation failed: {}", e.pretty_print());
-		}
-		catch (chaiscript::exception::bad_boxed_cast& e)
-		{
-			LogError("chai: casting return-type from script to native failed: {}", e.what());
-		}
-		catch (std::exception& e)
-		{
-			LogError("{}", e.what());
-		}
-	}
-	return returnValue;
+	E2_PROFILE_SCOPE_CTX(Scripting, entity->game());
+	INVOKE_SCRIPT_HANDLE_WITH_RETURN(bool, false, grugTick, entity, seconds);
 }
 
 void e2::EntityScriptInterface::invokeCollectRevenue(e2::GameEntity* entity, e2::ResourceTable &outTable)
 {
-	if (collectRevenue)
-	{
-		try
-		{
-			collectRevenue(entity, outTable);
-		}
-		catch (chaiscript::exception::eval_error& e)
-		{
-			LogError("chai: evaluation failed: {}", e.pretty_print());
-		}
-		catch (chaiscript::exception::bad_boxed_cast& e)
-		{
-			LogError("chai: casting return-type from script to native failed: {}", e.what());
-		}
-		catch (std::exception& e)
-		{
-			LogError("{}", e.what());
-		}
-	}
+	E2_PROFILE_SCOPE_CTX(Scripting, entity->game());
+	INVOKE_SCRIPT_HANDLE(collectRevenue, entity, outTable);
 }
 
 void e2::EntityScriptInterface::invokeCollectExpenditure(e2::GameEntity* entity, e2::ResourceTable& outTable)
 {
-	if (collectExpenditure)
-	{
-		try
-		{
-			collectExpenditure(entity, outTable);
-		}
-		catch (chaiscript::exception::eval_error& e)
-		{
-			LogError("chai: evaluation failed: {}", e.pretty_print());
-		}
-		catch (chaiscript::exception::bad_boxed_cast& e)
-		{
-			LogError("chai: casting return-type from script to native failed: {}", e.what());
-		}
-		catch (std::exception& e)
-		{
-			LogError("{}", e.what());
-		}
-	}
+	E2_PROFILE_SCOPE_CTX(Scripting, entity->game());
+	INVOKE_SCRIPT_HANDLE(collectExpenditure, entity, outTable);
 }
 
 void e2::EntityScriptInterface::invokeOnHit(e2::GameEntity* entity, e2::GameEntity* instigator, float dmg)
 {
-	if (onHit)
-	{
-		try
-		{
-			onHit(entity, instigator, dmg);
-		}
-		catch (chaiscript::exception::eval_error& e)
-		{
-			LogError("chai: evaluation failed: {}", e.pretty_print());
-		}
-		catch (chaiscript::exception::bad_boxed_cast& e)
-		{
-			LogError("chai: casting return-type from script to native failed: {}", e.what());
-		}
-		catch (std::exception& e)
-		{
-			LogError("{}", e.what());
-		}
-	}
+	E2_PROFILE_SCOPE_CTX(Scripting, entity->game());
+	INVOKE_SCRIPT_HANDLE(onHit, entity, instigator, dmg);
 }
 
 void e2::EntityScriptInterface::invokeOnTargetChanged(e2::GameEntity* entity, glm::ivec2 const& hex)
 {
-	if (onTargetChanged)
-	{
-		try
-		{
-			onTargetChanged(entity, hex);
-		}
-		catch (chaiscript::exception::eval_error& e)
-		{
-			LogError("chai: evaluation failed: {}", e.pretty_print());
-		}
-		catch (chaiscript::exception::bad_boxed_cast& e)
-		{
-			LogError("chai: casting return-type from script to native failed: {}", e.what());
-		}
-		catch (std::exception& e)
-		{
-			LogError("{}", e.what());
-		}
-	}
+	E2_PROFILE_SCOPE_CTX(Scripting, entity->game());
+	INVOKE_SCRIPT_HANDLE(onTargetChanged, entity, hex);
 }
 
 void e2::EntityScriptInterface::invokeOnTargetClicked(e2::GameEntity* entity)
 {
-	if (onTargetClicked)
-	{
-		try
-		{
-			onTargetClicked(entity);
-		}
-		catch (chaiscript::exception::eval_error& e)
-		{
-			LogError("chai: evaluation failed: {}", e.pretty_print());
-		}
-		catch (chaiscript::exception::bad_boxed_cast& e)
-		{
-			LogError("chai: casting return-type from script to native failed: {}", e.what());
-		}
-		catch (std::exception& e)
-		{
-			LogError("{}", e.what());
-		}
-	}
+	E2_PROFILE_SCOPE_CTX(Scripting, entity->game());
+	INVOKE_SCRIPT_HANDLE(onTargetClicked, entity);
 }
 
 void e2::EntityScriptInterface::invokeUpdateCustomAction(e2::GameEntity* entity, double seconds)
 {
-	if (updateCustomAction)
-	{
-		try
-		{
-			updateCustomAction(entity, seconds);
-		}
-		catch (chaiscript::exception::eval_error& e)
-		{
-			LogError("chai: evaluation failed: {}", e.pretty_print());
-		}
-		catch (chaiscript::exception::bad_boxed_cast& e)
-		{
-			LogError("chai: casting return-type from script to native failed: {}", e.what());
-		}
-		catch (std::exception& e)
-		{
-			LogError("{}", e.what());
-		}
-	}
+	E2_PROFILE_SCOPE_CTX(Scripting, entity->game());
+	INVOKE_SCRIPT_HANDLE(updateCustomAction, entity, seconds);
+}
+
+void e2::EntityScriptInterface::invokeOnActionTrigger(e2::GameEntity* entity, e2::Name action, e2::Name trigger)
+{
+	E2_PROFILE_SCOPE_CTX(Scripting, entity->game());
+	INVOKE_SCRIPT_HANDLE(onActionTrigger, entity, action.string(), trigger.string());
 }
 
 void e2::EntityScriptInterface::invokeOnTurnStart(e2::GameEntity* entity)
 {
-	if (onTurnStart)
-	{
-		try
-		{
-			onTurnStart(entity);
-		}
-		catch (chaiscript::exception::eval_error& e)
-		{
-			LogError("chai: evaluation failed: {}", e.pretty_print());
-		}
-		catch (chaiscript::exception::bad_boxed_cast& e)
-		{
-			LogError("chai: casting return-type from script to native failed: {}", e.what());
-		}
-		catch (std::exception& e)
-		{
-			LogError("{}", e.what());
-		}
-	}
+	E2_PROFILE_SCOPE_CTX(Scripting, entity->game());
+	INVOKE_SCRIPT_HANDLE(onTurnStart, entity);
 }
 
 void e2::EntityScriptInterface::invokeOnTurnEnd(e2::GameEntity* entity)
 {
-	if (onTurnEnd)
-	{
-		try
-		{
-			onTurnEnd(entity);
-		}
-		catch (chaiscript::exception::eval_error& e)
-		{
-			LogError("chai: evaluation failed: {}", e.pretty_print());
-		}
-		catch (chaiscript::exception::bad_boxed_cast& e)
-		{
-			LogError("chai: casting return-type from script to native failed: {}", e.what());
-		}
-		catch (std::exception& e)
-		{
-			LogError("{}", e.what());
-		}
-	}
+	E2_PROFILE_SCOPE_CTX(Scripting, entity->game());
+	INVOKE_SCRIPT_HANDLE(onTurnEnd, entity);
 }
 
 void e2::EntityScriptInterface::invokeOnBeginMove(e2::GameEntity* entity)
 {
-	if (onBeginMove)
-	{
-		try
-		{
-			onBeginMove(entity);
-		}
-		catch (chaiscript::exception::eval_error& e)
-		{
-			LogError("chai: evaluation failed: {}", e.pretty_print());
-		}
-		catch (chaiscript::exception::bad_boxed_cast& e)
-		{
-			LogError("chai: casting return-type from script to native failed: {}", e.what());
-		}
-		catch (std::exception& e)
-		{
-			LogError("{}", e.what());
-		}
-	}
+	E2_PROFILE_SCOPE_CTX(Scripting, entity->game());
+	INVOKE_SCRIPT_HANDLE(onBeginMove, entity);
 }
 
 void e2::EntityScriptInterface::invokeOnEndMove(e2::GameEntity* entity)
 {
-	if (onEndMove)
-	{
-		try
-		{
-			onEndMove(entity);
-		}
-		catch (chaiscript::exception::eval_error& e)
-		{
-			LogError("chai: evaluation failed: {}", e.pretty_print());
-		}
-		catch (chaiscript::exception::bad_boxed_cast& e)
-		{
-			LogError("chai: casting return-type from script to native failed: {}", e.what());
-		}
-		catch (std::exception& e)
-		{
-			LogError("{}", e.what());
-		}
-	}
+	E2_PROFILE_SCOPE_CTX(Scripting, entity->game());
+	INVOKE_SCRIPT_HANDLE(onEndMove, entity);
 }
 
 void e2::EntityScriptInterface::setCreateState(scriptFunc_createState func)
@@ -1362,6 +1268,11 @@ void e2::EntityScriptInterface::setCreateState(scriptFunc_createState func)
 void e2::EntityScriptInterface::setDrawUI(scriptFunc_drawUI func)
 {
 	drawUI = func;
+}
+
+void e2::EntityScriptInterface::setUpdate(scriptFunc_update func)
+{
+	update = func;
 }
 
 void e2::EntityScriptInterface::setUpdateAnimation(scriptFunc_updateAnimation func)
@@ -1409,6 +1320,11 @@ void e2::EntityScriptInterface::setUpdateCustomAction(scriptFunc_updateCustomAct
 	updateCustomAction = func;
 }
 
+void e2::EntityScriptInterface::setOnActionTrigger(scriptFunc_onActionTrigger func)
+{
+	onActionTrigger = func;
+}
+
 void e2::EntityScriptInterface::setOnTurnStart(scriptFunc_onTurnStart func)
 {
 	onTurnStart = func;
@@ -1432,6 +1348,11 @@ void e2::EntityScriptInterface::setOnEndMove(scriptFunc_onEndMove func)
 bool e2::EntityScriptInterface::hasCreateState()
 {
 	return createState != nullptr;
+}
+
+bool e2::EntityScriptInterface::hasUpdate()
+{
+	return update != nullptr;
 }
 
 bool e2::EntityScriptInterface::hasDrawUI()
@@ -1482,6 +1403,11 @@ bool e2::EntityScriptInterface::hasOnTargetClicked()
 bool e2::EntityScriptInterface::hasUpdateCustomAction()
 {
 	return updateCustomAction != nullptr;
+}
+
+bool e2::EntityScriptInterface::hasOnActionTrigger()
+{
+	return onActionTrigger != nullptr;
 }
 
 bool e2::EntityScriptInterface::hasOnTurnStart()

@@ -1,0 +1,67 @@
+
+// calculated meta for a hypothesized unit attack
+// used for both actual attacks, but also for UX/UI reasons when displaying combat predictions
+class AttackMeta 
+{
+    // damage applied to target
+    var targetDamage;
+
+    // true if target dies
+    var targetDead;
+
+    // damage applied to instigator (retaliatory)
+    var instigatorDamage;
+
+    // true if instigator dies (suicide mission)
+    var instigatorDead;
+    
+    def AttackMeta()
+    {
+        this.targetDamage = 0.0;
+        this.targetDead = false;
+        this.instigatorDamage = 0.0;
+        this.instigatorDead = false;
+    }
+}
+
+def calculateAttackMeta(instigator, target)
+{
+    var newMeta = AttackMeta();
+
+    var attackPenalty = instigator.health / instigator.specification.maxHealth;
+    var attackStrength = instigator.specification.attackStrength * attackPenalty;
+
+    var defensePenalty = target.health / target.specification.maxHealth;
+    var defenseStrength = (target.specification.attackStrength * target.specification.defensiveModifier) * defensePenalty;
+
+    newMeta.targetDamage = attackStrength - defenseStrength;
+    if(newMeta.targetDamage < 0.0)
+    {
+        newMeta.targetDamage = 0.0;
+    }
+
+    newMeta.targetDead = (target.health - newMeta.targetDamage) <= 0.0;
+
+    // if the target would die, or if target isnt retaliatory, we dont need to calculate retaliatory strike 
+    if(newMeta.targetDead || target.specification.retaliatoryModifier <= 0.0)
+    {
+        return newMeta;
+    }
+
+    // retaliatory parameters; flip the roles (and add retaliatory modifier into mix)
+    attackPenalty = target.health / target.specification.maxHealth;
+    attackStrength = target.specification.attackStrength * attackPenalty * target.specification.retaliatoryModifier;
+
+    defensePenalty = instigator.health / instigator.specification.maxHealth;
+    defenseStrength = (instigator.specification.attackStrength * instigator.specification.defensiveModifier) * defensePenalty;
+
+    newMeta.instigatorDamage = attackStrength - defenseStrength;
+    if(newMeta.instigatorDamage < 0.0)
+    {
+        newMeta.instigatorDamage = 0.0;
+    }
+
+    newMeta.instigatorDead = (instigator.health - newMeta.instigatorDamage) <= 0.0;
+
+    return newMeta;
+}

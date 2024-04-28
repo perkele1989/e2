@@ -232,7 +232,7 @@ e2::Renderer::Renderer(e2::Session* session, glm::uvec2 const& resolution)
 	}
 
 	// setup shadow buffers 
-	constexpr uint32_t shadowMapResolution = 2048;
+	constexpr uint32_t shadowMapResolution = 4096;
 	{
 		e2::TextureCreateInfo textureCreateInfo{};
 		textureCreateInfo.resolution.x = shadowMapResolution;
