@@ -125,7 +125,7 @@ void main()
 	outColor.rgb *= getCloudShadows(fragmentPosition.xyz);
 
 
-	//outColor.rgb = mix(outColor.rgb, outline.rgb, outline.a);
+	outColor.rgb = mix(outColor.rgb, outline.rgb, outline.a);
 
 
 	//float ndotl = max(0.0, dot(fragNormal, -normalize(renderer.sun1.xyz)));
@@ -137,8 +137,8 @@ void main()
 	//outColor.rgb = clamp(vec3(finalNormal.x, finalNormal.z, -finalNormal.y) * 0.5 + 0.5, vec3(0.0), vec3(1.0));
 
 	float gridCoeff2 = smoothstep(0.92, 0.95, fragmentColor.a);
-	gridCoeff2 *= 0.1;
-	//outColor.rgb = mix(outColor.rgb, vec3(0.0), gridCoeff2);
+	gridCoeff2 *= 0.2;
+	outColor.rgb = mix(outColor.rgb, vec3(0.0), gridCoeff2);
 #endif
 
 }

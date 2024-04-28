@@ -29,7 +29,12 @@ namespace e2
 		virtual void write(Buffer& destination) const override;
 		virtual bool read(Buffer& source) override;
 
-		e2::Sprite getSprite(e2::Name name);
+		e2::Sprite *getSprite(e2::Name name);
+
+		inline e2::Texture2DPtr texture()
+		{
+			return m_texture;
+		}
 
 	protected:
 		e2::Texture2DPtr m_texture{};

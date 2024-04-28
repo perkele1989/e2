@@ -165,6 +165,9 @@ namespace e2
 		/** The global identifier for this entity, i.e. its identifiable name */
 		e2::Name id;
 
+		/** The badge id. Wil ldefault to id if empty */
+		e2::Name badgeId;
+
 		/** C++ type to instantiate when creating an entity of this specification */
 		e2::Type* type{};
 

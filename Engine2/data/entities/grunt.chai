@@ -19,8 +19,6 @@ gruntScript.setCreateState(fun(entity){
     return GruntState(entity);
 });
 
-
-
 gruntScript.setOnActionTrigger(fun(entity, action, trigger){
 
     var targetEntity = game.entityAtHex(LayerIndex_Unit, entity.scriptState.targetHex);
@@ -31,7 +29,6 @@ gruntScript.setOnActionTrigger(fun(entity, action, trigger){
 
     if(isShotTrigger && isAttacking && isTargetValid)
     {
-
         var attackMeta = calculateAttackMeta(entity, targetEntity);
         if(attackMeta.targetDamage > 0.0)
         {
@@ -42,10 +39,8 @@ gruntScript.setOnActionTrigger(fun(entity, action, trigger){
         {
             game.applyDamage(entity,targetEntity, attackMeta.instigatorDamage);
         }
-
     }
 });
-
 
 gruntScript.setUpdateCustomAction(fun(entity, time) {
 
@@ -55,7 +50,6 @@ gruntScript.setUpdateCustomAction(fun(entity, time) {
         {
             if(!entity.isActionPlaying("fire"))
             {
-                // @todo move this to an anim event? could probably add it to frame index in the action spec!   
                 entity.scriptState.actionType = GruntActionType_None;
                 game.endCustomAction();
             }
@@ -81,11 +75,6 @@ gruntScript.setOnHit(fun(entity, instigator, damage){
     {
         entity.playAction("hit");
     }
-});
-
-
-gruntScript.setOnTurnStart(fun(entity){
-    
 });
 
 gruntScript.setOnTargetChanged(fun(entity, newTarget){

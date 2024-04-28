@@ -26,6 +26,11 @@ namespace e2
 			return m_texture;
 		}
 
+		inline glm::uvec2 resolution()
+		{
+			return m_resolution;
+		}
+
 	protected:
 		e2::ITexture* m_texture{};
 

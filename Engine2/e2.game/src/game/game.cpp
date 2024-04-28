@@ -326,6 +326,8 @@ void e2::Game::finalizeBoot()
 
 	m_testSound = am->get("assets/audio/S_Test.e2a").cast<e2::Sound>();
 
+	m_uiIconsSheet = am->get("assets/ui/S_UI_Icons.e2a").cast<e2::Spritesheet>();
+
 	// After this line, we may no longer safely fetch and store loaded assets
 	am->returnALJ(m_bootTicket);
 
@@ -458,6 +460,16 @@ void e2::Game::initializeScriptEngine()
 			{chaiscript::fun(&GameContext::hexGrid), "hexGrid"},
 			{chaiscript::fun(&GameContext::gameSession), "gameSession"},
 		}
+		);
+
+		chaiscript::utility::add_class<e2::UIColor>(*m_scriptModule,
+			"Color",
+			{
+				chaiscript::constructor<UIColor(glm::vec4 const&)>()
+			},
+			{
+				{chaiscript::fun(&UIColor::toVec4), "toVec4"},
+			}
 		);
 
 		chaiscript::utility::add_class<e2::TileData>(*m_scriptModule,
@@ -612,6 +624,7 @@ void e2::Game::initializeScriptEngine()
 				{chaiscript::fun(&Game::empireById), "empireById"},
 				{chaiscript::fun(&Game::destroyEmpire), "destroyEmpire"},
 				{chaiscript::fun(&Game::harvestWood), "harvestWood"},
+				{chaiscript::fun(&Game::getUiSprite), "getUiSprite"},
 				{chaiscript::fun(&Game::removeWood), "removeWood"},
 				{chaiscript::fun(&Game::view), "view"},
 				{chaiscript::fun(&Game::viewPoints), "viewPoints"},
@@ -680,6 +693,7 @@ void e2::Game::initializeScriptEngine()
 				{chaiscript::fun(&UIContext::drawSDFText), "drawSDFText"},
 				{chaiscript::fun(&UIContext::drawRasterText), "drawRasterText"},
 				{chaiscript::fun(&UIContext::drawQuad), "drawQuad"},
+				{chaiscript::fun(&UIContext::drawSprite), "drawSprite"},
 				{chaiscript::fun(&UIContext::drawTexturedQuad), "drawTexturedQuad"},
 			}
 		);
@@ -934,7 +948,7 @@ void e2::Game::initialize()
 	am->prescribeALJ(alj, "assets/environment/trees/SM_PineForest003.e2a");
 	am->prescribeALJ(alj, "assets/environment/trees/SM_PineForest004.e2a");
 
-
+	am->prescribeALJ(alj, "assets/ui/S_UI_Icons.e2a");
 
 
 	/*am->prescribeALJ(alj, "assets/environment/trees/SM_PalmTree001.e2a");
@@ -2469,9 +2483,7 @@ void e2::Game::drawStatusUI()
 
 void e2::Game::drawUnitUI()
 {
-	if (!m_selectedEntity)
-		return;
-	
+
 	e2::GameSession* session = gameSession();
 	e2::Renderer* renderer = session->renderer();
 	e2::UIContext* ui = session->uiContext();
@@ -2481,6 +2493,31 @@ void e2::Game::drawUnitUI()
 
 	e2::IWindow* wnd = session->window();
 	glm::vec2 winSize = wnd->size();
+
+	for (e2::GameEntity* entity : m_entitiesInView)
+	{
+		static const e2::Name badgeBgName = "badge";
+		e2::Sprite* badgeBg = getUiSprite(badgeBgName);
+		e2::Sprite* badgeSprite = getUiSprite(entity->specification->badgeId);
+
+		if (badgeBg && badgeSprite)
+		{
+			glm::vec2 badgeSize{32.0f, 32.0f};
+			glm::vec2 badgeShieldSize = badgeSize * 2.0f;
+
+			glm::vec2 badgePos = worldToPixels(e2::Hex(entity->tileIndex).localCoords() + e2::worldUpf() * 1.15f);
+		
+			ui->drawSprite(badgePos - badgeShieldSize / 2.0f, *badgeBg, 0x000000FF, 64.0f/80.0f);
+
+			ui->drawSprite(badgePos - badgeSize / 2.0f, *badgeSprite, 0xFFFFFFFF, 32.0f / 40.0f);
+		}
+
+	}
+
+	if (!m_selectedEntity)
+		return;
+	
+
 
 	float width = 450.0f;
 	float height = 180.0f;
@@ -3037,6 +3074,11 @@ void e2::Game::killEntity(e2::GameEntity* entity)
 	m_dyingEntities.insert(entity);
 }
 
+e2::Sprite* e2::Game::getUiSprite(e2::Name name)
+{
+	return m_uiIconsSheet->getSprite(name);
+}
+
 void e2::Game::harvestWood(glm::ivec2 const& location, EmpireId empire)
 {
 	e2::TileData* tileData = m_hexGrid->getExistingTileData(location);
@@ -3170,11 +3212,18 @@ void e2::Game::updateAnimation(double seconds)
 
 	e2::Aabb2D viewAabb = m_viewPoints.toAabb();
 
+
+	m_entitiesInView.clear();
 	for (e2::GameEntity* entity : m_entities)
 	{
 		// update inView, first check aabb to give chance for implicit early exit
 		glm::vec2 unitCoords = entity->meshPlanarCoords();
 		entity->inView = viewAabb.isWithin(unitCoords) && m_viewPoints.isWithin(unitCoords, 1.0f);
+
+		if (entity->inView)
+		{
+			m_entitiesInView.insert(entity);
+		}
 
 		// @todo consider using this instead if things break
 		//for(int32_t i = 0; i < numTicks; i++)

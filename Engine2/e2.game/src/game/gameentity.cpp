@@ -869,6 +869,15 @@ void e2::EntitySpecification::initializeSpecifications(e2::GameContext* ctx)
 				continue;
 			}
 
+			if (entity.contains("badgeId"))
+			{
+				newSpec.badgeId = entity.at("badgeId").template get<std::string>();
+			}
+			else
+			{
+				newSpec.badgeId = newSpec.id;
+			}
+
 			newSpec.displayName = entity.at("displayName").template get<std::string>();
 
 			if (entity.contains("passableFlags"))

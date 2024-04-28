@@ -301,6 +301,7 @@ namespace e2
 		std::unordered_set<GameEntity*> m_entitiesPendingDestroy;
 		std::unordered_set<GameEntity*> m_dyingEntities;
 
+		std::unordered_set<GameEntity*> m_entitiesInView;
 
 	protected:
 
@@ -350,6 +351,11 @@ namespace e2
 		float m_sunAngleA{ -57.6f };
 		float m_sunAngleB{ 24.3f };
 
+
+	public:
+		e2::Sprite* getUiSprite(e2::Name name);
+	protected:
+		e2::SpritesheetPtr m_uiIconsSheet;
 	};
 
 

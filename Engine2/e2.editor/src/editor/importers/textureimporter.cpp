@@ -179,3 +179,144 @@ bool e2::TextureImporter::writeAssets()
 		return false;
 	}
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+e2::SheetImporter::SheetImporter(e2::Editor* editor, SheetImportConfig const& config)
+	: e2::Importer(editor)
+	, m_config(config)
+{
+
+}
+
+e2::SheetImporter::~SheetImporter()
+{
+
+}
+
+void e2::SheetImporter::update(double seconds)
+{
+	e2::Importer::update(seconds);
+}
+
+bool e2::SheetImporter::analyze()
+{
+	return true;
+}
+
+bool e2::SheetImporter::writeAssets()
+{
+	std::filesystem::path inputPath = std::filesystem::path(m_config.input);
+
+	struct _Sprite
+	{
+		std::string name;
+		glm::vec2 offset;
+		glm::vec2 size;
+	};
+
+	std::string texture;
+	std::vector<_Sprite> sprites;
+
+
+	std::string linesStr;
+	if (!e2::readFile(m_config.input, linesStr))
+	{
+		LogError("failed to read spritesheet file");
+		return false;
+	}
+
+	std::vector<std::string> lines = e2::split(linesStr, '\n');
+	for (std::string& l : lines)
+	{
+		std::string trimmed = e2::trim(l);
+		std::vector<std::string> parts = e2::split(trimmed, ' ');
+
+		if (parts.size() < 2)
+			continue;
+
+		std::string cmd = e2::toLower(parts[0]);
+		if (cmd == "texture" && parts.size() == 2)
+		{
+			texture = parts[1];
+		}
+		if (cmd == "sprite" && parts.size() == 6)
+		{
+			_Sprite newSprite;
+			newSprite.name = parts[1];
+			newSprite.offset.x = std::atof(parts[2].c_str());
+			newSprite.offset.y = std::atof(parts[3].c_str());
+			newSprite.size.x = std::atof(parts[4].c_str());
+			newSprite.size.y = std::atof(parts[5].c_str());
+
+			sprites.push_back(newSprite);
+		}
+
+	}
+
+	std::filesystem::path outFilename = std::filesystem::path(inputPath).replace_extension(".e2a").filename();
+
+	std::string outFile = (fs::path(m_config.outputDirectory) / outFilename).string();
+	std::string outFileLower = e2::toLower(outFile);
+
+
+
+	e2::AssetHeader spritesheetHeader;
+	spritesheetHeader.version = e2::AssetVersion::Latest;
+	spritesheetHeader.assetType = "e2::Spritesheet";
+
+	e2::AssetEntry* entr = assetManager()->database().entryFromPath(texture);
+	if (!entr)
+	{
+		LogError("texture asset {} doesn't exist in database", texture);
+		return false;
+	}
+
+	e2::DependencySlot newDep;
+	newDep.name = "texture";
+	newDep.uuid = entr->uuid;
+	spritesheetHeader.dependencies.push(newDep);
+
+
+	e2::Buffer spritesheetData;
+
+	spritesheetData << uint32_t(sprites.size());
+	for (_Sprite& s : sprites)
+	{
+		spritesheetData << s.name;
+		spritesheetData << s.offset;
+		spritesheetData << s.size;
+	}
+
+
+	spritesheetHeader.size = spritesheetData.size();
+
+	e2::Buffer fileBuffer(true, 1024 + spritesheetData.size());
+	fileBuffer << spritesheetHeader;
+	fileBuffer.write(spritesheetData.begin(), spritesheetData.size());
+	if (fileBuffer.writeToFile(outFile))
+	{
+		assetManager()->database().invalidateAsset(outFile);
+		assetManager()->database().validate(true);
+
+		return true;
+	}
+	else
+	{
+		LogError("Failed to create spritesheet, could not write to file: {}", outFile);
+		return false;
+	}
+}

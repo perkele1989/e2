@@ -37,4 +37,28 @@ namespace e2
 
 	};
 
+	struct SheetImportConfig
+	{
+		std::string input;
+		std::string outputDirectory{ "./assets/" };
+	};
+
+
+	class SheetImporter : public Importer
+	{
+	public:
+		SheetImporter(e2::Editor* editor, SheetImportConfig const& config);
+		virtual ~SheetImporter();
+
+		virtual void update(double seconds) override;
+
+		bool analyze();
+
+		bool writeAssets();
+	protected:
+
+		SheetImportConfig m_config;
+
+	};
+
 }

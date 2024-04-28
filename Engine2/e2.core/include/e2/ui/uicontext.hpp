@@ -268,7 +268,7 @@ namespace e2
 		void drawTexturedQuad(glm::vec2 position, glm::vec2 size, e2::UIColor color, e2::ITexture* texture, glm::vec2 uvOffset = { 0.0f, 0.0f }, glm::vec2 uvScale = {1.0f, 1.0f}, e2::UITexturedQuadType type = UITexturedQuadType::Default);
 
 		/** Draws a sprite */
-		void drawSprite(glm::vec2 position, e2::Sprite sprite);
+		void drawSprite(glm::vec2 position, e2::Sprite sprite, e2::UIColor color, float scale);
 
 		/** Draws a fancy quad with corner radius and thin bevel */
 		void drawQuadFancy(glm::vec2 position, glm::vec2 size, e2::UIColor color, float cornerRadius, float bevelStrength, bool windowBorder = false);

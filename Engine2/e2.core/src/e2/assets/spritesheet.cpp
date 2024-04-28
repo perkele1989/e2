@@ -1,6 +1,8 @@
 
 #include "e2/assets/spritesheet.hpp"
 
+#include "e2/managers/assetmanager.hpp"
+
 e2::Spritesheet::~Spritesheet()
 {
 
@@ -33,17 +35,25 @@ bool e2::Spritesheet::read(Buffer& source)
 		m_sprites[name] = newSprite;
 	}
 
+	if (dependencies.size() == 0)
+		return false;
+
+	m_texture = assetManager()->get(dependencies[0].uuid).cast<e2::Texture2D>();
+
+	if (!m_texture)
+		return false;
+
 	return true;
 }
 
-e2::Sprite e2::Spritesheet::getSprite(e2::Name name)
+e2::Sprite* e2::Spritesheet::getSprite(e2::Name name)
 {
 	auto it = m_sprites.find(name);
 	if (it == m_sprites.end())
 	{
-		LogError("No such sprite in spritesheet: {}", name);
-		return {};
+		//LogError("No such sprite in spritesheet: {}", name);
+		return nullptr;
 	}
 
-	return it->second;
+	return &it->second;
 }

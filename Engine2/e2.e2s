@@ -63,7 +63,19 @@
             "source-paths": [ "e2.editor/src" ],
             "private": {
                 "dependencies": [ "e2.core", "assimp.core"],
-                "include-paths": [ "e2.editor/include" ]
+                "include-paths": [ "e2.editor/include" ],
+                "defines": {
+                    "GLM_ENABLE_EXPERIMENTAL": "1",
+                    "NOMINMAX": "1"
+                },
+                "defines-profile": {
+                    "GLM_ENABLE_EXPERIMENTAL": "1",
+                    "NOMINMAX": "1"
+                },
+                "defines-devel": {
+                    "GLM_ENABLE_EXPERIMENTAL": "1",
+                    "NOMINMAX": "1"
+                }
             }
         },
         {

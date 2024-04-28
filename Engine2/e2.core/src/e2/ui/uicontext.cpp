@@ -666,9 +666,12 @@ void e2::UIContext::drawTexturedQuad(glm::vec2 position, glm::vec2 size, e2::UIC
 	m_hasRecordedData = true;
 }
 
-void e2::UIContext::drawSprite(glm::vec2 position, e2::Sprite sprite)
+void e2::UIContext::drawSprite(glm::vec2 position, e2::Sprite sprite, e2::UIColor color, float scale)
 {
-
+	glm::vec2 resf = glm::vec2(sprite.sheet->texture()->resolution());
+	glm::vec2 uvScale = sprite.size / resf;
+	glm::vec2 uvOffset = sprite.offset / resf;
+	drawTexturedQuad(position, sprite.size * scale, color, sprite.sheet->texture()->handle(), uvOffset, uvScale, e2::UITexturedQuadType::Default);
 }
 
 void e2::UIContext::drawQuadFancy(glm::vec2 position, glm::vec2 size, e2::UIColor color, float cornerRadius, float bevelStrength, bool windowBorder)

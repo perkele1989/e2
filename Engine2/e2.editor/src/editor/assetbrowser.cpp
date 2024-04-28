@@ -81,6 +81,18 @@ void e2::AssetBrowser::update(e2::UIContext* ui, double seconds)
 				}
 				editor()->oneShotImporter(newImporter);
 			}
+			else if (ext == ".spritesheet")
+			{
+				e2::SheetImportConfig cfg;
+				cfg.input = file;
+				cfg.outputDirectory = std::format(".{}", m_path->fullPath());
+				e2::SheetImporter* newImporter = e2::create<e2::SheetImporter>(editor(), cfg);
+				if (!newImporter->writeAssets())
+				{
+					LogError("Failed to import file: {} to location {}", cfg.input, cfg.outputDirectory);
+				}
+				editor()->oneShotImporter(newImporter);
+			}
 			else if (ext == ".wav")
 			{
 				e2::SoundImportConfig cfg;

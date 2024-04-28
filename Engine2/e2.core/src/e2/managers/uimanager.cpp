@@ -133,6 +133,7 @@ void main()
 	// original
 	if(type == 0)
 	{
+		//outColor = vec3(uvOffset, 0.0, 1.0);
 		outColor = texture(sampler2D(quadTextures[textureIndex], quadSampler), fragmentUv) * quadColor;
 	}
 	// raster text 
