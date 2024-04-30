@@ -167,6 +167,11 @@ vec3 getSunColor(vec3 fragPos, vec3 fragNormal, vec3 fragAlbedo)
     return ndotl * renderer.sun2.xyz * renderer.sun2.w * fragAlbedo * shadow;
 }
 
+vec3 getIrradiance(vec3 fragNormal)
+{
+	return texture(sampler2D(irradianceCube, equirectSampler), equirectangularUv(fragNormal)).rgb * renderer.ibl1.x;
+}
+
 vec3 getIblColor(vec3 fragPosition, vec3 fragAlbedo, vec3 fragNormal,float fragRoughness, float fragMetalness, vec3 viewVector)
 {
     // 0.2

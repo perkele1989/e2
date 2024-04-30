@@ -16,12 +16,26 @@ void main()
 	vec3 frontColor = getFrontColor(screenUv);
 	vec3 frontPosition = getFrontPosition(screenUv);
 
-	outPosition = fragmentPosition;
+	float fogHeight = 1.0 -sampleFogHeight(frontPosition.xz,  renderer.time.x);
+	vec4 fragPos = vec4(frontPosition.xyz, 1.0);
+	fragPos.y -= fogHeight;
+
+
+
+	outPosition = fragmentPosition + vec4(0.0, -fogHeight, 0.0, 0.0);
 	outColor = vec4(frontColor, 1.0);
+
+    
+
+
+	float depth = clamp(distance(frontPosition,fragmentPosition.xyz)/1.0, 0.0, 1.0); 
+	depth = pow(depth, 0.25);
 
 	vec3 visibility = textureLod(sampler2D(visibilityMask, clampSampler), screenUv, 0).xyz;
 
-	outColor.rgb = fogOfWar(outColor.rgb, frontPosition, visibility, renderer.time.x);
+	outColor.rgb = fogOfWar(outColor.rgb,fragPos.xyz, visibility, renderer.time.x, depth, fogHeight);
+
+	//outColor.rgb = vec3(fogHeight);
 
 	//outColor.rgb = vec3(renderer.time.x);
 

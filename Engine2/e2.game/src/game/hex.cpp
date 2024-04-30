@@ -1643,7 +1643,7 @@ void e2::HexGrid::renderFogOfWar()
 
 
 		outlineConstants.mvpMatrix = vpMatrix * transform;
-		outlineConstants.color = { 1.0f, 1.0f, 1.0f, 1.0f };
+		outlineConstants.color = { 1.0f, 1.0f, 1.0f, 0.5f };
 
 		buff->pushConstants(m_outlinePipelineLayout, 0, sizeof(e2::OutlineConstants), reinterpret_cast<uint8_t*>(&outlineConstants));
 		buff->draw(hexSpec.indexCount, 1);
@@ -1662,7 +1662,7 @@ void e2::HexGrid::renderFogOfWar()
 		transform = glm::scale(transform, { 1.01f, 1.01f, 1.01f });
 
 		outlineConstants.mvpMatrix = vpMatrix * transform;
-		outlineConstants.color = { 0.0f, 0.00f, 0.00f, 0.0f };
+		outlineConstants.color = { 0.0f, 0.5f, 0.15f, 0.1f };
 
 		buff->pushConstants(m_outlinePipelineLayout, 0, sizeof(e2::OutlineConstants), reinterpret_cast<uint8_t*>(&outlineConstants));
 		buff->draw(hexSpec.indexCount, 1);

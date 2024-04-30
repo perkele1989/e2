@@ -1029,7 +1029,7 @@ void e2::Game::shutdown()
 	m_irradianceMap = nullptr;
 	m_radianceMap = nullptr;
 	m_uiTextureResources = nullptr;
-
+	m_uiIconsSheet = nullptr;
 
 
 }
@@ -2212,11 +2212,11 @@ void e2::Game::drawUI()
 
 		drawFinalUI();
 
-		constexpr bool debugShadows = false;
+		constexpr bool debugShadows = true;
 		if(debugShadows)
 		{
-			glm::vec2 offset{ 384.0f, 24.0f };
-			glm::vec2 size{ 384.0f, 384.0f };
+			glm::vec2 offset{ 300.0f, 40.0f };
+			glm::vec2 size{ 120, 80.0f };
 
 			e2::UIContext* ui = gameSession()->uiContext();
 			auto& mouse = ui->mouseState();
@@ -2494,6 +2494,8 @@ void e2::Game::drawUnitUI()
 	e2::IWindow* wnd = session->window();
 	glm::vec2 winSize = wnd->size();
 
+	float alpha = glm::mix( 1.0f,  0.75f, m_viewZoom);
+	e2::UIColor bgColor = e2::UIColor(glm::vec4{0.0f, 0.0f, 0.0f, alpha});
 	for (e2::GameEntity* entity : m_entitiesInView)
 	{
 		static const e2::Name badgeBgName = "badge";
@@ -2502,14 +2504,19 @@ void e2::Game::drawUnitUI()
 
 		if (badgeBg && badgeSprite)
 		{
-			glm::vec2 badgeSize{32.0f, 32.0f};
+			
+			float uiScale = float(winSize.y) / 1080.0f;
+
+			glm::vec2 badgeSize = glm::vec2( 32.0f, 32.0f) * uiScale;
 			glm::vec2 badgeShieldSize = badgeSize * 2.0f;
 
-			glm::vec2 badgePos = worldToPixels(e2::Hex(entity->tileIndex).localCoords() + e2::worldUpf() * 1.15f);
-		
-			ui->drawSprite(badgePos - badgeShieldSize / 2.0f, *badgeBg, 0x000000FF, 64.0f/80.0f);
+			
 
-			ui->drawSprite(badgePos - badgeSize / 2.0f, *badgeSprite, 0xFFFFFFFF, 32.0f / 40.0f);
+			glm::vec2 badgePos = worldToPixels( entity->meshPosition + e2::worldUpf() * 0.75f);
+		
+			ui->drawSprite(badgePos - badgeShieldSize / 2.0f, *badgeBg, bgColor, (64.0f/80.0f) * uiScale);
+
+			ui->drawSprite(badgePos - badgeSize / 2.0f, *badgeSprite, 0xFFFFFFFF, (32.0f / 40.0f) * uiScale);
 		}
 
 	}

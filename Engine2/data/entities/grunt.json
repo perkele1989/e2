@@ -17,7 +17,7 @@
             "defensiveModifier": 0.25,
             "retaliatoryModifier": 0.0,
             "moveSpeed": 2.8,
-            "meshScale": [0.005, -0.005, -0.005],
+            "meshScale": [0.004, -0.004, -0.004],
             "script": "data/entities/grunt.chai",
             "mesh": "assets/characters/SM_Soldier.e2a",
             "skeleton": "assets/characters/SK_Soldier.e2a",

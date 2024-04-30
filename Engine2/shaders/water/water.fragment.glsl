@@ -41,7 +41,8 @@ void main()
 
 
 	//vec3 n = vec3(0.0, -1.0, 0.0);
-	
+	float sunShadow = calculateSunShadow(fragmentPosition);
+	float sunDelta =  sunShadow * renderer.sun2.w;
 	vec3 l = normalize(renderer.sun1.xyz);
 	vec3 ndotl = vec3(clamp(dot(n, -l), 0.0, 1.0));
 
@@ -77,7 +78,7 @@ void main()
 	float viewDepthCoeffFoam = 1.0 - smoothstep(0.0,  (0.15 + timeSin2 * 0.2 ) * pow((simplex(fragmentPosition.xz * 4.0 + vec2(cos(time * 0.25), sin(time*0.2))) * 0.5 + 0.5), 1.0), viewDistanceToDepth);
 	//float viewDepthCoeffFoam = 1.0;
 
-	vec3 baseColor = mix(shoreDark, lightWater,  pow(h, 1.4) * (ndotl * 0.5 + 0.5) );
+	vec3 baseColor = mix(shoreDark, lightWater,  pow(h, 1.4) * (ndotl * 0.5 + 0.5) * sunShadow );
 	
 
 	vec3 dimBaseColor = mix(baseColor * frontColor, frontColor, 0.2);
@@ -91,19 +92,26 @@ void main()
 
 	//baseColor = shoreDark  * (ndotl);
 
+
+	float ibl = renderer.ibl1.x * 3.0;
+	
+
+	//sun += sun * 0.5 + ibl * 0.5;
+	//float ibl = 
+
 	// basecolor
-	outColor.rgb =  baseColor ;
+	outColor.rgb = (baseColor * ibl );
 
 	float vdotn = pow(clamp(-dot(v, n), 0.0, 1.0), 4.0);
 
     float reflCoeff = smoothstep(0.0, 0.35, h);
 
 	// fresnel reflection
-	outColor.rgb += hdr * vdotn * 0.15 * reflCoeff;
+	outColor.rgb += hdr * vdotn * 0.15 * reflCoeff * (sunDelta * 0.333);
 
 
 	float reflCoeff2 = mix(1.0, reflCoeff, vis.w);
-	outColor.rgb += hdr *  0.04 * reflCoeff;
+	outColor.rgb += hdr *  0.04 * reflCoeff * (sunDelta * 0.333);
 
 
 	// debug normal 

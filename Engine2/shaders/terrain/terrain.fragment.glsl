@@ -120,7 +120,7 @@ void main()
 	outColor.rgb += getIblColor(fragmentPosition.xyz, albedo, finalNormal, roughness, metalness, viewVector);
 
 	float rimHeightCoeff = smoothstep(0.1, 1.0, -fragmentPosition.y);
-	outColor.rgb += getRimColor(fragNormal, viewVector, vec3(1.0, 0.7, 0.5) * 0.45) * rimHeightCoeff;
+	outColor.rgb += getRimColor(fragNormal, viewVector, vec3(1.0, 0.7, 0.5) * 0.45 * (renderer.sun2.w * 1/1.75)) * rimHeightCoeff;
 
 	outColor.rgb *= getCloudShadows(fragmentPosition.xyz);
 

@@ -3,6 +3,7 @@
     "entities":[
         {
             "id": "mobile_mob",
+            "badgeId": "mobilemob",
             "typeName": "e2::GameEntity",
             "displayName": "Mobile M.O.B",
             "passableFlags": ["land"],

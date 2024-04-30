@@ -13,7 +13,7 @@
             "buildPoints": 1,
             "attackStrength": 0.0,
             "defensiveStrength": 25.0,
-            "meshScale": [0.005, -0.005, -0.005],
+            "meshScale": [0.004, -0.004, -0.004],
             "moveSpeed": 2.8,
             "script": "data/entities/engineer.chai",
             "mesh": "assets/characters/SM_Engineer.e2a",
