@@ -29,6 +29,11 @@ namespace e2
 		bool isBegin{};
 		e2::Hex index;
 
+		bool hexHasTarget{};
+
+		// lowest health target directly attackable from this hex , 
+		e2::GameEntity* grugTarget{};
+
 		e2::PathFindingHex* towardsOrigin{};
 		uint32_t stepsFromOrigin{};
 	};
@@ -39,14 +44,27 @@ namespace e2
 		ObjectDeclaration();
 	public:
 		PathFindingAS();
-		PathFindingAS(e2::GameContext* ctx, e2::Hex const& start, uint64_t range, bool ignoreVisibility = false, e2::PassableFlags passableFlags = PassableFlags::Land);
+		PathFindingAS(e2::Game* game, e2::Hex const& start, uint64_t range, bool ignoreVisibility = false, e2::PassableFlags passableFlags = PassableFlags::Land);
 		PathFindingAS(e2::GameEntity* unit);
 		~PathFindingAS();
 
 		std::vector<e2::Hex> find(e2::Hex const& target);
 
+		// lowest health target directly attackable from origin hex , 
+		e2::GameEntity* grugTarget{};
+		e2::Hex grugTargetMoveHex;
+		uint32_t grugTargetMovePoints{};
+
 		e2::PathFindingHex* origin{};
 		std::unordered_map<glm::ivec2, e2::PathFindingHex*> hexIndex;
+
+		/** targets directly attackable from origin hex */
+		std::unordered_set<e2::GameEntity*> targetsInRange;
+
+		/** Maps attackable entities to the hex that is closest to move to in order to attack it */
+		std::unordered_map<e2::GameEntity*, std::pair<e2::Hex, uint32_t>> targetsInMoveRange;
+
+		
 		
 	};
 
@@ -156,6 +174,7 @@ namespace e2
 			return m_turnState;
 		}
 
+
 	protected:
 
 		e2::ALJTicket m_bootTicket;
@@ -223,9 +242,19 @@ namespace e2
 			return m_localEmpire;
 		}
 
+		e2::EmpireId localEmpireId()
+		{
+			return m_localEmpireId;
+		}
+
 		e2::GameEmpire* nomadEmpire()
 		{
 			return m_nomadEmpire;
+		}
+
+		e2::EmpireId nomadEmpireId()
+		{
+			return m_nomadEmpireId;
 		}
 		
 
@@ -287,6 +316,18 @@ namespace e2
 
 		void killEntity(e2::GameEntity* entity);
 
+		inline e2::PathFindingAS* selectedUnitAS()
+		{
+			return m_unitAS;
+		}
+
+		int32_t grugNumAttackMovePoints();
+		e2::GameEntity* grugAttackTarget();
+		glm::ivec2 grugAttackMoveLocation();
+		glm::ivec2 grugMoveLocation();
+
+		bool entityRelevantForPlay(e2::GameEntity* entity);
+
 	protected:
 
 		e2::PathFindingAS* m_unitAS{};
@@ -294,6 +335,7 @@ namespace e2
 		std::vector<e2::Hex> m_unitMovePath;
 		uint32_t m_unitMoveIndex{};
 		float m_unitMoveDelta{};
+		bool m_ffwMove = false;
 
 		GameEntity* m_selectedEntity{};
 		std::unordered_set<GameEntity*> m_entities;

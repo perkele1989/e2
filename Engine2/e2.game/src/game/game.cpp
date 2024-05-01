@@ -375,7 +375,7 @@ void e2::Game::initializeScriptEngine()
 			{
 				{chaiscript::fun(&glm::ivec2::x), "x"},
 				{chaiscript::fun(&glm::ivec2::y), "y"},
-				{chaiscript::fun( (glm::ivec2 & (glm::ivec2::*)(const glm::ivec2&)) (&glm::ivec2::operator=) ), "="}
+				{chaiscript::fun( (glm::ivec2 & (glm::ivec2::*)(const glm::ivec2&)) (&glm::ivec2::operator=) ), "="},
 			}
 			);
 		
@@ -541,6 +541,7 @@ void e2::Game::initializeScriptEngine()
 			{chaiscript::fun(&e2::EntitySpecification::moveType), "moveType"},
 			{chaiscript::fun(&e2::EntitySpecification::retaliatoryModifier), "retaliatoryModifier"},
 			{chaiscript::fun(&e2::EntitySpecification::sightRange), "sightRange"},
+			{chaiscript::fun(&e2::EntitySpecification::attackRange), "attackRange"},
 		}
 		);
 
@@ -563,6 +564,33 @@ void e2::Game::initializeScriptEngine()
 			{chaiscript::fun(&e2::UnitBuildAction::turnLastBuilt), "turnLastBuilt"},
 			{chaiscript::fun(&e2::UnitBuildAction::tick), "tick"},
 		}
+		);
+
+		chaiscript::utility::add_class<e2::PathFindingHex>(*m_scriptModule,
+			"PathFindingHex",
+			{
+			},
+			{
+				{chaiscript::fun(&e2::PathFindingHex::index), "index"},
+				{chaiscript::fun(&e2::PathFindingHex::isBegin), "isBegin"},
+				{chaiscript::fun(&e2::PathFindingHex::hexHasTarget), "hexHasTarget"},
+				{chaiscript::fun(&e2::PathFindingHex::grugTarget), "grugTarget"},
+				{chaiscript::fun(&e2::PathFindingHex::stepsFromOrigin), "stepsFromOrigin"},
+				{chaiscript::fun(&e2::PathFindingHex::towardsOrigin), "towardsOrigin"},
+			}
+			);
+
+		chaiscript::utility::add_class<e2::PathFindingAS>(*m_scriptModule,
+			"PathFindingAS",
+			{
+				{ chaiscript::constructor<e2::PathFindingAS(e2::GameEntity*)>() },
+				{ chaiscript::constructor<e2::PathFindingAS(e2::Game*, e2::Hex const&, uint64_t, bool, e2::PassableFlags)>() }
+
+				// e2::Game* game, e2::Hex const& start, uint64_t range, bool ignoreVisibility = false, e2::PassableFlags passableFlags = PassableFlags::Land
+			},
+			{
+				{chaiscript::fun(&e2::PathFindingAS::find), "find"},
+			}
 		);
 
 		chaiscript::utility::add_class<e2::GameEntity>(*m_scriptModule,
@@ -621,6 +649,8 @@ void e2::Game::initializeScriptEngine()
 				{chaiscript::fun(&Game::spawnAIEmpire), "spawnAIEmpire"},
 				{chaiscript::fun(&Game::localEmpire), "localEmpire"},
 				{chaiscript::fun(&Game::nomadEmpire), "nomadEmpire"},
+				{chaiscript::fun(&Game::localEmpireId), "localEmpireId"},
+				{chaiscript::fun(&Game::nomadEmpireId), "nomadEmpireId"},
 				{chaiscript::fun(&Game::empireById), "empireById"},
 				{chaiscript::fun(&Game::destroyEmpire), "destroyEmpire"},
 				{chaiscript::fun(&Game::harvestWood), "harvestWood"},
@@ -640,7 +670,17 @@ void e2::Game::initializeScriptEngine()
 				{chaiscript::fun(&Game::queueDestroyEntity), "destroyEntity"},
 				{chaiscript::fun(&Game::entityAtHex), "entityAtHex"},
 				{chaiscript::fun(&Game::getSelectedEntity), "getSelectedEntity"},
-				{chaiscript::fun(&Game::getTurnState), "getTurnState"}
+				{chaiscript::fun(&Game::getTurnState), "getTurnState"},
+				{chaiscript::fun(&Game::grugNumAttackMovePoints), "grugNumAttackMovePoints"},
+				{chaiscript::fun(&Game::grugAttackTarget), "grugAttackTarget"},
+				{chaiscript::fun(&Game::grugAttackMoveLocation), "grugAttackMoveLocation"},
+				{chaiscript::fun(&Game::grugMoveLocation), "grugMoveLocation"},
+				/*
+						int32_t grugNumAttackMovePoints();
+		e2::GameEntity* grugAttackTarget();
+		glm::ivec2 grugAttackMoveLocation();
+		glm::ivec2 grugMoveLocation();
+				*/
 			}
 		);
 
@@ -764,111 +804,111 @@ void e2::Game::initializeScriptEngine()
 		m_scriptModule->add(chaiscript::type_conversion<std::string, e2::Name>([](const std::string & asString) { return e2::Name(asString); }));
 
 
-		m_scriptEngine = e2::create<chaiscript::ChaiScript>();
-		m_scriptEngine->add(m_scriptModule);
 
-/*
+
 		chaiscript::utility::add_class<e2::EntityLayerIndex>(*m_scriptModule,
-			"EntityLayerIndex",
+			"LayerIndex",
 			{
-				{e2::EntityLayerIndex::Unit, "Unit"},
-				{e2::EntityLayerIndex::Structure, "Structure"},
-				{e2::EntityLayerIndex::Air, "Air"},
+				{e2::EntityLayerIndex::Unit, "LI_Unit"},
+				{e2::EntityLayerIndex::Structure, "LI_Structure"},
+				{e2::EntityLayerIndex::Air, "LI_Air"}
 			}
 		);
 
 		chaiscript::utility::add_class<e2::EntityMoveType>(*m_scriptModule,
-			"EntityMoveType",
+			"MoveType",
 			{
-				{e2::EntityMoveType::Static, "Static"},
-				{e2::EntityMoveType::Linear, "Linear"},
-				{e2::EntityMoveType::Smooth, "Smooth"},
+				{e2::EntityMoveType::Static, "MT_Static"},
+				{e2::EntityMoveType::Linear, "MT_Linear"},
+				{e2::EntityMoveType::Smooth, "MT_Smooth"}
 			}
 		);
-*/
+
+		chaiscript::utility::add_class<e2::TileFlags>(*m_scriptModule,
+			"TileFlags",
+			{
+				{e2::TileFlags::None, "TF_None"},
+
+				{e2::TileFlags::BiomeMask, "TF_BiomeMask"},
+				{e2::TileFlags::BiomeGrassland, "TF_BiomeGrassland"},
+				{e2::TileFlags::BiomeDesert, "TF_BiomeDesert"},
+				{e2::TileFlags::BiomeTundra, "TF_BiomeTundra"},
+
+				{e2::TileFlags::FeatureMask, "TF_FeatureMask"},
+				{e2::TileFlags::FeatureNone, "TF_FeatureNone"},
+				{e2::TileFlags::FeatureMountains, "TF_FeatureMountains"},
+				{e2::TileFlags::FeatureForest, "TF_FeatureForest"},
+
+				{e2::TileFlags::WaterMask, "TF_WaterMask"},
+				{e2::TileFlags::WaterNone, "TF_WaterNone"},
+				{e2::TileFlags::WaterShallow, "TF_WaterShallow"},
+				{e2::TileFlags::WaterDeep, "TF_WaterDeep"},
+
+				{e2::TileFlags::ResourceMask, "TF_ResourceMask"},
+				{e2::TileFlags::ResourceNone, "TF_ResourceNone"},
+				{e2::TileFlags::ResourceStone, "TF_ResourceStone"},
+				{e2::TileFlags::ResourceOre, "TF_ResourceOre"},
+				{e2::TileFlags::ResourceGold, "TF_ResourceGold"},
+				{e2::TileFlags::ResourceOil, "TF_ResourceOil"},
+				{e2::TileFlags::ResourceUranium, "TF_ResourceUranium"},
+
+				{e2::TileFlags::AbundanceMask, "TF_AbundanceMask"},
+				{e2::TileFlags::Abundance1, "TF_Abundance1"},
+				{e2::TileFlags::Abundance2, "TF_Abundance2"},
+				{e2::TileFlags::Abundance3, "TF_Abundance3"},
+				{e2::TileFlags::Abundance4, "TF_Abundance4"},
+
+				{e2::TileFlags::WoodAbundanceMask, "TF_WoodAbundanceMask"},
+				{e2::TileFlags::WoodAbundance1, "TF_WoodAbundance1"},
+				{e2::TileFlags::WoodAbundance2, "TF_WoodAbundance2"},
+				{e2::TileFlags::WoodAbundance3, "TF_WoodAbundance3"},
+				{e2::TileFlags::WoodAbundance4, "TF_WoodAbundance4"},
+			}
+		);
+
+		chaiscript::utility::add_class<e2::PassableFlags>(*m_scriptModule,
+			"PassableFlags",
+			{
+				{e2::PassableFlags::None, "PF_None"},
+				{e2::PassableFlags::Land, "PF_Land"},
+				{e2::PassableFlags::WaterShallow, "PF_WaterShallow"},
+				{e2::PassableFlags::WaterDeep, "PF_WaterDeep"},
+				{e2::PassableFlags::Mountain, "PF_Mountain"},
+				{e2::PassableFlags::Air, "PF_Air"},
+			}
+		);
+
+		chaiscript::utility::add_class<e2::FontFace>(*m_scriptModule,
+			"FontFace",
+			{
+				{e2::FontFace::Sans, "FF_Sans"},
+				{e2::FontFace::Serif, "FF_Serif"},
+				{e2::FontFace::Monospace, "FF_Monospace"}
+			}
+		);
 
 
-		m_scriptEngine->add_global_const(chaiscript::const_var(e2::EntityLayerIndex(e2::EntityLayerIndex::Unit)), "Unit");
-		m_scriptEngine->add_global_const(chaiscript::const_var(e2::EntityLayerIndex(e2::EntityLayerIndex::Structure)), "Structure");
-		m_scriptEngine->add_global_const(chaiscript::const_var(e2::EntityLayerIndex(e2::EntityLayerIndex::Air)), "Air)");
+		chaiscript::utility::add_class<e2::UITextAlign>(*m_scriptModule,
+			"UITextAlign",
+			{
+				{e2::UITextAlign::Begin, "TA_Begin"},
+				{e2::UITextAlign::End, "TA_End"},
+				{e2::UITextAlign::Middle, "TA_Middle"}
+			}
+		);
 
-		m_scriptEngine->add_global_const(chaiscript::const_var(e2::EntityLayerIndex(e2::EntityLayerIndex::Unit)), "LayerIndex_Unit");
-		m_scriptEngine->add_global_const(chaiscript::const_var(e2::EntityLayerIndex(e2::EntityLayerIndex::Structure)), "LayerIndex_Structure");
-		m_scriptEngine->add_global_const(chaiscript::const_var(e2::EntityLayerIndex(e2::EntityLayerIndex::Air)), "LayerIndex_Air)");
+		chaiscript::utility::add_class<e2::TurnState>(*m_scriptModule,
+			"TurnState",
+			{
+				{e2::TurnState::Unlocked, "TS_Unlocked"},
+				{e2::TurnState::UnitAction_Move, "TS_UnitAction_Move"},
+				{e2::TurnState::EntityAction_Generic, "TS_EntityAction_Generic"},
+				{e2::TurnState::EntityAction_Target, "TS_EntityAction_Target"},
+			}
+		);
 
-		m_scriptEngine->add_global_const(chaiscript::const_var(e2::EntityMoveType(e2::EntityMoveType::Static)), "Static");
-		m_scriptEngine->add_global_const(chaiscript::const_var(e2::EntityMoveType(e2::EntityMoveType::Linear)), "Linear");
-		m_scriptEngine->add_global_const(chaiscript::const_var(e2::EntityMoveType(e2::EntityMoveType::Smooth)), "Smooth)");
-		m_scriptEngine->add_global_const(chaiscript::const_var(e2::EntityMoveType(e2::EntityMoveType::Static)), "MoveType_Static");
-		m_scriptEngine->add_global_const(chaiscript::const_var(e2::EntityMoveType(e2::EntityMoveType::Linear)), "MoveType_Linear");
-		m_scriptEngine->add_global_const(chaiscript::const_var(e2::EntityMoveType(e2::EntityMoveType::Smooth)), "MoveType_Smooth)");
-
-		m_scriptEngine->add_global_const(chaiscript::const_var(e2::TileFlags(e2::TileFlags::None)), "TileFlags_None");
-
-		m_scriptEngine->add_global_const(chaiscript::const_var(e2::TileFlags(e2::TileFlags::BiomeMask)), "TileFlags_BiomeMask");
-		m_scriptEngine->add_global_const(chaiscript::const_var(e2::TileFlags(e2::TileFlags::BiomeGrassland)), "TileFlags_BiomeGrassland");
-		m_scriptEngine->add_global_const(chaiscript::const_var(e2::TileFlags(e2::TileFlags::BiomeDesert)), "TileFlags_BiomeDesert");
-		m_scriptEngine->add_global_const(chaiscript::const_var(e2::TileFlags(e2::TileFlags::BiomeTundra)), "TileFlags_BiomeTundra");
-
-		m_scriptEngine->add_global_const(chaiscript::const_var(e2::TileFlags(e2::TileFlags::FeatureMask)), "TileFlags_FeatureMask");
-		m_scriptEngine->add_global_const(chaiscript::const_var(e2::TileFlags(e2::TileFlags::FeatureNone)), "TileFlags_FeatureNone");
-		m_scriptEngine->add_global_const(chaiscript::const_var(e2::TileFlags(e2::TileFlags::FeatureMountains)), "TileFlags_FeatureMountains");
-		m_scriptEngine->add_global_const(chaiscript::const_var(e2::TileFlags(e2::TileFlags::FeatureForest)), "TileFlags_FeatureForest");
-
-		m_scriptEngine->add_global_const(chaiscript::const_var(e2::TileFlags(e2::TileFlags::WaterMask)), "TileFlags_WaterMask");
-		m_scriptEngine->add_global_const(chaiscript::const_var(e2::TileFlags(e2::TileFlags::WaterNone)), "TileFlags_WaterNone");
-		m_scriptEngine->add_global_const(chaiscript::const_var(e2::TileFlags(e2::TileFlags::WaterShallow)), "TileFlags_WaterShallow");
-		m_scriptEngine->add_global_const(chaiscript::const_var(e2::TileFlags(e2::TileFlags::WaterDeep)), "TileFlags_WaterDeep");
-
-		m_scriptEngine->add_global_const(chaiscript::const_var(e2::TileFlags(e2::TileFlags::ResourceMask)), "TileFlags_ResourceMask");
-		m_scriptEngine->add_global_const(chaiscript::const_var(e2::TileFlags(e2::TileFlags::ResourceNone)), "TileFlags_ResourceNone");
-		m_scriptEngine->add_global_const(chaiscript::const_var(e2::TileFlags(e2::TileFlags::ResourceStone)), "TileFlags_ResourceStone");
-		m_scriptEngine->add_global_const(chaiscript::const_var(e2::TileFlags(e2::TileFlags::ResourceOre)), "TileFlags_ResourceOre");
-		m_scriptEngine->add_global_const(chaiscript::const_var(e2::TileFlags(e2::TileFlags::ResourceGold)), "TileFlags_ResourceGold");
-		m_scriptEngine->add_global_const(chaiscript::const_var(e2::TileFlags(e2::TileFlags::ResourceOil)), "TileFlags_ResourceOil");
-		m_scriptEngine->add_global_const(chaiscript::const_var(e2::TileFlags(e2::TileFlags::ResourceUranium)), "TileFlags_ResourceUranium");
-
-		m_scriptEngine->add_global_const(chaiscript::const_var(e2::TileFlags(e2::TileFlags::AbundanceMask)), "TileFlags_AbundanceMask");
-		m_scriptEngine->add_global_const(chaiscript::const_var(e2::TileFlags(e2::TileFlags::Abundance1)), "TileFlags_Abundance1");
-		m_scriptEngine->add_global_const(chaiscript::const_var(e2::TileFlags(e2::TileFlags::Abundance2)), "TileFlags_Abundance2");
-		m_scriptEngine->add_global_const(chaiscript::const_var(e2::TileFlags(e2::TileFlags::Abundance3)), "TileFlags_Abundance3");
-		m_scriptEngine->add_global_const(chaiscript::const_var(e2::TileFlags(e2::TileFlags::Abundance4)), "TileFlags_Abundance4");
-
-		m_scriptEngine->add_global_const(chaiscript::const_var(e2::TileFlags(e2::TileFlags::WoodAbundanceMask)), "TileFlags_WoodAbundanceMask");
-		m_scriptEngine->add_global_const(chaiscript::const_var(e2::TileFlags(e2::TileFlags::WoodAbundance1)), "TileFlags_WoodAbundance1");
-		m_scriptEngine->add_global_const(chaiscript::const_var(e2::TileFlags(e2::TileFlags::WoodAbundance2)), "TileFlags_WoodAbundance2");
-		m_scriptEngine->add_global_const(chaiscript::const_var(e2::TileFlags(e2::TileFlags::WoodAbundance3)), "TileFlags_WoodAbundance3");
-		m_scriptEngine->add_global_const(chaiscript::const_var(e2::TileFlags(e2::TileFlags::WoodAbundance4)), "TileFlags_WoodAbundance4");
-
-
-		m_scriptEngine->add_global_const(chaiscript::const_var(e2::PassableFlags(e2::PassableFlags::None)),			"PassableFlags_None");
-		m_scriptEngine->add_global_const(chaiscript::const_var(e2::PassableFlags(e2::PassableFlags::Land)),			"PassableFlags_Land");
-		m_scriptEngine->add_global_const(chaiscript::const_var(e2::PassableFlags(e2::PassableFlags::WaterShallow)), "PassableFlags_WaterShallow");
-		m_scriptEngine->add_global_const(chaiscript::const_var(e2::PassableFlags(e2::PassableFlags::WaterDeep)),	"PassableFlags_WaterDeep");
-		m_scriptEngine->add_global_const(chaiscript::const_var(e2::PassableFlags(e2::PassableFlags::Mountain)),		"PassableFlags_Mountain");
-		m_scriptEngine->add_global_const(chaiscript::const_var(e2::PassableFlags(e2::PassableFlags::Air)), "PassableFlags_Air");
-
-
-		m_scriptEngine->add_global_const(chaiscript::const_var(e2::FontFace(e2::FontFace::Sans)), "Sans");
-		m_scriptEngine->add_global_const(chaiscript::const_var(e2::FontFace(e2::FontFace::Serif)), "Serif");
-		m_scriptEngine->add_global_const(chaiscript::const_var(e2::FontFace(e2::FontFace::Monospace)), "Monospace");
-
-		m_scriptEngine->add_global_const(chaiscript::const_var(e2::UITextAlign(e2::UITextAlign::Begin)), "Begin");
-		m_scriptEngine->add_global_const(chaiscript::const_var(e2::UITextAlign(e2::UITextAlign::End)), "End");
-		m_scriptEngine->add_global_const(chaiscript::const_var(e2::UITextAlign(e2::UITextAlign::Middle)), "Middle");
-
-
-		m_scriptEngine->add_global_const(chaiscript::const_var(e2::TurnState(e2::TurnState::Unlocked)), "Unlocked");
-		m_scriptEngine->add_global_const(chaiscript::const_var(e2::TurnState(e2::TurnState::UnitAction_Move)), "UnitAction_Move");
-		m_scriptEngine->add_global_const(chaiscript::const_var(e2::TurnState(e2::TurnState::EntityAction_Generic)), "EntityAction_Generic");
-		m_scriptEngine->add_global_const(chaiscript::const_var(e2::TurnState(e2::TurnState::EntityAction_Target)), "EntityAction_Target");
-		/*
-		
-				Unlocked,
-		UnitAction_Move,
-		EntityAction_Generic,
-		EntityAction_Target
-		*/
+		m_scriptEngine = e2::create<chaiscript::ChaiScript>();
+		m_scriptEngine->add(m_scriptModule);
 
 		m_scriptEngine->add_global(chaiscript::var(this), "game");
 	}
@@ -1852,6 +1892,22 @@ void e2::Game::updateTurnLocal()
 	// turn logic here
 	if (!m_uiHovered && leftMouse.clicked && leftMouse.dragDistance <= 2.0f)
 	{
+		if (kb.state(e2::Key::LeftControl))
+		{
+			// ugly line of code, no I wont fix it 
+			bool onLand = m_cursorTile ? m_cursorTile->getWater() == TileFlags::WaterNone : m_hexGrid->getCalculatedTileData(m_cursorHex).getWater() == TileFlags::WaterNone;
+			bool unitSlotTaken = entityAtHex(e2::EntityLayerIndex::Unit, m_cursorHex) != nullptr;
+
+			if (!unitSlotTaken)
+			{
+				if (onLand)
+					spawnEntity("grunt", m_cursorHex, m_nomadEmpireId);
+				else
+					spawnEntity("cb90", m_cursorHex, m_nomadEmpireId);
+			}
+			return;
+		}
+
 		if (kb.state(e2::Key::LeftShift))
 		{
 			// ugly line of code, no I wont fix it 
@@ -1949,6 +2005,11 @@ void e2::Game::onStartOfTurn()
 	{
 		entity->onTurnStart();
 	}
+
+	if (m_empires[m_empireTurn]->ai)
+	{
+		m_empires[m_empireTurn]->ai->grugBrainWakeUp();
+	}
 }
 
 void e2::Game::onEndOfTurn()
@@ -1957,6 +2018,9 @@ void e2::Game::onEndOfTurn()
 	{
 		entity->onTurnEnd();
 	}
+
+	if (m_empires[m_empireTurn]->ai)
+		m_empires[m_empireTurn]->ai->grugBrainGoSleep();
 
 }
 
@@ -1975,7 +2039,7 @@ void e2::Game::updateUnitMove()
 
 	if (m_selectedEntity->specification->moveType == EntityMoveType::Linear)
 	{
-		m_unitMoveDelta += float(m_timeDelta) * m_selectedEntity->specification->moveSpeed;
+		m_unitMoveDelta += float(m_timeDelta) * m_selectedEntity->specification->moveSpeed * (m_ffwMove?100.0f : 1.0f);
 
 		while (m_unitMoveDelta > 1.0f)
 		{
@@ -2025,7 +2089,7 @@ void e2::Game::updateUnitMove()
 	else if (m_selectedEntity->specification->moveType == e2::EntityMoveType::Smooth)
 	{
 
-		m_unitMoveDelta += float(m_timeDelta) * m_selectedEntity->specification->moveSpeed;
+		m_unitMoveDelta += float(m_timeDelta) * m_selectedEntity->specification->moveSpeed * (m_ffwMove ? 100.0f : 1.0f);
 
 		while (m_unitMoveDelta > 1.0f)
 		{
@@ -2496,32 +2560,55 @@ void e2::Game::drawUnitUI()
 
 	float alpha = glm::mix( 1.0f,  0.75f, m_viewZoom);
 	e2::UIColor bgColor = e2::UIColor(glm::vec4{0.0f, 0.0f, 0.0f, alpha});
+	e2::UIColor bgColorNomad = e2::UIColor(166, 28, 0, (alpha * 255.f));
+	e2::UIColor bgColorEnemy = e2::UIColor(7, 82, 163, (alpha*255.f));
 	for (e2::GameEntity* entity : m_entitiesInView)
 	{
+		if (!m_hexGrid->isVisible(entity->tileIndex))
+		{
+			continue;
+		}
+
+		bool isPlayer = entity->empireId == m_localEmpireId;
+		bool isNomad = entity->empireId == m_nomadEmpireId;
+		bool isEnemyCiv = !isPlayer && !isNomad;
+
+		e2::UIColor bg = isPlayer ? bgColor : isNomad ? bgColorNomad : bgColorEnemy;
+
+		bool selected = entity == m_selectedEntity;
+
+		if (!selected)
+			bg.a = bg.a * 0.8;
+
+
 		static const e2::Name badgeBgName = "badge";
 		e2::Sprite* badgeBg = getUiSprite(badgeBgName);
 		e2::Sprite* badgeSprite = getUiSprite(entity->specification->badgeId);
+
+		
 
 		if (badgeBg && badgeSprite)
 		{
 			
 			float uiScale = float(winSize.y) / 1080.0f;
+			uiScale *= selected ? 1.0f : 0.80f;
 
 			glm::vec2 badgeSize = glm::vec2( 32.0f, 32.0f) * uiScale;
+
 			glm::vec2 badgeShieldSize = badgeSize * 2.0f;
 
 			
 
 			glm::vec2 badgePos = worldToPixels( entity->meshPosition + e2::worldUpf() * 0.75f);
 		
-			ui->drawSprite(badgePos - badgeShieldSize / 2.0f, *badgeBg, bgColor, (64.0f/80.0f) * uiScale);
+			ui->drawSprite(badgePos - badgeShieldSize / 2.0f, *badgeBg, bg, (64.0f/80.0f) * uiScale);
 
 			ui->drawSprite(badgePos - badgeSize / 2.0f, *badgeSprite, 0xFFFFFFFF, (32.0f / 40.0f) * uiScale);
 		}
 
 	}
 
-	if (!m_selectedEntity)
+	if (!m_selectedEntity || !m_selectedEntity->isLocal())
 		return;
 	
 
@@ -2653,9 +2740,16 @@ void e2::Game::drawFinalUI()
 	ui->pushFixedPanel("test", offset + glm::vec2(4.0f, 4.0f), glm::vec2(width - 8.0f, height - 8.0f));
 	ui->beginStackV("test2");
 
-	if (ui->button("te", "End turn"))
+	if (m_empireTurn == m_localEmpireId)
 	{
-		endTurn();
+		if (ui->button("te", "End turn"))
+		{
+			endTurn();
+		}
+	}
+	else
+	{
+		ui->gameLabel("Please wait, AI turn..");
 	}
 
 	ui->endStackV();
@@ -2777,28 +2871,39 @@ void e2::Game::applyDamage(e2::GameEntity* entity, e2::GameEntity* instigator, f
 
 void e2::Game::resolveSelectedEntity()
 {
+	if (!m_selectedEntity)
+		return;
+
 	if (m_unitAS)
 		e2::destroy(m_unitAS);
 
 	m_unitAS = nullptr;
 
-	if (m_selectedEntity->specification->moveType == EntityMoveType::Static)
+	m_unitAS = e2::create<PathFindingAS>(m_selectedEntity);
+
+	if (!m_selectedEntity->isLocal() || m_selectedEntity->specification->moveType == EntityMoveType::Static)
 	{
+		
 		m_hexGrid->clearOutline();
+		/*
 		tmpHex.clear();
 		e2::Hex::circle(e2::Hex(m_selectedEntity->tileIndex), m_selectedEntity->specification->sightRange, ::tmpHex);
 		for (e2::Hex h : ::tmpHex)
 		{
 			m_hexGrid->pushOutline(h.offsetCoords());
-		}
+		}*/
 	}
 	else
 	{
-		m_unitAS = e2::create<PathFindingAS>(m_selectedEntity);
 		m_hexGrid->clearOutline();
 		for (auto& [coords, hexAS] : m_unitAS->hexIndex)
 		{
-			m_hexGrid->pushOutline(coords);
+			m_hexGrid->pushOutline(e2::OutlineLayer::Movement, coords);
+		}
+
+		for (auto& [entity, pair] : m_unitAS->targetsInMoveRange)
+		{
+			m_hexGrid->pushOutline(e2::OutlineLayer::Attack, entity->tileIndex);
 		}
 	}
 
@@ -2830,7 +2935,7 @@ void e2::Game::selectEntity(e2::GameEntity* entity)
 	if (!entity || entity == m_selectedEntity)
 		return;
 
-	if (m_dyingEntities.contains(entity) || m_entitiesPendingDestroy.contains(entity))
+	if (!entityRelevantForPlay(entity))
 		return;
 
 	deselectEntity();
@@ -2867,6 +2972,8 @@ void e2::Game::moveSelectedEntityTo(glm::ivec2 const& to)
 		return;
 	else if (m_unitMovePath.size() - 1 > m_selectedEntity->movePointsLeft)
 		return;
+
+	m_ffwMove = !m_selectedEntity->isLocal() && !m_hexGrid->isVisible(to) && !m_hexGrid->isVisible(m_selectedEntity->tileIndex);
 
 	m_hexGrid->clearOutline();
 
@@ -3044,6 +3151,8 @@ void e2::Game::destroyEntity(e2::GameEntity* entity)
 	}
 
 	e2::destroy(entity);
+
+	resolveSelectedEntity();
 }
 
 
@@ -3079,6 +3188,52 @@ void e2::Game::killEntity(e2::GameEntity* entity)
 	entity->playAction("die");
 
 	m_dyingEntities.insert(entity);
+}
+
+int32_t e2::Game::grugNumAttackMovePoints()
+{
+	if (!m_selectedEntity || !m_unitAS)
+		return 0;
+
+	return m_unitAS->grugTargetMovePoints;
+}
+
+e2::GameEntity* e2::Game::grugAttackTarget()
+{
+	if (!m_selectedEntity || !m_unitAS)
+		return nullptr;
+
+	return m_unitAS->grugTarget;
+}
+
+glm::ivec2 e2::Game::grugAttackMoveLocation()
+{
+	if (!m_selectedEntity || !m_unitAS)
+		return {};
+
+	return m_unitAS->grugTargetMoveHex.offsetCoords();
+}
+
+glm::ivec2 e2::Game::grugMoveLocation()
+{
+	if (!m_selectedEntity || !m_unitAS)
+		return {};
+
+	if (m_unitAS->hexIndex.size() == 0)
+		return m_selectedEntity->tileIndex;
+
+	int64_t index = e2::randomInt(0, m_unitAS->hexIndex.size() - 1);
+	auto it =m_unitAS->hexIndex.begin();
+	for (int64_t i = 0; i < index; i++)
+		it++;
+
+	return it->first;
+}
+
+bool e2::Game::entityRelevantForPlay(e2::GameEntity* entity)
+{
+	bool entityInvalid = (!entity || entity->health <= 0.0f || m_dyingEntities.contains(entity) || m_entitiesPendingDestroy.contains(entity));
+	return !entityInvalid;
 }
 
 e2::Sprite* e2::Game::getUiSprite(e2::Name name)
@@ -3254,6 +3409,42 @@ e2::PathFindingAS::PathFindingAS(e2::GameEntity* entity)
 	origin = e2::create<e2::PathFindingHex>(originHex);
 	origin->isBegin = true;
 
+	// find all hexes in attack range from origin hex, add them to targetsInRange and set grugTargets for each hex 
+	e2::GameEntity* lowestHealthEntity = nullptr;
+	float lowestHealth = std::numeric_limits<float>::max();
+	tmpHex.clear();
+	e2::Hex::circle(originHex, entity->specification->attackRange, tmpHex);
+	for (e2::Hex& attackHex : tmpHex)
+	{
+		e2::GameEntity* potentialTarget = game->entityAtHex(e2::EntityLayerIndex::Unit, attackHex.offsetCoords());
+
+		if (potentialTarget)
+		{
+			if (potentialTarget->empireId == entity->empireId)
+			{
+				continue;
+			}
+
+			targetsInRange.insert(potentialTarget);
+
+			if (potentialTarget->health < lowestHealth)
+			{
+				lowestHealthEntity = potentialTarget;
+				lowestHealth = potentialTarget->health;
+			}
+		}
+	}
+
+	if (lowestHealthEntity)
+	{
+		origin->grugTarget = lowestHealthEntity;
+
+		grugTarget = lowestHealthEntity;
+		grugTargetMoveHex = originHex;
+		grugTargetMovePoints = 0;
+	}
+
+
 	hexIndex[entity->tileIndex] = origin;
 
 
@@ -3264,24 +3455,24 @@ e2::PathFindingAS::PathFindingAS(e2::GameEntity* entity)
 
 	while (!queue.empty())
 	{
-		e2::PathFindingHex* curr  = queue.front();
+		e2::PathFindingHex* currHexEntry  = queue.front();
 		queue.pop();
 
-		for (e2::Hex n : curr->index.neighbours())
+		for (e2::Hex nextHex : currHexEntry->index.neighbours())
 		{
-			if (curr->stepsFromOrigin + 1 > entity->movePointsLeft)
+			if (currHexEntry->stepsFromOrigin + 1 > entity->movePointsLeft)
 				continue;
 
-			if (processed.contains(n))
+			if (processed.contains(nextHex))
 				continue;
 
-			glm::ivec2 coords = n.offsetCoords();
+			glm::ivec2 coords = nextHex.offsetCoords();
 
 			if (hexIndex.contains(coords))
 				continue;
 
-			// ignore hexes not directly visible
-			if (!grid->isVisible(coords))
+			// ignore hexes not directly visible, but only if we are lcoal
+			if (entity->isLocal() && !grid->isVisible(coords))
 				continue;
 
 			// ignore hexes that are occupied by unpassable biome
@@ -3294,25 +3485,78 @@ e2::PathFindingAS::PathFindingAS(e2::GameEntity* entity)
 			if (otherUnit)
 				continue;
 
-			e2::PathFindingHex* newHex = e2::create<e2::PathFindingHex>(n);
-			newHex->towardsOrigin = curr;
-			newHex->stepsFromOrigin = curr->stepsFromOrigin + 1;
-			hexIndex[coords] = newHex;
+			e2::PathFindingHex* nextHexEntry = e2::create<e2::PathFindingHex>(nextHex);
+			nextHexEntry->towardsOrigin = currHexEntry;
+			nextHexEntry->stepsFromOrigin = currHexEntry->stepsFromOrigin + 1;
+
+
+
+			lowestHealthEntity = nullptr;
+			lowestHealth = std::numeric_limits<float>::max();
+			tmpHex.clear();
+			e2::Hex::circle(nextHex, entity->specification->attackRange, tmpHex);
+			for (e2::Hex& attackHex : tmpHex)
+			{
+				if (attackHex == originHex)
+					continue;
+
+				e2::GameEntity* potentialTarget = game->entityAtHex(e2::EntityLayerIndex::Unit, attackHex.offsetCoords());
+
+				if (potentialTarget)
+				{
+
+					if (potentialTarget->empireId == game->localEmpireId())
+					{
+						continue;
+					}
+
+					auto finder = targetsInMoveRange.find(potentialTarget);
+					if (finder != targetsInMoveRange.end())
+					{
+						uint32_t currStepsFromOrigin = finder->second.second;
+						if (nextHexEntry->stepsFromOrigin < currStepsFromOrigin)
+						{
+							targetsInMoveRange[potentialTarget] = { nextHex, nextHexEntry->stepsFromOrigin };
+						}
+					}
+					else
+					{
+						targetsInMoveRange[potentialTarget] = { nextHex, nextHexEntry->stepsFromOrigin };
+					}
+
+
+					if (!grugTarget || grugTargetMovePoints > nextHexEntry->stepsFromOrigin)
+					{
+						grugTarget = potentialTarget;
+						grugTargetMovePoints = nextHexEntry->stepsFromOrigin;
+						grugTargetMoveHex = nextHex;
+					}
+
+					if (potentialTarget->health < lowestHealth)
+					{
+						lowestHealthEntity = potentialTarget;
+						lowestHealth = potentialTarget->health;
+					}
+				}
+			}
+
+			if (lowestHealthEntity)
+			{
+				nextHexEntry->grugTarget = lowestHealthEntity;
+			}
+
+			hexIndex[coords] = nextHexEntry;
 			
 
-			queue.push(newHex);
+			queue.push(nextHexEntry);
 		}
 
-		processed.insert(curr->index);
+		processed.insert(currHexEntry->index);
 	}
 }
 
-e2::PathFindingAS::PathFindingAS(e2::GameContext* ctx, e2::Hex const& start, uint64_t range, bool ignoreVisibility, e2::PassableFlags passableFlags)
+e2::PathFindingAS::PathFindingAS(e2::Game* game, e2::Hex const& start, uint64_t range, bool ignoreVisibility, e2::PassableFlags passableFlags)
 {
-	if (!ctx)
-		return;
-
-	e2::Game* game = ctx->game();
 	e2::HexGrid* grid = game->hexGrid();
 	glm::ivec2 tileIndex = start.offsetCoords();
 
@@ -3351,7 +3595,7 @@ e2::PathFindingAS::PathFindingAS(e2::GameContext* ctx, e2::Hex const& start, uin
 				continue;
 
 			// ignore hexes that are occupied by unpassable biome
-			e2::TileData tile = ctx->game()->hexGrid()->getCalculatedTileData(coords);
+			e2::TileData tile = game->hexGrid()->getCalculatedTileData(coords);
 			if (!tile.isPassable(passableFlags))
 				continue;
 

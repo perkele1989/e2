@@ -15,13 +15,31 @@ class GruntState
     }
 }
 
+def gruntAttack(target) {
+
+    var instigator = game.getSelectedEntity();
+
+    if(instigator.is_var_null || target.is_var_null)
+    {
+        return;
+    }
+
+    instigator.scriptState.targetHex = target.tileIndex;
+
+    instigator.attackPointsLeft -= 1;
+    instigator.turnTowards(target.tileIndex);
+    instigator.playAction("fire");
+    instigator.scriptState.actionType = GruntActionType_Attack;
+    game.beginCustomAction();
+}
+
 gruntScript.setCreateState(fun(entity){
     return GruntState(entity);
 });
 
 gruntScript.setOnActionTrigger(fun(entity, action, trigger){
 
-    var targetEntity = game.entityAtHex(LayerIndex_Unit, entity.scriptState.targetHex);
+    var targetEntity = game.entityAtHex(LI_Unit, entity.scriptState.targetHex);
 
     var isShotTrigger = action == "fire" && trigger == "shot";
     var isAttacking = entity.scriptState.actionType == GruntActionType_Attack;
@@ -83,29 +101,19 @@ gruntScript.setOnTargetChanged(fun(entity, newTarget){
 
 gruntScript.setOnTargetClicked(fun(entity){
 
-    var targetEntity = game.entityAtHex(LayerIndex_Unit, entity.scriptState.targetHex);
+    var targetEntity = game.entityAtHex(LI_Unit, entity.scriptState.targetHex);
 
     game.endTargeting();
 
-    if(targetEntity.is_var_null)
-    {
-        return;
-    }
-
-    entity.turnTowards(targetEntity.tileIndex);
-
-    entity.playAction("fire");
-    entity.scriptState.actionType = GruntActionType_Attack;
-    game.beginCustomAction();
-
+    gruntAttack(targetEntity);
 });
 
 gruntScript.setDrawUI(fun(entity, ui){
     ui.beginStackV("gruntV", vec2(0.0, 0.0))
 
-    ui.gameLabel("**" + entity.specification.displayName + "**", 12, Middle);
-    ui.gameLabel("*Movement points left:* " + to_string(entity.movePointsLeft), 11, Begin);
-    ui.gameLabel("*Attack points left:* " + to_string(entity.attackPointsLeft), 11, Begin);
+    ui.gameLabel("**" + entity.specification.displayName + "**", 12, TA_Middle);
+    ui.gameLabel("*Movement points left:* " + to_string(entity.movePointsLeft), 11, TA_Begin);
+    ui.gameLabel("*Attack points left:* " + to_string(entity.attackPointsLeft), 11, TA_Begin);
 
 
     var canAttack = entity.attackPointsLeft > 0;
@@ -118,6 +126,61 @@ gruntScript.setDrawUI(fun(entity, ui){
     }
 
     ui.endStackV();
+});
+
+gruntScript.setGrugRelevant(fun(entity){
+    // grug no want be left out, so grug always say grug relevant
+    return true;
+});
+
+gruntScript.setGrugTick(fun(entity, seconds){
+    var turnState = game.getTurnState();
+
+    if(turnState == TS_Unlocked) {
+        var target = game.grugAttackTarget();
+
+        if(!target.is_var_null && entity.attackPointsLeft > 0)
+        {
+            var attackMovePoints = game.grugNumAttackMovePoints();
+            if(attackMovePoints > 0)
+            {
+                var moveTo = game.grugAttackMoveLocation();
+                game.moveSelectedEntityTo(moveTo);
+                return true;
+            }
+            else 
+            {
+                gruntAttack(target);
+                return true;
+            }
+        }
+        else if(entity.movePointsLeft > 0) 
+        {
+            var moveTo = game.grugMoveLocation();
+            if(moveTo.x == entity.tileIndex.x && moveTo.y == entity.tileIndex.y)
+            {
+                return false;
+            }
+            game.moveSelectedEntityTo(moveTo);
+            return true;
+        }
+
+        // we are unlocked, and we didnt find somethign to do , so we are done (return false)
+        return false;
+    } else if(turnState == TS_UnitAction_Move) {
+        // wait until unlocked
+        return true;
+    } else if(turnState == TS_EntityAction_Target) {
+        // we are targetting, should never happen when AI, wtf do we do?
+        // return false as to not lock game
+        return false;
+    } else if(turnState == TS_EntityAction_Generic) {
+        // we are currently attacking, so just wait it out
+        return true;
+    }
+
+    // turn state is unknown, return false
+    return false;
 });
 
 gruntScript;

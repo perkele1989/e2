@@ -19,11 +19,11 @@ navalbaseScript.setCreateState(fun(entity){
 /** Function that renders the UI for an entity of this type */
 navalbaseScript.setDrawUI(fun(entity, ui){
     ui.beginStackV("mobUiStackV", vec2(0.0, 0.0));
-    ui.gameLabel("**" + entity.specification.displayName + "**", 12, Middle);
+    ui.gameLabel("**" + entity.specification.displayName + "**", 12, TA_Middle);
 
     if(entity.buildMessage.size > 0)
     {
-        ui.gameLabel(entity.buildMessage, 12.0, Begin);
+        ui.gameLabel(entity.buildMessage, 12.0, TA_Begin);
     }
 
     ui.beginStackH("actions", 32.0);
@@ -43,7 +43,7 @@ navalbaseScript.setDrawUI(fun(entity, ui){
         }
         else 
         {
-            ui.gameLabel("Build CB-90 (No funds)", 12.0, Begin);
+            ui.gameLabel("Build CB-90 (No funds)", 12.0, TA_Begin);
         }
     }
     ui.endStackH();

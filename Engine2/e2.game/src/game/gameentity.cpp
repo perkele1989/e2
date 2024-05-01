@@ -898,8 +898,8 @@ void e2::EntitySpecification::initializeSpecifications(e2::GameContext* ctx)
 					else if (flagStr == "air")
 						newSpec.passableFlags |= e2::PassableFlags::Air;
 				}
-
 			}
+
 
 			if (entity.contains("moveType"))
 			{
@@ -922,6 +922,8 @@ void e2::EntitySpecification::initializeSpecifications(e2::GameContext* ctx)
 				else if (layerIndexStr == "structure")
 					newSpec.layerIndex = EntityLayerIndex::Structure;
 			}
+
+
 
 			if (entity.contains("maxHealth"))
 				newSpec.maxHealth = entity.at("maxHealth").template get<float>();
@@ -949,6 +951,9 @@ void e2::EntitySpecification::initializeSpecifications(e2::GameContext* ctx)
 
 			if (entity.contains("sightRange"))
 				newSpec.sightRange = entity.at("sightRange").template get<int32_t>();
+
+			if (entity.contains("attackRange"))
+				newSpec.attackRange = entity.at("attackRange").template get<int32_t>();
 
 			if (entity.contains("meshScale"))
 			{

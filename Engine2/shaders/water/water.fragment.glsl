@@ -96,8 +96,6 @@ void main()
 	float ibl = renderer.ibl1.x * 3.0;
 	
 
-	//sun += sun * 0.5 + ibl * 0.5;
-	//float ibl = 
 
 	// basecolor
 	outColor.rgb = (baseColor * ibl );

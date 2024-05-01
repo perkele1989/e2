@@ -61,6 +61,8 @@ namespace e2
 		virtual void grugBrainTick(double seconds);
 		virtual void grugBrainGoSleep();
 
+		void cycleNextEntity();
+
 		virtual e2::Game* game() override;
 		EmpireId id;
 		e2::GameEmpire* empire{};

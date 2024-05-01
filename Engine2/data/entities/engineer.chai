@@ -49,11 +49,11 @@ engineerScript.setDrawUI(fun(entity, ui){
 
     ui.beginStackV("engineerV", vec2(0.0, 0.0))
 
-    ui.gameLabel("**" + entity.specification.displayName + "**", 12, Middle);
-    ui.gameLabel("*Movement points left:* " + to_string(entity.movePointsLeft), 11, Begin);
-    ui.gameLabel("*Build points left:* " + to_string(entity.buildPointsLeft), 11, Begin);
+    ui.gameLabel("**" + entity.specification.displayName + "**", 12, TA_Middle);
+    ui.gameLabel("*Movement points left:* " + to_string(entity.movePointsLeft), 11, TA_Begin);
+    ui.gameLabel("*Build points left:* " + to_string(entity.buildPointsLeft), 11, TA_Begin);
 
-    var hasStructure = !game.entityAtHex(LayerIndex_Structure, entity.tileIndex).is_var_null();
+    var hasStructure = !game.entityAtHex(LI_Structure, entity.tileIndex).is_var_null();
     var canBuild = !hasStructure && entity.buildPointsLeft > 0;
     var abundance = tileData.getAbundanceAsFloat();
     var woodAbundance = tileData.getWoodAbundanceAsFloat();
@@ -77,7 +77,7 @@ engineerScript.setDrawUI(fun(entity, ui){
 
         if(nbData.isShallowWater())
         {
-            var nbHasStructure = !game.entityAtHex(LayerIndex_Structure, nbIndex).is_var_null();
+            var nbHasStructure = !game.entityAtHex(LI_Structure, nbIndex).is_var_null();
             if(nbHasStructure)
             {
                 continue;

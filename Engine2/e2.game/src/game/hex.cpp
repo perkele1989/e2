@@ -1629,44 +1629,56 @@ void e2::HexGrid::renderFogOfWar()
 	for (uint8_t i = 0; i < hexSpec.vertexAttributes.size(); i++)
 		buff->bindVertexBuffer(i, hexSpec.vertexAttributes[i]);
 
-	// base
-	for (glm::ivec2 const& hexIndex : m_outlineTiles)
+
+
+	const glm::vec4 layerColors[2] = {
+		{ 0.0f, 0.5f, 0.15f, 0.1f },
+		{ 0.5f, 0.0f, 0.15f, 0.1f }
+	};
+
+	for (uint8_t i = 0; i < size_t(e2::OutlineLayer::Count); i++)
 	{
-		//e2::TileData* td = getExistingTileData(hexIndex);
-		glm::vec3 worldOffset = e2::Hex(hexIndex).localCoords();
-		//if (td && td->getWater() != e2::TileFlags::WaterNone)
-		//	worldOffset.y += 0.1f;
 
-		glm::mat4 transform = glm::identity<glm::mat4>();
-		transform = glm::translate(transform, worldOffset);
-		transform = glm::scale(transform, { 1.1f, 1.1f, 1.1f });
+		// base
+		for (glm::ivec2 const& hexIndex : m_outlineTiles[i])
+		{
+			//e2::TileData* td = getExistingTileData(hexIndex);
+			glm::vec3 worldOffset = e2::Hex(hexIndex).localCoords();
+			//if (td && td->getWater() != e2::TileFlags::WaterNone)
+			//	worldOffset.y += 0.1f;
+
+			glm::mat4 transform = glm::identity<glm::mat4>();
+			transform = glm::translate(transform, worldOffset);
+			transform = glm::scale(transform, { 1.1f, 1.1f, 1.1f });
 
 
-		outlineConstants.mvpMatrix = vpMatrix * transform;
-		outlineConstants.color = { 1.0f, 1.0f, 1.0f, 0.5f };
+			outlineConstants.mvpMatrix = vpMatrix * transform;
+			outlineConstants.color = { 1.0f, 1.0f, 1.0f, 0.5f };
 
-		buff->pushConstants(m_outlinePipelineLayout, 0, sizeof(e2::OutlineConstants), reinterpret_cast<uint8_t*>(&outlineConstants));
-		buff->draw(hexSpec.indexCount, 1);
+			buff->pushConstants(m_outlinePipelineLayout, 0, sizeof(e2::OutlineConstants), reinterpret_cast<uint8_t*>(&outlineConstants));
+			buff->draw(hexSpec.indexCount, 1);
+		}
+		// subtractive
+		for (glm::ivec2 const& hexIndex : m_outlineTiles[i])
+		{
+			//e2::TileData* td = getExistingTileData(hexIndex);
+			glm::vec3 worldOffset = e2::Hex(hexIndex).localCoords();
+
+			//if (td && td->getWater() != e2::TileFlags::WaterNone)
+			//	worldOffset.y += 0.1f;
+
+			glm::mat4 transform = glm::identity<glm::mat4>();
+			transform = glm::translate(transform, worldOffset);
+			transform = glm::scale(transform, { 1.01f, 1.01f, 1.01f });
+
+			outlineConstants.mvpMatrix = vpMatrix * transform;
+			outlineConstants.color = layerColors[i];
+
+			buff->pushConstants(m_outlinePipelineLayout, 0, sizeof(e2::OutlineConstants), reinterpret_cast<uint8_t*>(&outlineConstants));
+			buff->draw(hexSpec.indexCount, 1);
+		}
 	}
-	// subtractive
-	for (glm::ivec2 const& hexIndex : m_outlineTiles)
-	{
-		//e2::TileData* td = getExistingTileData(hexIndex);
-		glm::vec3 worldOffset = e2::Hex(hexIndex).localCoords();
 
-		//if (td && td->getWater() != e2::TileFlags::WaterNone)
-		//	worldOffset.y += 0.1f;
-
-		glm::mat4 transform = glm::identity<glm::mat4>();
-		transform = glm::translate(transform, worldOffset);
-		transform = glm::scale(transform, { 1.01f, 1.01f, 1.01f });
-
-		outlineConstants.mvpMatrix = vpMatrix * transform;
-		outlineConstants.color = { 0.0f, 0.5f, 0.15f, 0.1f };
-
-		buff->pushConstants(m_outlinePipelineLayout, 0, sizeof(e2::OutlineConstants), reinterpret_cast<uint8_t*>(&outlineConstants));
-		buff->draw(hexSpec.indexCount, 1);
-	}
 	buff->endRender();
 	buff->useAsDefault(frameData.outlineTexture);
 
@@ -2127,12 +2139,16 @@ bool e2::HexGrid::isVisible(glm::ivec2 const& v)
 
 void e2::HexGrid::clearOutline()
 {
-	m_outlineTiles.clear();
+	for (uint8_t i = 0; i < size_t(e2::OutlineLayer::Count); i++)
+	{
+		m_outlineTiles[i].clear();
+	}
+	
 }
 
-void e2::HexGrid::pushOutline(glm::ivec2 const& tile)
+void e2::HexGrid::pushOutline(e2::OutlineLayer layer, glm::ivec2 const& tile)
 {
-	m_outlineTiles.push_back(tile);
+	m_outlineTiles[size_t(layer)].push_back(tile);
 }
 
 e2::ITexture* e2::HexGrid::outlineTexture(uint8_t frameIndex)

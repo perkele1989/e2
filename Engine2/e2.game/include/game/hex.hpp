@@ -245,6 +245,15 @@ namespace e2
 		glm::uvec2 resolution;
 	};
 
+
+	enum class OutlineLayer : uint8_t
+	{
+		Movement = 0,
+		Attack,
+
+		Count
+	};
+
 	constexpr float waterLine = 0.025f;
 
 	/** 
@@ -450,7 +459,7 @@ namespace e2
 		bool isVisible(glm::ivec2 const& v);
 
 		void clearOutline();
-		void pushOutline(glm::ivec2 const& tile);
+		void pushOutline(e2::OutlineLayer layer, glm::ivec2 const& tile);
 
 		e2::ITexture* outlineTexture(uint8_t frameIndex);
 
@@ -491,7 +500,7 @@ namespace e2
 		e2::MeshPtr m_fogChunk;
 
 
-		std::vector<glm::ivec2> m_outlineTiles;
+		std::vector<glm::ivec2> m_outlineTiles[size_t(e2::OutlineLayer::Count)];
 
 
 		struct FrameData

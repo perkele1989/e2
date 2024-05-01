@@ -203,6 +203,8 @@ namespace e2
 		/** Sight range */
 		int32_t sightRange{ 2 };
 
+		int32_t attackRange{ 2 };
+
 		bool revenueByAbundance = false;
 
 		/** Revenue from this entity */

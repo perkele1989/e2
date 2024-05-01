@@ -30,16 +30,17 @@ vec3 hash(vec3 p) {
                 43758.5453);
 }
 
-float voronoi2d(const in vec2 point) {
+float voronoi2d(const in vec2 point)
+{
     vec2 p = floor(point);
     vec2 f = fract(point);
     float res = 0.0;
     for (int j = -1; j <= 1; j++) {
-    for (int i = -1; i <= 1; i++) {
-        vec2 b = vec2(i, j);
-        vec2 r = vec2(b) - f + rhash(p + b);
-        res += 1. / pow(dot(r, r), 8.);
-    }
+        for (int i = -1; i <= 1; i++) {
+            vec2 b = vec2(i, j);
+            vec2 r = vec2(b) - f + rhash(p + b);
+            res += 1. / pow(dot(r, r), 8.);
+        }
     }
     return pow(1. / res, 0.0625);
 }

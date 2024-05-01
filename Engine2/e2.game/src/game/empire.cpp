@@ -56,10 +56,7 @@ void e2::EmpireAI::grugBrainWakeUp()
 		}
 	}
 
-	if (turnEntities.size() > 0)
-		currentEntity = *turnEntities.begin();
-	else
-		currentEntity = nullptr;
+	cycleNextEntity();
 }
 
 void e2::EmpireAI::grugBrainTick(double seconds)
@@ -70,20 +67,34 @@ void e2::EmpireAI::grugBrainTick(double seconds)
 		return;
 	}
 
-	if (!currentEntity->grugRelevant() || !currentEntity->grugTick(seconds))
+	if (!game()->entityRelevantForPlay(currentEntity) || !currentEntity->grugTick(seconds))
 	{
-		turnEntities.erase(currentEntity);
-
-		if (turnEntities.size() > 0)
-			currentEntity = *turnEntities.begin();
-		else
-			currentEntity = nullptr;
+		cycleNextEntity();
 	}
 }
 
 void e2::EmpireAI::grugBrainGoSleep()
 {
 
+}
+
+void e2::EmpireAI::cycleNextEntity()
+{
+	do
+	{
+		if (currentEntity)
+			turnEntities.erase(currentEntity);
+
+		currentEntity = nullptr;
+
+		if (turnEntities.size() > 0)
+			currentEntity = *turnEntities.begin();
+	} while (currentEntity && !game()->entityRelevantForPlay(currentEntity));
+
+	if (currentEntity)
+		game()->selectEntity(currentEntity);
+	else
+		game()->deselectEntity();
 }
 
 e2::Game* e2::EmpireAI::game()
@@ -95,7 +106,7 @@ e2::EmpireAI::EmpireAI(e2::GameContext* ctx, EmpireId empireId)
 	: m_game(ctx->game())
 	, id(empireId)
 {
-
+	empire = m_game->empireById(id);
 }
 
 e2::NomadAI::NomadAI()
