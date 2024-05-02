@@ -104,23 +104,20 @@ void main()
 	outColor.rgb = albedo + emissive;
 #endif
 
-
 	// debug refl
 	//outColor.rgb = F;
-
-	//outColor.rgb = fragmentPosition.xyz *0.5 + 0.5;
 	// debug norm
 	//outColor.rgb = clamp(vec3(worldNormal.x, worldNormal.z, -worldNormal.y) * 0.5 + 0.5, vec3(EPSILON), vec3(1.0));
     //outColor.rgb = clamp(vec3(fragmentNormal.x, fragmentNormal.z, -fragmentNormal.y) * 0.5 + 0.5, vec3(EPSILON), vec3(1.0));
-	//outColor.rgb = b;
-	//outColor.rgb = texelNormal.rgb;
-
-	//outColor.rgb = vec3(brdf.g);
-
 	// debug ndotl 
 	//outColor.rgb = pow(vec3(outPosition.y), vec3(1.00));
 
-    
-    //outColor.rgb = fogOfWar(outColor.rgb, fragmentPosition.xyz, visibility, renderer.time.x);
+
+//#else
+//#if defined(Material_AlbedoTexture) && defined(Material_AlphaClip)
+//	float alpha = texture(sampler2D(albedoTexture, repeatSampler), uv).a;
+//	if(alpha < 0.5)
+//		discard;
+//#endif
 #endif
 }

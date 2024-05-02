@@ -397,7 +397,9 @@ void e2::Game::initializeScriptEngine()
 				{chaiscript::fun(&e2::Hex::y), "y"},
 				{chaiscript::fun(&e2::Hex::z), "z"},
 			}
-			);
+		);
+
+		m_scriptModule->add(chaiscript::fun(&e2::Hex::distance), "hexDistance" );
 
 		/*
 		e2::StackVector<Hex, 6> 
@@ -804,6 +806,8 @@ void e2::Game::initializeScriptEngine()
 		m_scriptModule->add(chaiscript::type_conversion<std::string, e2::Name>([](const std::string & asString) { return e2::Name(asString); }));
 
 
+		m_scriptModule->add(chaiscript::type_conversion<e2::Hex, glm::ivec2>([](const e2::Hex& asHex) { return asHex.offsetCoords(); }));
+		m_scriptModule->add(chaiscript::type_conversion<glm::ivec2, e2::Hex>([](const glm::ivec2& asIvec2) { return e2::Hex(asIvec2); }));
 
 
 		chaiscript::utility::add_class<e2::EntityLayerIndex>(*m_scriptModule,
@@ -983,10 +987,14 @@ void e2::Game::initialize()
 	am->prescribeALJ(alj, "assets/SM_HexBase.e2a");
 	am->prescribeALJ(alj, "assets/SM_HexBaseHigh.e2a");
 
-	am->prescribeALJ(alj, "assets/environment/trees/SM_PineForest001.e2a");
+	/*am->prescribeALJ(alj, "assets/environment/trees/SM_PineForest001.e2a");
 	am->prescribeALJ(alj, "assets/environment/trees/SM_PineForest002.e2a");
 	am->prescribeALJ(alj, "assets/environment/trees/SM_PineForest003.e2a");
-	am->prescribeALJ(alj, "assets/environment/trees/SM_PineForest004.e2a");
+	am->prescribeALJ(alj, "assets/environment/trees/SM_PineForest004.e2a");*/
+
+	am->prescribeALJ(alj, "assets/environment/SM_PineForest2_1.e2a");
+	am->prescribeALJ(alj, "assets/environment/SM_PineForest2_2.e2a");
+	am->prescribeALJ(alj, "assets/environment/SM_PineForest2_3.e2a");
 
 	am->prescribeALJ(alj, "assets/ui/S_UI_Icons.e2a");
 

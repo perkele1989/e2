@@ -9,9 +9,12 @@ class GruntState
     // ivec2 
     var targetHex;
 
+    var hasActedThisRound;
+
     def GruntState(entity)
     {
         this.actionType = GruntActionType_None;
+        this.hasActedThisRound = false;
     }
 }
 
@@ -100,10 +103,23 @@ gruntScript.setOnTargetChanged(fun(entity, newTarget){
 });
 
 gruntScript.setOnTargetClicked(fun(entity){
+    game.endTargeting();
 
     var targetEntity = game.entityAtHex(LI_Unit, entity.scriptState.targetHex);
+    if(targetEntity.is_var_null){
+        return;
+    }
 
-    game.endTargeting();
+    var attackDistance = hexDistance(targetEntity.tileIndex, entity.tileIndex);
+    if(attackDistance > entity.specification.attackRange)
+    {
+        return;
+    }
+
+    var attackMeta = calculateAttackMeta(entity, targetEntity);
+    if(attackMeta.targetDamage <= 0.0) {
+        return;
+    }
 
     gruntAttack(targetEntity);
 });
@@ -128,8 +144,13 @@ gruntScript.setDrawUI(fun(entity, ui){
     ui.endStackV();
 });
 
+gruntScript.setOnTurnStart(fun(entity){
+    entity.scriptState.hasActedThisRound = false;
+});
+
 gruntScript.setGrugRelevant(fun(entity){
     // grug no want be left out, so grug always say grug relevant
+    
     return true;
 });
 
@@ -137,10 +158,20 @@ gruntScript.setGrugTick(fun(entity, seconds){
     var turnState = game.getTurnState();
 
     if(turnState == TS_Unlocked) {
-        var target = game.grugAttackTarget();
 
-        if(!target.is_var_null && entity.attackPointsLeft > 0)
-        {
+        if(entity.scriptState.hasActedThisRound){
+            return false;
+        }
+
+        var target = game.grugAttackTarget();
+        var canAttack = false;
+
+        if(!target.is_var_null){
+            var attackMeta = calculateAttackMeta(entity, target);
+            canAttack = attackMeta.targetDamage > 0.0;
+        }
+
+        if(canAttack && entity.attackPointsLeft > 0){
             var attackMovePoints = game.grugNumAttackMovePoints();
             if(attackMovePoints > 0)
             {
@@ -153,15 +184,16 @@ gruntScript.setGrugTick(fun(entity, seconds){
                 gruntAttack(target);
                 return true;
             }
-        }
-        else if(entity.movePointsLeft > 0) 
-        {
+        } else if(entity.movePointsLeft > 0) {
             var moveTo = game.grugMoveLocation();
             if(moveTo.x == entity.tileIndex.x && moveTo.y == entity.tileIndex.y)
             {
                 return false;
             }
             game.moveSelectedEntityTo(moveTo);
+
+            // we only want it to move one time 
+            entity.scriptState.hasActedThisRound = true;
             return true;
         }
 

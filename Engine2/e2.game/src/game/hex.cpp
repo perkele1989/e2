@@ -39,9 +39,13 @@ e2::HexGrid::HexGrid(e2::GameContext* gameCtx)
 
 	auto am = game()->assetManager();
 
-	m_treeMesh[0] = am->get("assets/environment/trees/SM_PineForest001.e2a")->cast<e2::Mesh>();
+	/*m_treeMesh[0] = am->get("assets/environment/trees/SM_PineForest001.e2a")->cast<e2::Mesh>();
 	m_treeMesh[1] = am->get("assets/environment/trees/SM_PineForest002.e2a")->cast<e2::Mesh>();
-	m_treeMesh[2] = am->get("assets/environment/trees/SM_PineForest003.e2a")->cast<e2::Mesh>();
+	m_treeMesh[2] = am->get("assets/environment/trees/SM_PineForest003.e2a")->cast<e2::Mesh>();*/
+
+	m_treeMesh[0] = am->get("assets/environment/SM_PineForest2_1.e2a")->cast<e2::Mesh>();
+	m_treeMesh[1] = am->get("assets/environment/SM_PineForest2_2.e2a")->cast<e2::Mesh>();
+	m_treeMesh[2] = am->get("assets/environment/SM_PineForest2_3.e2a")->cast<e2::Mesh>(); 
 
 	m_baseHex = am->get("assets/SM_HexBase.e2a")->cast<e2::Mesh>();
 	m_dynaHex = e2::DynamicMesh(m_baseHex, 0, VertexAttributeFlags::Color);
