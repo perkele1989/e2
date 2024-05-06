@@ -655,6 +655,51 @@ void e2::UIManager::queueDestroy(e2::UIWindow* wnd)
 	m_removeQueue.insert(wnd);
 }
 
+void e2::UIManager::registerGlobalSpritesheet(e2::Name id, e2::SpritesheetPtr sheet)
+{
+	if (m_globalSheets.contains(id))
+	{
+		LogWarning("{} already registered", id);
+		return;
+	}
+
+	m_globalSheets[id] = sheet;
+
+	for (auto& [spriteId, sprite] : sheet->spriteMap())
+	{
+		e2::Name fullId = std::format("{}.{}", id, spriteId);
+		m_globalSprites[fullId] = &sprite;
+	}
+}
+
+void e2::UIManager::unregisterGlobalSpritesheet(e2::Name id)
+{
+	if (!m_globalSheets.contains(id))
+	{
+		LogWarning("{} not registered", id);
+		return;
+	}
+
+	e2::SpritesheetPtr sheet = m_globalSheets.find(id)->second;
+
+	for (auto& [spriteId, sprite] : sheet->spriteMap())
+	{
+		e2::Name fullId = std::format("{}.{}", id, spriteId);
+		m_globalSprites.erase(fullId);
+	}
+
+	m_globalSheets.erase(id);
+}
+
+e2::Sprite* e2::UIManager::globalSprite(e2::Name fullId)
+{
+	auto it = m_globalSprites.find(fullId);
+	if (it == m_globalSprites.end())
+		return nullptr;
+
+	return it->second;
+}
+
 e2::UIWindow::UIWindow(e2::Context* ctx, UIWindowFlags flags)
 	: m_engine(ctx->engine())
 	, m_flags(flags)

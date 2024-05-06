@@ -5,6 +5,7 @@
 
 #include <string>
 #include <format>
+#include <mutex>
 
 //#if defined(E2_DEVELOPMENT)
 #define LogNotice(x, ...) e2::Log::write( e2::Severity::Notice, __func__, __FILE__, __LINE__, std::format(x, __VA_ARGS__))

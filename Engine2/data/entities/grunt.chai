@@ -125,23 +125,14 @@ gruntScript.setOnTargetClicked(fun(entity){
 });
 
 gruntScript.setDrawUI(fun(entity, ui){
-    ui.beginStackV("gruntV", vec2(0.0, 0.0))
-
-    ui.gameLabel("**" + entity.specification.displayName + "**", 12, TA_Middle);
-    ui.gameLabel("*Movement points left:* " + to_string(entity.movePointsLeft), 11, TA_Begin);
-    ui.gameLabel("*Attack points left:* " + to_string(entity.attackPointsLeft), 11, TA_Begin);
-
-
     var canAttack = entity.attackPointsLeft > 0;
-    if(canAttack)
+    ui.beginStackH("gruntH1", 40.0)
+    if(ui.gameGridButton("gruntAttack", "gameUi.attack", "Attack enemy", canAttack))
     {
-        if(ui.button("att", "Attack"))
-        {
-            game.beginTargeting();
-        }
+        game.beginTargeting();
     }
 
-    ui.endStackV();
+    ui.endStackH();
 });
 
 gruntScript.setOnTurnStart(fun(entity){

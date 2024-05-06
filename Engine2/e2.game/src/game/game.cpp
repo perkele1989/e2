@@ -328,6 +328,8 @@ void e2::Game::finalizeBoot()
 
 	m_uiIconsSheet = am->get("assets/ui/S_UI_Icons.e2a").cast<e2::Spritesheet>();
 
+	uiManager()->registerGlobalSpritesheet("gameUi", m_uiIconsSheet);
+
 	// After this line, we may no longer safely fetch and store loaded assets
 	am->returnALJ(m_bootTicket);
 
@@ -730,6 +732,7 @@ void e2::Game::initializeScriptEngine()
 				{chaiscript::fun(&UIContext::sliderInt), "sliderInt"},
 				{chaiscript::fun(&UIContext::sliderFloat), "sliderFloat"},
 				{chaiscript::fun(&UIContext::gameLabel), "gameLabel"},
+				{chaiscript::fun(&UIContext::gameGridButton), "gameGridButton"},
 				{chaiscript::fun(&UIContext::calculateSDFTextWidth), "calculateSDFTextWidth"},
 				{chaiscript::fun(&UIContext::calculateTextWidth), "calculateTextWidth"},
 				{chaiscript::fun(&UIContext::drawSDFText), "drawSDFText"},
@@ -1071,7 +1074,7 @@ void e2::Game::shutdown()
 	destroyScriptEngine();
 
 	e2::destroy(m_session);
-
+	uiManager()->unregisterGlobalSpritesheet("gameUi");
 
 
 	m_irradianceMap = nullptr;
@@ -1105,7 +1108,13 @@ void e2::Game::update(double seconds)
 		float textWidth = m_session->uiContext()->calculateSDFTextWidth(FontFace::Serif, 22.0f, "Loading... ");
 		m_session->uiContext()->drawSDFTextCarousel(FontFace::Serif, 22.f, 0xFFFFFFFF, { winSize.x - textWidth - 16.f, winSize.y - 32.0f }, "Loading... ", 8.0f, m_bootBegin.durationSince().seconds() * 4.0f);
 
-		if (assetManager()->queryALJ(m_bootTicket).status == ALJStatus::Completed && m_bootBegin.durationSince().seconds() > 4.0f)
+#if defined(E2_SHIPPING)
+		bool bootPredicate = assetManager()->queryALJ(m_bootTicket).status == ALJStatus::Completed && m_bootBegin.durationSince().seconds() > 4.0f;
+#else 
+		bool bootPredicate = assetManager()->queryALJ(m_bootTicket).status == ALJStatus::Completed;
+#endif
+
+		if (bootPredicate)
 		{
 			m_globalState = GlobalState::Menu;
 			finalizeBoot();
@@ -1453,6 +1462,11 @@ void e2::Game::updateMenu(double seconds)
 
 	if (!m_haveBegunStart && kb.pressed(Key::Escape))
 		timer = 20.0;
+
+#if !defined(E2_SHIPPING)
+	if (timer < 20.0)
+		timer = 20.0;
+#endif
 
 	m_viewZoom = 0.5f;
 
@@ -2638,7 +2652,45 @@ void e2::Game::drawUnitUI()
 	ui->pushFixedPanel("test", offset + glm::vec2(4.0f, 4.0f), glm::vec2(width - 8.0f, height - 8.0f));
 
 	if (m_selectedEntity && m_turnState == TurnState::Unlocked)
+	{
+		e2::EntitySpecification* spec = m_selectedEntity->specification;
+
+		ui->beginStackV("unitV", glm::vec2(0.0, 0.0));
+		ui->beginStackH("headerH", 24.0f);
+		ui->gameLabel(std::format("**{}**", spec->displayName));
+
+		
+		if (spec->showMovePoints)
+		{
+			e2::Sprite* moveSprite = uiManager()->globalSprite("gameUi.run");
+
+			ui->sprite(*moveSprite, 0xFFFFFFFF, 0.5f);
+			ui->gameLabel(std::to_string(m_selectedEntity->movePointsLeft));
+		}
+
+		if (spec->showAttackPoints)
+		{
+			e2::Sprite* attackSprite = uiManager()->globalSprite("gameUi.attack");
+
+			ui->sprite(*attackSprite, 0xFFFFFFFF, 0.5f);
+			ui->gameLabel(std::to_string(m_selectedEntity->attackPointsLeft));
+		}
+
+		if (spec->showBuildPoints)
+		{
+			e2::Sprite* buildSprite = uiManager()->globalSprite("gameUi.engineer");
+
+			ui->sprite(*buildSprite, 0xFFFFFFFF, 0.5f);
+			ui->gameLabel(std::to_string(m_selectedEntity->buildPointsLeft));
+		}
+
+		ui->endStackH();
+
 		m_selectedEntity->drawUI(ui);
+
+		ui->endStackV();
+	}
+		
 
 
 
@@ -2706,7 +2758,7 @@ void e2::Game::drawDebugUI()
 	ui->drawRasterText(e2::FontFace::Monospace, 14, 0xFFFFFFFF, { xOffset, yOffset + (18.0f * 2.0f) }, std::format("^4Real fps: {:.1f}", metrics.realCpuFps));
 	ui->drawRasterText(e2::FontFace::Monospace, 14, 0xFFFFFFFF, { xOffset, yOffset + (18.0f * 3.0f) }, std::format("^5Num. chunks: {}", m_hexGrid->numChunks()));
 	ui->drawRasterText(e2::FontFace::Monospace, 14, 0xFFFFFFFF, { xOffset, yOffset + (18.0f * 4.0f) }, std::format("^6Visible chunks: {}", m_hexGrid->numVisibleChunks()));
-	//ui->drawRasterText(e2::FontFace::Monospace, 14, 0xFFFFFFFF, { xOffset, yOffset + (18.0f * 5.0f) }, std::format("^7Num. chunk meshes: {}", m_hexGrid->numChunkMeshes()));
+	ui->drawRasterText(e2::FontFace::Monospace, 14, 0xFFFFFFFF, { xOffset, yOffset + (18.0f * 5.0f) }, std::format("^7Entities: {}", m_entities.size()));
 	ui->drawRasterText(e2::FontFace::Monospace, 14, 0xFFFFFFFF, { xOffset, yOffset + (18.0f * 6.0f) }, std::format("^8High loadtime: {:.2f}ms", m_hexGrid->highLoadTime()));
 	ui->drawRasterText(e2::FontFace::Monospace, 14, 0xFFFFFFFF, { xOffset, yOffset + (18.0f * 7.0f) }, std::format("^9Jobs in flight: {}", m_hexGrid->numJobsInFlight()));
 	ui->drawRasterText(e2::FontFace::Monospace, 14, 0xFFFFFFFF, { xOffset, yOffset + (18.0f * 8.0f) }, std::format("^2View Origin: {}", m_viewOrigin));
@@ -3039,8 +3091,9 @@ void e2::Game::updateMainCamera(double seconds)
 	auto& mouse = ui->mouseState();
 	auto& leftMouse = mouse.buttons[uint16_t(e2::MouseButton::Left)];
 
-	m_viewZoom -= float(mouse.scrollOffset) * 0.1f;
-	m_viewZoom = glm::clamp(m_viewZoom, 0.0f, 1.0f);
+	m_targetViewZoom -= float(mouse.scrollOffset) * 0.1f;
+	m_targetViewZoom = glm::clamp(m_targetViewZoom, 0.0f, 1.0f);
+	m_viewZoom = glm::mix(m_viewZoom, m_targetViewZoom, glm::clamp(float(seconds)*16.0f, 0.0f, 1.0f));
 
 	
 

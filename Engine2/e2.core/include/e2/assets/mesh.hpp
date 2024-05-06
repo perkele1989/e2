@@ -96,7 +96,7 @@ namespace e2
 	};
 
 
-	/** @tags(arena, arenaSize=1024)*/
+	/** @tags(arena, arenaSize=16384)*/
 	struct E2_API AnimationBinding
 	{
 		std::vector<e2::AnimationTrack*> translationTracks;
@@ -200,7 +200,7 @@ namespace e2
 		e2::StackVector<glm::mat4, e2::maxNumSkeletonBones> m_skin;
 	};
 
-	/** @tags(arena, arenaSize=1024) */
+	/** @tags(arena, arenaSize=16384) */
 	class E2_API AnimationPose : public e2::Pose
 	{
 		ObjectDeclaration();

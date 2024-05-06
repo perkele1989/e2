@@ -31,6 +31,11 @@ namespace e2
 
 		e2::Sprite *getSprite(e2::Name name);
 
+		inline std::unordered_map<e2::Name, e2::Sprite> &spriteMap()
+		{
+			return m_sprites;
+		}
+
 		inline e2::Texture2DPtr texture()
 		{
 			return m_texture;

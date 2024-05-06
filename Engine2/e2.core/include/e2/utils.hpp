@@ -1455,24 +1455,54 @@ struct std::hash<e2::UUID>
 template <>
 struct std::formatter<e2::Name>
 {
-	constexpr auto parse(std::format_parse_context& ctx) {
+	template<class ParseContext>
+	constexpr ParseContext::iterator parse(ParseContext& ctx)
+	{
 		return ctx.begin();
 	}
 
-	auto format(const e2::Name& id, std::format_context& ctx) {
+	template<class CmtContext>
+	CmtContext::iterator format(e2::Name const& id, CmtContext& ctx) const
+	{
 		return std::format_to(ctx.out(), "{}", id.cstring());
 	}
 };
+
+/*
+
+template<>
+struct std::formatter<QuotableString, char>
+{
+	bool quoted = false;
+
+	template<class ParseContext>
+	constexpr ParseContext::iterator parse(ParseContext& ctx)
+	{
+
+	}
+
+	template<class FmtContext>
+	FmtContext::iterator format(QuotableString s, FmtContext& ctx) const
+	{
+
+	}
+};
+
+
+*/
+
 
 /** Makes glm types formattable in std::format, and LogNotice etc. */
 template <>
 struct std::formatter<glm::vec2>
 {
-	constexpr auto parse(std::format_parse_context& ctx) {
+	constexpr auto parse(std::format_parse_context& ctx)
+	{
 		return ctx.begin();
 	}
 
-	auto format(const glm::vec2& vec, std::format_context& ctx) {
+	auto format(const glm::vec2& vec, std::format_context& ctx) const
+	{
 		return std::format_to(ctx.out(), "x={:.2f},y={:.2f}", vec.x, vec.y);
 	}
 };
@@ -1480,11 +1510,13 @@ struct std::formatter<glm::vec2>
 template <>
 struct std::formatter<glm::vec3>
 {
-	constexpr auto parse(std::format_parse_context& ctx) {
+	constexpr auto parse(std::format_parse_context& ctx)
+	{
 		return ctx.begin();
 	}
 
-	auto format(const glm::vec3& vec, std::format_context& ctx) {
+	auto format(const glm::vec3& vec, std::format_context& ctx) const
+	{
 		return std::format_to(ctx.out(), "x={:.2f},y={:.2f},z={:.2f}", vec.x, vec.y, vec.z);
 	}
 };
@@ -1492,11 +1524,13 @@ struct std::formatter<glm::vec3>
 template <>
 struct std::formatter<glm::quat>
 {
-	constexpr auto parse(std::format_parse_context& ctx) {
+	constexpr auto parse(std::format_parse_context& ctx)
+	{
 		return ctx.begin();
 	}
 
-	auto format(const glm::quat& quat, std::format_context& ctx) {
+	auto format(const glm::quat& quat, std::format_context& ctx) const
+	{
 		return std::format_to(ctx.out(), "w={:.2f},x={:.2f},y={:.2f},z={:.2f}", quat.w, quat.x, quat.y, quat.z);
 	}
 };
@@ -1504,11 +1538,13 @@ struct std::formatter<glm::quat>
 template <>
 struct std::formatter<glm::ivec2>
 {
-	constexpr auto parse(std::format_parse_context& ctx) {
+	constexpr auto parse(std::format_parse_context& ctx)
+	{
 		return ctx.begin();
 	}
 
-	auto format(const glm::ivec2& vec, std::format_context& ctx) {
+	auto format(const glm::ivec2& vec, std::format_context& ctx) const
+	{
 		return std::format_to(ctx.out(), "x={},y={}", vec.x, vec.y);
 	}
 };
@@ -1516,11 +1552,13 @@ struct std::formatter<glm::ivec2>
 template <>
 struct std::formatter<glm::uvec2>
 {
-	constexpr auto parse(std::format_parse_context& ctx) {
+	constexpr auto parse(std::format_parse_context& ctx)
+	{
 		return ctx.begin();
 	}
 
-	auto format(const glm::uvec2& vec, std::format_context& ctx) {
+	auto format(const glm::uvec2& vec, std::format_context& ctx) const
+	{
 		return std::format_to(ctx.out(), "x={},y={}", vec.x, vec.y);
 	}
 };

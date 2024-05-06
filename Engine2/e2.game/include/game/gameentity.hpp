@@ -19,6 +19,8 @@ namespace e2
 {
 	class MeshProxy;
 
+	constexpr float globalMeshScale = 0.5f;
+
 	constexpr uint32_t maxNumTriggersPerAction = 4;
 
 	class GameEntity;
@@ -222,11 +224,20 @@ namespace e2
 		/** Number of movement points */
 		int32_t movePoints{};
 
+		/** Whether to show move points in unit UI */
+		bool showMovePoints{};
+
 		/** Number of attack points */
 		int32_t attackPoints{};
 
+		/** Whether to show attack points in unit UI */
+		bool showAttackPoints{};
+
 		/** Number of build points */
 		int32_t buildPoints{};
+
+		/** Whether to show attack points in unit UI */
+		bool showBuildPoints{};
 
 		/** Mesh scale */
 		glm::vec3 meshScale{ 1.0f, 1.0f, 1.0f };

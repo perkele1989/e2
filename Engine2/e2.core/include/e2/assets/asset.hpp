@@ -32,6 +32,9 @@ namespace e2
 		// Add skeletons 
 		AddSkeletons,
 
+		// 
+		TextureImportRework,
+
 		// New versions above this line 
 		End,
 		Latest = End - 1

@@ -4,6 +4,7 @@
 #include "e2/managers/rendermanager.hpp"
 #include "e2/renderer/shadermodel.hpp"
 
+#include "e2/utils.hpp"
 
 e2::Material::~Material()
 {

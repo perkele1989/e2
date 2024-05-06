@@ -441,14 +441,15 @@ namespace
 
 	}
 
-	// r = desert, g = grassland, b = tundra
-	glm::vec3 sampleBiomeAtVertex(glm::vec2 const& worldPosition, ::HexShaderData* shaderData)
+	// r = desert, g = grassland, b = tundra, a = forest
+	glm::vec4 sampleBiomeAtVertex(glm::vec2 const& worldPosition, ::HexShaderData* shaderData)
 	{
-		auto biomeToValues = [](e2::TileFlags biome)  -> glm::vec3 {
-			glm::vec3 returner;
-			returner.x = (biome == e2::TileFlags::BiomeDesert) ? 1.0f : 0.0f;
-			returner.y = (biome == e2::TileFlags::BiomeGrassland) ? 1.0f : 0.0f;
-			returner.z = (biome == e2::TileFlags::BiomeTundra) ? 1.0f : 0.0f;
+		auto tileFlagsToValues = [](e2::TileFlags tileFlags)  -> glm::vec4 {
+			glm::vec4 returner;
+			returner.x = ((tileFlags & e2::TileFlags::BiomeMask) == e2::TileFlags::BiomeDesert) ? 1.0f : 0.0f;
+			returner.y = ((tileFlags & e2::TileFlags::BiomeMask) == e2::TileFlags::BiomeGrassland) ? 1.0f : 0.0f;
+			returner.z = ((tileFlags & e2::TileFlags::BiomeMask) == e2::TileFlags::BiomeTundra) ? 1.0f : 0.0f;
+			returner.w = ((tileFlags & e2::TileFlags::FeatureForest) == e2::TileFlags::FeatureNone) ? 0.0f : 1.0f;
 
 			return returner;
 		};
@@ -461,7 +462,7 @@ namespace
 		float hexWeight = 1.0f - glm::smoothstep(0.0f, hexDistBlendLen, hexDistance);
 		e2::TileData& hexTile = shaderData->tileData;// @todo only need biome info here! @perf
 
-		glm::vec3 finalValues = biomeToValues((hexTile.flags & e2::TileFlags::BiomeMask)) * hexWeight;
+		glm::vec4 finalValues = tileFlagsToValues(hexTile.flags) * hexWeight;
 
 		for (e2::Hex const& neighbourHex : hex.neighbours())
 		{
@@ -470,7 +471,7 @@ namespace
 			float neighbourWeight = 1.0f - glm::smoothstep(0.0f, hexDistBlendLen, neighbourDistance);
 			e2::TileData neighbourTile = shaderData->getTileData(neighbourHex.offsetCoords()); // @todo only need biome info here! @perf
 
-			finalValues += biomeToValues((neighbourTile.flags & e2::TileFlags::BiomeMask)) * neighbourWeight;
+			finalValues += tileFlagsToValues(neighbourTile.flags) * neighbourWeight;
 		}
 
 		finalValues = glm::normalize(finalValues);
@@ -485,18 +486,6 @@ namespace
 	{
 		::HexShaderData* data = reinterpret_cast<::HexShaderData*>(shaderData);
 
-
-		/*
-		BiomeGrassland			= 0b0000'0000'0000'0000,
-		BiomeForest				= 0b0010'0000'0000'0000,
-		BiomeDesert				= 0b0100'0000'0000'0000,
-		BiomeTundra				= 0b0110'0000'0000'0000,
-		BiomeMountain			= 0b1000'0000'0000'0000,
-		BiomeShallow			= 0b1010'0000'0000'0000,
-		BiomeOcean				= 0b1100'0000'0000'0000,
-		*/
-
-
 		e2::TileData curr = data->tileData;
 
 		glm::vec2 localVertexPosition = glm::vec2(vertex->position.x, vertex->position.z);
@@ -508,15 +497,13 @@ namespace
 
 		//vertex->tangent = glm::rotate(glm::quat(1.0f, 0.0f, 0.0f, 0.0f), glm::radians(90.0f), glm::vec3(0.0f, 0.0f, -1.0f)) * vertex->normal;
 		
-
-		glm::vec3 biomeValues = sampleBiomeAtVertex(worldVertexPosition, data);
+		glm::vec4 biomeValues = sampleBiomeAtVertex(worldVertexPosition, data);
 
 		// save hex grid thingy
 		vertex->color.a = vertex->color.r;
 
-		// grasslands 
-		//float heightGrass = 1.0f - glm::smoothstep(0.0f, 0.085f, vertex->position.y);
-		vertex->color.r = biomeValues.r;
+		// forest 
+		vertex->color.r = biomeValues.a;
 
 		// tundra
 		vertex->color.g = biomeValues.g;
@@ -920,7 +907,7 @@ void e2::HexGrid::calculateFeaturesAndWater(glm::vec2 const& planarCoords, float
 		{
 			float forestCoeff = sampleSimplex((planarCoords + glm::vec2(32.14f, 29.28f)) * 4.0f);
 
-			if (forestCoeff > 0.4f)
+			if (forestCoeff > 0.4f && ((outFlags & TileFlags::BiomeMask) != TileFlags::BiomeDesert))
 				outFlags |= TileFlags::FeatureForest;
 
 			if (forestCoeff > 0.80f)

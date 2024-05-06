@@ -11,27 +11,26 @@ mobile_mobScript.setUpdateCustomAction(fun(entity, ui){
 });
 
 mobile_mobScript.setDrawUI(fun(entity, ui){
-    ui.beginStackV(Name("mobUiStackV"), vec2(0.0, 0.0));
-    ui.gameLabel("**" + entity.specification.displayName + "**", 12, TA_Middle);
-    ui.gameLabel("*Movement points left:* " + to_string(entity.movePointsLeft), 11, TA_Begin);
+
 
     var tileData = game.hexGrid().getExistingTileData(entity.tileIndex);
-    if(!tileData.is_var_null())
-    {
-        var isForested = tileData.isForested();
-        var hasResource = tileData.hasResource();
-        var hasStructure = !game.entityAtHex(LI_Structure, entity.tileIndex).is_var_null();
-        var canBuild = !hasStructure && !hasResource && !isForested;
 
-        if(canBuild && ui.button(Name("deploy"), "*Deploy M.O.B*"))
-        {
-            // uncomment once we have animation
-            // entity.playAction(Name("deploying"));
-            game.beginCustomAction();
-        }
+    var isForested = !tileData.is_var_null() && tileData.isForested();
+    var hasResource = !tileData.is_var_null() && tileData.hasResource();
+    var hasStructure = !game.entityAtHex(LI_Structure, entity.tileIndex).is_var_null();
+    var canDeploy = !hasStructure && !hasResource && !isForested;
+
+    
+    ui.beginStackH("mobilemobH1", 40.0)
+    if(ui.gameGridButton("mobileMobDepoloy", "gameUi.deploy", "Deploy", canDeploy))
+    {
+        // uncomment once we have animation
+        // entity.playAction(Name("deploying"));
+        game.beginCustomAction();
     }
 
-    ui.endStackV();
+    ui.endStackH();
+
 });
 
 mobile_mobScript;

@@ -50,7 +50,8 @@ void main()
 	if(albedoTexel.a < 0.5)
 		discard;
 #endif 
-	vec3 albedo = albedoTexel.rgb *  pow(material.albedo.rgb, vec3(1.0));
+	vec3 albedo = albedoTexel.rgb *  pow(material.albedo.rgb, vec3(1.0));// * 0.65;
+	//albedo = mix(vec3(dot(vec3(1.0/3.0), albedo)), albedo, 0.5);
 
 #else
 	vec3 albedo = pow(material.albedo.rgb, vec3(1.0));

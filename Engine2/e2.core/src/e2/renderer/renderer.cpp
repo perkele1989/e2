@@ -513,6 +513,7 @@ void e2::Renderer::recordRenderLayers(double deltaTime, e2::ICommandBuffer* buff
 
 		e2::IDescriptorSet* rendererSet = backBuff.sets[frameIndex];
 
+		/*
 		buff->useAsAttachment(backBuff.colorTexture);
 		buff->useAsAttachment(backBuff.positionTexture);
 		buff->useAsDepthAttachment(backBuff.depthTexture);
@@ -523,7 +524,7 @@ void e2::Renderer::recordRenderLayers(double deltaTime, e2::ICommandBuffer* buff
 		buff->endRender();
 		buff->useAsDefault(backBuff.colorTexture);
 		buff->useAsDefault(backBuff.positionTexture);
-		buff->useAsDefault(backBuff.depthTexture);
+		buff->useAsDefault(backBuff.depthTexture);*/
 
 		buff->useAsTransferDst(backBuff.colorTexture);
 		buff->useAsTransferSrc(frontBuff.colorTexture);
@@ -572,29 +573,18 @@ void e2::Renderer::recordRenderLayers(double deltaTime, e2::ICommandBuffer* buff
 			for (uint8_t i = 0; i < meshSpec.vertexAttributes.size(); i++)
 				buff->bindVertexBuffer(i, meshSpec.vertexAttributes[i]);
 
+
+			// Bind descriptor sets (0 is renderer, 1 is model, 2 is material, 3 is reserved)
 			buff->bindDescriptorSet(pipelineLayout, 0, rendererSet);
 
-			//if (meshProxy->skinProxy)
-			{
-				uint32_t skinId = meshProxy->skinProxy ? meshProxy->skinProxy->id : 0;
-				// Bind descriptor sets (0 is renderer, 1 is model, 2 is material, 3 is reserved)
-				uint32_t offsets[2] = {
-					renderManager()->paddedBufferSize(sizeof(glm::mat4)) * meshProxy->id,
-					renderManager()->paddedBufferSize(sizeof(glm::mat4) * e2::maxNumSkeletonBones) * skinId
-				};
+			uint32_t skinId = meshProxy->skinProxy ? meshProxy->skinProxy->id : 0;
+			uint32_t offsets[2] = {
+				renderManager()->paddedBufferSize(sizeof(glm::mat4)) * meshProxy->id,
+				renderManager()->paddedBufferSize(sizeof(glm::mat4) * e2::maxNumSkeletonBones) * skinId
+			};
 
-				buff->bindDescriptorSet(pipelineLayout, 1, modelSet, 2, &offsets[0]);
-			}
-			/*else
-			{
-				// Bind descriptor sets (0 is renderer, 1 is model, 2 is material, 3 is reserved)
-				uint32_t offsets[1] = {
-					renderManager()->paddedBufferSize(sizeof(glm::mat4)) * meshProxy->id
-				};
+			buff->bindDescriptorSet(pipelineLayout, 1, modelSet, 2, &offsets[0]);
 
-				buff->bindDescriptorSet(pipelineLayout, 1, modelSet, 1, &offsets[0]);
-			}
-			*/
 			meshProxy->materialProxies[submeshIndex]->bind(buff, frameIndex, false);
 
 			// Issue drawcall
@@ -683,13 +673,10 @@ void e2::Renderer::recordFrame(double deltaTime)
 
 	// Begin command buffer
 	buff->beginRecord(true, m_defaultSettings);
-	{
-		recordShadows(deltaTime, buff);
-		recordRenderLayers(deltaTime, buff);
-		recordDebugLines(deltaTime, buff);
-
-		buff->endRecord();
-	}
+	recordShadows(deltaTime, buff);
+	recordRenderLayers(deltaTime, buff);
+	recordDebugLines(deltaTime, buff);
+	buff->endRecord();
 
 	renderManager()->queue(buff, nullptr, nullptr);
 	m_debugLines.clear();

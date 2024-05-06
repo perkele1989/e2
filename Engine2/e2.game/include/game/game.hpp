@@ -363,6 +363,7 @@ namespace e2
 		e2::Viewpoints2D m_viewPoints;
 		glm::vec2 m_startViewOrigin{};
 		glm::vec2 m_viewOrigin{ 0.0f, 0.0f };
+		float m_targetViewZoom{ 0.0f };
 		float m_viewZoom{0.0f};
 		glm::vec2 m_viewVelocity{};
 		
@@ -388,10 +389,10 @@ namespace e2
 		chaiscript::ChaiScript* m_scriptEngine{};
 		chaiscript::ModulePtr m_scriptModule;
 
-		float m_sunStrength{ 1.75f };
+		float m_sunStrength{ 6.75f };
 		float m_iblStrength{ 0.3f };
-		float m_sunAngleA{ -57.6f };
-		float m_sunAngleB{ 24.3f };
+		float m_sunAngleA{ 33.0f };
+		float m_sunAngleB{ 15.75f };
 
 
 	public:

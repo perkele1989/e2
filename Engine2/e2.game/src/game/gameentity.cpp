@@ -174,7 +174,7 @@ void e2::GameEntity::updateAnimation(double seconds)
 		if (meshProxy)
 		{
 			meshProxy->modelMatrix = glm::translate(glm::mat4(1.0), meshPosition + glm::vec3(e2::worldUp()) * specification->meshHeightOffset);
-			meshProxy->modelMatrix = meshProxy->modelMatrix * glm::toMat4(meshRotation) * glm::scale(glm::mat4(1.0f), specification->meshScale);
+			meshProxy->modelMatrix = meshProxy->modelMatrix * glm::toMat4(meshRotation) * glm::scale(glm::mat4(1.0f), specification->meshScale * e2::globalMeshScale);
 			meshProxy->modelMatrixDirty = true;
 		}
 	}
@@ -257,7 +257,7 @@ void e2::GameEntity::initialize()
 
 		meshProxy = e2::create<e2::MeshProxy>(gameSession(), proxyConf);
 		meshProxy->modelMatrix = glm::translate(glm::mat4(1.0), meshPosition + glm::vec3(e2::worldUp()) * specification->meshHeightOffset);
-		meshProxy->modelMatrix = meshProxy->modelMatrix * glm::toMat4(meshRotation) * glm::scale(glm::mat4(1.0f), specification->meshScale);
+		meshProxy->modelMatrix = meshProxy->modelMatrix * glm::toMat4(meshRotation) * glm::scale(glm::mat4(1.0f), specification->meshScale * e2::globalMeshScale);
 
 		meshProxy->modelMatrixDirty = true;
 	}
@@ -939,6 +939,17 @@ void e2::EntitySpecification::initializeSpecifications(e2::GameContext* ctx)
 
 			if (entity.contains("attackPoints"))
 				newSpec.attackPoints = entity.at("attackPoints").template get<int32_t>();
+
+
+			if (entity.contains("showMovePoints"))
+				newSpec.showMovePoints = entity.at("showMovePoints").template get<bool>();
+
+			if (entity.contains("showBuildPoints"))
+				newSpec.showBuildPoints = entity.at("showBuildPoints").template get<bool>();
+
+			if (entity.contains("showAttackPoints"))
+				newSpec.showAttackPoints = entity.at("showAttackPoints").template get<bool>();
+
 
 			if (entity.contains("attackStrength"))
 				newSpec.attackStrength = entity.at("attackStrength").template get<float>();

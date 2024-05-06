@@ -14,6 +14,8 @@
 #include <e2/rhi/pipeline.hpp>
 #include <e2/ui/uitypes.hpp>
 
+#include <e2/assets/spritesheet.hpp>
+
 #include <unordered_set>
 #include <unordered_map>
 
@@ -128,10 +130,21 @@ namespace e2
 
 		UIPipeline quadPipeline;
 
+
+		void registerGlobalSpritesheet(e2::Name id, e2::SpritesheetPtr sheet);
+		void unregisterGlobalSpritesheet(e2::Name id);
+
+		// fullId = "x.y" where x = spritesheet id, and y = sprite id
+		e2::Sprite* globalSprite(e2::Name fullId);
+
 	protected:
 
 		friend e2::UIWindow;
 		friend e2::UIContext;
+
+
+		std::unordered_map<e2::Name, e2::SpritesheetPtr> m_globalSheets;
+		std::unordered_map<e2::Name, e2::Sprite*> m_globalSprites;
 
 		e2::UIStyle m_workingStyle;
 

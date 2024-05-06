@@ -287,7 +287,7 @@ void e2::UIContext::gameLabel(std::string const& text, uint8_t fontSize /*= 12*/
 
 	static const e2::Name n = "";
 
-	glm::vec2 minSize = glm::vec2(0.0f, 20.0f * style.scale);
+	glm::vec2 minSize = glm::vec2(textWidth, 20.0f * style.scale);
 	e2::UIWidgetState* widgetState = reserve(n, minSize);
 
 	if (minSize.x > widgetState->size.x || minSize.y > widgetState->size.y)
@@ -400,6 +400,52 @@ void e2::UIContext::label(e2::Name id, std::string const& text, uint8_t fontSize
 	
 }
 
+
+bool e2::UIContext::gameGridButton(e2::Name id, e2::Name iconSpriteId, std::string const& hoverTextMain, bool active)
+{
+	e2::UIStyle const& style = uiManager()->workingStyle();
+	e2::Sprite* sprite = uiManager()->globalSprite(iconSpriteId);
+	if (!sprite)
+		return false;
+
+
+	glm::vec2 minSize(40.0f * style.scale);
+	e2::UIWidgetState* widgetState = reserve(id, minSize);
+
+	if (minSize.x > widgetState->size.x || minSize.y > widgetState->size.y)
+		return false;
+
+	bool clicked = active && widgetState->active && widgetState->hovered && m_mouseState.buttons[0].clicked;
+	bool hovered = active && widgetState->hovered;
+	bool held = hovered && m_mouseState.buttons[0].held && widgetState->active;
+
+	if (active)
+	{
+		if (held)
+		{
+			drawQuadFancy(widgetState->position, widgetState->size, 0x000000FF, 2.f * style.scale, 1.0f);
+			drawSprite(widgetState->position, *sprite, 0xFFFFFFFF, style.scale);
+		}
+		else if (hovered)
+		{
+			drawQuadFancy(widgetState->position, widgetState->size, 0x0000007F, 2.f * style.scale, 1.0f);
+			drawSprite(widgetState->position, *sprite, 0xFFFFFFFF, style.scale);
+		}
+		else
+		{
+			drawQuadFancy(widgetState->position, widgetState->size, 0x0000007F, 2.f * style.scale, 1.0f);
+			drawSprite(widgetState->position, *sprite, 0xFFFFFF7F, style.scale);
+		}
+	}
+	else
+	{
+		drawQuadFancy(widgetState->position, widgetState->size, 0x0000007F, 2.f * style.scale, 0.0f);
+		drawSprite(widgetState->position, *sprite, 0xFFFFFF40, style.scale);
+	}
+
+	return clicked;
+}
+
 bool e2::UIContext::button(e2::Name id, std::string const& title)
 {
 	e2::UIStyle const& style = uiManager()->workingStyle();
@@ -427,6 +473,21 @@ bool e2::UIContext::button(e2::Name id, std::string const& title)
 	
 
 	return clicked;
+}
+
+void e2::UIContext::sprite(e2::Sprite const& spr, e2::UIColor const& col, float scale)
+{
+	e2::UIStyle const& style = uiManager()->workingStyle();
+
+	glm::vec2 minSize = spr.size * style.scale * scale;
+	e2::UIWidgetState* widgetState = reserve("", minSize);
+
+	if (minSize.x > widgetState->size.x || minSize.y > widgetState->size.y)
+		return;
+
+	drawSprite(widgetState->position, spr, col, style.scale  * scale);
+
+
 }
 
 bool e2::UIContext::checkbox(e2::Name id, bool& value, std::string const& text)
@@ -1502,7 +1563,12 @@ namespace
 			outSize.y = glm::min(state.size.y, minSize.y);
 
 		float remainingSpace = state.size.x - (state.cursor.x - state.offset.x);
-		outSize.x = glm::min(remainingSpace, minSize.x);
+
+		if (minSize.x == 0.0f)
+			outSize.x = remainingSpace;
+		else
+			outSize.x = minSize.x;
+
 		state.cursor.x += outSize.x;
 	}
 
@@ -1741,6 +1807,7 @@ void e2::UIContext::endWrap()
 {
 	popRenderState();
 }
+
 
 e2::UIRenderState& e2::UIContext::renderState()
 {

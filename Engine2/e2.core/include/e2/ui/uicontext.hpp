@@ -235,7 +235,7 @@ namespace e2
 		// --- End Containers --- //
 
 
-
+		bool gameGridButton(e2::Name id, e2::Name iconSprite, std::string const& hoverTextMain, bool active);
 
 		void gameLabel(std::string const& text, uint8_t fontSize = 12, e2::UITextAlign horizAlign = UITextAlign::Begin);
 
@@ -245,6 +245,7 @@ namespace e2
 
 		void label(e2::Name id, std::string const& text, uint8_t fontSize = 12, e2::UITextAlign horizAlign = UITextAlign::Begin);
 		bool button(e2::Name id, std::string const& title);
+		void sprite(e2::Sprite const &spr, e2::UIColor const& col, float scale);
 		bool checkbox(e2::Name id, bool& value, std::string const& text);
 
 		/** currentIndex is the index of this button, value is the current value of the group */
