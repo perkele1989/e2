@@ -5,9 +5,6 @@
 #include "e2/assets/material.hpp"
 #include "e2/assets/texture2d.hpp"
 
-#include "e2/game/world.hpp"
-#include "e2/game/entity.hpp"
-#include "e2/game/meshcomponent.hpp"
 #include "e2/renderer/shadermodel.hpp"
 #include "e2/renderer/shadermodels/lightweight.hpp"
 #include "e2/managers/rendermanager.hpp"
@@ -19,8 +16,6 @@
 e2::Session::Session(e2::Context* ctx)
 	: m_engine(ctx->engine())
 {
-	m_persistentWorld = spawnWorld();
-
 	m_meshProxies.reserve(1024);
 	//m_submeshIndex.reserve(2048);
 
@@ -57,11 +52,6 @@ e2::Session::Session(e2::Context* ctx)
 e2::Session::~Session()
 {
 	gameManager()->unregisterSession(this);
-	std::unordered_set<e2::World*> tmpWorlds = m_worlds;
-	for (e2::World* world : tmpWorlds)
-	{
-		destroyWorld(world);
-	}
 
 	for (std::pair<e2::Material* const, e2::MaterialProxy*> & p : m_defaultMaterialProxies)
 	{
@@ -86,9 +76,6 @@ void e2::Session::preTick(double seconds)
 
 void e2::Session::tick(double seconds)
 {
-
-	for(e2::World* world : m_worlds)
-		world->tick(seconds);
 
 	// Now we actually update any mesh proxies and material proxies that need updating 
 	// for the uninitiated, we do this here instead of renderer or world, because you can have many renderers, and you can have many worlds.
@@ -135,31 +122,20 @@ e2::Engine* e2::Session::engine()
 	return m_engine;
 }
 
-e2::World* e2::Session::spawnWorld()
-{
-	e2::World* newWorld = e2::create<e2::World>(this);
-	m_worlds.insert(newWorld);
-	return newWorld;
-}
-
-void e2::Session::destroyWorld(e2::World* world)
-{
-	m_worlds.erase(world);
-	e2::destroy(world);
-}
-
-
 uint32_t e2::Session::registerMeshProxy(e2::MeshProxy* proxy)
 {
-	for (uint8_t i = 0; i < proxy->asset->submeshCount(); i++)
+	for (uint8_t lod = 0; lod < proxy->lods.size(); lod++)
 	{
-		e2::ShaderModel* shaderModel = proxy->materialProxies[i]->asset->model();
-		e2::RenderLayer layer = shaderModel->renderLayer();
+		for (uint8_t i = 0; i < proxy->lods[lod].asset->submeshCount(); i++)
+		{
+			e2::ShaderModel* shaderModel = proxy->lods[lod].materialProxies[i]->asset->model();
+			e2::RenderLayer layer = shaderModel->renderLayer();
 
-		m_submeshIndex[layer].insert({ proxy, i });
+			m_submeshIndex[layer].insert({ proxy, lod, i });
 
-		if(shaderModel->supportsShadows())
-			m_shadowSubmeshes.insert({ proxy, i });
+			if (shaderModel->supportsShadows())
+				m_shadowSubmeshes.insert({ proxy, lod, i });
+		}
 	}
 
 	return m_modelIds.create();
@@ -169,14 +145,18 @@ void e2::Session::unregisterMeshProxy(e2::MeshProxy* proxy)
 {
 	m_modelIds.destroy(proxy->id);
 
-	for (uint8_t i = 0; i < proxy->asset->submeshCount(); i++)
+
+	for (uint8_t lod = 0; lod < proxy->lods.size(); lod++)
 	{
-		e2::ShaderModel* shaderModel = proxy->materialProxies[i]->asset->model();
-		e2::RenderLayer layer = shaderModel->renderLayer();
+		for (uint8_t i = 0; i < proxy->lods[lod].asset->submeshCount(); i++)
+		{
+			e2::ShaderModel* shaderModel = proxy->lods[lod].materialProxies[i]->asset->model();
+			e2::RenderLayer layer = shaderModel->renderLayer();
 
 
-		m_submeshIndex[layer].erase({ proxy, i });
-		m_shadowSubmeshes.erase({ proxy, i });
+			m_submeshIndex[layer].erase({ proxy, lod, i });
+			m_shadowSubmeshes.erase({ proxy, lod, i });
+		}
 	}
 }
 
@@ -211,13 +191,13 @@ void e2::Session::unregisterSkinProxy(e2::SkinProxy* proxy)
 	m_skinProxies.erase(proxy);
 }
 
-std::map<e2::RenderLayer, std::unordered_set<e2::MeshProxySubmesh>> const& e2::Session::submeshIndex() const
+std::map<e2::RenderLayer, std::unordered_set<e2::MeshProxyLODEntry>> const& e2::Session::submeshIndex() const
 {
 	return m_submeshIndex;
 }
 
 
-std::unordered_set<e2::MeshProxySubmesh> const& e2::Session::shadowSubmeshes() const
+std::unordered_set<e2::MeshProxyLODEntry> const& e2::Session::shadowSubmeshes() const
 {
 	return m_shadowSubmeshes;
 }
@@ -263,12 +243,12 @@ void e2::Session::invalidateAllPipelines()
 	}
 }
 
-bool e2::MeshProxySubmesh::operator==(const MeshProxySubmesh& rhs) const
+bool e2::MeshProxyLODEntry::operator==(const MeshProxyLODEntry& rhs) const
 {
-	return std::tie(proxy, submesh) == std::tie(rhs.proxy, rhs.submesh);
+	return std::tie(proxy, lod, submesh) == std::tie(rhs.proxy, rhs.lod, rhs.submesh);
 }
 
-bool e2::MeshProxySubmesh::operator<(const MeshProxySubmesh& rhs) const
+bool e2::MeshProxyLODEntry::operator<(const MeshProxyLODEntry& rhs) const
 {
-	return std::tie(proxy, submesh) < std::tie(rhs.proxy, rhs.submesh);
+	return std::tie(proxy, lod, submesh) < std::tie(rhs.proxy, rhs.lod, rhs.submesh);
 }

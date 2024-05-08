@@ -43,9 +43,142 @@ e2::HexGrid::HexGrid(e2::GameContext* gameCtx)
 	m_treeMesh[1] = am->get("assets/environment/trees/SM_PineForest002.e2a")->cast<e2::Mesh>();
 	m_treeMesh[2] = am->get("assets/environment/trees/SM_PineForest003.e2a")->cast<e2::Mesh>();*/
 
-	m_treeMesh[0] = am->get("assets/environment/SM_PineForest2_1.e2a")->cast<e2::Mesh>();
-	m_treeMesh[1] = am->get("assets/environment/SM_PineForest2_2.e2a")->cast<e2::Mesh>();
-	m_treeMesh[2] = am->get("assets/environment/SM_PineForest2_3.e2a")->cast<e2::Mesh>(); 
+
+
+
+
+
+
+
+
+	e2::MeshPtr lod001_0Mesh = am->get("assets/environment/SM_PineTree001_LOD0.e2a")->cast<e2::Mesh>();
+	e2::MeshPtr lod001_1Mesh = am->get("assets/environment/SM_PineTree001_LOD1.e2a")->cast<e2::Mesh>();
+	e2::MeshPtr lod001_2Mesh = am->get("assets/environment/SM_PineTree001_LOD2.e2a")->cast<e2::Mesh>();
+
+	e2::MeshPtr lod002_0Mesh = am->get("assets/environment/SM_PineTree002_LOD0.e2a")->cast<e2::Mesh>();
+	e2::MeshPtr lod002_1Mesh = am->get("assets/environment/SM_PineTree002_LOD1.e2a")->cast<e2::Mesh>();
+	e2::MeshPtr lod002_2Mesh = am->get("assets/environment/SM_PineTree002_LOD2.e2a")->cast<e2::Mesh>();
+
+	e2::MeshPtr lod003_0Mesh = am->get("assets/environment/SM_PineTree003_LOD0.e2a")->cast<e2::Mesh>();
+	e2::MeshPtr lod003_1Mesh = am->get("assets/environment/SM_PineTree003_LOD1.e2a")->cast<e2::Mesh>();
+	e2::MeshPtr lod003_2Mesh = am->get("assets/environment/SM_PineTree003_LOD2.e2a")->cast<e2::Mesh>();
+
+	e2::MeshPtr lod004_0Mesh = am->get("assets/environment/SM_PineTree004_LOD0.e2a")->cast<e2::Mesh>();
+	e2::MeshPtr lod004_1Mesh = am->get("assets/environment/SM_PineTree004_LOD1.e2a")->cast<e2::Mesh>();
+	e2::MeshPtr lod004_2Mesh = am->get("assets/environment/SM_PineTree004_LOD2.e2a")->cast<e2::Mesh>();
+
+	e2::MaterialPtr forestMaterial = am->get("assets/environment/M_PineTree2_Branch.e2a")->cast<e2::Material>();
+
+	e2::DynamicMesh dynLod001_0 = e2::DynamicMesh(lod001_0Mesh, 0);
+	e2::DynamicMesh dynLod001_1 = e2::DynamicMesh(lod001_1Mesh, 0);
+	e2::DynamicMesh dynLod001_2 = e2::DynamicMesh(lod001_2Mesh, 0);
+	e2::DynamicMesh* dynLods001[3] = {
+		&dynLod001_0,
+		&dynLod001_1,
+		&dynLod001_2,
+	};
+
+	e2::DynamicMesh dynLod002_0 = e2::DynamicMesh(lod002_0Mesh, 0);
+	e2::DynamicMesh dynLod002_1 = e2::DynamicMesh(lod002_1Mesh, 0);
+	e2::DynamicMesh dynLod002_2 = e2::DynamicMesh(lod002_2Mesh, 0);
+	e2::DynamicMesh* dynLods002[3] = {
+		&dynLod002_0,
+		&dynLod002_1,
+		&dynLod002_2,
+	};
+
+	e2::DynamicMesh dynLod003_0 = e2::DynamicMesh(lod003_0Mesh, 0);
+	e2::DynamicMesh dynLod003_1 = e2::DynamicMesh(lod003_1Mesh, 0);
+	e2::DynamicMesh dynLod003_2 = e2::DynamicMesh(lod003_2Mesh, 0);
+	e2::DynamicMesh* dynLods003[3] = {
+		&dynLod003_0,
+		&dynLod003_1,
+		&dynLod003_2,
+	};
+
+	e2::DynamicMesh dynLod004_0 = e2::DynamicMesh(lod004_0Mesh, 0);
+	e2::DynamicMesh dynLod004_1 = e2::DynamicMesh(lod004_1Mesh, 0);
+	e2::DynamicMesh dynLod004_2 = e2::DynamicMesh(lod004_2Mesh, 0);
+	e2::DynamicMesh* dynLods004[3] = {
+		&dynLod004_0,
+		&dynLod004_1,
+		&dynLod004_2,
+	};
+
+	e2::DynamicMesh** dynLodArrays[4] = {
+		dynLods001,
+		dynLods002,
+		dynLods003,
+		dynLods004,
+	};
+
+	e2::DynamicMesh dynForest0_lod0;
+	e2::DynamicMesh dynForest0_lod1;
+	e2::DynamicMesh dynForest0_lod2;
+	e2::DynamicMesh* forestLods0[3] = {
+		&dynForest0_lod0,
+		&dynForest0_lod1,
+		&dynForest0_lod2,
+	};
+
+	e2::DynamicMesh dynForest1_lod0;
+	e2::DynamicMesh dynForest1_lod1;
+	e2::DynamicMesh dynForest1_lod2;
+	e2::DynamicMesh* forestLods1[3] = {
+		&dynForest1_lod0,
+		&dynForest1_lod1,
+		&dynForest1_lod2,
+	};
+
+	e2::DynamicMesh dynForest2_lod0;
+	e2::DynamicMesh dynForest2_lod1;
+	e2::DynamicMesh dynForest2_lod2;
+	e2::DynamicMesh* forestLods2[3] = {
+		&dynForest2_lod0,
+		&dynForest2_lod1,
+		&dynForest2_lod2,
+	};
+
+	e2::DynamicMesh** forestLodArray[3] = {
+		forestLods0,
+		forestLods1,
+		forestLods2
+	};
+
+	uint32_t forestNumTrees[3] = { 14, 32, 56 };
+
+	for (uint32_t f = 0; f < 3; f++)
+	{
+		for (uint32_t i = 0; i < forestNumTrees[f]; i++)
+		{
+			uint32_t treeIndex = e2::randomInt(0, 3);
+
+			float treeScale = e2::randomFloat(0.8, 1.2);
+			float treeRotation = e2::randomFloat(0.0, 359.9999f);
+			glm::vec2 treePosition = e2::randomInUnitCircle();
+
+			glm::mat4 treeTransform = glm::identity<glm::mat4>();
+			treeTransform = glm::scale(treeTransform, glm::vec3(treeScale));
+			treeTransform = glm::rotate(treeTransform, glm::radians(treeRotation), e2::worldUpf());
+			treeTransform = glm::translate(treeTransform, glm::vec3(treePosition.x, 0.0f, treePosition.y));
+
+			
+			for (uint32_t l = 0; l < 3; l++)
+			{
+				// who needs code readability anyways
+				forestLodArray[f][l]->addMesh(dynLodArrays[treeIndex][l], treeTransform);
+			}
+		}
+
+		for (uint32_t l = 0; l < 3; l++)
+		{
+			// who needs code readability anyways
+			m_pineForestMeshes[f].lods[l] = forestLodArray[f][l]->bake(forestMaterial, VertexAttributeFlags::All);
+		}
+	}
+
+
+
 
 	m_baseHex = am->get("assets/SM_HexBase.e2a")->cast<e2::Mesh>();
 	m_dynaHex = e2::DynamicMesh(m_baseHex, 0, VertexAttributeFlags::Color);
@@ -164,11 +297,6 @@ void e2::HexGrid::saveToBuffer(e2::Buffer& toBuffer)
 		toBuffer << int32_t(m_tileVisibility[i]);
 		toBuffer << uint16_t(m_tiles[i].empireId);
 		toBuffer << uint16_t(m_tiles[i].flags);
-
-		if (m_tiles[i].forestMesh)
-			toBuffer << m_tiles[i].forestMesh->uuid;
-		else
-			toBuffer << e2::UUID();
 	}
 
 	toBuffer << uint64_t(m_tileIndex.size());
@@ -211,12 +339,8 @@ void e2::HexGrid::loadFromBuffer(e2::Buffer& fromBuffer)
 		uint16_t flags{};
 		fromBuffer >> flags;
 		newTile.flags = (e2::TileFlags)flags;
-		e2::UUID formes;
-		fromBuffer >> formes;
-		if (formes.valid())
-		{
-			newTile.forestMesh = assetManager()->get(formes).cast<e2::Mesh>();
-		}
+
+		newTile.forestLods = getForestMeshForFlags(newTile.flags);
 
 		m_tiles.push_back(newTile);
 
@@ -933,7 +1057,7 @@ void e2::HexGrid::calculateFeaturesAndWater(glm::vec2 const& planarCoords, float
 	}
 }
 
-e2::MeshPtr e2::HexGrid::getForestMeshForFlags(e2::TileFlags flags)
+e2::MeshTreeLods* e2::HexGrid::getForestMeshForFlags(e2::TileFlags flags)
 {
 
 	if ((flags & e2::TileFlags::FeatureForest) != e2::TileFlags::FeatureNone)
@@ -942,22 +1066,19 @@ e2::MeshPtr e2::HexGrid::getForestMeshForFlags(e2::TileFlags flags)
 		switch ((flags & e2::TileFlags::WoodAbundanceMask))
 		{
 		case TileFlags::WoodAbundance1:
-			return m_treeMesh[0];
+			return &m_pineForestMeshes[0];
 			break;
 		case TileFlags::WoodAbundance2:
-			return m_treeMesh[1];
+			return &m_pineForestMeshes[1];
 			break;
+		default:
 		case TileFlags::WoodAbundance3:
-			return m_treeMesh[2];
-			break;
 		case TileFlags::WoodAbundance4:
-			return m_treeMesh[2]; // we skip 3 because its too THICCCCC
+			return &m_pineForestMeshes[2];
 			break;
 		}
 	}
-
 	return nullptr;
-
 }
 
 e2::TileData e2::HexGrid::getCalculatedTileData(glm::ivec2 const& hex)
@@ -970,7 +1091,7 @@ e2::TileData e2::HexGrid::getCalculatedTileData(glm::ivec2 const& hex)
 	calculateFeaturesAndWater(planarCoords, baseHeight, newTileData.flags);
 	calculateResources(planarCoords, newTileData.flags);
 
-	newTileData.forestMesh = getForestMeshForFlags(newTileData.flags);
+	newTileData.forestLods = getForestMeshForFlags(newTileData.flags);
 
 	e2::GameEntity* existingStructure = game()->entityAtHex(EntityLayerIndex::Structure, hex);
 	if (existingStructure)
@@ -995,11 +1116,22 @@ e2::MeshProxy* e2::HexGrid::createForestProxyForTile(e2::TileData* tileData, glm
 	if (!tileData)
 		return nullptr;
 
-	e2::MeshProxyConfiguration treeConf;
-	treeConf.mesh = tileData->forestMesh;
-
-	if (!treeConf.mesh)
+	if (!tileData->forestLods)
 		return nullptr;
+
+	e2::MeshProxyConfiguration treeConf;
+	e2::MeshLodConfiguration lod;
+	lod.maxDistance = 5.0f;
+	lod.mesh = tileData->forestLods->lods[0];
+	treeConf.lods.push(lod);
+
+	lod.maxDistance = 15.0f;
+	lod.mesh = tileData->forestLods->lods[1];
+	treeConf.lods.push(lod);
+
+	lod.maxDistance = 0.0f;
+	lod.mesh = tileData->forestLods->lods[2];
+	treeConf.lods.push(lod);
 
 	glm::vec3 meshOffset = e2::Hex(hex).localCoords();
 
@@ -2342,7 +2474,9 @@ void e2::HexGrid::popInChunk(e2::ChunkState* state)
 	if (state->mesh && !state->proxy)
 	{
 		e2::MeshProxyConfiguration proxyConf;
-		proxyConf.mesh = state->mesh;
+		e2::MeshLodConfiguration lod;
+		lod.mesh = state->mesh;
+		proxyConf.lods.push(lod);
 
 		state->proxy = e2::create<e2::MeshProxy>(gameSession(), proxyConf);
 		state->proxy->modelMatrix = glm::translate(glm::mat4(1.0f), chunkOffset);
@@ -2354,7 +2488,9 @@ void e2::HexGrid::popInChunk(e2::ChunkState* state)
 	if (!state->waterProxy /** && state->hasWaterTile */)
 	{
 		e2::MeshProxyConfiguration waterConf;
-		waterConf.mesh = m_waterChunk;
+		e2::MeshLodConfiguration lod;
+		lod.mesh = m_waterChunk;
+		waterConf.lods.push(lod);
 
 		state->waterProxy = e2::create<e2::MeshProxy>(gameSession(), waterConf);
 		state->waterProxy->modelMatrix = glm::translate(glm::mat4(1.0f), chunkOffset + glm::vec3(0.0f, e2::waterLine, 0.0f));
@@ -2363,7 +2499,9 @@ void e2::HexGrid::popInChunk(e2::ChunkState* state)
 	if (!state->fogProxy)
 	{
 		e2::MeshProxyConfiguration fogConf;
-		fogConf.mesh = m_fogChunk;
+		e2::MeshLodConfiguration lod;
+		lod.mesh = m_fogChunk;
+		fogConf.lods.push(lod);
 
 		state->fogProxy = e2::create<e2::MeshProxy>(gameSession(), fogConf);
 		state->fogProxy->modelMatrix = glm::translate(glm::mat4(1.0f), chunkOffset + glm::vec3(0.0f, -1.0f, 0.0f));

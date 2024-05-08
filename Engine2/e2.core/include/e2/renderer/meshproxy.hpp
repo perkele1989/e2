@@ -88,14 +88,40 @@ namespace e2
 		e2::Pair<bool> skinDirty{ true };
 	};
 
-	struct E2_API MeshProxyConfiguration
-	{
-		e2::MeshPtr mesh;
+	constexpr uint32_t maxNumLods = 3;
 
-		// if this is empty, will use default materials from mesh
+	struct E2_API MeshLodConfiguration
+	{
+		float maxDistance{ 0.0f };
+		e2::MeshPtr mesh;
 		e2::StackVector<e2::MaterialProxy*, e2::maxNumSubmeshes> materials;
 	};
 
+	struct E2_API MeshProxyConfiguration
+	{
+		e2::StackVector<MeshLodConfiguration, e2::maxNumLods> lods;
+	};
+
+
+
+
+	struct E2_API MeshProxyLOD
+	{
+		float maxDistance{ 0.0f };
+
+		e2::MeshPtr asset{};
+
+		/** Material proxies for this mesh lod, they default to the materials default proxies unless overridden. */
+		e2::StackVector<e2::MaterialProxy*, e2::maxNumSubmeshes> materialProxies;
+
+		/** Cache for the pipelines to use for the given submeshes in this lod. Cached from session. */
+		e2::StackVector<e2::IPipeline*, e2::maxNumSubmeshes> pipelines;
+		e2::StackVector<e2::IPipeline*, e2::maxNumSubmeshes> shadowPipelines;
+
+		/** Cache for the pipeline layouts to be used for the given submeshes in this lod. Cached from session. */
+		e2::StackVector<e2::IPipelineLayout*, e2::maxNumSubmeshes> pipelineLayouts;
+		e2::StackVector<e2::IPipelineLayout*, e2::maxNumSubmeshes> shadowPipelineLayouts;
+	};
 
 	/**
 	 * GPU proxy of a mesh instance
@@ -123,27 +149,15 @@ namespace e2
 		/** The unique identifier we got from session when registering. Used for things like modelmatrix buffer offsets etc. */
 		uint32_t id{UINT32_MAX};
 
-		e2::MeshPtr asset{};
-
-		/** Material proxies for this mesh proxy, they default to the materials default proxies unless overridden. */
-		e2::StackVector<e2::MaterialProxy*, e2::maxNumSubmeshes> materialProxies;
-
-		/** Cache for the pipelines to use for the given submeshes in this proxy. Cached from session. */
-		e2::StackVector<e2::IPipeline*, e2::maxNumSubmeshes> pipelines;
-
-		e2::StackVector<e2::IPipeline*, e2::maxNumSubmeshes> shadowPipelines;
-
-		/** Cache for the pipeline layouts to used for the given submeshes in this proxy. Cached from session. */
-		e2::StackVector<e2::IPipelineLayout*, e2::maxNumSubmeshes> pipelineLayouts;
-
-		e2::StackVector<e2::IPipelineLayout*, e2::maxNumSubmeshes> shadowPipelineLayouts;
-
-		// can be set whenever we bind it at render time if needed
 		e2::SkinProxy* skinProxy{};
 
-		// Local buffered mesh data, the data to be written to buffer next frame, if dirty
 		glm::mat4 modelMatrix{};
 		e2::Pair<bool> modelMatrixDirty{ true };
+		e2::StackVector<MeshProxyLOD, e2::maxNumLods> lods;
+
+		bool lodTest(uint8_t lod, float distance);
+
+		MeshProxyLOD* lodByDistance(float distance);
 	};
 }  
   

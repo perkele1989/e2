@@ -22,6 +22,11 @@ namespace e2
 
 	class GameUnit;
 
+	struct MeshTreeLods
+	{
+		e2::MeshPtr lods[3];
+	};
+
 	enum class TileFlags : uint16_t
 	{
 		None					= 0b0000'0000'0000'0000,
@@ -113,7 +118,7 @@ namespace e2
 
 		// optional forest proxy, if this tile is discovered it shows: forest abundance if unbuilt on forest, partly forest if built on forest, nothing if not on forest or if undiscovered (undiscovered tile meshes lives on chunk array)
 		e2::MeshProxy* forestProxy{};
-		e2::MeshPtr forestMesh{};
+		e2::MeshTreeLods* forestLods{};
 
 	};
 
@@ -255,6 +260,9 @@ namespace e2
 	};
 
 	constexpr float waterLine = 0.025f;
+
+
+
 
 	/** 
 	 * Procedural hex grid
@@ -414,7 +422,7 @@ namespace e2
 		void calculateResources(glm::vec2 const& planarCoords, e2::TileFlags& outFlags);
 		void calculateFeaturesAndWater(glm::vec2 const& planarCoords, float baseHeight, e2::TileFlags& outFlags);
 
-		e2::MeshPtr getForestMeshForFlags(e2::TileFlags flags);
+		e2::MeshTreeLods* getForestMeshForFlags(e2::TileFlags flags);
 
 		
 
@@ -479,8 +487,7 @@ namespace e2
 		std::unordered_map<glm::ivec2, size_t> m_tileIndex;
 
 
-
-		e2::MeshPtr m_treeMesh[3];
+		MeshTreeLods m_pineForestMeshes[3];
 
 		e2::MeshPtr m_baseHex;
 		e2::DynamicMesh m_dynaHex;

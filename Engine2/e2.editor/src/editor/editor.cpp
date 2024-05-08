@@ -11,10 +11,6 @@
 #include "editor/importers/textureimporter.hpp"
 #include "editor/importers/fontimporter.hpp"
 
-#include "e2/game/world.hpp"
-#include "e2/game/entity.hpp"
-#include "e2/game/meshcomponent.hpp"
-
 #include "e2/ui/uicontext.hpp"
 
 #include "e2/dmesh/dmesh.hpp"
@@ -577,17 +573,7 @@ void e2::WorldEditorWorkspace::update(double deltaSeconds)
 e2::WorldEditorSession::WorldEditorSession(e2::Context* ctx)
 	: e2::Session(ctx)
 {
-	e2::AssetManager* am = assetManager();
-	e2::ALJDescription desc;
-	am->prescribeALJ(desc, "assets/SM_CoordinateSpace.e2a");
-	am->prescribeALJ(desc, "assets/SM_Cube.e2a");
-	am->prescribeALJ(desc, "assets/SM_HexBase.e2a");
-	am->queueWaitALJ(desc);
 	
-	e2::Entity* e = persistentWorld()->spawnEntity<e2::Entity>("p");
-	e2::MeshComponent* m2 = e->spawnComponent<e2::MeshComponent>("m2");
-	m2->mesh(am->get("assets/SM_Cube.e2a")->cast<e2::Mesh>());
-
 
 }
 

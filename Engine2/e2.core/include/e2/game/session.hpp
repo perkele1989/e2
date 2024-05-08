@@ -30,27 +30,28 @@ namespace e2
 
 	class AssetEntry;
 
-	struct E2_API MeshProxySubmesh
+	struct E2_API MeshProxyLODEntry
 	{
 		e2::MeshProxy* proxy{};
+		uint8_t lod{};
 		uint8_t submesh{};
 
-		bool operator==(const MeshProxySubmesh& rhs) const;
-		bool operator<(const MeshProxySubmesh& rhs) const;
+		bool operator==(const MeshProxyLODEntry& rhs) const;
+		bool operator<(const MeshProxyLODEntry& rhs) const;
 	};
 
 }
 template <>
-struct std::hash<e2::MeshProxySubmesh>
+struct std::hash<e2::MeshProxyLODEntry>
 {
-	std::size_t operator()(const e2::MeshProxySubmesh& k) const
+	std::size_t operator()(const e2::MeshProxyLODEntry& k) const
 	{
-		// @todo use our own hashing here 
-		// e2::hash_combine()
-		std::size_t res = 17;
-		res = res * 31 + std::hash<e2::MeshProxy*>{}(k.proxy);
-		res = res * 31 + std::hash<uint8_t>{}(k.submesh);
-		return res;
+
+		size_t h{};
+		e2::hash_combine(h, k.proxy);
+		e2::hash_combine(h, k.lod);
+		e2::hash_combine(h, k.submesh);
+		return h;
 	}
 };
 namespace e2
@@ -67,10 +68,6 @@ namespace e2
 
 		virtual Engine* engine() override;
 
-
-		virtual e2::World* spawnWorld();
-		virtual void destroyWorld(e2::World* world);
-
 		uint32_t registerMeshProxy(e2::MeshProxy* proxy);
 		void unregisterMeshProxy(e2::MeshProxy* proxy);
 
@@ -80,13 +77,8 @@ namespace e2
 		uint32_t registerSkinProxy(e2::SkinProxy* proxy);
 		void unregisterSkinProxy(e2::SkinProxy* proxy);
 
-		std::map<e2::RenderLayer, std::unordered_set<MeshProxySubmesh>> const& submeshIndex() const;
-		std::unordered_set<MeshProxySubmesh> const& shadowSubmeshes() const;
-
-		inline e2::World* persistentWorld() const
-		{
-			return m_persistentWorld;
-		}
+		std::map<e2::RenderLayer, std::unordered_set<MeshProxyLODEntry>> const& submeshIndex() const;
+		std::unordered_set<MeshProxyLODEntry> const& shadowSubmeshes() const;
 
 		e2::IDescriptorSet* getModelSet(uint8_t frameIndex);
 
@@ -105,12 +97,6 @@ namespace e2
 		e2::IdArena<uint32_t, e2::maxNumMeshProxies> m_modelIds;
 		e2::IdArena<uint32_t, e2::maxNumSkinProxies> m_skinIds;
 
-		/** Set of all the worlds */
-		std::unordered_set<e2::World*> m_worlds{};
-
-		/** The persistent world */
-		e2::World* m_persistentWorld{};
-
 		/** Descriptor sets for model matrices (one per frame index) */
 		e2::Pair<e2::IDescriptorSet*> m_modelSets{nullptr};
 
@@ -128,9 +114,9 @@ namespace e2
 		std::unordered_set<e2::SkinProxy*> m_skinProxies;
 
 		/** Submeshes ordered by render layer */
-		std::map<e2::RenderLayer, std::unordered_set<MeshProxySubmesh>> m_submeshIndex;
+		std::map<e2::RenderLayer, std::unordered_set<MeshProxyLODEntry>> m_submeshIndex;
 
-		std::unordered_set<MeshProxySubmesh> m_shadowSubmeshes;
+		std::unordered_set<MeshProxyLODEntry> m_shadowSubmeshes;
 
 		std::unordered_set<e2::MaterialProxy*> m_materialProxies;
 

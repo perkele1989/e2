@@ -99,12 +99,12 @@ e2::MaterialProxy* e2::FogModel::createMaterialProxy(e2::Session* session, e2::M
 	return newProxy;
 }
 
-e2::IPipelineLayout* e2::FogModel::getOrCreatePipelineLayout(e2::MeshProxy* proxy, uint8_t submeshIndex, bool shadows)
+e2::IPipelineLayout* e2::FogModel::getOrCreatePipelineLayout(e2::MeshProxy* proxy, uint8_t lodIndex, uint8_t submeshIndex, bool shadows)
 {
 	return m_pipelineLayout;
 }
 
-e2::IPipeline* e2::FogModel::getOrCreatePipeline(e2::MeshProxy* proxy, uint8_t submeshIndex, e2::RendererFlags rendererFlags)
+e2::IPipeline* e2::FogModel::getOrCreatePipeline(e2::MeshProxy* proxy, uint8_t lodIndex, uint8_t submeshIndex, e2::RendererFlags rendererFlags)
 {
 	if (!m_shadersReadFromDisk)
 	{
@@ -130,8 +130,8 @@ e2::IPipeline* e2::FogModel::getOrCreatePipeline(e2::MeshProxy* proxy, uint8_t s
 		return nullptr;
 	}
 
-	e2::SubmeshSpecification const& spec = proxy->asset->specification(submeshIndex);
-	e2::FogProxy* lwProxy = static_cast<e2::FogProxy*>(proxy->materialProxies[submeshIndex]);
+	e2::SubmeshSpecification const& spec = proxy->lods[lodIndex].asset->specification(submeshIndex);
+	e2::FogProxy* lwProxy = static_cast<e2::FogProxy*>(proxy->lods[lodIndex].materialProxies[submeshIndex]);
 
 	uint16_t geometryFlags = (uint16_t)spec.attributeFlags;
 

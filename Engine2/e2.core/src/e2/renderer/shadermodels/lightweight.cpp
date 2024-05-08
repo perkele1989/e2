@@ -143,7 +143,7 @@ e2::MaterialProxy* e2::LightweightModel::createMaterialProxy(e2::Session* sessio
 	return newProxy;
 }
 
-e2::IPipelineLayout* e2::LightweightModel::getOrCreatePipelineLayout(e2::MeshProxy* proxy, uint8_t submeshIndex, bool shadows)
+e2::IPipelineLayout* e2::LightweightModel::getOrCreatePipelineLayout(e2::MeshProxy* proxy, uint8_t lodIndex, uint8_t submeshIndex, bool shadows)
 {
 	if (shadows)
 		return m_pipelineLayoutShadows;
@@ -151,7 +151,7 @@ e2::IPipelineLayout* e2::LightweightModel::getOrCreatePipelineLayout(e2::MeshPro
 		return m_pipelineLayout;
 }
 
-e2::IPipeline* e2::LightweightModel::getOrCreatePipeline(e2::MeshProxy* proxy, uint8_t submeshIndex, e2::RendererFlags rendererFlags)
+e2::IPipeline* e2::LightweightModel::getOrCreatePipeline(e2::MeshProxy* proxy, uint8_t lodIndex, uint8_t submeshIndex, e2::RendererFlags rendererFlags)
 {
 
 	if (!m_shadersReadFromDisk)
@@ -183,8 +183,8 @@ e2::IPipeline* e2::LightweightModel::getOrCreatePipeline(e2::MeshProxy* proxy, u
 
 
 
-	e2::SubmeshSpecification const &spec = proxy->asset->specification(submeshIndex);
-	e2::LightweightProxy* lwProxy = static_cast<e2::LightweightProxy*>(proxy->materialProxies[submeshIndex]);
+	e2::SubmeshSpecification const &spec = proxy->lods[lodIndex].asset->specification(submeshIndex);
+	e2::LightweightProxy* lwProxy = static_cast<e2::LightweightProxy*>(proxy->lods[lodIndex].materialProxies[submeshIndex]);
 
 	uint16_t geometryFlags = (uint16_t)spec.attributeFlags;
 	

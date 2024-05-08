@@ -206,7 +206,7 @@ namespace e2
 
 	constexpr uint32_t maxVkVertexLayouts = 64;
 
-	constexpr uint32_t maxVkWindows = 8;
+	constexpr uint32_t maxVkWindows = 16;
 
 	/// ------ End Vulkan
 

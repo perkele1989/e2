@@ -61,7 +61,7 @@ void main()
 	vec3 emissive = pow(material.emissive.rgb, vec3(1.0)) * material.emissive.a;
 
 #if defined(Vertex_Color)
-	albedo.rgb *= pow(fragmentColor.rgb, vec3(2.2));
+	//albedo.rgb *= pow(fragmentColor.rgb, vec3(2.2));
 #endif
 
 
@@ -111,8 +111,8 @@ void main()
 	//outColor.rgb = clamp(vec3(worldNormal.x, worldNormal.z, -worldNormal.y) * 0.5 + 0.5, vec3(EPSILON), vec3(1.0));
     //outColor.rgb = clamp(vec3(fragmentNormal.x, fragmentNormal.z, -fragmentNormal.y) * 0.5 + 0.5, vec3(EPSILON), vec3(1.0));
 	// debug ndotl 
-	//outColor.rgb = pow(vec3(outPosition.y), vec3(1.00));
-
+	//outColor.rgb = vec3( max(0.0, dot(fragmentNormal, normalize(vec3(1.0, -1.0, 1.0)) )));
+	//outColor.rgb = albedo;
 
 //#else
 //#if defined(Material_AlbedoTexture) && defined(Material_AlphaClip)

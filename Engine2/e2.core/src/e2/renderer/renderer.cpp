@@ -407,7 +407,7 @@ void e2::Renderer::recordShadows(double deltaTime, e2::ICommandBuffer* buff)
 {
 	uint8_t frameIndex = renderManager()->frameIndex();
 	e2::IDescriptorSet* modelSet = m_session->getModelSet(frameIndex);
-	std::unordered_set<MeshProxySubmesh> const& shadowSubmeshes = m_session->shadowSubmeshes();
+	std::unordered_set<MeshProxyLODEntry> const& shadowSubmeshes = m_session->shadowSubmeshes();
 
 
 	e2::ShadowPushConstantData shadowPushConstantData;
@@ -419,24 +419,35 @@ void e2::Renderer::recordShadows(double deltaTime, e2::ICommandBuffer* buff)
 	buff->clearDepth(1.0f);
 	buff->endRender();
 
-
+	glm::mat4 shadowMatrix = glm::inverse(m_rendererData.shadowView);
+	glm::vec3 shadowCameraPosition = shadowMatrix * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
 
 	// Setup render target states
 	buff->beginRender(m_shadowBuffer.renderTarget);
 
-	for (e2::MeshProxySubmesh const& meshProxySubmesh : shadowSubmeshes)
+	for (e2::MeshProxyLODEntry const& lodEntry : shadowSubmeshes)
 	{
-		e2::MeshProxy* meshProxy = meshProxySubmesh.proxy;
-		uint8_t submeshIndex = meshProxySubmesh.submesh;
+		e2::MeshProxy* meshProxy = lodEntry.proxy;
+		glm::vec3 meshOrigin = meshProxy->modelMatrix * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
+		float cameraDistance = glm::distance(shadowCameraPosition, meshOrigin);
 
-		if (!meshProxy->shadowPipelines[submeshIndex])
+		if (!lodEntry.proxy->lodTest(lodEntry.lod, cameraDistance))
 			continue;
 
-		buff->bindPipeline(meshProxy->shadowPipelines[submeshIndex]);
 
-		e2::MeshPtr mesh = meshProxy->asset;
-		e2::IPipelineLayout* shadowPipelineLayout = meshProxy->shadowPipelineLayouts[submeshIndex];
+		e2::MeshProxyLOD* meshProxyLOD = &meshProxy->lods[lodEntry.lod];
+		uint8_t submeshIndex = lodEntry.submesh;
 
+		if (!meshProxyLOD->shadowPipelines[submeshIndex])
+			continue;
+
+		buff->bindPipeline(meshProxyLOD->shadowPipelines[submeshIndex]);
+
+		e2::IPipelineLayout* shadowPipelineLayout = meshProxyLOD->shadowPipelineLayouts[submeshIndex];
+
+
+
+		e2::MeshPtr mesh = meshProxyLOD->asset;
 		e2::SubmeshSpecification const& meshSpec = mesh->specification(submeshIndex);
 
 		// Push constant data
@@ -457,7 +468,7 @@ void e2::Renderer::recordShadows(double deltaTime, e2::ICommandBuffer* buff)
 
 		buff->bindDescriptorSet(shadowPipelineLayout, 0, modelSet, 2, &offsets[0]);
 	
-		meshProxy->materialProxies[submeshIndex]->bind(buff, frameIndex, true);
+		meshProxyLOD->materialProxies[submeshIndex]->bind(buff, frameIndex, true);
 
 		// Issue drawcall
 		buff->draw(meshSpec.indexCount, 1);
@@ -475,7 +486,7 @@ void e2::Renderer::recordRenderLayers(double deltaTime, e2::ICommandBuffer* buff
 {
 	uint8_t frameIndex = renderManager()->frameIndex();
 	e2::IDescriptorSet* modelSet = m_session->getModelSet(frameIndex);
-	std::map<e2::RenderLayer, std::unordered_set<MeshProxySubmesh>> const& submeshIndex = m_session->submeshIndex();
+	std::map<e2::RenderLayer, std::unordered_set<MeshProxyLODEntry>> const& submeshIndex = m_session->submeshIndex();
 
 	buff->useAsAttachment(m_renderBuffers[0].colorTexture);
 	buff->useAsAttachment(m_renderBuffers[0].positionTexture);
@@ -505,7 +516,7 @@ void e2::Renderer::recordRenderLayers(double deltaTime, e2::ICommandBuffer* buff
 	for (auto& pair : submeshIndex)
 	{
 		e2::RenderLayer renderLayer = pair.first;
-		std::unordered_set<e2::MeshProxySubmesh> const& submeshSet = pair.second;
+		std::unordered_set<e2::MeshProxyLODEntry> const& submeshSet = pair.second;
 
 		uint8_t frontBuffIndex = frontBuffer();
 		auto& backBuff = m_renderBuffers[m_backBuffer];
@@ -544,20 +555,32 @@ void e2::Renderer::recordRenderLayers(double deltaTime, e2::ICommandBuffer* buff
 		buff->useAsDefault(frontBuff.depthTexture);
 		buff->useAsDepthAttachment(backBuff.depthTexture);
 
+		 
 		// Setup render target states
 		buff->beginRender(backBuff.renderTarget);
-		for (e2::MeshProxySubmesh const& meshProxySubmesh : submeshSet)
-		{
-			e2::MeshProxy* meshProxy = meshProxySubmesh.proxy;
-			uint8_t submeshIndex = meshProxySubmesh.submesh;
 
-			if (!meshProxy->pipelines[submeshIndex])
+
+		for (e2::MeshProxyLODEntry const& lodEntry : submeshSet)
+		{
+			e2::MeshProxy* meshProxy = lodEntry.proxy;
+			glm::vec3 meshOrigin = meshProxy->modelMatrix * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
+			float cameraDistance = glm::distance(glm::vec3(m_view.origin), meshOrigin);
+
+			if (!lodEntry.proxy->lodTest(lodEntry.lod, cameraDistance))
 				continue;
 
-			buff->bindPipeline(meshProxy->pipelines[submeshIndex]);
 
-			e2::MeshPtr mesh = meshProxy->asset;
-			e2::IPipelineLayout* pipelineLayout = meshProxy->pipelineLayouts[submeshIndex];
+			e2::MeshProxyLOD* meshProxyLOD = &meshProxy->lods[lodEntry.lod];
+			uint8_t submeshIndex = lodEntry.submesh;
+
+
+			if (!meshProxyLOD->pipelines[submeshIndex])
+				continue;
+
+			buff->bindPipeline(meshProxyLOD->pipelines[submeshIndex]);
+
+			e2::MeshPtr mesh = meshProxyLOD->asset;
+			e2::IPipelineLayout* pipelineLayout = meshProxyLOD->pipelineLayouts[submeshIndex];
 
 			e2::SubmeshSpecification const& meshSpec = mesh->specification(submeshIndex);
 
@@ -585,7 +608,7 @@ void e2::Renderer::recordRenderLayers(double deltaTime, e2::ICommandBuffer* buff
 
 			buff->bindDescriptorSet(pipelineLayout, 1, modelSet, 2, &offsets[0]);
 
-			meshProxy->materialProxies[submeshIndex]->bind(buff, frameIndex, false);
+			meshProxyLOD->materialProxies[submeshIndex]->bind(buff, frameIndex, false);
 
 			// Issue drawcall
 			buff->draw(meshSpec.indexCount, 1);
@@ -606,7 +629,7 @@ void e2::Renderer::recordDebugLines(double deltaTime, e2::ICommandBuffer* buff)
 {
 	uint8_t frameIndex = renderManager()->frameIndex();
 	e2::IDescriptorSet* modelSet = m_session->getModelSet(frameIndex);
-	std::map<e2::RenderLayer, std::unordered_set<MeshProxySubmesh>> const& submeshIndex = m_session->submeshIndex();
+	std::map<e2::RenderLayer, std::unordered_set<MeshProxyLODEntry>> const& submeshIndex = m_session->submeshIndex();
 
 	if (m_debugLines.size() == 0)
 	{

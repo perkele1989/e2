@@ -155,7 +155,7 @@ e2::MaterialProxy* e2::TerrainModel::createMaterialProxy(e2::Session* session, e
 	return newProxy;
 }
 
-e2::IPipelineLayout* e2::TerrainModel::getOrCreatePipelineLayout(e2::MeshProxy* proxy, uint8_t submeshIndex, bool shadows)
+e2::IPipelineLayout* e2::TerrainModel::getOrCreatePipelineLayout(e2::MeshProxy* proxy, uint8_t lodIndex, uint8_t submeshIndex, bool shadows)
 {
 	if(shadows)
 		return m_pipelineLayoutShadows;
@@ -163,7 +163,7 @@ e2::IPipelineLayout* e2::TerrainModel::getOrCreatePipelineLayout(e2::MeshProxy* 
 		return m_pipelineLayout;
 }
 
-e2::IPipeline* e2::TerrainModel::getOrCreatePipeline(e2::MeshProxy* proxy, uint8_t submeshIndex, e2::RendererFlags rendererFlags)
+e2::IPipeline* e2::TerrainModel::getOrCreatePipeline(e2::MeshProxy* proxy, uint8_t lodIndex, uint8_t submeshIndex, e2::RendererFlags rendererFlags)
 {
 	if (!m_shadersReadFromDisk)
 	{
@@ -189,8 +189,8 @@ e2::IPipeline* e2::TerrainModel::getOrCreatePipeline(e2::MeshProxy* proxy, uint8
 		return nullptr;
 	}
 
-	e2::SubmeshSpecification const& spec = proxy->asset->specification(submeshIndex);
-	e2::TerrainProxy* lwProxy = static_cast<e2::TerrainProxy*>(proxy->materialProxies[submeshIndex]);
+	e2::SubmeshSpecification const& spec = proxy->lods[lodIndex].asset->specification(submeshIndex);
+	e2::TerrainProxy* lwProxy = static_cast<e2::TerrainProxy*>(proxy->lods[lodIndex].materialProxies[submeshIndex]);
 
 	uint16_t geometryFlags = (uint16_t)spec.attributeFlags;
 

@@ -110,7 +110,7 @@ e2::MaterialProxy* e2::WaterModel::createMaterialProxy(e2::Session* session, e2:
 	return newProxy;
 }
 
-e2::IPipelineLayout* e2::WaterModel::getOrCreatePipelineLayout(e2::MeshProxy* proxy, uint8_t submeshIndex, bool shadows)
+e2::IPipelineLayout* e2::WaterModel::getOrCreatePipelineLayout(e2::MeshProxy* proxy, uint8_t lodIndex, uint8_t submeshIndex, bool shadows)
 {
 	if (shadows)
 		return nullptr;
@@ -118,7 +118,7 @@ e2::IPipelineLayout* e2::WaterModel::getOrCreatePipelineLayout(e2::MeshProxy* pr
 		return m_pipelineLayout;
 }
 
-e2::IPipeline* e2::WaterModel::getOrCreatePipeline(e2::MeshProxy* proxy, uint8_t submeshIndex, e2::RendererFlags rendererFlags)
+e2::IPipeline* e2::WaterModel::getOrCreatePipeline(e2::MeshProxy* proxy, uint8_t lodIndex, uint8_t submeshIndex, e2::RendererFlags rendererFlags)
 {
 	if (!m_shadersReadFromDisk)
 	{
@@ -144,8 +144,8 @@ e2::IPipeline* e2::WaterModel::getOrCreatePipeline(e2::MeshProxy* proxy, uint8_t
 		return nullptr;
 	}
 
-	e2::SubmeshSpecification const& spec = proxy->asset->specification(submeshIndex);
-	e2::WaterProxy* lwProxy = static_cast<e2::WaterProxy*>(proxy->materialProxies[submeshIndex]);
+	e2::SubmeshSpecification const& spec = proxy->lods[lodIndex].asset->specification(submeshIndex);
+	e2::WaterProxy* lwProxy = static_cast<e2::WaterProxy*>(proxy->lods[lodIndex].materialProxies[submeshIndex]);
 
 	uint16_t geometryFlags = (uint16_t)spec.attributeFlags;
 

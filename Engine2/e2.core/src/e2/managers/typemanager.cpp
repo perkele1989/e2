@@ -1,8 +1,6 @@
 
 #include "e2/managers/typemanager.hpp"
 
-#include "e2/game/component.hpp"
-
 #include "init.inl"
 
 e2::TypeManager::TypeManager(Engine* owner)

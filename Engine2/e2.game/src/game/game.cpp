@@ -10,6 +10,7 @@
 #include "e2/managers/uimanager.hpp"
 #include "e2/game/gamesession.hpp"
 #include "e2/renderer/renderer.hpp"
+#include "e2/transform.hpp"
 
 #include <glm/gtx/intersect.hpp>
 #include <glm/gtx/vector_angle.hpp>
@@ -329,6 +330,17 @@ void e2::Game::finalizeBoot()
 	m_uiIconsSheet = am->get("assets/ui/S_UI_Icons.e2a").cast<e2::Spritesheet>();
 
 	uiManager()->registerGlobalSpritesheet("gameUi", m_uiIconsSheet);
+
+	// --
+	// WARNING: POINTER ARITHMETIC MASTURBATION AREA
+	// BEWARE OF CUMSTAINS 
+	// --
+
+
+	
+
+
+
 
 	// After this line, we may no longer safely fetch and store loaded assets
 	am->returnALJ(m_bootTicket);
@@ -1000,6 +1012,24 @@ void e2::Game::initialize()
 	am->prescribeALJ(alj, "assets/environment/SM_PineForest2_3.e2a");
 
 	am->prescribeALJ(alj, "assets/ui/S_UI_Icons.e2a");
+
+
+
+	am->prescribeALJ(alj, "assets/environment/SM_PineTree001_LOD0.e2a");
+	am->prescribeALJ(alj, "assets/environment/SM_PineTree001_LOD1.e2a");
+	am->prescribeALJ(alj, "assets/environment/SM_PineTree001_LOD2.e2a");
+
+	am->prescribeALJ(alj, "assets/environment/SM_PineTree002_LOD0.e2a");
+	am->prescribeALJ(alj, "assets/environment/SM_PineTree002_LOD1.e2a");
+	am->prescribeALJ(alj, "assets/environment/SM_PineTree002_LOD2.e2a");
+
+	am->prescribeALJ(alj, "assets/environment/SM_PineTree003_LOD0.e2a");
+	am->prescribeALJ(alj, "assets/environment/SM_PineTree003_LOD1.e2a");
+	am->prescribeALJ(alj, "assets/environment/SM_PineTree003_LOD2.e2a");
+
+	am->prescribeALJ(alj, "assets/environment/SM_PineTree004_LOD0.e2a");
+	am->prescribeALJ(alj, "assets/environment/SM_PineTree004_LOD1.e2a");
+	am->prescribeALJ(alj, "assets/environment/SM_PineTree004_LOD2.e2a");
 
 
 	/*am->prescribeALJ(alj, "assets/environment/trees/SM_PalmTree001.e2a");
@@ -3321,7 +3351,7 @@ void e2::Game::harvestWood(glm::ivec2 const& location, EmpireId empire)
 		e2::destroy(tileData->forestProxy);
 
 	tileData->forestProxy = nullptr;
-	tileData->forestMesh = nullptr;
+	tileData->forestLods = nullptr;
 
 }
 
@@ -3341,7 +3371,7 @@ void e2::Game::removeWood(glm::ivec2 const& location)
 		e2::destroy(tileData->forestProxy);
 
 	tileData->forestProxy = nullptr;
-	tileData->forestMesh = nullptr;
+	tileData->forestLods = nullptr;
 }
 
 void e2::Game::discoverEmpire(EmpireId empireId)

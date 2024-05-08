@@ -253,7 +253,10 @@ void e2::GameEntity::initialize()
 	if (specification->meshAsset && !meshProxy)
 	{
 		e2::MeshProxyConfiguration proxyConf{};
-		proxyConf.mesh = specification->meshAsset;
+		e2::MeshLodConfiguration lod;
+
+		lod.mesh = specification->meshAsset;
+		proxyConf.lods.push(lod);
 
 		meshProxy = e2::create<e2::MeshProxy>(gameSession(), proxyConf);
 		meshProxy->modelMatrix = glm::translate(glm::mat4(1.0), meshPosition + glm::vec3(e2::worldUp()) * specification->meshHeightOffset);

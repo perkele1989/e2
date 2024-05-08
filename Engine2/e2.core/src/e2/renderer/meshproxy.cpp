@@ -1,7 +1,6 @@
 
 #include "e2/renderer/meshproxy.hpp"
 #include "e2/managers/rendermanager.hpp"
-#include "e2/game/meshcomponent.hpp"
 #include "e2/renderer/shadermodel.hpp"
 #include "e2/assets/mesh.hpp"
 #include "e2/assets/material.hpp"
@@ -26,22 +25,30 @@ e2::Engine* e2::MaterialProxy::engine()
 
 e2::MeshProxy::MeshProxy(e2::Session* inSession, e2::MeshProxyConfiguration const& config)
 	: session{ inSession }
-	, asset(config.mesh)
 {
 	session->m_meshProxies.insert(this);
 
-	if (config.materials.size() > 0)
+	for (MeshLodConfiguration const& lod : config.lods)
 	{
-		materialProxies = config.materials;
-	}
-	else
-	{
-		for (uint8_t i = 0; i < config.mesh->submeshCount(); i++)
+		MeshProxyLOD newLod;
+		newLod.asset = lod.mesh;
+		newLod.maxDistance = lod.maxDistance;
+		if (lod.materials.size() > 0)
 		{
-			e2::MaterialProxy* newMaterialProxy = session->getOrCreateDefaultMaterialProxy(config.mesh->material(i));
-			materialProxies.push(newMaterialProxy);
+			newLod.materialProxies = lod.materials;
 		}
+		else
+		{
+			for (uint8_t i = 0; i < lod.mesh->submeshCount(); i++)
+			{
+				e2::MaterialProxy* newMaterialProxy = session->getOrCreateDefaultMaterialProxy(lod.mesh->material(i));
+				newLod.materialProxies.push(newMaterialProxy);
+			}
+		}
+		lods.push(newLod);
 	}
+
+
 
 	modelMatrix = glm::mat4(1.0f);
 	
@@ -87,29 +94,35 @@ void e2::MeshProxy::invalidatePipeline()
 	if (wasEnabled)
 		disable();
 
-	pipelineLayouts.resize(asset->submeshCount());
-	shadowPipelineLayouts.resize(asset->submeshCount());
-	pipelines.resize(asset->submeshCount());
-	shadowPipelines.resize(asset->submeshCount());
-
-
-	for (uint8_t submeshIndex = 0; submeshIndex < asset->submeshCount(); submeshIndex++)
+	uint8_t lodIndex = 0;
+	for (auto& lod : lods)
 	{
-		e2::ShaderModel* model = materialProxies[submeshIndex]->asset->model();
-		pipelineLayouts[submeshIndex] = model->getOrCreatePipelineLayout(this, submeshIndex, false);
-		pipelines[submeshIndex] = model->getOrCreatePipeline(this, submeshIndex, skinProxy ? RendererFlags::Skin : e2::RendererFlags::None);
+		
+		lod.pipelineLayouts.resize(lod.asset->submeshCount());
+		lod.shadowPipelineLayouts.resize(lod.asset->submeshCount());
+		lod.pipelines.resize(lod.asset->submeshCount());
+		lod.shadowPipelines.resize(lod.asset->submeshCount());
 
-		if (model->supportsShadows())
+		for (uint8_t submeshIndex = 0; submeshIndex < lod.asset->submeshCount(); submeshIndex++)
 		{
-			shadowPipelineLayouts[submeshIndex] = model->getOrCreatePipelineLayout(this, submeshIndex, true);
-			shadowPipelines[submeshIndex] = model->getOrCreatePipeline(this, submeshIndex, skinProxy ? RendererFlags::Skin | RendererFlags::Shadow: e2::RendererFlags::Shadow);
-		}
-		else
-		{
-			shadowPipelineLayouts[submeshIndex] = nullptr;
-			shadowPipelines[submeshIndex] = nullptr;
+			e2::ShaderModel* model = lod.materialProxies[submeshIndex]->asset->model();
+			lod.pipelineLayouts[submeshIndex] = model->getOrCreatePipelineLayout(this, lodIndex, submeshIndex, false);
+			lod.pipelines[submeshIndex] = model->getOrCreatePipeline(this, lodIndex, submeshIndex, skinProxy ? RendererFlags::Skin : e2::RendererFlags::None);
+
+			if (model->supportsShadows())
+			{
+				lod.shadowPipelineLayouts[submeshIndex] = model->getOrCreatePipelineLayout(this, lodIndex, submeshIndex, true);
+				lod.shadowPipelines[submeshIndex] = model->getOrCreatePipeline(this, lodIndex, submeshIndex, skinProxy ? RendererFlags::Skin | RendererFlags::Shadow : e2::RendererFlags::Shadow);
+			}
+			else
+			{
+				lod.shadowPipelineLayouts[submeshIndex] = nullptr;
+				lod.shadowPipelines[submeshIndex] = nullptr;
+			}
+
 		}
 
+		lodIndex++;
 	}
 
 	if (wasEnabled)
@@ -119,6 +132,26 @@ void e2::MeshProxy::invalidatePipeline()
 e2::Engine* e2::MeshProxy::engine()
 {
 	return session->engine();
+}
+
+bool e2::MeshProxy::lodTest(uint8_t lod, float distance)
+{
+	for (uint8_t i = 0; i < lods.size(); i++)
+	{
+		if (distance <= lods[i].maxDistance || lods[i].maxDistance <= 0.0001f)
+			return lod == i;
+	}
+}
+
+e2::MeshProxyLOD* e2::MeshProxy::lodByDistance(float distance)
+{
+	for (uint32_t i = 0; i < lods.size(); i++)
+	{
+		if (distance <= lods[i].maxDistance || lods[i].maxDistance <= 0.0001f)
+			return &lods[i];
+	}
+
+	return nullptr;
 }
 
 e2::SkinProxy::SkinProxy(e2::Session* inSession, e2::SkinProxyConfiguration const& config)

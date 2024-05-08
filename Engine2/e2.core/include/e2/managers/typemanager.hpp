@@ -6,7 +6,6 @@
 
 #include <e2/utils.hpp>
 
-#include <e2/game/meshcomponent.hpp>
  
 namespace e2
 { 

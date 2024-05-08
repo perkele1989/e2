@@ -163,16 +163,20 @@ void e2::ITexture_Vk::generateMips()
 
 void e2::ITexture_Vk::generateMipsCmd(e2::ICommandBuffer* buff)
 {
-	VkCommandBuffer cmdBuffer = buff->unsafeCast<e2::ICommandBuffer_Vk>()->m_vkHandle;
-
+	VkCommandBuffer cmdBuffer  = buff->unsafeCast<e2::ICommandBuffer_Vk>()->m_vkHandle;
 	mipsCmd(cmdBuffer);
 
 }
 
-void e2::ITexture_Vk::mipsCmd(VkCommandBuffer cmdBuffer)
+void e2::ITexture_Vk::mipsCmd(VkCommandBuffer buff)
 {
 	// Transition all mips to TRANSFER_DST
-	m_renderContextVk->vkCmdTransitionTexture(cmdBuffer, this, m_vkTempLayout, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+
+	//buff->useAsTransferDst(this);
+	m_renderContextVk->vkCmdTransitionTexture(buff, this, m_vkTempLayout, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+
+	int32_t mipWidth = m_size.x;
+	int32_t mipHeight = m_size.y;
 
 	// Setup barrier base
 	VkImageMemoryBarrier barrier{ VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
@@ -183,17 +187,12 @@ void e2::ITexture_Vk::mipsCmd(VkCommandBuffer cmdBuffer)
 	barrier.subresourceRange.baseArrayLayer = 0;
 	barrier.subresourceRange.layerCount = 1;
 	barrier.subresourceRange.levelCount = 1;
-
-	int32_t mipWidth = m_size.x;
-	int32_t mipHeight = m_size.y;
-
-	// Transition source from TRANSFER_DST to TRANSFER_SRC
 	barrier.subresourceRange.baseMipLevel = 0;
 	barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
 	barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
 	barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
 	barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-	vkCmdPipelineBarrier(cmdBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1, &barrier);
+	vkCmdPipelineBarrier(buff, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1, &barrier);
 
 
 	int32_t tgtWidth = mipWidth;
@@ -219,8 +218,16 @@ void e2::ITexture_Vk::mipsCmd(VkCommandBuffer cmdBuffer)
 		blit.dstSubresource.mipLevel = i;
 		blit.dstSubresource.baseArrayLayer = 0;
 		blit.dstSubresource.layerCount = 1;
-		vkCmdBlitImage(cmdBuffer, m_vkImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, m_vkImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit, VK_FILTER_LINEAR);
+		vkCmdBlitImage(buff, m_vkImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, m_vkImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit, VK_FILTER_LINEAR);
 
+
+		// Transition target from TRANSFER_DST to default (shader read)
+		barrier.subresourceRange.baseMipLevel = i;
+		barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+		barrier.newLayout = m_vkLayout;
+		barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+		barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+		vkCmdPipelineBarrier(buff, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1, &barrier);
 
 	}
 
@@ -230,7 +237,8 @@ void e2::ITexture_Vk::mipsCmd(VkCommandBuffer cmdBuffer)
 	barrier.newLayout = m_vkLayout;
 	barrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
 	barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-	vkCmdPipelineBarrier(cmdBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1, &barrier);
+	vkCmdPipelineBarrier(buff, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1, &barrier);
+
 }
 
 void e2::ITexture_Vk::upload(uint32_t mip, glm::uvec3 offset, glm::uvec3 size, uint8_t const* data, uint64_t dataSize)
