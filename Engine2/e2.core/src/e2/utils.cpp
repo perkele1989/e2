@@ -1083,3 +1083,8 @@ int32_t e2::Hex::distance(Hex const& lhs, Hex const& rhs)
 	Hex c = lhs - rhs;
 	return (glm::abs(c.x) + glm::abs(c.y) + glm::abs(c.z)) / 2;
 }
+
+int32_t e2::Hex::distance(glm::ivec2 const& lhs, glm::ivec2 const& rhs)
+{
+	return distance(Hex(lhs), Hex(rhs));
+}

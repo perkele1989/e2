@@ -79,7 +79,7 @@ vec3 undiscovered(float f,vec3 n, vec3 color, vec3 position, float depth)
 	vec3 lightVector = normalize(renderer.sun1.xyz);
     vec3 ndotl = vec3(clamp(dot(n, -lightVector), 0.0, 1.0)) * renderer.sun2.xyz * renderer.sun2.w;
 
-    vec3 fogResult = fogDiffuse * 0.5 + (fogColor * ndotl *0.5);
+    vec3 fogResult = fogDiffuse * 0.5 + (fogColor * ndotl *0.2);
 
     float heightCoeff = smoothstep(0.0, 1.0, depth);
     vec3 undis = mix(color, fogResult, heightCoeff);

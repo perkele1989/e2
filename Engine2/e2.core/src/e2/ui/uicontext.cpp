@@ -443,6 +443,9 @@ bool e2::UIContext::gameGridButton(e2::Name id, e2::Name iconSpriteId, std::stri
 		drawSprite(widgetState->position, *sprite, 0xFFFFFF40, style.scale);
 	}
 
+	if(hovered)
+		gameHoverText(hoverTextMain);
+
 	return clicked;
 }
 
@@ -657,7 +660,7 @@ void e2::UIContext::setScissor(glm::vec2 position, glm::vec2 size)
 	buff->setScissor(position, size);
 }
 
-void e2::UIContext::drawQuad(glm::vec2 position, glm::vec2 size, e2::UIColor color)
+void e2::UIContext::drawQuad(glm::vec2 position, glm::vec2 size, e2::UIColor color, float zoffset)
 {
 	uint8_t frameIndex = renderManager()->frameIndex();
 	e2::ICommandBuffer* buff = m_commandBuffers[frameIndex];
@@ -670,7 +673,7 @@ void e2::UIContext::drawQuad(glm::vec2 position, glm::vec2 size, e2::UIColor col
 	pushConstants.quadColor = color.toVec4();
 	pushConstants.quadPosition = position;
 	pushConstants.quadSize = size;
-	pushConstants.quadZ = m_currentZ;
+	pushConstants.quadZ = m_currentZ - zoffset;
 	pushConstants.surfaceSize = glm::vec2(m_renderTargetSize);
 
 
@@ -690,7 +693,7 @@ void e2::UIContext::drawQuad(glm::vec2 position, glm::vec2 size, e2::UIColor col
 	
 }
 
-void e2::UIContext::drawTexturedQuad(glm::vec2 position, glm::vec2 size, e2::UIColor color, e2::ITexture* texture, glm::vec2 uvOffset /*= { 0.0f, 0.0f }*/, glm::vec2 uvScale /*= {1.0f, 1.0f}*/, e2::UITexturedQuadType type)
+void e2::UIContext::drawTexturedQuad(glm::vec2 position, glm::vec2 size, e2::UIColor color, e2::ITexture* texture, glm::vec2 uvOffset /*= { 0.0f, 0.0f }*/, glm::vec2 uvScale /*= {1.0f, 1.0f}*/, e2::UITexturedQuadType type, float zoffset)
 {
 	uint8_t frameIndex = renderManager()->frameIndex();
 	e2::ICommandBuffer* buff = m_commandBuffers[frameIndex];
@@ -705,7 +708,7 @@ void e2::UIContext::drawTexturedQuad(glm::vec2 position, glm::vec2 size, e2::UIC
 	pushConstants.quadColor = color.toVec4();
 	pushConstants.quadPosition = position;
 	pushConstants.quadSize = size;
-	pushConstants.quadZ = m_currentZ;
+	pushConstants.quadZ = m_currentZ - zoffset;
 	pushConstants.surfaceSize = glm::vec2(m_renderTargetSize);
 	pushConstants.textureIndex = ui->idFromTexture(texture);
 	pushConstants.uvOffset = uvOffset;
@@ -813,7 +816,7 @@ void e2::UIContext::drawQuadShadow(glm::vec2 position, glm::vec2 size, float cor
 	m_hasRecordedData = true;
 }
 
-void e2::UIContext::drawRasterText(e2::FontFace fontFace, uint8_t fontSize, e2::UIColor color, glm::vec2 position, std::string const& markdownUtf8, bool enableColorChange, bool soft )
+void e2::UIContext::drawRasterText(e2::FontFace fontFace, uint8_t fontSize, e2::UIColor color, glm::vec2 position, std::string const& markdownUtf8, bool enableColorChange, float zoffset)
 {
 	position.x = glm::floor(position.x);
 	position.y = glm::floor(position.y);
@@ -939,7 +942,7 @@ void e2::UIContext::drawRasterText(e2::FontFace fontFace, uint8_t fontSize, e2::
 
 		e2::FontGlyph const&glyph = font->getRasterGlyph(codepoint, currentStyle, fontSize);
 		
-		drawTexturedQuad(cursor + glyph.offset, glyph.size, color, font->glyphTexture(glyph.textureIndex), glyph.uvOffset, glyph.uvSize, e2::UITexturedQuadType::FontRaster);
+		drawTexturedQuad(cursor + glyph.offset, glyph.size, color, font->glyphTexture(glyph.textureIndex), glyph.uvOffset, glyph.uvSize, e2::UITexturedQuadType::FontRaster,zoffset);
 
 		cursor.x += glyph.advanceX;
 
@@ -951,7 +954,7 @@ void e2::UIContext::drawRasterText(e2::FontFace fontFace, uint8_t fontSize, e2::
 
 
 
-void e2::UIContext::drawSDFText(e2::FontFace fontFace, float fontSize, e2::UIColor color, glm::vec2 position, std::string const& markdownUtf8, bool enableColorChange /*= true*/, bool soft /*= false*/)
+void e2::UIContext::drawSDFText(e2::FontFace fontFace, float fontSize, e2::UIColor color, glm::vec2 position, std::string const& markdownUtf8, bool enableColorChange /*= true*/, float zoffset)
 {
 	position.x = glm::floor(position.x);
 	position.y = glm::floor(position.y);
@@ -1081,7 +1084,7 @@ void e2::UIContext::drawSDFText(e2::FontFace fontFace, float fontSize, e2::UICol
 		float advanceX = (glyph.advanceX / 32.0f) * fontSize;
 		glm::vec2 glyphOffset = (glyph.offset / 32.0f)* fontSize;
 
-		drawTexturedQuad(cursor + glyphOffset, glyphSize, color, font->glyphTexture(glyph.textureIndex), glyph.uvOffset, glyph.uvSize, e2::UITexturedQuadType::FontSDFShadow);
+		drawTexturedQuad(cursor + glyphOffset, glyphSize, color, font->glyphTexture(glyph.textureIndex), glyph.uvOffset, glyph.uvSize, e2::UITexturedQuadType::FontSDFShadow, zoffset);
 
 		cursor.x += advanceX;
 
@@ -1808,6 +1811,17 @@ void e2::UIContext::endWrap()
 	popRenderState();
 }
 
+
+void e2::UIContext::gameHoverText(std::string const& text)
+{
+	clearScissor();
+	float width = calculateTextWidth(FontFace::Serif, 11, text);
+	glm::vec2 pos = mouseState().relativePosition;
+	drawQuad(pos, glm::vec2(width + 4.f, 16), 0x0000007F, 0.5f);
+
+	drawRasterText(FontFace::Serif, 11, 0xFFFFFFFF, pos + glm::vec2(2.0f, 6.0f), text, true, 0.5f);
+
+}
 
 e2::UIRenderState& e2::UIContext::renderState()
 {

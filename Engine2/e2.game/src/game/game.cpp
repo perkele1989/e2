@@ -413,7 +413,7 @@ void e2::Game::initializeScriptEngine()
 			}
 		);
 
-		m_scriptModule->add(chaiscript::fun(&e2::Hex::distance), "hexDistance" );
+		m_scriptModule->add(chaiscript::fun<int32_t (*)(e2::Hex const&, e2::Hex const&)>(&e2::Hex::distance), "hexDistance" );
 
 		/*
 		e2::StackVector<Hex, 6> 
@@ -600,12 +600,14 @@ void e2::Game::initializeScriptEngine()
 			"PathFindingAS",
 			{
 				{ chaiscript::constructor<e2::PathFindingAS(e2::GameEntity*)>() },
-				{ chaiscript::constructor<e2::PathFindingAS(e2::Game*, e2::Hex const&, uint64_t, bool, e2::PassableFlags)>() }
-
+				{ chaiscript::constructor<e2::PathFindingAS(e2::Game*, e2::Hex const&, uint64_t, bool, e2::PassableFlags)>() },
+				
 				// e2::Game* game, e2::Hex const& start, uint64_t range, bool ignoreVisibility = false, e2::PassableFlags passableFlags = PassableFlags::Land
 			},
 			{
 				{chaiscript::fun(&e2::PathFindingAS::find), "find"},
+				{ chaiscript::fun(&e2::PathFindingAS::grugTarget), "grugTarget" },
+				{ chaiscript::fun(&e2::PathFindingAS::grugCanMove), "grugCanMove" },
 			}
 		);
 
@@ -642,6 +644,8 @@ void e2::Game::initializeScriptEngine()
 			{chaiscript::fun(&e2::GameEntity::isAnyActionPlaying), "isAnyActionPlaying"},
 			{chaiscript::fun(&e2::GameEntity::setPose), "setPose"},
 			{chaiscript::fun(&e2::GameEntity::turnTowards), "turnTowards"},
+			{chaiscript::fun(&e2::GameEntity::grugCanAttack), "grugCanAttack"},
+			{chaiscript::fun(&e2::GameEntity::grugCanMove), "grugCanMove"},
 		}
 		);
 
@@ -691,6 +695,7 @@ void e2::Game::initializeScriptEngine()
 				{chaiscript::fun(&Game::grugAttackTarget), "grugAttackTarget"},
 				{chaiscript::fun(&Game::grugAttackMoveLocation), "grugAttackMoveLocation"},
 				{chaiscript::fun(&Game::grugMoveLocation), "grugMoveLocation"},
+				{chaiscript::fun(&Game::resolveLocalEntity), "resolveLocalEntity"},
 				/*
 						int32_t grugNumAttackMovePoints();
 		e2::GameEntity* grugAttackTarget();
@@ -803,6 +808,7 @@ void e2::Game::initializeScriptEngine()
 				{chaiscript::fun(&EntityScriptInterface::setDrawUI), "setDrawUI"},
 				{chaiscript::fun(&EntityScriptInterface::setCollectExpenditure), "setCollectExpenditure"},
 				{chaiscript::fun(&EntityScriptInterface::setCollectRevenue), "setCollectRevenue"},
+				{chaiscript::fun(&EntityScriptInterface::setPlayerRelevant), "setPlayerRelevant"},
 				{chaiscript::fun(&EntityScriptInterface::setGrugRelevant), "setGrugRelevant"},
 				{chaiscript::fun(&EntityScriptInterface::setGrugTick), "setGrugTick"},
 				{chaiscript::fun(&EntityScriptInterface::setOnBeginMove), "setOnBeginMove"},
@@ -920,6 +926,7 @@ void e2::Game::initializeScriptEngine()
 			"TurnState",
 			{
 				{e2::TurnState::Unlocked, "TS_Unlocked"},
+				//{e2::TurnState::Auto, "TS_Auto"},
 				{e2::TurnState::UnitAction_Move, "TS_UnitAction_Move"},
 				{e2::TurnState::EntityAction_Generic, "TS_EntityAction_Generic"},
 				{e2::TurnState::EntityAction_Target, "TS_EntityAction_Target"},
@@ -1870,6 +1877,8 @@ void e2::Game::updateGameState()
 
 		if (m_turnState == TurnState::Unlocked)
 			updateTurn();
+		//else if (m_turnState == TurnState::Auto)
+//			updateAuto();
 		else if (m_turnState == TurnState::UnitAction_Move)
 			updateUnitMove();
 		else if (m_turnState == TurnState::EntityAction_Target)
@@ -1921,11 +1930,25 @@ void e2::Game::updateGameState()
 void e2::Game::updateTurn()
 {
 	// if local is making turn
-	if (m_empireTurn == 0)
+	if (m_empireTurn == m_localEmpireId)
 		updateTurnLocal();
 	else
 		updateTurnAI();
 }
+
+/*void e2::Game::updateAuto()
+{
+	if (m_localAutoEntities.size() == 0)
+	{
+		m_turnState = TurnState::Unlocked;
+	}
+	else
+	{
+		e2::GameEntity* firstEntity = *m_localAutoEntities.begin();
+		selectEntity(firstEntity);
+		moveSelectedEntityTo(firstEntity->autoMoveTarget);
+	}
+}*/
 
 void e2::Game::updateTurnLocal()
 {
@@ -2058,7 +2081,33 @@ void e2::Game::onStartOfTurn()
 		entity->onTurnStart();
 	}
 
-	if (m_empires[m_empireTurn]->ai)
+
+	if (m_empireTurn == m_localEmpireId)
+	{
+		m_localTurnEntities.clear();
+		//m_localAutoEntities.clear();
+		for (e2::GameEntity* entity : m_localEmpire->entities)
+		{
+			//if (entity->sleeping)
+				//continue;
+
+			/*if (entity->autoMove)
+			{
+				m_localAutoEntities.insert(entity);
+			} else */
+
+			entity->updateGrugVariables();
+
+			if (entity->playerRelevant())
+			{
+				m_localTurnEntities.insert(entity);
+			}
+		}
+		
+		if (m_localTurnEntities.size() > 0)
+			nextLocalEntity();
+	}
+	else if (m_empires[m_empireTurn]->ai)
 	{
 		m_empires[m_empireTurn]->ai->grugBrainWakeUp();
 	}
@@ -2122,7 +2171,9 @@ void e2::Game::updateUnitMove()
 
 				m_selectedEntity->onEndMove();
 
-				m_turnState = TurnState::Unlocked;
+				m_turnState = m_moveTurnStateFallback;
+
+				resolveLocalEntity();
 
 				return;
 			}
@@ -2169,7 +2220,9 @@ void e2::Game::updateUnitMove()
 				resolveSelectedEntity();
 				m_selectedEntity->onEndMove();
 
-				m_turnState = TurnState::Unlocked;
+				m_turnState = m_moveTurnStateFallback;
+
+				resolveLocalEntity();
 
 				return;
 			}
@@ -2227,6 +2280,9 @@ void e2::Game::updateUnitMove()
 		float angle = radiansBetween(newPos2, newPos);
 		m_selectedEntity->setMeshTransform(newPos, angle);
 	}
+
+	if(!m_selectedEntity->isLocal() && hexGrid()->isVisible(m_selectedEntity->tileIndex))
+		m_viewOrigin = m_selectedEntity->meshPlanarCoords();
 }
 
 void e2::Game::updateTarget()
@@ -2828,21 +2884,23 @@ void e2::Game::drawFinalUI()
 	//ui->drawRasterText(e2::FontFace::Serif, 14, 0xFFFFFFFF, offset + glm::vec2(8.f, 14.f), str);
 
 	ui->pushFixedPanel("test", offset + glm::vec2(4.0f, 4.0f), glm::vec2(width - 8.0f, height - 8.0f));
-	ui->beginStackV("test2");
+	ui->beginStackH("test2", 40.0f);
 
 	if (m_empireTurn == m_localEmpireId)
 	{
-		if (ui->button("te", "End turn"))
-		{
+		
+		if (ui->gameGridButton("nextent", "gameUi.nextunit", "Next unit..", m_localTurnEntities.size() > 0))
+			nextLocalEntity();
+		
+		if (ui->gameGridButton("endturn", "gameUi.endturn", "End turn", true))
 			endTurn();
-		}
 	}
 	else
 	{
 		ui->gameLabel("Please wait, AI turn..");
 	}
 
-	ui->endStackV();
+	ui->endStackH();
 	ui->popFixedPanel();
 }
 
@@ -2953,6 +3011,46 @@ e2::GameEmpire* e2::Game::empireById(EmpireId id)
 }
 
 
+void e2::Game::resolveLocalEntity()
+{
+	if (!m_selectedEntity || !m_selectedEntity->isLocal())
+		return;
+
+	resolveSelectedEntity();
+
+	if (!m_selectedEntity)
+	{
+		nextLocalEntity();
+		return;
+	}
+	
+	m_selectedEntity->updateGrugVariables();
+	if (!m_selectedEntity->playerRelevant())
+	{
+		nextLocalEntity();
+	}
+}
+
+void e2::Game::nextLocalEntity()
+{
+	if (m_localTurnEntities.size() == 0)
+		return;
+
+	e2::GameEntity* entity = *m_localTurnEntities.begin();
+	if (m_selectedEntity == entity)
+	{
+		deselectEntity();
+		m_localTurnEntities.erase(entity);
+	}
+
+	if (m_localTurnEntities.size() == 0)
+		return;
+
+	entity = *m_localTurnEntities.begin();
+	selectEntity(entity);
+	m_viewOrigin = entity->meshPlanarCoords();
+}
+
 void e2::Game::applyDamage(e2::GameEntity* entity, e2::GameEntity* instigator, float damage)
 {
 	game()->spawnHitLabel(entity->meshPosition + e2::worldUpf() * 0.5f, std::format("{}", int64_t(damage)));
@@ -2973,15 +3071,7 @@ void e2::Game::resolveSelectedEntity()
 
 	if (!m_selectedEntity->isLocal() || m_selectedEntity->specification->moveType == EntityMoveType::Static)
 	{
-		
 		m_hexGrid->clearOutline();
-		/*
-		tmpHex.clear();
-		e2::Hex::circle(e2::Hex(m_selectedEntity->tileIndex), m_selectedEntity->specification->sightRange, ::tmpHex);
-		for (e2::Hex h : ::tmpHex)
-		{
-			m_hexGrid->pushOutline(h.offsetCoords());
-		}*/
 	}
 	else
 	{
@@ -2997,16 +3087,13 @@ void e2::Game::resolveSelectedEntity()
 		}
 	}
 
-
+	if(!m_selectedEntity->isLocal() && m_selectedEntity->inView)
+		m_viewOrigin = m_selectedEntity->meshPlanarCoords();
 
 }
 
 void e2::Game::unresolveSelectedEntity()
 {
-	if (m_turnState != TurnState::Unlocked)
-	{
-		m_turnState = TurnState::Unlocked;
-	}
 
 	if (m_unitAS)
 		e2::destroy(m_unitAS);
@@ -3047,12 +3134,13 @@ void e2::Game::deselectEntity()
 
 void e2::Game::moveSelectedEntityTo(glm::ivec2 const& to)
 {
-	if (m_state != GameState::Turn || m_turnState != TurnState::Unlocked || !m_selectedEntity)
+	
+
+	if (m_state != GameState::Turn || (m_turnState != TurnState::Unlocked/* && m_turnState != TurnState::Auto*/) || !m_selectedEntity)
 		return;
 
 	if (m_selectedEntity->movePointsLeft < 1 || m_selectedEntity->specification->moveType == e2::EntityMoveType::Static)
 		return;
-
 
 	if (to == m_selectedEntity->tileIndex)
 		return;
@@ -3062,6 +3150,9 @@ void e2::Game::moveSelectedEntityTo(glm::ivec2 const& to)
 		return;
 	else if (m_unitMovePath.size() - 1 > m_selectedEntity->movePointsLeft)
 		return;
+
+
+	m_moveTurnStateFallback = m_turnState;
 
 	m_ffwMove = !m_selectedEntity->isLocal() && !m_hexGrid->isVisible(to) && !m_hexGrid->isVisible(m_selectedEntity->tileIndex);
 
@@ -3087,7 +3178,10 @@ void e2::Game::beginCustomAction()
 void e2::Game::endCustomAction()
 {
 	if (m_turnState == TurnState::EntityAction_Generic)
+	{
 		m_turnState = TurnState::Unlocked;
+	}
+
 }
 
 void e2::Game::updateCustomAction()
@@ -3231,6 +3325,7 @@ void e2::Game::destroyEntity(e2::GameEntity* entity)
 		deselectEntity();
 	}
 
+	m_localTurnEntities.erase(entity);
 	m_entityLayers[size_t(entity->specification->layerIndex)].entityIndex.erase(entity->tileIndex);
 	m_entities.erase(entity);
 
@@ -3638,6 +3733,7 @@ e2::PathFindingAS::PathFindingAS(e2::GameEntity* entity)
 
 			hexIndex[coords] = nextHexEntry;
 			
+			grugCanMove = true;
 
 			queue.push(nextHexEntry);
 		}
@@ -3645,6 +3741,108 @@ e2::PathFindingAS::PathFindingAS(e2::GameEntity* entity)
 		processed.insert(currHexEntry->index);
 	}
 }
+//
+//e2::PathFindingAS::PathFindingAS(e2::GameEntity* entity, glm::ivec2 const& target)
+//{
+//	if (!entity)
+//		return;
+//
+//	if (!entity->isLocal())
+//	{
+//		LogError("passed entity wasn't local; this constructor is only meant for local players!");
+//		return;
+//	}
+//
+//	if (e2::Hex::distance(entity->tileIndex, target) > e2::maxAutoMoveRange)
+//	{
+//		LogError("max range overflow");
+//		return;
+//	}
+//
+//	e2::Game* game = entity->game();
+//	e2::HexGrid* grid = game->hexGrid();
+//
+//	e2::Hex originHex = e2::Hex(entity->tileIndex);
+//	origin = e2::create<e2::PathFindingHex>(originHex);
+//	origin->isBegin = true;
+//
+//	hexIndex[entity->tileIndex] = origin;
+//
+//
+//	std::queue<e2::PathFindingHex*> queue;
+//	std::unordered_set<e2::Hex> processed;
+//
+//	queue.push(origin);
+//
+//	while (!queue.empty())
+//	{
+//		e2::PathFindingHex* currHexEntry = queue.front();
+//		queue.pop();
+//
+//		for (e2::Hex nextHex : currHexEntry->index.neighbours())
+//		{
+//			
+//			if (processed.contains(nextHex))
+//				continue;
+//
+//			glm::ivec2 coords = nextHex.offsetCoords();
+//
+//			if (hexIndex.contains(coords))
+//				continue;
+//
+//			if (currHexEntry->stepsFromOrigin + 1 > e2::maxAutoMoveRange)
+//				continue;
+//
+//			// check movepoints 
+//			if (currHexEntry->stepsFromOrigin + 1 > entity->movePointsLeft)
+//			{
+//				// we are out of move bounds, do cheeky version 
+//				e2::TileData* existingTile = grid->getExistingTileData(coords);
+//				if (existingTile && !existingTile->isPassable(entity->specification->passableFlags))
+//					continue;
+//
+//				// ignore hexes that are occupied by units (but only if they are visible)
+//				e2::GameEntity* otherUnit = game->entityAtHex(e2::EntityLayerIndex::Unit, coords);
+//				if (grid->isVisible(coords) && otherUnit)
+//					continue;
+//
+//				e2::PathFindingHex* nextHexEntry = e2::create<e2::PathFindingHex>(nextHex);
+//				nextHexEntry->towardsOrigin = currHexEntry;
+//				nextHexEntry->stepsFromOrigin = currHexEntry->stepsFromOrigin + 1;
+//				nextHexEntry->instantlyReachable = false;
+//				hexIndex[coords] = nextHexEntry;
+//				queue.push(nextHexEntry);
+//			}
+//			else
+//			{
+//				// we are within move bounds, do proper version 
+//				if (!grid->isVisible(coords))
+//					continue;
+//
+//				// ignore hexes that are occupied by unpassable biome
+//				e2::TileData tile = grid->getCalculatedTileData(coords);
+//				if (!tile.isPassable(entity->specification->passableFlags))
+//					continue;
+//
+//				// ignore hexes that are occupied by units
+//				e2::GameEntity* otherUnit = game->entityAtHex(e2::EntityLayerIndex::Unit, coords);
+//				if (otherUnit)
+//					continue;
+//
+//				e2::PathFindingHex* nextHexEntry = e2::create<e2::PathFindingHex>(nextHex);
+//				nextHexEntry->towardsOrigin = currHexEntry;
+//				nextHexEntry->stepsFromOrigin = currHexEntry->stepsFromOrigin + 1;
+//				nextHexEntry->instantlyReachable = true;
+//				hexIndex[coords] = nextHexEntry;
+//				queue.push(nextHexEntry);
+//			}
+//
+//
+//		}
+//
+//		processed.insert(currHexEntry->index);
+//	}
+//}
 
 e2::PathFindingAS::PathFindingAS(e2::Game* game, e2::Hex const& start, uint64_t range, bool ignoreVisibility, e2::PassableFlags passableFlags)
 {
@@ -3710,8 +3908,18 @@ e2::PathFindingAS::PathFindingAS(e2::Game* game, e2::Hex const& start, uint64_t 
 
 e2::PathFindingAS::~PathFindingAS()
 {
-	for (auto& [coords, as] : hexIndex)
-		e2::destroy(as);
+	std::unordered_set<e2::PathFindingHex*> hexes;
+	for (auto [coords, hex] : hexIndex)
+		hexes.insert(hex);
+	hexIndex.clear(); 
+
+	while (!hexes.empty())
+	{
+		e2::PathFindingHex* h = *hexes.begin();
+		hexes.erase(h);
+		e2::destroy(h);
+	}
+		
 }
 
 e2::PathFindingAS::PathFindingAS()

@@ -30,6 +30,7 @@ def gruntAttack(target) {
     instigator.scriptState.targetHex = target.tileIndex;
 
     instigator.attackPointsLeft -= 1;
+    instigator.movePointsLeft = 0;
     instigator.turnTowards(target.tileIndex);
     instigator.playAction("fire");
     instigator.scriptState.actionType = GruntActionType_Attack;
@@ -51,10 +52,8 @@ gruntScript.setOnActionTrigger(fun(entity, action, trigger){
     if(isShotTrigger && isAttacking && isTargetValid)
     {
         var attackMeta = calculateAttackMeta(entity, targetEntity);
-        if(attackMeta.targetDamage > 0.0)
-        {
-            game.applyDamage(targetEntity, entity, attackMeta.targetDamage);
-        }
+
+        game.applyDamage(targetEntity, entity, attackMeta.targetDamage);
 
         if(attackMeta.instigatorDamage > 0.0)
         {
@@ -73,6 +72,7 @@ gruntScript.setUpdateCustomAction(fun(entity, time) {
             {
                 entity.scriptState.actionType = GruntActionType_None;
                 game.endCustomAction();
+                game.resolveLocalEntity();
             }
 
             return;
@@ -116,16 +116,11 @@ gruntScript.setOnTargetClicked(fun(entity){
         return;
     }
 
-    var attackMeta = calculateAttackMeta(entity, targetEntity);
-    if(attackMeta.targetDamage <= 0.0) {
-        return;
-    }
-
     gruntAttack(targetEntity);
 });
 
 gruntScript.setDrawUI(fun(entity, ui){
-    var canAttack = entity.attackPointsLeft > 0;
+    var canAttack = entity.attackPointsLeft > 0 && entity.grugCanAttack;
     ui.beginStackH("gruntH1", 40.0)
     if(ui.gameGridButton("gruntAttack", "gameUi.attack", "Attack enemy", canAttack))
     {
@@ -138,6 +133,15 @@ gruntScript.setDrawUI(fun(entity, ui){
 gruntScript.setOnTurnStart(fun(entity){
     entity.scriptState.hasActedThisRound = false;
 });
+
+gruntScript.setPlayerRelevant(fun(entity){
+
+    var canMove =  entity.movePointsLeft > 0 && entity.grugCanMove;
+    var canAttack = entity.attackPointsLeft > 0 && entity.grugCanAttack;
+
+    return canMove || canAttack;
+});
+
 
 gruntScript.setGrugRelevant(fun(entity){
     // grug no want be left out, so grug always say grug relevant

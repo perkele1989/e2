@@ -436,6 +436,21 @@ void e2::GameEntity::readForSave(e2::Buffer& fromBuffer)
 	fromBuffer >> meshPosition;
 }
 
+bool e2::GameEntity::playerRelevant()
+{
+	if (sleeping)
+		return false;
+
+	if (specification->scriptInterface.hasPlayerRelevant())
+	{
+		updateGrugVariables();
+		return specification->scriptInterface.invokePlayerRelevant(this);
+	}
+
+
+	return false;
+}
+
 bool e2::GameEntity::grugRelevant()
 {
 	if (specification->scriptInterface.hasGrugRelevant())
@@ -494,6 +509,15 @@ bool e2::GameEntity::isBuilding()
 e2::Game* e2::GameEntity::game()
 {
 	return m_game;
+}
+
+void e2::GameEntity::updateGrugVariables()
+{
+	e2::PathFindingAS* newAS = e2::create<e2::PathFindingAS>(this);
+	grugCanMove = newAS->grugCanMove;
+	grugCanAttack = newAS->grugTarget != nullptr && newAS->grugTargetMovePoints == 0;
+	e2::destroy(newAS);
+
 }
 
 glm::vec2 e2::GameEntity::meshPlanarCoords()
@@ -1210,6 +1234,12 @@ void e2::EntityScriptInterface::invokeUpdateAnimation(e2::GameEntity* entity, do
 	INVOKE_SCRIPT_HANDLE(updateAnimation, entity, seconds);
 }
 
+bool e2::EntityScriptInterface::invokePlayerRelevant(e2::GameEntity* entity)
+{
+	E2_PROFILE_SCOPE_CTX(Scripting, entity->game());
+	INVOKE_SCRIPT_HANDLE_WITH_RETURN(bool, false, playerRelevant, entity);
+}
+
 bool e2::EntityScriptInterface::invokeGrugRelevant(e2::GameEntity* entity)
 {
 	E2_PROFILE_SCOPE_CTX(Scripting, entity->game());
@@ -1308,6 +1338,11 @@ void e2::EntityScriptInterface::setUpdateAnimation(scriptFunc_updateAnimation fu
 	updateAnimation = func;
 }
 
+void e2::EntityScriptInterface::setPlayerRelevant(scriptFunc_playerRelevant func)
+{
+	playerRelevant = func;
+}
+
 void e2::EntityScriptInterface::setGrugRelevant(scriptFunc_grugRelevant func)
 {
 	grugRelevant = func;
@@ -1392,6 +1427,12 @@ bool e2::EntityScriptInterface::hasUpdateAnimation()
 {
 	return updateAnimation != nullptr;
 }
+
+bool e2::EntityScriptInterface::hasPlayerRelevant()
+{
+	return playerRelevant != nullptr;
+}
+
 
 bool e2::EntityScriptInterface::hasGrugRelevant()
 {

@@ -66,6 +66,7 @@ namespace e2
 
 	enum class TurnState : uint8_t
 	{
+		//Auto,
 		Unlocked,
 		UnitAction_Move,
 		EntityAction_Generic,

@@ -18,7 +18,7 @@ namespace e2
 {
 
 
-	/** @tags(arena, arenaSize=16384) */
+	/** @tags(arena, arenaSize=16384*128) */
 	class PathFindingHex : public e2::Object
 	{
 		ObjectDeclaration();
@@ -26,17 +26,19 @@ namespace e2
 		PathFindingHex(e2::Hex const& index);
 		virtual ~PathFindingHex();
 
-		bool isBegin{};
 		e2::Hex index;
 
-		bool hexHasTarget{};
-
-		// lowest health target directly attackable from this hex , 
 		e2::GameEntity* grugTarget{};
-
 		e2::PathFindingHex* towardsOrigin{};
+
 		uint32_t stepsFromOrigin{};
+
+		bool isBegin{};
+		bool hexHasTarget{};
+		bool instantlyReachable{};
 	};
+
+	//uint32_t maxAutoMoveRange = 128; // 128*128 = 16384 pathfindinghex
 
 	/** @tags(arena, arenaSize=4096) */
 	class PathFindingAS : public e2::Object
@@ -46,11 +48,14 @@ namespace e2
 		PathFindingAS();
 		PathFindingAS(e2::Game* game, e2::Hex const& start, uint64_t range, bool ignoreVisibility = false, e2::PassableFlags passableFlags = PassableFlags::Land);
 		PathFindingAS(e2::GameEntity* unit);
+		// for long range targets
+		//PathFindingAS(e2::GameEntity* unit, glm::ivec2 const& target);
 		~PathFindingAS();
 
 		std::vector<e2::Hex> find(e2::Hex const& target);
 
 		// lowest health target directly attackable from origin hex , 
+		bool grugCanMove{};
 		e2::GameEntity* grugTarget{};
 		e2::Hex grugTargetMoveHex;
 		uint32_t grugTargetMovePoints{};
@@ -126,6 +131,8 @@ namespace e2
 
 		void updateGameState();
 		void updateTurn();
+		void updateAuto();
+		
 
 		void updateTurnLocal();
 		void updateTurnAI();
@@ -202,6 +209,7 @@ namespace e2
 		EmpireId m_empireTurn{};
 
 		TurnState m_turnState{ TurnState::Unlocked };
+		TurnState m_moveTurnStateFallback{ TurnState::Unlocked };
 
 		// main world grid
 		e2::HexGrid* m_hexGrid{};
@@ -260,9 +268,15 @@ namespace e2
 
 		e2::GameEmpire* empireById(EmpireId id);
 
+		void resolveLocalEntity();
+		void nextLocalEntity();
+
 	protected:
 		e2::EmpireId m_localEmpireId{};
 		e2::GameEmpire* m_localEmpire{};
+
+		std::unordered_set<e2::GameEntity*> m_localTurnEntities;
+		//std::unordered_set<e2::GameEntity*> m_localAutoEntities;
 
 		e2::EmpireId m_nomadEmpireId{};
 		e2::GameEmpire* m_nomadEmpire{};

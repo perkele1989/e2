@@ -234,7 +234,7 @@ namespace e2
 
 		// --- End Containers --- //
 
-
+		void gameHoverText(std::string const& text);
 		bool gameGridButton(e2::Name id, e2::Name iconSprite, std::string const& hoverTextMain, bool active);
 
 		void gameLabel(std::string const& text, uint8_t fontSize = 12, e2::UITextAlign horizAlign = UITextAlign::Begin);
@@ -264,9 +264,9 @@ namespace e2
 		void setScissor(glm::vec2 position, glm::vec2 size);
 
 		/** Draws a quad */
-		void drawQuad(glm::vec2 position, glm::vec2 size, e2::UIColor color);
+		void drawQuad(glm::vec2 position, glm::vec2 size, e2::UIColor color, float zoffset = 0.0f);
 
-		void drawTexturedQuad(glm::vec2 position, glm::vec2 size, e2::UIColor color, e2::ITexture* texture, glm::vec2 uvOffset = { 0.0f, 0.0f }, glm::vec2 uvScale = {1.0f, 1.0f}, e2::UITexturedQuadType type = UITexturedQuadType::Default);
+		void drawTexturedQuad(glm::vec2 position, glm::vec2 size, e2::UIColor color, e2::ITexture* texture, glm::vec2 uvOffset = { 0.0f, 0.0f }, glm::vec2 uvScale = {1.0f, 1.0f}, e2::UITexturedQuadType type = UITexturedQuadType::Default, float zoffset = 0.0f);
 
 		/** Draws a sprite */
 		void drawSprite(glm::vec2 position, e2::Sprite sprite, e2::UIColor color, float scale);
@@ -289,8 +289,8 @@ namespace e2
 		 * ^3This Text Is Colored (use 0 for fg, 1 for bg, 2-9 for accents)
 		 * ^-This Text Is No Longer Colored
 		 */
-		void drawRasterText(e2::FontFace fontFace, uint8_t fontSize,  e2::UIColor color, glm::vec2 position, std::string const& markdownUtf8, bool enableColorChange = true, bool soft = false);
-		void drawSDFText(e2::FontFace fontFace, float fontSize, e2::UIColor color, glm::vec2 position, std::string const& markdownUtf8, bool enableColorChange = true, bool soft = false);
+		void drawRasterText(e2::FontFace fontFace, uint8_t fontSize,  e2::UIColor color, glm::vec2 position, std::string const& markdownUtf8, bool enableColorChange = true, float zoffset = 0.0f);
+		void drawSDFText(e2::FontFace fontFace, float fontSize, e2::UIColor color, glm::vec2 position, std::string const& markdownUtf8, bool enableColorChange = true, float zoffset = 0.0f);
 		void drawSDFTextCarousel(e2::FontFace fontFace, float fontSize, e2::UIColor color, glm::vec2 position, std::string const& markdownUtf8, float heightScale, float time);
 		void drawRasterTextShadow(e2::FontFace fontFace, uint8_t fontSize,glm::vec2 position, std::string const& markdownUtf8);
 

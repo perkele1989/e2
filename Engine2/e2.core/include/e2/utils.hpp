@@ -1372,6 +1372,9 @@ namespace e2
 
 		static int32_t distance(Hex const& lhs, Hex const& rhs);
 
+		static int32_t distance(glm::ivec2 const& lhs, glm::ivec2 const& rhs);
+
+
 		int32_t x{};
 		int32_t y{};
 		int32_t z{};

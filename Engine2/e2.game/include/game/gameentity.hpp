@@ -62,6 +62,7 @@ namespace e2
 	using scriptFunc_update = std::function<void(e2::GameEntity*, double)>;
 	using scriptFunc_updateAnimation = std::function<void(e2::GameEntity*, double)>;
 	using scriptFunc_grugTick = std::function<bool(e2::GameEntity*, double)>;
+	using scriptFunc_playerRelevant = std::function<bool(e2::GameEntity*)>;
 	using scriptFunc_grugRelevant = std::function<bool(e2::GameEntity*)>;
 	using scriptFunc_fiscal = std::function<void(e2::GameEntity*, e2::ResourceTable&)>;
 	using scriptFunc_onHit = std::function<void(e2::GameEntity*, e2::GameEntity*, float)>;
@@ -85,6 +86,7 @@ namespace e2
 		void invokeUpdate(e2::GameEntity* entity, double seconds);
 
 		void invokeUpdateAnimation(e2::GameEntity* entity, double seconds);
+		bool invokePlayerRelevant(e2::GameEntity* entity);
 		bool invokeGrugRelevant(e2::GameEntity* entity);
 		bool invokeGrugTick(e2::GameEntity* entity, double seconds);
 		void invokeCollectRevenue(e2::GameEntity* entity, e2::ResourceTable &outTable);
@@ -103,6 +105,7 @@ namespace e2
 		void setDrawUI(scriptFunc_drawUI func);
 		void setUpdate(scriptFunc_update func);
 		void setUpdateAnimation(scriptFunc_updateAnimation func);
+		void setPlayerRelevant(scriptFunc_playerRelevant func);
 		void setGrugRelevant(scriptFunc_grugRelevant func);
 		void setGrugTick(scriptFunc_grugTick func);
 		void setCollectRevenue(scriptFunc_fiscal func);
@@ -121,6 +124,7 @@ namespace e2
 		bool hasUpdate();
 		bool hasDrawUI();
 		bool hasUpdateAnimation();
+		bool hasPlayerRelevant();
 		bool hasGrugRelevant();
 		bool hasGrugTick();
 		bool hasCollectRevenue();
@@ -140,6 +144,7 @@ namespace e2
 		scriptFunc_drawUI drawUI;
 		scriptFunc_updateAnimation updateAnimation;
 		scriptFunc_update update;
+		scriptFunc_playerRelevant playerRelevant;
 		scriptFunc_grugRelevant grugRelevant;
 		scriptFunc_grugTick grugTick;
 		scriptFunc_fiscal collectRevenue;
@@ -359,6 +364,8 @@ namespace e2
 		virtual void writeForSave(e2::Buffer& toBuffer);
 		virtual void readForSave(e2::Buffer& fromBuffer);
 
+		virtual bool playerRelevant();
+
 		/** returns true if this entity has actions available to them, or false if they can't do shit this round */
 		virtual bool grugRelevant();
 
@@ -444,6 +451,17 @@ namespace e2
 
 		std::string buildMessage;
 		e2::UnitBuildAction* currentlyBuilding{};
+
+		bool sleeping{};
+
+		bool autoMove{};
+		glm::ivec2 autoMoveTarget;
+
+
+		// these two are updated 
+		void updateGrugVariables();
+		bool grugCanMove{};
+		bool grugCanAttack{};
 
 	protected:
 		e2::Game* m_game{};

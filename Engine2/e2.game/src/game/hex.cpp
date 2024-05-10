@@ -1121,11 +1121,11 @@ e2::MeshProxy* e2::HexGrid::createForestProxyForTile(e2::TileData* tileData, glm
 
 	e2::MeshProxyConfiguration treeConf;
 	e2::MeshLodConfiguration lod;
-	lod.maxDistance = 5.0f;
+	lod.maxDistance = 10.0f;
 	lod.mesh = tileData->forestLods->lods[0];
 	treeConf.lods.push(lod);
 
-	lod.maxDistance = 15.0f;
+	lod.maxDistance = 35.0f;
 	lod.mesh = tileData->forestLods->lods[1];
 	treeConf.lods.push(lod);
 
