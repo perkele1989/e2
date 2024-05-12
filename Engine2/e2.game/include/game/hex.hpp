@@ -120,6 +120,9 @@ namespace e2
 		e2::MeshProxy* forestProxy{};
 		e2::MeshTreeLods* forestLods{};
 
+		e2::MeshProxy* resourceProxy{};
+		e2::MeshPtr resourceMesh;
+
 	};
 
 	constexpr uint32_t hexChunkResolution = 6;
@@ -128,7 +131,7 @@ namespace e2
 	constexpr uint32_t maxNumChunkStates = 512;
 
 	constexpr uint32_t maxNumChunkLoadTasks = 256;
-	constexpr uint32_t maxNumMeshesPerChunk = hexChunkResolution * hexChunkResolution;
+	constexpr uint32_t maxNumMeshesPerChunk = (hexChunkResolution * hexChunkResolution)*2;
 
 	class HexGrid;
 
@@ -422,21 +425,13 @@ namespace e2
 		void calculateResources(glm::vec2 const& planarCoords, e2::TileFlags& outFlags);
 		void calculateFeaturesAndWater(glm::vec2 const& planarCoords, float baseHeight, e2::TileFlags& outFlags);
 
+		e2::MeshPtr getResourceMeshForFlags(e2::TileFlags flags);
+
 		e2::MeshTreeLods* getForestMeshForFlags(e2::TileFlags flags);
 
-		
-
-
-
+		e2::MeshProxy* createResourceProxyForTile(e2::TileData* tileData, glm::ivec2 const& hex);
 		e2::MeshProxy* createForestProxyForTile(e2::TileData* tileData, glm::ivec2 const& hex);
 		static float sampleSimplex(glm::vec2 const& position);
-
-		
-
-
-
-		
-
 
 		e2::DynamicMesh& dynamicHex()
 		{
@@ -486,7 +481,7 @@ namespace e2
 		std::vector<int32_t> m_tileVisibility;
 		std::unordered_map<glm::ivec2, size_t> m_tileIndex;
 
-
+		e2::MeshPtr m_resourceMeshStone;
 		MeshTreeLods m_pineForestMeshes[3];
 
 		e2::MeshPtr m_baseHex;

@@ -1020,8 +1020,8 @@ void e2::Game::initialize()
 
 	am->prescribeALJ(alj, "assets/ui/S_UI_Icons.e2a");
 
-
-
+	;
+	am->prescribeALJ(alj, "assets/environment/resources/SM_ResourceMesh_Stone_LOD0.e2a");
 	am->prescribeALJ(alj, "assets/environment/SM_PineTree001_LOD0.e2a");
 	am->prescribeALJ(alj, "assets/environment/SM_PineTree001_LOD1.e2a");
 	am->prescribeALJ(alj, "assets/environment/SM_PineTree001_LOD2.e2a");
@@ -3020,15 +3020,15 @@ void e2::Game::resolveLocalEntity()
 
 	if (!m_selectedEntity)
 	{
-		nextLocalEntity();
+		//nextLocalEntity();
 		return;
 	}
 	
 	m_selectedEntity->updateGrugVariables();
-	if (!m_selectedEntity->playerRelevant())
-	{
-		nextLocalEntity();
-	}
+	//if (!m_selectedEntity->playerRelevant())
+	//{
+	//	nextLocalEntity();
+	//}
 }
 
 void e2::Game::nextLocalEntity()
@@ -3467,6 +3467,25 @@ void e2::Game::removeWood(glm::ivec2 const& location)
 
 	tileData->forestProxy = nullptr;
 	tileData->forestLods = nullptr;
+}
+
+void e2::Game::removeResource(glm::ivec2 const& location)
+{
+	e2::TileData* tileData = m_hexGrid->getExistingTileData(location);
+	if (!tileData)
+		return;
+
+	bool hasResource = (tileData->flags & e2::TileFlags::ResourceMask) != TileFlags::ResourceNone;
+	if (!hasResource)
+		return;
+
+	tileData->flags = e2::TileFlags(uint16_t(tileData->flags) & (~uint16_t(e2::TileFlags::ResourceMask)));
+
+	if (tileData->resourceProxy)
+		e2::destroy(tileData->resourceProxy);
+
+	tileData->resourceProxy = nullptr;
+	tileData->resourceMesh = nullptr;
 }
 
 void e2::Game::discoverEmpire(EmpireId empireId)

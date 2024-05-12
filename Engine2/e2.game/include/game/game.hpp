@@ -291,6 +291,8 @@ namespace e2
 		void harvestWood(glm::ivec2 const& location, EmpireId empire);
 		void removeWood(glm::ivec2 const& location);
 
+		void removeResource(glm::ivec2 const& location);
+
 		e2::RenderView const& view()
 		{
 			return m_view;

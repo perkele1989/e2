@@ -177,6 +177,7 @@ e2::HexGrid::HexGrid(e2::GameContext* gameCtx)
 		}
 	}
 
+	m_resourceMeshStone = am->get("assets/environment/resources/SM_ResourceMesh_Stone_LOD0.e2a").cast<e2::Mesh>();
 
 
 
@@ -341,6 +342,7 @@ void e2::HexGrid::loadFromBuffer(e2::Buffer& fromBuffer)
 		newTile.flags = (e2::TileFlags)flags;
 
 		newTile.forestLods = getForestMeshForFlags(newTile.flags);
+		newTile.resourceMesh = getResourceMeshForFlags(newTile.flags);
 
 		m_tiles.push_back(newTile);
 
@@ -961,7 +963,7 @@ float e2::HexGrid::sampleSimplex(glm::vec2 const& position)
 	return glm::simplex(position) * 0.5f + 0.5f;
 }
 
-void e2::HexGrid::calculateBiome(glm::vec2 const& planarCoords, e2::TileFlags &outFlags)
+void e2::HexGrid::calculateBiome(glm::vec2 const& planarCoords, e2::TileFlags& outFlags)
 {
 	float biomeCoeff = sampleSimplex((planarCoords + glm::vec2(81.44f, 93.58f)) * 0.01f);
 
@@ -1057,6 +1059,23 @@ void e2::HexGrid::calculateFeaturesAndWater(glm::vec2 const& planarCoords, float
 	}
 }
 
+e2::MeshPtr e2::HexGrid::getResourceMeshForFlags(e2::TileFlags flags)
+{
+	switch (flags & e2::TileFlags::ResourceMask)
+	{
+		case e2::TileFlags::ResourceStone:
+			return m_resourceMeshStone;
+		case e2::TileFlags::ResourceGold:
+			return m_resourceMeshStone; // @todo
+		case e2::TileFlags::ResourceOre:
+			return m_resourceMeshStone; // @todo
+		case e2::TileFlags::ResourceUranium:
+			return m_resourceMeshStone; // @todo
+		default:
+			return nullptr;
+	}
+}
+
 e2::MeshTreeLods* e2::HexGrid::getForestMeshForFlags(e2::TileFlags flags)
 {
 
@@ -1081,6 +1100,30 @@ e2::MeshTreeLods* e2::HexGrid::getForestMeshForFlags(e2::TileFlags flags)
 	return nullptr;
 }
 
+e2::MeshProxy* e2::HexGrid::createResourceProxyForTile(e2::TileData* tileData, glm::ivec2 const& hex)
+{
+	if (!tileData)
+		return nullptr; 
+
+	if (!tileData->resourceMesh)
+		return nullptr;
+
+
+	e2::MeshProxyConfiguration meshConf;
+	e2::MeshLodConfiguration lodConf;
+	lodConf.mesh = tileData->resourceMesh;
+	meshConf.lods.push(lodConf);
+	
+	glm::vec3 meshOffset = e2::Hex(hex).localCoords();
+
+	e2::MeshProxy* newMeshProxy = e2::create<e2::MeshProxy>(gameSession(), meshConf);
+	newMeshProxy->modelMatrix = glm::translate(glm::mat4(1.0f), meshOffset);
+	newMeshProxy->modelMatrix = glm::rotate(newMeshProxy->modelMatrix, glm::radians(e2::randomFloat(0.0f, 359.f)), glm::vec3(e2::worldUp()));
+	newMeshProxy->modelMatrixDirty = { true };
+
+	return newMeshProxy;
+}
+
 e2::TileData e2::HexGrid::getCalculatedTileData(glm::ivec2 const& hex)
 {
 	TileData newTileData;
@@ -1092,6 +1135,7 @@ e2::TileData e2::HexGrid::getCalculatedTileData(glm::ivec2 const& hex)
 	calculateResources(planarCoords, newTileData.flags);
 
 	newTileData.forestLods = getForestMeshForFlags(newTileData.flags);
+	newTileData.resourceMesh = getResourceMeshForFlags(newTileData.flags);
 
 	e2::GameEntity* existingStructure = game()->entityAtHex(EntityLayerIndex::Structure, hex);
 	if (existingStructure)
@@ -1137,7 +1181,7 @@ e2::MeshProxy* e2::HexGrid::createForestProxyForTile(e2::TileData* tileData, glm
 
 	e2::MeshProxy* newMeshProxy = e2::create<e2::MeshProxy>(gameSession(), treeConf);
 	newMeshProxy->modelMatrix = glm::translate(glm::mat4(1.0f), meshOffset);
-	newMeshProxy->modelMatrix = glm::rotate(newMeshProxy->modelMatrix, glm::radians(0.0f), glm::vec3(e2::worldUp()));
+	newMeshProxy->modelMatrix = glm::rotate(newMeshProxy->modelMatrix, glm::radians(e2::randomFloat(0.0f, 359.f)), glm::vec3(e2::worldUp()));
 	newMeshProxy->modelMatrixDirty = { true };
 
 	return newMeshProxy;
@@ -1169,7 +1213,8 @@ size_t e2::HexGrid::discover(glm::ivec2 const& hex)
 	
 	
 	e2::TileData* tileData = &m_tiles[m_tiles.size() - 1];
-	tileData->forestProxy = createForestProxyForTile(tileData, hex);
+	//tileData->forestProxy = createForestProxyForTile(tileData, hex);
+	//tileData->resourceProxy = createResourceProxyForTile(tileData, hex);
 
 	flagChunkOutdated(chunkIndex);
 	
@@ -2556,6 +2601,11 @@ void e2::HexGrid::popOutChunk(e2::ChunkState* state)
 						e2::destroy(realTileData->forestProxy);
 
 					realTileData->forestProxy = nullptr;
+
+					if (realTileData->resourceProxy)
+						e2::destroy(realTileData->resourceProxy);
+
+					realTileData->resourceProxy = nullptr;
 				}
 			}
 		}
@@ -2589,6 +2639,11 @@ void e2::HexGrid::refreshChunkMeshes(e2::ChunkState* state)
 					e2::destroy(realTileData->forestProxy);
 
 				realTileData->forestProxy = createForestProxyForTile(realTileData, tileHex);
+
+				if (realTileData->resourceProxy)
+					e2::destroy(realTileData->resourceProxy);
+
+				realTileData->resourceProxy = createResourceProxyForTile(realTileData, tileHex);
 			}
 			else
 			{
@@ -2597,6 +2652,10 @@ void e2::HexGrid::refreshChunkMeshes(e2::ChunkState* state)
 				e2::MeshProxy* newForestProxy = createForestProxyForTile(&tileData, tileHex);
 				if (newForestProxy)
 					state->extraMeshes.push(newForestProxy);
+
+				e2::MeshProxy* newResourceProxy = createResourceProxyForTile(&tileData, tileHex);
+				if (newResourceProxy)
+					state->extraMeshes.push(newResourceProxy);
 			}
 		}
 	}
