@@ -1,20 +1,14 @@
 var engineerScript = EntityScript();
 
-global EngineerActionType_BuildOnLand = 0;
-global EngineerActionType_BuildOnWater = 1;
-global EngineerActionType_HarvestWood = 2;
 
 class EngineerState 
 {
-    var waterHex;
-    var buildEntityName;
-    var actionType;
+
+    var sleeping;
 
     def EngineerState(entity)
     {
-        this.waterHex = entity.tileIndex;
-        this.actionType = EngineerActionType_BuildOnLand;
-        this.buildEntityName = "";
+        this.sleeping = true;
     }
 }
 
@@ -22,24 +16,40 @@ engineerScript.setCreateState(fun(entity) {
     return EngineerState(entity);
 });
 
-
-engineerScript.setUpdateCustomAction(fun(entity, time) {
-    if(!entity.isActionPlaying("build"))
+engineerScript.setOnBeginMove(fun(entity){
+    if(entity.scriptState.sleeping)
     {
-        if(entity.scriptState.actionType == EngineerActionType_BuildOnLand)
-        {
-            game.spawnEntity(entity.scriptState.buildEntityName, entity.tileIndex, entity.empireId);
-        }
-        else if(entity.scriptState.actionType == EngineerActionType_BuildOnWater)
-        {
-            game.spawnEntity(entity.scriptState.buildEntityName, entity.scriptState.waterHex, entity.empireId);
-        }
-        else if(entity.scriptState.actionType == EngineerActionType_HarvestWood)
-        {
-            game.harvestWood(entity.tileIndex, entity.empireId);
-        }
+        entity.scriptState.sleeping = false;
+    }
+    entity.stopAction();
 
-        game.endCustomAction();
+    entity.setPose("walk");
+});
+
+engineerScript.setOnEndMove(fun(entity){
+    if(entity.scriptState.sleeping)
+    {
+        entity.scriptState.sleeping = false;
+    }
+    
+    entity.setPose("idle");
+});
+
+engineerScript.setOnSelected(fun(entity){
+    if(entity.scriptState.sleeping)
+    {
+        entity.setPose("idle");
+        entity.playAction("wakeup");
+        entity.scriptState.sleeping = false;
+    }
+});
+
+engineerScript.setOnDeselected(fun(entity){
+    if(!entity.scriptState.sleeping)
+    {
+        entity.setPose("sleep");
+        entity.playAction("nightnight");
+        entity.scriptState.sleeping = true;
     }
 });
 
@@ -57,6 +67,8 @@ engineerScript.setDrawUI(fun(entity, ui){
 
     var nbList = Hex(entity.tileIndex).neighbours();
     var numNb = nbList.size();
+
+    var waterHex;
 
     for(var i = 0; i < numNb; ++i)
     {
@@ -77,7 +89,7 @@ engineerScript.setDrawUI(fun(entity, ui){
                 continue;
             }
 
-            entity.scriptState.waterHex = nbIndex;
+            waterHex = nbIndex;
 
             hasWaterTile = true;
             break;
@@ -91,126 +103,40 @@ engineerScript.setDrawUI(fun(entity, ui){
             // @todo make all these check if we afford!
             if(ui.button("wf", "Build War Factory"))
             {
-                entity.scriptState.buildEntityName = "warfactory";
-                entity.scriptState.actionType = EngineerActionType_BuildOnLand;
-                entity.playAction("build");
-
+                game.spawnEntity("warfactory", entity.tileIndex, entity.empireId);
                 --entity.buildPointsLeft;
-
-                game.beginCustomAction();
-            }
-
-            if(ui.button("brc", "Build Barracks"))
-            {
-                entity.scriptState.buildEntityName = "barracks";
-                entity.scriptState.actionType = EngineerActionType_BuildOnLand;
-                entity.playAction("build");
-
-                --entity.buildPointsLeft;
-
-                game.beginCustomAction();
-            }
-
-            if(ui.button("arb", "Build Airbase"))
-            {
-                entity.scriptState.buildEntityName = "airbase";
-                entity.scriptState.actionType = EngineerActionType_BuildOnLand;
-                entity.playAction("build");
-
-                --entity.buildPointsLeft;
-
-                game.beginCustomAction();
             }
         }
 
         if(hasWaterTile && ui.button("navb", "Build Naval Base"))
         {
-            entity.scriptState.buildEntityName = "navalbase";
-            entity.scriptState.actionType = EngineerActionType_BuildOnWater;
-            entity.playAction("build");
+            game.spawnEntity("navalbase", waterHex, entity.empireId);
 
             --entity.buildPointsLeft;
-
-            game.beginCustomAction();
         }
 
         if(isForested)
         {
             if(ui.button("hrvst", "Harvest Wood"))
             {
-                entity.scriptState.actionType = EngineerActionType_HarvestWood;
-                entity.playAction("build");
-
+                game.harvestWood(entity.tileIndex, entity.empireId);
                 --entity.buildPointsLeft;
 
-                game.beginCustomAction();
             }
 
             if(ui.button("sawmill", "Build Saw Mill"))
             {
-                entity.scriptState.buildEntityName = "sawmill";
-                entity.scriptState.actionType = EngineerActionType_BuildOnLand;
-                entity.playAction("build");
+                game.spawnEntity("sawmill", entity.tileIndex, entity.empireId);
 
                 --entity.buildPointsLeft;
-
-                game.beginCustomAction();
             }
         }
 
-        if(tileData.hasGold() && ui.button("gldm", "Build Gold Mine"))
-        {
-            entity.scriptState.buildEntityName = "goldmine";
-            entity.scriptState.actionType = EngineerActionType_BuildOnLand;
-            entity.playAction("build");
-
-            --entity.buildPointsLeft;
-
-            game.beginCustomAction();
-        }
-
-        if(tileData.hasOil() && ui.button("gldm", "Build Oil Well"))
-        {
-            entity.scriptState.buildEntityName = "oilwell";
-            entity.scriptState.actionType = EngineerActionType_BuildOnLand;
-            entity.playAction("build");
-
-            --entity.buildPointsLeft;
-
-            game.beginCustomAction();
-        }
 
         if(tileData.hasOre() && ui.button("orm", "Build Ore Mine"))
         {
-            entity.scriptState.buildEntityName = "oremine";
-            entity.scriptState.actionType = EngineerActionType_BuildOnLand;
-            entity.playAction("build");
-
+            game.spawnEntity("oremine", entity.tileIndex, entity.empireId);
             --entity.buildPointsLeft;
-
-            game.beginCustomAction();
-        }
-
-        if(tileData.hasStone() && ui.button("qrr", "Build Quarry"))
-        {
-            entity.scriptState.buildEntityName = "quarry";
-            entity.scriptState.actionType = EngineerActionType_BuildOnLand;
-            entity.playAction("build");
-
-            --entity.buildPointsLeft;
-
-            game.beginCustomAction();
-        }
-
-        if(tileData.hasUranium() && ui.button("gldm", "Build Uranium Mine"))
-        {
-            entity.scriptState.buildEntityName = "uraniummine";
-            entity.scriptState.actionType = EngineerActionType_BuildOnLand;
-            entity.playAction("build");
-
-            --entity.buildPointsLeft;
-
-            game.beginCustomAction();
         }
     }
 

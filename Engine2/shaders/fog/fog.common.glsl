@@ -44,24 +44,29 @@ vec3 sampleFogNormal(vec2 position, float time)
 {
     float eps = 0.4;
     float eps2 = eps * 2;
+    float strength = 1.25;
     vec3 off = vec3(1.0, 1.0, 0.0)* eps;
     float hL = sampleFogHeight(position.xy - off.xz, time);
     float hR = sampleFogHeight(position.xy + off.xz, time);
     float hD = sampleFogHeight(position.xy - off.zy, time);
     float hU = sampleFogHeight(position.xy + off.zy, time);
 
-    return normalize(vec3(hR - hL, -eps2 , hU - hD));
+    return normalize(vec3(hR - hL, -eps2 * (1.0 / strength) , hU - hD));
 }
 
 vec3 undiscovered(float f,vec3 n, vec3 color, vec3 position, float depth)
 {
-    float fogSaturation = 0.75;
-    float fogBrightness = 0.65;
+    //float vary = pow(sampleSimplex(position.xz*0.05 + vec2(-0.02, 0.015) * renderer.time.x), 2.2);
+    float fogSaturation = 1.0;
+    float fogBrightness = 0.25;
     vec3 fogColor = vec3(250, 187, 107) / 255.0;
-    float fogDustiness = 0.4;
+    float fogDustiness = 0.8;// * vary;
     
+    fogColor = mix(vec3(1.0), fogColor, fogDustiness);
+
     vec3 fogColorDesaturate = vec3(dot(fogColor, vec3(1.0/3.0)));
     fogColor = mix(fogColorDesaturate, fogColor, fogSaturation) * fogBrightness;
+
 
     vec3 irr_back = getIrradiance(-n);
     vec3 irr_front = getIrradiance(n);
@@ -71,18 +76,33 @@ vec3 undiscovered(float f,vec3 n, vec3 color, vec3 position, float depth)
 
     vec3 back_actual = irr_back * (1.0 - ratio_half) + irr_front * ratio_half;
     vec3 front_actual = irr_front * (1.0 - ratio_half) + irr_back * ratio_half;
+    //front_actual *= vary*0.25 + 0.75;
 
-    vec3 irradiance =  mix(back_actual, front_actual, pow(f, 2.0));
+    vec3 irradiance =  mix(back_actual, front_actual, pow(f, 1.0));
 
-    vec3 fogDiffuse =  mix(irradiance, irradiance * fogColor, fogDustiness);
+
 
 	vec3 lightVector = normalize(renderer.sun1.xyz);
-    vec3 ndotl = vec3(clamp(dot(n, -lightVector), 0.0, 1.0)) * renderer.sun2.xyz * renderer.sun2.w;
+    float ndl = clamp(dot(n, -lightVector), 0.0, 1.0);
+    vec3 ndotl = renderer.sun2.xyz * renderer.sun2.w * ndl;
 
-    vec3 fogResult = fogDiffuse * 0.5 + (fogColor * ndotl *0.2);
+/*
+    vec3 lvv = -lightVector;
+    lvv.xz = -lvv.xz;
+    float nndl = clamp(dot(n, lvv), 0.0, 1.0);
+    float varyll = pow(sampleSimplex(position.xz*0.05 + vec2(-0.02, 0.015) * renderer.time.x), 4.0);
+    vec3 ll = vec3(0.2, 0.5, 1.0) * nndl * varyll * 5;*/
+
+    //ndotl *= vary*0.75 + 0.25;
+
+    vec3 fogResult = (irradiance * fogColor) + (fogColor * ndotl);
 
     float heightCoeff = smoothstep(0.0, 1.0, depth);
     vec3 undis = mix(color, fogResult, heightCoeff);
+
+//    undis += ll;
+
+//    return vec3(vary);
 
     return undis;
 }

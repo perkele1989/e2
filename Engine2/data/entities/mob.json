@@ -8,10 +8,11 @@
             "layerIndex": "structure",
             "passableFlags": ["none"],
             "moveType": "static",
-            "sightRange": 2,
+            "sightRange": 5,
             "defensiveStrength": 1000.0,
             "script": "data/entities/mob.chai",
-            "mesh": "assets/structures/SM_BuildingPlaceholder.e2a",
+            "mesh": "assets/structures/city/SM_City.e2a",
+            "meshScale": [1, 1, 1],
             "revenue": {
                 "gold": 2
             }

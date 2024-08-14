@@ -191,9 +191,9 @@ namespace e2
 
 	constexpr uint32_t maxVkDescriptorSetLayouts = 256;
 
-	constexpr uint32_t maxVkFences = 64;
+	constexpr uint32_t maxVkFences = 256;
 
-	constexpr uint32_t maxVkRenderTargets = 64;
+	constexpr uint32_t maxVkRenderTargets = 256;
 
 	constexpr uint32_t maxVkSemaphores = 64;
 

@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <e2/utils.hpp>
 #include <e2/timer.hpp>
+#include <e2/ui/uitypes.hpp>
 
 namespace e2 
 {
@@ -10,6 +11,13 @@ namespace e2
 
     constexpr uint64_t maxNumEmpires = 256;
     using EmpireId = uint64_t;
+
+	enum class EntityMoveType : uint8_t
+	{
+		Static,
+		Linear,
+		Smooth
+	};
 
 	enum class PassableFlags : uint8_t
 	{
@@ -70,7 +78,10 @@ namespace e2
 		Unlocked,
 		UnitAction_Move,
 		EntityAction_Generic,
-		EntityAction_Target
+		EntityAction_Target,
+		WavePreparing,
+		Wave,
+		WaveEnding,
 	};
 
 	enum class EntityLayerIndex : uint8_t
@@ -117,5 +128,13 @@ namespace e2
 		glm::vec3 offset;
 		glm::vec3 velocity;
 	};
+
+
+	static const e2::UIColor gameAccent{ 0xf59b14FF };
+	static const e2::UIColor gameAccentHalf{ 0xf59b147F };
+	static const e2::UIColor gamePanelDark{ 0x1d2531FF };
+	static const e2::UIColor gamePanelDarkHalf{ 0x1d25317F };
+	static const e2::UIColor gamePanelLight{ 0x425168FF };
+	static const e2::UIColor gamePanelLightHalf{ 0x4251687F };
 
 }

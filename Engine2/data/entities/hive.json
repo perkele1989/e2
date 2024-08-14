@@ -1,0 +1,71 @@
+
+{
+    "entities":[
+        {
+            "id": "hive",
+            "typeName": "e2::GameEntity",
+            "displayName": "Hive",
+            "layerIndex": "unit",
+            "passableFlags": ["none"],
+            "moveType": "static",
+            "sightRange": 10,
+            "maxHealth": 100.0,
+            "waveRelevant": true,
+            "script": "data/entities/hive.chai",
+            "mesh": "assets/entities/hive/SM_Hive.e2a",
+            "skeleton": "assets/entities/hive/SK_Hive.e2a",
+            "meshScale": [0.25, 0.25, 0.25],
+            "poses": [
+                {
+                    "name": "idleClose",
+                    "asset": "assets/entities/hive/A_HiveIdleClose.e2a",
+                    "blendTime": 0.0
+                },
+                {
+                    "name": "idleOpen",
+                    "asset": "assets/entities/hive/A_HiveIdleOpen.e2a",
+                    "blendTime": 0.0
+                },
+                {
+                    "name": "idleExpanded",
+                    "asset": "assets/entities/hive/A_HiveIdleExpanded.e2a",
+                    "blendTime": 0.0
+                }
+            ],
+            "actions": [
+                {
+                    "name": "open",
+                    "asset": "assets/entities/hive/A_HiveOpen.e2a",
+                    "blendInTime": 0.0,
+                    "blendOutTime": 0.0
+                },
+                {
+                    "name": "reopen",
+                    "asset": "assets/entities/hive/A_HiveReopen.e2a",
+                    "blendInTime": 0.0,
+                    "blendOutTime": 0.0
+                },
+                {
+                    "name": "close",
+                    "asset": "assets/entities/hive/A_HiveClose.e2a",
+                    "blendInTime": 0.0,
+                    "blendOutTime": 0.0
+                },
+                {
+                    "name": "spawn",
+                    "asset": "assets/entities/hive/A_HiveSpawn.e2a",
+                    "blendInTime": 0.0,
+                    "blendOutTime": 0.0,
+                    "triggers":[
+                        {
+                            "id": "spawn",
+                            "time": 0.04
+                        }
+                    ]
+                    
+                }
+            ]
+        }
+    ]
+
+}

@@ -173,7 +173,7 @@ e2::IPipeline* e2::FogModel::getOrCreatePipeline(e2::MeshProxy* proxy, uint8_t l
 		e2::PipelineCreateInfo pipelineInfo;
 		pipelineInfo.layout = m_pipelineLayout;
 		pipelineInfo.shaders = { newEntry.vertexShader, newEntry.fragmentShader };
-		pipelineInfo.colorFormats = { e2::TextureFormat::RGBA8, e2::TextureFormat::RGBA32 };
+		pipelineInfo.colorFormats = { e2::TextureFormat::RGBA32, e2::TextureFormat::RGBA32 };
 		pipelineInfo.depthFormat = { e2::TextureFormat::D32 };
 		pipelineInfo.alphaBlending = true;
 		newEntry.pipeline = renderContext()->createPipeline(pipelineInfo);

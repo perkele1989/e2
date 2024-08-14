@@ -3,48 +3,36 @@
 
 void e2::ResourceTable::write(e2::Buffer& destination) const
 {
-	destination << wood;
-	destination << stone;
-	destination << metal;
 	destination << gold;
-	destination << oil;
-	destination << uranium;
-	destination << meteorite;
+	destination << wood;
+	destination << iron;
+	destination << steel;
 }
 
 bool e2::ResourceTable::read(e2::Buffer& source)
 {
-	source >> wood;
-	source >> stone;
-	source >> metal;
 	source >> gold;
-	source >> oil;
-	source >> uranium;
-	source >> meteorite;
+	source >> wood;
+	source >> iron;
+	source >> steel;
 	return true;
 }
 
 void e2::ResourceTable::clear()
 {
-	wood = 0.0f;
-	stone = 0.0f;
-	metal = 0.0f;
 	gold = 0.0f;
-	oil = 0.0f;
-	uranium = 0.0f;
-	meteorite = 0.0f;
+	wood = 0.0f;
+	iron = 0.0f;
+	steel = 0.0f;
 }
 
 e2::ResourceTable e2::ResourceTable::operator*(float v) const
 {
 	ResourceTable table = *this;
 	table.gold *= v;
-	table.metal *= v;
-	table.meteorite *= v;
-	table.oil *= v;
-	table.stone *= v;
-	table.uranium *= v;
 	table.wood *= v;
+	table.iron *= v;
+	table.steel *= v;
 	return table;
 }
 
@@ -64,27 +52,21 @@ e2::ResourceTable e2::ResourceTable::operator-(ResourceTable const& other) const
 
 e2::ResourceTable& e2::ResourceTable::operator-=(ResourceTable const& other)
 {
-	wood -= other.wood;
-	stone -= other.stone;
-	metal -= other.metal;
 	gold -= other.gold;
-	oil -= other.oil;
-	uranium -= other.uranium;
-	meteorite -= other.meteorite;
-
+	wood -= other.wood;
+	iron -= other.iron;
+	steel -= other.steel;
+	
 	return *this;
 }
 
 e2::ResourceTable& e2::ResourceTable::operator+=(ResourceTable const& other)
 {
-	wood += other.wood;
-	stone += other.stone;
-	metal += other.metal;
 	gold += other.gold;
-	oil += other.oil;
-	uranium += other.uranium;
-	meteorite += other.meteorite;
-
+	wood += other.wood;
+	iron += other.iron;
+	steel += other.steel;
+	
 	return *this;
 }
 

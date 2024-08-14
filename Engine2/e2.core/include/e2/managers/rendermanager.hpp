@@ -26,8 +26,6 @@ namespace e2
 
 
 
-
-
 	class E2_API RenderCallbacks
 	{
 	public:
@@ -121,6 +119,10 @@ namespace e2
 		}
 
 		e2::IShader* fullscreenTriangleShader();
+		e2::IPipeline* tonemapPipeline();
+		e2::IPipelineLayout* tonemapLayout();
+		e2::IDescriptorSetLayout* tonemapSetLayout();
+		e2::IDescriptorPool* tonemapPool();
 
 		void invalidatePipelines();
 
@@ -143,6 +145,12 @@ namespace e2
 		e2::Texture2DPtr m_integratedBrdf;
 
 		e2::IShader* m_fullscreenTriangleShader{};
+		e2::IShader* m_tonemapShader{};
+
+		e2::IPipelineLayout* m_tonemapLayout{};
+		e2::IDescriptorSetLayout* m_tonemapSetLayout{};
+		e2::IPipeline* m_tonemapPipeline{};
+		e2::IDescriptorPool* m_tonemapPool{};
 
 		e2::ISampler* m_shadowSampler{};
 		e2::Texture2DPtr m_defaultTexture;

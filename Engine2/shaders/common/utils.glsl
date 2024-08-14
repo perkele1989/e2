@@ -5,11 +5,16 @@
 const vec2 invAtan = vec2(0.1591, 0.3183);
 vec2 equirectangularUv(vec3 direction)
 {
+    //direction = normalize(direction);
     vec2 uv = vec2(atan(direction.z, direction.x), asin(-direction.y));
     uv *= invAtan;
     uv += 0.5;
 
     uv.y = 1.0 - uv.y;
+
+
+    //uv = clamp(uv, vec2(0.01), vec2(0.99));
+
 
     return uv;
 }
@@ -81,6 +86,22 @@ float sampleSimplex(vec2 position)
 {
 	return simplex(position) * 0.5 + 0.5;
 }
+
+
+
+vec3 shiftHue(vec3 col, float shift)
+{
+    vec3 P = vec3(0.55735)*dot(vec3(0.55735), col);
+    
+    vec3 U = col-P;
+    
+    vec3 V = cross(vec3(0.55735),U);    
+
+    col = U*cos(shift*6.2832) + V*sin(shift*6.2832) + P;
+    
+    return col;
+}
+
 
 float sampleBaseHeight(vec2 position)
 {
@@ -161,3 +182,66 @@ vec4 blur9(texture2D sourceTexture, sampler sourceSampler, vec2 uv, vec2 directi
 }
 
 
+
+
+float beckmannDistribution(float x, float roughness)
+{
+    roughness = max(0.0001, roughness);
+    float NdotH = max(x, 0.0001);
+    float cos2Alpha = NdotH * NdotH;
+    float tan2Alpha = (cos2Alpha - 1.0) / cos2Alpha;
+    float roughness2 = roughness * roughness;
+    float denom = 3.141592653589793 * roughness2 * cos2Alpha * cos2Alpha;
+    return exp(tan2Alpha / roughness2) / denom;
+}
+
+vec3 cookTorranceSpecular(vec3 lightDirection, vec3 viewDirection, vec3 surfaceNormal, float roughness, vec3 F0)
+{
+
+  //Half angle vector
+  vec3 H = normalize(lightDirection + viewDirection);
+
+  float VdotN = max(dot(viewDirection, surfaceNormal), 0.0001);
+  float LdotN = max(dot(lightDirection, surfaceNormal), 0.0001);
+
+  //Geometric term
+  float NdotH = max(dot(surfaceNormal, H), 0.0001);
+  float VdotH = max(dot(viewDirection, H), 0.0001);
+  float LdotH = max(dot(lightDirection, H), 0.0001);
+  float G1 = (2.0 * NdotH * VdotN) / VdotH;
+  float G2 = (2.0 * NdotH * LdotN) / VdotH;
+  float G = min(1.0, min(G1, G2));
+
+  //Distribution term
+  float D = beckmannDistribution(NdotH, roughness);
+
+  //Fresnel term
+  vec3 F = (F0 + (1.0 - F0)) * pow(1.0 - VdotH, 5.0);
+
+  //Multiply terms and done
+  return  (F * G * D / max(4.0  * VdotN, 0.0001));
+}
+
+
+
+float hex(in vec2 p)
+{
+    const vec2 s = vec2(1, 1.7320508);
+    p = abs(p);
+    
+    return max(dot(p, s*.5), p.x); // Hexagon.
+}
+
+vec4 getHex(vec2 p)
+{
+    const vec2 s = vec2(1, 1.7320508);
+    p *=  1.0 / sqrt(3.0);
+    
+    vec4 hC = floor(vec4(p, p - vec2(.5, 1))/s.xyxy) + .5;
+    
+    vec4 h = vec4(p - hC.xy*s, p - (hC.zw + .5)*s);
+    
+    return dot(h.xy, h.xy) < dot(h.zw, h.zw) 
+        ? vec4(h.xy, hC.xy) 
+        : vec4(h.zw, hC.zw + .5);
+}

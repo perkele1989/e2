@@ -80,10 +80,9 @@ void e2::WaterModel::postConstruct(e2::Context* ctx)
 	m_proxyUniformBuffers[0] = renderContext()->createDataBuffer(bufferCreateInfo);
 	m_proxyUniformBuffers[1] = renderContext()->createDataBuffer(bufferCreateInfo);
 
-	//std::string cubemapName = "assets/lakeside_4k.e2a";
-	//std::string cubemapName = "assets/the_sky_is_on_fire_4k.e2a";
-	//std::string cubemapName = "assets/studio_small_03_4k.e2a";
-	std::string cubemapName = "assets/kloofensky_rad.e2a";
+	
+	//std::string cubemapName = "assets/hdri/courtyard_irr.e2a";
+	std::string cubemapName = "assets/hdri/sunset_rad.e2a";
 
 	e2::ALJDescription aljDesc;
 	assetManager()->prescribeALJ(aljDesc, cubemapName);
@@ -187,7 +186,7 @@ e2::IPipeline* e2::WaterModel::getOrCreatePipeline(e2::MeshProxy* proxy, uint8_t
 		e2::PipelineCreateInfo pipelineInfo;
 		pipelineInfo.layout = m_pipelineLayout;
 		pipelineInfo.shaders = { newEntry.vertexShader, newEntry.fragmentShader };
-		pipelineInfo.colorFormats = { e2::TextureFormat::RGBA8, e2::TextureFormat::RGBA32 };
+		pipelineInfo.colorFormats = { e2::TextureFormat::RGBA32, e2::TextureFormat::RGBA32 };
 		pipelineInfo.depthFormat = { e2::TextureFormat::D32 };
 		pipelineInfo.alphaBlending = true;
 		newEntry.pipeline = renderContext()->createPipeline(pipelineInfo);

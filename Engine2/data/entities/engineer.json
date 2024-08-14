@@ -4,56 +4,62 @@
         {
             "id": "engineer",
             "typeName": "e2::GameEntity",
-            "displayName": "Engineer",
+            "displayName": "Drone",
+            "badgeId": "units.drone",
             "passableFlags": ["land"],
             "moveType": "smooth",
-            "sightRange": 3,
+            "sightRange": 6,
             "showMovePoints": true,
             "showAttackPoints": false,
             "showBuildPoints": true,
-            "movePoints": 3,
+            "movePoints": 13,
             "attackPoints": 0,
-            "buildPoints": 1,
+            "buildPoints": 3,
             "attackStrength": 0.0,
             "defensiveStrength": 25.0,
-            "meshScale": [0.004, -0.004, -0.004],
-            "moveSpeed": 2.8,
+            "meshScale": [0.5, 0.5, 0.5],
+            "moveSpeed": 1.0,
             "script": "data/entities/engineer.chai",
-            "mesh": "assets/characters/SM_Engineer.e2a",
-            "skeleton": "assets/characters/SK_Engineer.e2a",
+            "mesh": "assets/units/drone/SM_Drone_LOD0.e2a",
+            "skeleton": "assets/units/drone/SK_Drone_LOD0.e2a",
             "poses": [
                 {
                     "name": "idle",
-                    "asset": "assets/characters/A_EngineerIdle.e2a",
-                    "blendTime": 0.5 
+                    "asset": "assets/units/drone/A_Engineer_Idle.e2a",
+                    "blendTime": 0.0 
                 },
                 {
-                    "name": "move",
-                    "asset": "assets/characters/A_EngineerRun.e2a",
-                    "blendTime": 0.15
+                    "name": "sleep",
+                    "asset": "assets/units/drone/A_Engineer_Sleep.e2a",
+                    "blendTime": 0.0
+                },
+                {
+                    "name": "walk",
+                    "asset": "assets/units/drone/A_Engineer_Walk.e2a",
+                    "blendTime": 0.0,
+                    "speed": 2.0
                 }
             ],
             "actions": [
                 {
-                    "name": "build",
-                    "asset": "assets/characters/A_EngineerBuild.e2a",
-                    "blendInTime": 0.25,
-                    "blendOutTime": 0.5,
-                    "speed": 4.0
+                    "name": "nightnight",
+                    "asset": "assets/units/drone/A_Engineer_NightNight.e2a",
+                    "blendInTime": 0.0,
+                    "blendOutTime": 0.0
                 },
                 {
-                    "name": "die",
-                    "asset": "assets/characters/A_EngineerDie.e2a",
-                    "blendInTime": 0.25,
-                    "blendOutTime": 0.0
+                    "name": "wakeup",
+                    "asset": "assets/units/drone/A_Engineer_WakeUp.e2a",
+                    "blendInTime": 0.0,
+                    "blendOutTime": 0.25
                 }
             ],
             "buildTurns": 3,
             "upkeep": {
-                "gold": 0.25
+                "gold": 0.0
             },
             "cost": {
-                "gold": 2.0
+                "gold": 0.0
             }
         }
     ]

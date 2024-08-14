@@ -57,13 +57,13 @@ namespace e2
 
 		std::pair<uint32_t, double> getFrameDelta(double time, double frameRate);
 
-		float getFloat(double time, double frameRate);
+		float getFloat(double time, double frameRate, bool wrap);
 
-		glm::vec2 getVec2(double time, double frameRate);
+		glm::vec2 getVec2(double time, double frameRate, bool wrap);
 
-		glm::vec3 getVec3(double time, double frameRate);
+		glm::vec3 getVec3(double time, double frameRate, bool wrap);
 
-		glm::quat getQuat(double time, double frameRate);
+		glm::quat getQuat(double time, double frameRate, bool wrap);
 
 		e2::Name name;
 		AnimationType type;
@@ -101,6 +101,7 @@ namespace e2
 	{
 		std::vector<e2::AnimationTrack*> translationTracks;
 		std::vector<e2::AnimationTrack*> rotationTracks;
+		std::vector<e2::AnimationTrack*> scaleTracks;
 	};
 
 	class Animation;

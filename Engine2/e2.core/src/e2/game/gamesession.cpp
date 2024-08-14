@@ -17,6 +17,7 @@ e2::GameSession::GameSession(e2::Context* ctx)
 	m_window = renderManager()->mainThreadContext()->createWindow(winCreateInfo);
 	//m_window->setFullscreen(true);
 
+
 	m_renderer = e2::create<e2::Renderer>(this, winCreateInfo.size);
 
 	//m_window->source(m_renderer->colorTarget());
@@ -59,8 +60,7 @@ void e2::GameSession::tick(double seconds)
 
 	if (m_window->size() != m_renderer->resolution() && m_window->size().x > 0 && m_window->size().y > 0)
 	{
-		m_renderer->keepAround();
-		e2::destroy(m_renderer);
+		e2::discard(m_renderer);
 		m_renderer = e2::create<e2::Renderer>(this, m_window->size());
 	}
 

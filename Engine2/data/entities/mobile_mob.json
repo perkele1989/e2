@@ -8,7 +8,7 @@
             "displayName": "Mobile M.O.B",
             "passableFlags": ["land"],
             "moveType": "smooth",
-            "sightRange": 3,
+            "sightRange": 6,
             "movePoints": 3,
             "attackPoints": 0,
             "buildPoints": 0,

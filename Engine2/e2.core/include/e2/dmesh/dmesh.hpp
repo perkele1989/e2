@@ -86,6 +86,13 @@ namespace e2
 			uint32_t vertexIds[3] = { 0, 0, 0};
 		};
 
+		inline void flipWinding()
+		{
+			uint32_t swap = a;
+			a = c;
+			c = swap;
+		}
+
 		glm::vec3 faceNormal{};
 	};
 
@@ -112,6 +119,8 @@ namespace e2
 		void reserve(uint32_t numVertices, uint32_t numTriangles);
 
 		void cutSlack();
+
+		void buildIcoSphere(uint32_t subdivisions, bool flipWinding, glm::mat4 const& transform = glm::identity<glm::mat4>());
 
 		/** Adds an entire other mesh to this mesh */
 		void addMesh(e2::DynamicMesh const* other, glm::mat4 const& transform = glm::identity<glm::mat4>());

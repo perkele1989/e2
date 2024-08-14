@@ -351,6 +351,9 @@ bool e2::UfbxImporter::analyze()
 				}
 			}
 
+			if (!bone_cluster) // @todo ???
+				continue;
+
 			uint32_t currIndex = m_mesh.skeleton.bones.size();
 			m_mesh.skeleton.nameIndex[std::string(n->name.data)] = currIndex;
 			m_mesh.skeleton.nodeIndex[n] = currIndex;
@@ -415,6 +418,8 @@ bool e2::UfbxImporter::analyze()
 
 		// hardcode framerate
 		float durationSecs = animStack->time_end - animStack->time_begin;
+		if (durationSecs < 0.001f)
+			durationSecs = 1.0f;
 
 		newAnim.duration = glm::max((uint32_t)glm::ceil(durationSecs * 24.0f), (uint32_t)2);
 		newAnim.framesPerSecond = ((float)newAnim.duration - 1) / durationSecs;
@@ -445,6 +450,11 @@ bool e2::UfbxImporter::analyze()
 				rotKey.quat = ::glmQuat(transform.rotation);
 
 				channel.rotationKeys.push_back(rotKey);
+
+				UfbxVec3Key scaKey;
+				scaKey.time = time;
+				scaKey.vector = ::glmVec3(transform.scale);
+				channel.scaleKeys.push_back(scaKey);
 
 			}
 			newAnim.channels[bone.name] = channel;
@@ -827,7 +837,7 @@ bool e2::UfbxImporter::writeAssets()
 
 		animData << uint32_t(anim.duration);
 		animData << float(anim.framesPerSecond);
-		animData << uint32_t(anim.channels.size() * 2);
+		animData << uint32_t(anim.channels.size() * 3);
 
 		for (auto& pair : anim.channels)
 		{
@@ -845,6 +855,26 @@ bool e2::UfbxImporter::writeAssets()
 				animData << pos.x;
 				animData << pos.y;
 				animData << pos.z;
+				animData << 0.0f;
+			}
+		}
+
+		for (auto& pair : anim.channels)
+		{
+			std::string channelName = pair.first + ".scale";
+			UfbxImportChannel& channel = pair.second;
+
+			animData << channelName;
+
+			animData << uint8_t(2);//vec3
+
+			for (uint32_t frameIndex = 0; frameIndex < anim.duration; frameIndex++)
+			{
+				float time = (float(frameIndex) / float(anim.duration)) * (float(anim.duration) / anim.framesPerSecond);
+				glm::vec3 sca = channel.sampleScale(time);
+				animData << sca.x;
+				animData << sca.y;
+				animData << sca.z;
 				animData << 0.0f;
 			}
 		}
@@ -995,6 +1025,47 @@ glm::vec3 e2::UfbxImportChannel::samplePosition(float time)
 
 	return glm::mix(positionKeys[frameA].vector, positionKeys[frameB].vector, frameDelta);
 }
+
+
+
+
+
+glm::vec3 e2::UfbxImportChannel::sampleScale(float time)
+{
+	for (int32_t ki = 0; ki < scaleKeys.size(); ki++)
+	{
+		if (scaleKeys[ki].time == time)
+			return scaleKeys[ki].vector;
+	}
+
+	int32_t frameA = 0;
+	int32_t frameB = 0;
+
+	for (int32_t ki = 0; ki < scaleKeys.size(); ki++)
+	{
+		if (scaleKeys[ki].time > time)
+		{
+			frameB = ki;
+			break;
+		}
+	}
+
+	frameA = frameB - 1;
+	if (frameA < 0)
+	{
+		return scaleKeys[frameB].vector;
+	}
+	float timeA = scaleKeys[frameA].time;
+	float timeB = scaleKeys[frameB].time;
+
+	float frameDelta = (time - timeA) / (timeB - timeA);
+
+	return glm::mix(scaleKeys[frameA].vector, scaleKeys[frameB].vector, frameDelta);
+}
+
+
+
+
 
 glm::quat e2::UfbxImportChannel::sampleRotation(float time)
 {

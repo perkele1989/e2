@@ -35,39 +35,69 @@ layout(push_constant) uniform ConstantData
 
 void main()
 {
-	vec2 position = inUv * zoom;
+	vec2 position = (inUv) * zoom + (vec2(param1, param2) * 100.0);
+
+	vec4 hx = getHex(position);
+	float hd = hex(hx.xy);
+	float hcf = pow(smoothstep(0.475, 0.5, hd), 0.25);
 
 //	float h = pow(sampleSimplex(position, 0.05), 0.5);
 	
 
 
-	float h = sampleBaseHeight(position);
-	//h = h3;
+	// float h = sampleBaseHeight(position);
+	// float m = 0.0;
+	// float g = 0.0;
+	// float s = 0.0;
+	// float o = 0.0;
+
+	// if(h > 0.9)
+	// 	m = 1.0;
+	// else if(h > 0.5)
+	// 	g = 1.0;
+	// else if (h > 0.45)
+	// 	s = 1.0;
+	// else 
+	// 	o = 1.0;
+
+	// float f = sampleBaseHeight((position + vec2(32.14, 29.28)) * 4.0 );
+	// if(f > 0.4 && h > 0.6)
+	// 	f = 1.0;
+	// else
+	// 	f = 0.0;
+
+	// f = f * g;
+	// g = g - f;
+
+
+	float h = sampleBaseHeight(position * /**param3*/1.05);
 	float m = 0.0;
 	float g = 0.0;
 	float s = 0.0;
 	float o = 0.0;
 
-	if(h > 0.81)
+	if(h > /**param5*/ 0.9)
 		m = 1.0;
-	else if(h > 0.39)
+	else if(h > /**param6*/ 0.75)
 		g = 1.0;
-	else if (h > 0.03)
+	else if (h > /**param7*/ 0.57)
 		s = 1.0;
 	else 
 		o = 1.0;
 
-	float f = sampleBaseHeight((position + vec2(321.4, 2928.0)) * 4);
-	if(f > 0.2 && h > 0.6)
+	float f = sampleBaseHeight((position + vec2(32.14, 29.28)) * 8.0 );
+	if(f > 0.7 && h > 0.6)
 		f = 1.0;
 	else
 		f = 0.0;
 
 	f = f * g;
 	g = g - f;
+	//f = 0.0;
+
 
 	vec3 m_C = vec3(0.25, 0.255, 0.26);
-	vec3 g_C = vec3(0.2, 0.6, 0.05);
+	vec3 g_C = vec3(0.2, 0.1, 0.05);
 	vec3 s_C = vec3(0.0, 0.1, 0.6);
 	vec3 o_C = vec3(0.0, 0.05, 0.3);
 	vec3 f_C = vec3(0.05, 0.2, 0.01);
@@ -78,17 +108,7 @@ void main()
 	outColor.rgb = mix(outColor.rgb, m_C, m);
 	outColor.rgb = mix(outColor.rgb, f_C, f);
 
-
-	float f2 = sampleBaseHeight((position + vec2(321.4, 2928.0)) * param2 * 10.0);
-	f2 = pow(f2, 1.0/param1);
-
-	float ff = 0.0;
-	if (f2 > param3)
-		ff = 1.0;
-
-	outColor.rgb = mix(outColor.rgb, vec3(1.0, 0.0, 0.0), ff);
-
-	//outColor.r = h;
+	outColor.rgb = mix(outColor.rgb, vec3(1.0, 0.0, 0.0), hcf);
 
 	outColor.a = 1.0;
 }

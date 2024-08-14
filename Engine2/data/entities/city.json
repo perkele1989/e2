@@ -1,0 +1,31 @@
+
+{
+    "entities":[
+        {
+            "id": "city",
+            "typeName": "e2::GameEntity",
+            "displayName": "City",
+            "badgeId": "units.city",
+            "layerIndex": "structure",
+            "passableFlags": ["none"],
+            "moveType": "static",
+            "sightRange": 10,
+            "waveRelevant": true,
+            "defensiveStrength": 1000.0,
+            "script": "data/entities/city.chai",
+            "mesh": "assets/structures/city/SM_City.e2a",
+            "meshScale": [1, 1, 1],
+            "extraAssets": [
+                {
+                    "name": "damage",
+                    "path": "assets/sound/city_damage.e2a"
+                },
+                {
+                    "name": "die",
+                    "path": "assets/sound/city_die.e2a"
+                }
+            ]
+        }
+    ]
+
+}

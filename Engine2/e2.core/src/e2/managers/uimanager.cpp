@@ -143,7 +143,7 @@ void main()
 		outColor.a = texture(sampler2D(quadTextures[textureIndex], quadSampler), fragmentUv).r * quadColor.a;
 	}
 	// sdf 
-	else
+	else if(type == 2)
 	{
 		float mask = texture(sampler2D(quadTextures[textureIndex], quadSampler), fragmentUv).r;
 
@@ -181,8 +181,8 @@ layout(push_constant) uniform ConstantData
 	vec2 quadPosition; // surface-relative quad position, in pixels
 	vec2 quadSize; // quad size, in pixels
 	float quadZ; // z index of the quad
-	float cornerRadius;
-	float bevelStrength;
+	float cornerRadius; // alpha
+	float bevelStrength; // highlighted
 	uint type;
 	float pixelScale;
 };
@@ -218,8 +218,8 @@ layout(push_constant) uniform ConstantData
 	vec2 quadPosition; // surface-relative quad position, in pixels
 	vec2 quadSize; // quad size, in pixels
 	float quadZ; // z index of the quad
-	float cornerRadius;
-	float bevelStrength;
+	float cornerRadius; // alpha
+	float bevelStrength; // highlighted
 	uint type;
 	float pixelScale;
 };
@@ -240,56 +240,97 @@ float roundedMask( vec2 quadPosition, vec2 quadSize, float radius, float inset)
     return 1.0 - clamp((length(max( abs(p) - halfSize + actualRadius,0.0)) - actualRadius), 0.0, 1.0);
 }
 
+float blendLighten(float base, float blend)
+{
+	return max(blend,base);
+}
+
+vec3 blendLighten3(vec3 base, vec3 blend) {
+	return vec3(blendLighten(base.r,blend.r),blendLighten(base.g,blend.g),blendLighten(base.b,blend.b));
+}
+
+vec3 blendLighten3o(vec3 base, vec3 blend, float opacity) {
+	return (blendLighten3(base, blend) * opacity + base * (1.0 - opacity));
+}
+
+float mmax3(float a, float b, float c)
+{
+    return max(max(a, b), c);
+}
+
+float innerGlow(vec2 pos, vec2 size, float radius)
+{
+    vec2 rect_min = vec2(radius/1.25);
+    vec2 rect_max = size - vec2(radius/1.25);
+    
+    float dx = mmax3(rect_min.x - pos.x, 0.0, pos.x - rect_max.x);
+    float dy = mmax3(rect_min.y - pos.y, 0.0, pos.y - rect_max.y);
+    return pow((clamp(sqrt(dx*dx + dy*dy), 0.0, radius) / radius), 2.0);
+}
 
 void main()
 {
-	float a = 1.0;
-	float b = 2.0;
-
-	if(type == 0)
+	if(type < 2)
 	{
-		a = 0.5;
-		b = 1.5;
-	}
+		float a = 1.0;
+		float b = 2.0;
 
-	float baseMask = roundedMask(quadPosition, quadSize, cornerRadius, 0.0);
-	float innerMask1 = roundedMask(quadPosition, quadSize, cornerRadius, a);
-	float innerMask2 = roundedMask(quadPosition, quadSize, cornerRadius, b);
-	float bevelOuterCoeff = clamp(baseMask - innerMask1, 0.0, 1.0);
-	float bevelInnerCoeff = clamp(innerMask1 - innerMask2 - bevelOuterCoeff, 0.0, 1.0);
+		if(type == 0)
+		{
+			a = 0.5;
+			b = 1.5;
+		}
 
-	float innerOpacity = 0.75;
-	float outerOpacity = 0.1;
+		float baseMask = roundedMask(quadPosition, quadSize, cornerRadius, 0.0);
+		float innerMask1 = roundedMask(quadPosition, quadSize, cornerRadius, a);
+		float innerMask2 = roundedMask(quadPosition, quadSize, cornerRadius, b);
+		float bevelOuterCoeff = clamp(baseMask - innerMask1, 0.0, 1.0);
+		float bevelInnerCoeff = clamp(innerMask1 - innerMask2 - bevelOuterCoeff, 0.0, 1.0);
 
-	if(type == 0)
-	{
-		outerOpacity = 0.5;
-		innerOpacity = 0.25;
-	}
+		float innerOpacity = 0.75;
+		float outerOpacity = 0.1;
 
-	vec4 baseColor = quadColor;
-	// it may seem like we apply the opacities wrong, but thats incorrect
-	// we want the outer bevel at low output opacity, as a simple soft outline
-	// the same goes for inner, though this time for a subtle GI effect
-	// it looks amazing!
-	vec4 innerBevelColor = vec4(1.0, 1.0, 1.0, innerOpacity * bevelStrength);
-	vec4 outerBevelColor = vec4(0.0, 0.0, 0.0, outerOpacity * bevelStrength);
+		if(type == 0)
+		{
+			outerOpacity = 0.5;
+			innerOpacity = 0.25;
+		}
 
-	if(type == 0)
-	{
-		innerBevelColor = mix(baseColor, vec4(1.0, 1.0, 1.0, 1.0), bevelStrength * innerOpacity);
-		//innerBevelColor = vec4(1.0, 0.0, 1.0, 1.0);
-	}
-		//vec4 innerBevelColor = vec4(1.0, 0.0, 1.0, 1.0);
-	outColor = mix(outerBevelColor, innerBevelColor, innerMask1);
-	outColor = mix(outColor, baseColor, innerMask2);
+		vec4 baseColor = quadColor;
+		// it may seem like we apply the opacities wrong, but thats incorrect
+		// we want the outer bevel at low output opacity, as a simple soft outline
+		// the same goes for inner, though this time for a subtle GI effect
+		// it looks amazing!
+		vec4 innerBevelColor = vec4(1.0, 1.0, 1.0, innerOpacity * bevelStrength);
+		vec4 outerBevelColor = vec4(0.0, 0.0, 0.0, outerOpacity * bevelStrength);
 
-	//outColor = mix(baseColor, innerBevelColor, bevelInnerCoeff);
-	//outColor = mix(outColor, outerBevelColor, bevelOuterCoeff);
-	//if(type == 1)
+		if(type == 0)
+		{
+			innerBevelColor = mix(baseColor, vec4(1.0, 1.0, 1.0, 1.0), bevelStrength * innerOpacity);
+		}
+		outColor = mix(outerBevelColor, innerBevelColor, innerMask1);
+		outColor = mix(outColor, baseColor, innerMask2);
+
 		outColor.a = outColor.a * baseMask;
-	//else 
-	//	outColor.a = baseMask;
+	}
+	else
+	{
+
+		vec2 pos = gl_FragCoord.xy - quadPosition;
+
+		vec4 bgColor = pow(vec4(29.0, 37.0, 49.0, 255.0) / vec4(255.0), vec4(2.2));
+		vec4 highColor = pow(vec4(245.0, 155.0, 20.0, 255.0) / vec4(255.0), vec4(2.2));
+
+		outColor.rgb = bgColor.rgb;
+
+		float glow = innerGlow(pos, quadSize, 48.0) * bevelStrength;
+		outColor.rgb = blendLighten3o(outColor.rgb, highColor.rgb, 0.41 * glow);
+    
+		float highlight = step(quadSize.y / 2.0, quadSize.y - pos.y) *  bevelStrength;
+		outColor.rgb = blendLighten3o(outColor.rgb, vec3(highlight), 0.05);
+
+		outColor.a = cornerRadius;
+	}
 }
 )SRC";
 
@@ -503,7 +544,7 @@ void e2::UIManager::initialize()
 	m_texturedQuadSetLayout = renderContext()->createDescriptorSetLayout(setLayoutInfo);
 
 	e2::SamplerCreateInfo samplerInfo{};
-	samplerInfo.filter = SamplerFilter::Anisotropic;
+	samplerInfo.filter = SamplerFilter::Bilinear;
 	samplerInfo.wrap = SamplerWrap::Repeat;
 	m_texturedQuadSampler = renderContext()->createSampler(samplerInfo);
 

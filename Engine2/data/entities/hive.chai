@@ -1,0 +1,71 @@
+var hiveScript = EntityScript();
+
+global HiveIdleState_Closed = 0;
+global HiveIdleState_Open = 1;
+global HiveIdleState_Expanded = 2;
+
+class HiveState 
+{
+    var idleState;
+
+    def HiveState(entity)
+    {
+        this.idleState = HiveIdleState_Closed;
+    }
+
+    def expand(entity)
+    {
+        if(this.idleState == HiveIdleState_Closed)
+        {
+            entity.setPose("idleExpanded");
+            entity.playAction("open");
+            this.idleState = HiveIdleState_Expanded;
+        }
+        else if(this.idleState == HiveIdleState_Open)
+        {
+            entity.setPose("idleExpanded");
+            entity.playAction("reopen");
+            this.idleState = HiveIdleState_Expanded;
+        }
+    }
+
+    def retract(entity)
+    {
+        if(this.idleState == HiveIdleState_Expanded)
+        {
+            entity.setPose("idleOpen");
+            entity.playAction("close");
+            this.idleState = HiveIdleState_Open;
+        }
+    }
+}
+
+hiveScript.setCreateState(fun(entity){
+    return HiveState(entity);
+});
+
+
+hiveScript.setOnSpawned(fun(entity){
+    entity.setPose("idleClose");
+});
+
+hiveScript.setOnHit(fun(entity, instigator, dmg){
+    if(game.attemptBeginWave(entity, "data/wave_prefabs/wave_headcrab_5slow.txt"))
+    {
+        entity.scriptState.expand(entity);
+    }
+});
+
+hiveScript.setOnWaveUpdate(fun(entity, dt){
+});
+
+hiveScript.setOnWaveStart(fun(entity){
+    print("wave start");
+});
+
+hiveScript.setOnWaveEnd(fun(entity){
+    print("wave end");
+    entity.scriptState.retract(entity);
+});
+
+hiveScript;

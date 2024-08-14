@@ -19,10 +19,11 @@ namespace e2
 {
 	class MeshProxy;
 
-	constexpr float globalMeshScale = 0.5f;
+	constexpr float globalMeshScale = 1.0f;
 
 	constexpr uint32_t maxNumTriggersPerAction = 4;
 
+	class Mob;
 	class GameEntity;
 
 	struct EntityPoseSpecification
@@ -30,6 +31,7 @@ namespace e2
 		std::string animationAssetPath;
 		e2::AnimationPtr animationAsset;
 		float blendTime{0.0f};
+		float speed{ 1.0f };
 	};
 
 	struct EntityActionTriggerSpecification
@@ -47,15 +49,16 @@ namespace e2
 		float speed{ 1.0f };
 
 		e2::StackVector<e2::EntityActionTriggerSpecification, e2::maxNumTriggersPerAction> triggers;
-
 	};
 
-	enum class EntityMoveType : uint8_t
+	struct EntityAssetSpecification
 	{
-		Static,
-		Linear,
-		Smooth
+		e2::Name id;
+		std::string path;
+		e2::AssetPtr asset;
 	};
+
+
 
 
 	using scriptFunc_drawUI = std::function<void(e2::GameEntity*, e2::UIContext*)>;
@@ -75,6 +78,22 @@ namespace e2
 	using scriptFunc_onBeginMove = std::function<void(e2::GameEntity*)>;
 	using scriptFunc_onEndMove = std::function<void(e2::GameEntity*)>;
 	using scriptFunc_createState = std::function<chaiscript::Boxed_Value(e2::GameEntity*)>;
+
+	using scriptFunc_onSelected = std::function<void(e2::GameEntity*)>;
+	using scriptFunc_onDeselected = std::function<void(e2::GameEntity*)>;
+
+	using scriptFunc_onSpawned = std::function<void(e2::GameEntity*)>;
+
+	using scriptFunc_onWaveUpdate = std::function<void(e2::GameEntity*, double)>;
+	using scriptFunc_onWaveStart = std::function<void(e2::GameEntity*)>;
+	using scriptFunc_onWaveEnd = std::function<void(e2::GameEntity*)>;
+	using scriptFunc_onWavePreparing = std::function<void(e2::GameEntity*)>;
+	using scriptFunc_onWaveEnding = std::function<void(e2::GameEntity*)>;
+
+	using scriptFunc_onMobSpawned = std::function<void(e2::GameEntity*, e2::Mob*)>;
+	using scriptFunc_onMobDestroyed = std::function<void(e2::GameEntity*, e2::Mob*)>;
+
+
 
 	struct EntityScriptInterface
 	{
@@ -101,6 +120,20 @@ namespace e2
 		void invokeOnBeginMove(e2::GameEntity* entity);
 		void invokeOnEndMove(e2::GameEntity* entity);
 
+		void invokeOnWaveUpdate(e2::GameEntity* entity, double seconds);
+
+		void invokeOnWavePreparing(e2::GameEntity* entity);
+		void invokeOnWaveStart(e2::GameEntity* entity);
+		void invokeOnWaveEnding(e2::GameEntity* entity);
+		void invokeOnWaveEnd(e2::GameEntity* entity);
+
+		void invokeOnSpawned(e2::GameEntity* entity);
+		void invokeOnMobSpawned(e2::GameEntity* entity, e2::Mob* mob);
+		void invokeOnMobDestroyed(e2::GameEntity* entity, e2::Mob* mob);
+
+		void invokeOnSelected(e2::GameEntity* entity);
+		void invokeOnDeselected(e2::GameEntity* entity);
+
 		void setCreateState(scriptFunc_createState func);
 		void setDrawUI(scriptFunc_drawUI func);
 		void setUpdate(scriptFunc_update func);
@@ -119,6 +152,22 @@ namespace e2
 		void setOnTurnEnd(scriptFunc_onTurnEnd func);
 		void setOnBeginMove(scriptFunc_onBeginMove func);
 		void setOnEndMove(scriptFunc_onEndMove func);
+		void setOnWaveUpdate(scriptFunc_onWaveUpdate func);
+
+		void setOnSpawned(scriptFunc_onSpawned func);
+
+		void setOnWavePreparing(scriptFunc_onWavePreparing func);
+		void setOnWaveStart(scriptFunc_onWaveStart func);
+		void setOnWaveEnding(scriptFunc_onWaveEnding func);
+		void setOnWaveEnd(scriptFunc_onWaveEnd func);
+		
+
+
+		void setOnMobSpawned(scriptFunc_onMobSpawned func);
+		void setOnMobDestroyed(scriptFunc_onMobDestroyed func);
+
+		void setOnSelected(scriptFunc_onSelected func);
+		void setOnDeselected(scriptFunc_onDeselected func);
 
 		bool hasCreateState();
 		bool hasUpdate();
@@ -139,6 +188,21 @@ namespace e2
 		bool hasOnBeginMove();
 		bool hasOnEndMove();
 
+		bool hasOnWaveUpdate();
+		bool hasOnWavePreparing();
+		bool hasOnWaveStart();
+		bool hasOnWaveEnding();
+		bool hasOnWaveEnd();
+
+		bool hasOnSpawned();
+
+
+		bool hasOnMobSpawned();
+		bool hasOnMobDestroyed();
+
+		bool hasOnSelected();
+		bool hasOnDeselected();
+
 	private:
 		scriptFunc_createState createState;
 		scriptFunc_drawUI drawUI;
@@ -158,6 +222,20 @@ namespace e2
 		scriptFunc_onTurnEnd onTurnEnd;
 		scriptFunc_onBeginMove onBeginMove;
 		scriptFunc_onEndMove onEndMove;
+
+		scriptFunc_onSpawned onSpawned;
+
+		scriptFunc_onWavePreparing onWavePreparing;
+		scriptFunc_onWaveStart onWaveStart;
+		scriptFunc_onWaveEnding onWaveEnding;
+		scriptFunc_onWaveEnd onWaveEnd;
+		scriptFunc_onWaveUpdate onWaveUpdate;
+
+		scriptFunc_onMobSpawned onMobSpawned;
+		scriptFunc_onMobDestroyed onMobDestroyed;
+
+		scriptFunc_onSelected onSelected;
+		scriptFunc_onDeselected onDeselected;
 	};
 
 	struct EntitySpecification
@@ -180,6 +258,9 @@ namespace e2
 
 		/** Display name */
 		std::string displayName;
+
+		/** true if this entity is relevant in waves (otherwise wont be rendered during waves, unless on structure layer. also wont get onWaveUpdate() called without this) */
+		bool waveRelevant{ false };
 
 		/** The layer index for this entity, only one entity of each layer can fit on a given tile index */
 		EntityLayerIndex layerIndex = EntityLayerIndex::Unit;
@@ -258,11 +339,15 @@ namespace e2
 		std::string skeletonAssetPath;
 		e2::SkeletonPtr skeletonAsset;
 
+		e2::Name defaultPose;
+
 		/** Animation poses */
 		std::unordered_map<e2::Name, EntityPoseSpecification> poses;
 
 		/** Animation actions*/
 		std::unordered_map<e2::Name, EntityActionSpecification> actions;
+
+		std::unordered_map<e2::Name, EntityAssetSpecification> assets;
 
 		EntityScriptInterface scriptInterface;
 	};
@@ -303,6 +388,7 @@ namespace e2
 		e2::Name id;
 		e2::AnimationPose* pose{};
 		float blendTime{};
+		float speed{ 1.0f };
 	};
 
 
@@ -339,6 +425,7 @@ namespace e2
 
 	constexpr uint32_t maxNumPosesPerEntity = 8;
 	constexpr uint32_t maxNumActionsPerEntity = 8;
+	constexpr uint32_t maxNumMeshesPerEntity = 4;
 
 	constexpr uint64_t maxNumGameEntities = 32768;
 
@@ -384,6 +471,15 @@ namespace e2
 
 		virtual void updateCustomAction(double seconds);
 
+		virtual void onWavePreparing();
+		virtual void onWaveStart();
+		virtual void onWaveUpdate(double seconds);
+		virtual void onWaveEnding();
+		virtual void onWaveEnd();
+
+		virtual void onMobSpawned(e2::Mob* mob);
+		virtual void onMobDestroyed(e2::Mob* mob);
+
 		virtual void onTurnEnd();
 		virtual void onTurnStart();
 
@@ -397,7 +493,10 @@ namespace e2
 		virtual void onBeginMove();
 		virtual void onEndMove();
 
-		void turnTowards(glm::ivec2 hex);
+		virtual void onSpawned();
+
+		void turnTowards(glm::ivec2 const& hex);
+		void turnTowardsPlanar(glm::vec3 const &planar);
 
 		void spreadVisibility();
 		void rollbackVisibility();
@@ -423,7 +522,7 @@ namespace e2
 		bool inView{};
 
 		glm::ivec2 tileIndex;
-		EmpireId empireId;
+		EmpireId empireId{255};
 
 		float health{};
 		int32_t movePointsLeft{};
@@ -443,9 +542,15 @@ namespace e2
 		void playAction(e2::Name actionName);
 		bool isActionPlaying(e2::Name actionName);
 		bool isAnyActionPlaying();
+		void stopAction();
 
 		void setPose2(e2::Pose* pose, double lerpTime);
 		void playAction2(e2::AnimationPose* anim, double blendIn = 0.2f, double blendOut = 0.2f, double speed = 1.0);
+
+		void playSound(e2::Name assetName, float volume, float spatiality);
+
+		e2::MeshProxy* createMesh(e2::Name assetName);
+		void destroyMesh(e2::MeshProxy* mesh);
 
 		virtual e2::Game* game() override;
 
@@ -463,6 +568,8 @@ namespace e2
 		bool grugCanMove{};
 		bool grugCanAttack{};
 
+		e2::Mob* closestMobWithinRange(float range);
+
 	protected:
 		e2::Game* m_game{};
 
@@ -475,6 +582,7 @@ namespace e2
 		e2::Moment m_lastChangePose;
 		e2::Pose* m_currentPose{};
 		e2::Pose* m_oldPose{};
+		double m_poseSpeed{ 1.0f };
 
 		e2::AnimationPose* m_actionPose{};
 		double m_actionBlendInTime = 0.2;
@@ -485,11 +593,14 @@ namespace e2
 
 		e2::StackVector<EntityAnimationPose, e2::maxNumPosesPerEntity> m_animationPoses;
 		e2::StackVector<EntityAnimationAction, e2::maxNumActionsPerEntity> m_animationActions;
+		e2::StackVector<e2::MeshProxy*, e2::maxNumMeshesPerEntity> m_meshes;
 
 
 	};
 
 	constexpr uint64_t entitySizeBytes = sizeof(e2::GameEntity);
+
+
 }
 
 #include "gameentity.generated.hpp"

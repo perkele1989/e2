@@ -14,13 +14,20 @@ namespace e2
 
 
 
+	struct E2_API TonemapConstants
+	{
+		alignas(16) glm::vec4 parameters; // exposure, whitepoint, etc etc
+	};
+
 	enum class RenderLayer : uint32_t
 	{
-		Default = 0,
+		Sky = 512,
 
-		Water = 1000,
+		Default = 1024,
 
-		Fog = 5000
+		Water = 2048,
+
+		Fog = 4096
 	};
 
 }

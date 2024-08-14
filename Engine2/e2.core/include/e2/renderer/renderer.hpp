@@ -42,11 +42,12 @@ namespace e2
 	{
 		glm::mat4 normalMatrix;
 		glm::uvec2 resolution;
+		glm::uvec2 gridParams;
 	};
 
 	struct E2_API RendererData
 	{
-		alignas(16) glm::mat4 shadowView{ glm::identity<glm::mat4>() };
+		alignas(16) glm::mat4 shadowView{ glm::identity<glm::mat4>()};
 		alignas(16) glm::mat4 shadowProjection{ glm::identity<glm::mat4>() };
 		alignas(16) glm::mat4 viewMatrix{ glm::identity<glm::mat4>() };
 		alignas(16) glm::mat4 projectionMatrix{ glm::identity<glm::mat4>() };
@@ -124,7 +125,9 @@ namespace e2
 	struct E2_API Viewpoints2D
 	{
 		Viewpoints2D();
-		Viewpoints2D(glm::vec2 const& _resolution, e2::RenderView const& _view);
+		Viewpoints2D(glm::vec2 const& _resolution, e2::RenderView const& _view, double limitDistance);
+
+		Viewpoints2D limited(double limitDistance);
 
 		ConvexShape2D combine(Viewpoints2D const& other);
 
@@ -184,9 +187,13 @@ namespace e2
 		// records and queues the current frame
 		void recordFrame(double deltaTime);
 
+		void exposure(float newExposure);
+		void whitepoint(glm::vec3 const& newWhitepoint);
+
 		void recordShadows(double deltaTime, e2::ICommandBuffer* buff);
 		void recordRenderLayers(double deltaTime, e2::ICommandBuffer* buff);
 		void recordDebugLines(double deltaTime, e2::ICommandBuffer* buff);
+		void recordTonemap(double deltaTime, e2::ICommandBuffer* buff);
 
 		e2::Session* session() const;
 
@@ -194,7 +201,8 @@ namespace e2
 
 		inline e2::ITexture* colorTarget() const
 		{
-			return m_renderBuffers[frontBuffer()].colorTexture;
+			return m_tonemap.outputTexture;
+			//return m_renderBuffers[frontBuffer()].colorTexture;
 		}
 
 
@@ -224,8 +232,12 @@ namespace e2
 
 		void setOutlineTextures(e2::ITexture* textures[2]);
 
+		void setDrawGrid(bool newDrawGrid);
+
 	protected:
 		e2::Session* m_session{};
+
+		bool m_drawGrid{};
 
 		e2::RenderView m_view{};
 		e2::Viewpoints2D m_viewPoints{};
@@ -234,13 +246,28 @@ namespace e2
 
 		struct
 		{
+			// HDR output
 			e2::ITexture* colorTexture{};
-			e2::ITexture* positionTexture{};
-
+			
+			// Pre-pass
 			e2::ITexture* depthTexture{};
+			e2::ITexture* positionTexture{};
 			e2::IRenderTarget* renderTarget{};
+
 			e2::Pair<e2::IDescriptorSet*> sets{ nullptr };
 		} m_renderBuffers[2];
+
+
+		struct
+		{
+			// Tonemapped LDR output
+			e2::ITexture* outputTexture{};
+			e2::IRenderTarget* renderTarget{};
+			e2::Pair<e2::IDescriptorSet*> sets{};
+
+			e2::TonemapConstants constants{};
+		} m_tonemap;
+
 
 		struct
 		{

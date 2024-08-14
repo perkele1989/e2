@@ -1,6 +1,8 @@
 
 #include "game/game.hpp"
 
+#include "game/wave.hpp"
+
 #include "e2/e2.hpp"
 #include "e2/managers/rendermanager.hpp"
 #include "e2/managers/asyncmanager.hpp"
@@ -11,6 +13,8 @@
 #include "e2/game/gamesession.hpp"
 #include "e2/renderer/renderer.hpp"
 #include "e2/transform.hpp"
+
+
 
 #include <glm/gtx/intersect.hpp>
 #include <glm/gtx/vector_angle.hpp>
@@ -26,6 +30,9 @@
 #include <filesystem>
 #include <Shlobj.h>
 #include <ctime>
+
+#include <random>
+#include <algorithm>
 
 namespace
 {
@@ -49,6 +56,23 @@ e2::Game::Game(e2::Context* ctx)
 	}
 
 	readAllSaveMetas();
+
+	std::string namesRaw;
+	if (!e2::readFile("./data/citynames.txt", namesRaw))
+	{
+		LogError("failed to read city names");
+	}
+
+	std::vector<std::string> namesStr = e2::split(namesRaw, '\n');
+	for (std::string str : namesStr)
+	{
+		str = e2::trim(str);
+		m_cityNames.push_back(str);
+	}
+
+	auto rd = std::random_device{};
+	auto rng = std::default_random_engine{ rd() };
+	std::shuffle(m_cityNames.begin(), m_cityNames.end(), rng);
 }
 
 e2::Game::~Game()
@@ -58,11 +82,11 @@ e2::Game::~Game()
 
 void e2::Game::saveGame(uint8_t slot)
 {
-	if (m_empireTurn != m_localEmpireId)
-	{
-		LogError("refuse to save game on AI turn");
-		return;
-	}
+	//if (m_empireTurn != m_localEmpireId)
+	//{
+	//	LogError("refuse to save game on AI turn");
+	//	return;
+	//}
 
 	e2::SaveMeta newMeta;
 	newMeta.exists = true;
@@ -82,19 +106,6 @@ void e2::Game::saveGame(uint8_t slot)
 	m_localEmpire->write(buf);
 	m_nomadEmpire->write(buf);
 
-	// store all ais 
-	for (EmpireId i = 2; i < e2::maxNumEmpires-1; i++)
-	{
-		buf << int32_t(m_empires[i] != nullptr ? 1 : 0);
-
-		if (m_empires[i])
-		{
-			m_empires[i]->write(buf);
-			// @todo store ai shit here yo 
-		}
-
-	}
-
 	buf << uint64_t(m_entities.size());
 	for (e2::GameEntity* entity : m_entities)
 	{
@@ -109,12 +120,6 @@ void e2::Game::saveGame(uint8_t slot)
 
 		entity->writeForSave(buf);
 	}
-
-	// write discovered empires 
-	buf << uint64_t(m_discoveredEmpires.size());
-	for (e2::GameEmpire* discEm : m_discoveredEmpires)
-		buf << int64_t(discEm->id);
-
 
 	buf.writeToFile(newMeta.fileName());
 
@@ -184,43 +189,23 @@ void e2::Game::loadGame(uint8_t slot)
 	buf >> m_viewOrigin;
 	buf >> m_turn;
 
+
+
 	m_localEmpireId = spawnEmpire();
 	assert(m_localEmpireId == 0 && "local empire HAS to be 0!");
 
 	m_localEmpire = m_empires[m_localEmpireId];
-	discoverEmpire(m_localEmpireId);
+	//discoverEmpire(m_localEmpireId);
 	m_localEmpire->read(buf);
 
 	m_nomadEmpireId = spawnEmpire();
 	assert(m_nomadEmpireId == 1 && "nomad empire HAS to be 1!");
 
 	m_nomadEmpire = m_empires[m_nomadEmpireId];
-	discoverEmpire(m_nomadEmpireId);
+	//discoverEmpire(m_nomadEmpireId);
 	m_nomadEmpire->read(buf);
 
 	m_nomadEmpire->ai = e2::create<e2::NomadAI>(this, m_nomadEmpireId);
-
-	for (EmpireId i = 2; i < e2::maxNumEmpires - 1; i++)
-	{
-		int32_t hasAiEmpire = 0;
-		buf >> hasAiEmpire;
-
-		if (hasAiEmpire != 0)
-		{
-			// @todo store ai shit here yo 
-			m_empires[i] = e2::create<e2::GameEmpire>(this, i);
-			m_undiscoveredEmpires.insert(m_empires[i]);
-			m_aiEmpires.insert(m_empires[i]);
-			m_empires[i]->read(buf);
-
-			m_empires[i]->ai = e2::create<e2::CommanderAI>(this, i);
-
-
-		}
-
-	}
-
-
 
 
 	uint64_t numEntities{};
@@ -240,22 +225,22 @@ void e2::Game::loadGame(uint8_t slot)
 		newEntity->readForSave(buf);
 	}
 
-	uint64_t numDiscoveredEmpires{};
-	buf >> numDiscoveredEmpires;
-	for (uint64_t i = 0; i < numDiscoveredEmpires;i++)
-	{
-		int64_t empId;
-		buf >> empId;
+	//uint64_t numDiscoveredEmpires{};
+	//buf >> numDiscoveredEmpires;
+	//for (uint64_t i = 0; i < numDiscoveredEmpires;i++)
+	//{
+	//	int64_t empId;
+	//	buf >> empId;
 
-		if (empId > (std::numeric_limits<EmpireId>::max)())
-		{
-			LogError("unsupported datatype in savefile, try updating your game before loading this save!");
-			continue;
-		}
+	//	if (empId > (std::numeric_limits<EmpireId>::max)())
+	//	{
+	//		LogError("unsupported datatype in savefile, try updating your game before loading this save!");
+	//		continue;
+	//	}
 
 
-		discoverEmpire((EmpireId)empId);
-	}
+	//	discoverEmpire((EmpireId)empId);
+	//}
 
 	startGame();
 }
@@ -278,6 +263,7 @@ void e2::Game::nukeGame()
 
 	m_entitiesPendingDestroy.clear();
 
+
 	auto entitiesClone = m_entities;
 	for (GameEntity* entity: entitiesClone)
 		destroyEntity(entity);
@@ -294,11 +280,13 @@ void e2::Game::nukeGame()
 		m_hexGrid = nullptr;
 	}
 
+
+
 	m_globalState = GlobalState::Menu;
 	m_inGameMenuState = InGameMenuState::Main;
 	m_state = GameState::TurnPreparing;
 	m_turn = 0;
-	m_empireTurn = 0;
+	//m_empireTurn = 0;
 	m_turnState = TurnState::Unlocked;
 	m_timeDelta = 0.0;
 	m_localEmpireId = 0;
@@ -315,31 +303,27 @@ void e2::Game::finalizeBoot()
 {
 	// This will fetch and store the loaded assets from all entity specifications 
 	e2::EntitySpecification::finalizeSpecifications(this);
+	e2::MobSpecification::finalizeSpecifications(this);
 
 	auto am = assetManager();
 
 	m_uiTextureResources = am->get("assets/UI_ResourceIcons.e2a").cast<e2::Texture2D>();
 
-	m_irradianceMap = am->get("assets/kloofendal_irr.e2a").cast<e2::Texture2D>();
-	m_radianceMap = am->get("assets/kloofendal_rad.e2a").cast<e2::Texture2D>();
+	m_irradianceMap = am->get("assets/hdri/courtyard_irr.e2a").cast<e2::Texture2D>();
+	m_radianceMap = am->get("assets/hdri/courtyard_rad.e2a").cast<e2::Texture2D>();
 
 	m_session->renderer()->setEnvironment(m_irradianceMap->handle(), m_radianceMap->handle());
 
-	m_testSound = am->get("assets/audio/S_Test.e2a").cast<e2::Sound>();
+	m_testSound = am->get("assets/sound/city_damage.e2a").cast<e2::Sound>();
 
 	m_uiIconsSheet = am->get("assets/ui/S_UI_Icons.e2a").cast<e2::Spritesheet>();
 
+	m_uiIconsSheet2 = am->get("assets/ui/S_Icons.e2a").cast<e2::Spritesheet>();
+	m_uiUnitsSheet = am->get("assets/ui/S_Units.e2a").cast<e2::Spritesheet>();
+
 	uiManager()->registerGlobalSpritesheet("gameUi", m_uiIconsSheet);
-
-	// --
-	// WARNING: POINTER ARITHMETIC MASTURBATION AREA
-	// BEWARE OF CUMSTAINS 
-	// --
-
-
-	
-
-
+	uiManager()->registerGlobalSpritesheet("icons", m_uiIconsSheet2);
+	uiManager()->registerGlobalSpritesheet("units", m_uiUnitsSheet);
 
 
 	// After this line, we may no longer safely fetch and store loaded assets
@@ -616,8 +600,9 @@ void e2::Game::initializeScriptEngine()
 			{ },
 		{
 
-			{chaiscript::fun(&e2::GameEntity::scriptEqualityPtr), "=="},
-			{chaiscript::fun(&e2::GameEntity::scriptAssignPtr), "="},
+			//{chaiscript::fun(&e2::GameEntity::scriptEqualityPtr), "=="},
+			//{chaiscript::fun(&e2::GameEntity::scriptAssignPtr), "="},
+			//{chaiscript::fun((e2::GameEntity *& (e2::GameEntity::*)(const e2::GameEntity*&)) (&e2::GameEntity::operator=)), "="},
 			{chaiscript::fun(&e2::GameEntity::isBuilding), "isBuilding"},
 			{chaiscript::fun(&e2::GameEntity::canBuild), "canBuild"},
 			{chaiscript::fun(&e2::GameEntity::build), "build"},
@@ -640,12 +625,51 @@ void e2::Game::initializeScriptEngine()
 			{chaiscript::fun(&e2::GameEntity::createBuildAction), "createBuildAction"},
 			{chaiscript::fun(&e2::GameEntity::meshPlanarCoords), "meshPlanarCoords"},
 			{chaiscript::fun(&e2::GameEntity::playAction), "playAction"},
+			{chaiscript::fun(&e2::GameEntity::stopAction), "stopAction"},
 			{chaiscript::fun(&e2::GameEntity::isActionPlaying), "isActionPlaying"},
 			{chaiscript::fun(&e2::GameEntity::isAnyActionPlaying), "isAnyActionPlaying"},
 			{chaiscript::fun(&e2::GameEntity::setPose), "setPose"},
 			{chaiscript::fun(&e2::GameEntity::turnTowards), "turnTowards"},
+			{chaiscript::fun(&e2::GameEntity::turnTowardsPlanar), "turnTowardsPlanar"},
 			{chaiscript::fun(&e2::GameEntity::grugCanAttack), "grugCanAttack"},
 			{chaiscript::fun(&e2::GameEntity::grugCanMove), "grugCanMove"},
+			{chaiscript::fun(&e2::GameEntity::playSound), "playSound"},
+			{chaiscript::fun(&e2::GameEntity::createMesh), "createMesh"},
+			{chaiscript::fun(&e2::GameEntity::destroyMesh), "destroyMesh"},
+			{chaiscript::fun(&e2::GameEntity::closestMobWithinRange), "closestMobWithinRange"},
+			
+		}
+		);
+
+
+
+		chaiscript::utility::add_class<e2::MobSpecification>(*m_scriptModule,
+			"MobSpecification",
+			{ },
+		{
+
+			{chaiscript::fun(&e2::MobSpecification::attackStrength), "attackStrength"},
+			{chaiscript::fun(&e2::MobSpecification::defensiveStrength), "defensiveStrength"},
+			{chaiscript::fun(&e2::MobSpecification::displayName), "displayName"},
+			{chaiscript::fun(&e2::MobSpecification::id), "id"},
+			{chaiscript::fun(&e2::MobSpecification::layerIndex), "layerIndex"},
+			{chaiscript::fun(&e2::MobSpecification::maxHealth), "maxHealth"},
+			{chaiscript::fun(&e2::MobSpecification::moveSpeed), "moveSpeed"},
+			{chaiscript::fun(&e2::MobSpecification::moveType), "moveType"},
+			{chaiscript::fun(&e2::MobSpecification::passableFlags), "passableFlags"},
+			{chaiscript::fun(&e2::MobSpecification::reward), "reward"},
+		}
+		);
+
+		chaiscript::utility::add_class<e2::Mob>(*m_scriptModule,
+			"Mob",
+			{ },
+		{
+			//{chaiscript::fun(&e2::Mob::scriptEqualityPtr), "=="},
+			//{chaiscript::fun(&e2::Mob::scriptAssignPtr), "="},
+			{chaiscript::fun(&e2::Mob::health), "health"},
+			{chaiscript::fun(&e2::Mob::specification), "specification"},
+			{chaiscript::fun(&e2::Mob::meshPosition), "meshPosition"},
 		}
 		);
 
@@ -655,7 +679,7 @@ void e2::Game::initializeScriptEngine()
 			{
 				{chaiscript::fun(&Game::killEntity), "killEntity"},
 				{chaiscript::fun(&Game::spawnHitLabel), "spawnHitLabel"},
-				{chaiscript::fun(&Game::discoverEmpire), "discoverEmpire"},
+				//{chaiscript::fun(&Game::discoverEmpire), "discoverEmpire"},
 				{chaiscript::fun(&Game::turn), "turn"},
 				{chaiscript::fun(&Game::timeDelta), "timeDelta"},
 				{chaiscript::fun(&Game::worldToPixels), "worldToPixels"},
@@ -666,7 +690,7 @@ void e2::Game::initializeScriptEngine()
 				{chaiscript::fun(&Game::saveGame), "saveGame"},
 				{chaiscript::fun(&Game::exitToMenu), "exitToMenu"},
 				{chaiscript::fun(&Game::spawnEmpire), "spawnEmpire"},
-				{chaiscript::fun(&Game::spawnAIEmpire), "spawnAIEmpire"},
+				//{chaiscript::fun(&Game::spawnAIEmpire), "spawnAIEmpire"},
 				{chaiscript::fun(&Game::localEmpire), "localEmpire"},
 				{chaiscript::fun(&Game::nomadEmpire), "nomadEmpire"},
 				{chaiscript::fun(&Game::localEmpireId), "localEmpireId"},
@@ -683,6 +707,9 @@ void e2::Game::initializeScriptEngine()
 				{chaiscript::fun(&Game::deselectEntity), "deselectEntity"},
 				{chaiscript::fun(&Game::moveSelectedEntityTo), "moveSelectedEntityTo"},
 				{chaiscript::fun(&Game::beginCustomAction), "beginCustomAction"},
+				{chaiscript::fun(&Game::attemptBeginWave), "attemptBeginWave"},
+				{chaiscript::fun(&Game::addScreenShake), "addScreenShake"},
+				
 				{chaiscript::fun(&Game::endCustomAction), "endCustomAction"},
 				{chaiscript::fun(&Game::beginTargeting), "beginTargeting"},
 				{chaiscript::fun(&Game::endTargeting), "endTargeting"},
@@ -696,6 +723,7 @@ void e2::Game::initializeScriptEngine()
 				{chaiscript::fun(&Game::grugAttackMoveLocation), "grugAttackMoveLocation"},
 				{chaiscript::fun(&Game::grugMoveLocation), "grugMoveLocation"},
 				{chaiscript::fun(&Game::resolveLocalEntity), "resolveLocalEntity"},
+				{chaiscript::fun(&Game::getCityName), "getCityName"},
 				/*
 						int32_t grugNumAttackMovePoints();
 		e2::GameEntity* grugAttackTarget();
@@ -760,6 +788,20 @@ void e2::Game::initializeScriptEngine()
 			}
 		);
 
+		chaiscript::utility::add_class<e2::MeshProxy>(*m_scriptModule,
+			"MeshProxy",
+			{ },
+			{
+				{chaiscript::fun(&MeshProxy::enable), "enable"},
+				{chaiscript::fun(&MeshProxy::disable), "disable"},
+				{chaiscript::fun(&MeshProxy::enabled), "enabled"},
+				{chaiscript::fun(&MeshProxy::setPosition), "setPosition"},
+				{chaiscript::fun(&MeshProxy::setRotation), "setRotation"},
+				{chaiscript::fun(&MeshProxy::setScale), "setScale"},
+
+			}
+			);
+
 		chaiscript::utility::add_class<e2::EntityScriptInterface>(*m_scriptModule,
 			"EntityScript",
 			{
@@ -783,6 +825,13 @@ void e2::Game::initializeScriptEngine()
 				{chaiscript::fun(&EntityScriptInterface::hasOnTurnStart), "hasOnTurnStart"},
 				{chaiscript::fun(&EntityScriptInterface::hasUpdateAnimation), "hasUpdateAnimation"},
 				{chaiscript::fun(&EntityScriptInterface::hasUpdateCustomAction), "hasUpdateCustomAction"},
+				{chaiscript::fun(&EntityScriptInterface::hasOnWaveUpdate), "hasOnWaveUpdate"},
+				{chaiscript::fun(&EntityScriptInterface::hasOnWaveStart), "hasOnWaveStart"},
+				{chaiscript::fun(&EntityScriptInterface::hasOnWaveEnd), "hasOnWaveEnd"},
+				{chaiscript::fun(&EntityScriptInterface::hasOnSpawned), "hasOnSpawned"},
+
+				{chaiscript::fun(&EntityScriptInterface::hasOnSelected), "hasOnSelected"},
+				{chaiscript::fun(&EntityScriptInterface::hasOnDeselected), "hasOnDeselected"},
 
 				{chaiscript::fun(&EntityScriptInterface::invokeOnActionTrigger), "invokeOnActionTrigger"},
 				{chaiscript::fun(&EntityScriptInterface::invokeUpdate), "invokeUpdate"},
@@ -801,6 +850,13 @@ void e2::Game::initializeScriptEngine()
 				{chaiscript::fun(&EntityScriptInterface::invokeOnTurnStart), "invokeOnTurnStart"},
 				{chaiscript::fun(&EntityScriptInterface::invokeUpdateAnimation), "invokeUpdateAnimation"},
 				{chaiscript::fun(&EntityScriptInterface::invokeUpdateCustomAction), "invokeUpdateCustomAction"},
+				{chaiscript::fun(&EntityScriptInterface::invokeOnWaveUpdate), "invokeOnWaveUpdate"},
+				{chaiscript::fun(&EntityScriptInterface::invokeOnWaveStart), "invokeOnWaveStart"},
+				{chaiscript::fun(&EntityScriptInterface::invokeOnWaveEnd), "invokeOnWaveEnd"},
+				{chaiscript::fun(&EntityScriptInterface::invokeOnSpawned), "invokeOnSpawned"},
+
+				{chaiscript::fun(&EntityScriptInterface::setOnSelected), "setOnSelected"},
+				{chaiscript::fun(&EntityScriptInterface::setOnDeselected), "setOnDeselected"},
 
 				{chaiscript::fun(&EntityScriptInterface::setOnActionTrigger), "setOnActionTrigger"},
 				{chaiscript::fun(&EntityScriptInterface::setUpdate), "setUpdate"},
@@ -819,9 +875,42 @@ void e2::Game::initializeScriptEngine()
 				{chaiscript::fun(&EntityScriptInterface::setOnTurnEnd), "setOnTurnEnd"},
 				{chaiscript::fun(&EntityScriptInterface::setOnTurnStart), "setOnTurnStart"},
 				{chaiscript::fun(&EntityScriptInterface::setUpdateAnimation), "setUpdateAnimation"},
-				{chaiscript::fun(&EntityScriptInterface::setUpdateCustomAction), "setUpdateCustomAction"}
+				{chaiscript::fun(&EntityScriptInterface::setUpdateCustomAction), "setUpdateCustomAction"},
+				{chaiscript::fun(&EntityScriptInterface::setOnWaveUpdate), "setOnWaveUpdate"},
+				{chaiscript::fun(&EntityScriptInterface::setOnWaveStart), "setOnWaveStart"},
+				{chaiscript::fun(&EntityScriptInterface::setOnWaveEnd), "setOnWaveEnd"},
+				{chaiscript::fun(&EntityScriptInterface::setOnSpawned), "setOnSpawned"},
+				{chaiscript::fun(&EntityScriptInterface::setOnMobSpawned), "setOnMobSpawned"},
+				{chaiscript::fun(&EntityScriptInterface::setOnMobDestroyed), "setOnMobDestroyed"},
+				{chaiscript::fun(&EntityScriptInterface::hasOnMobSpawned), "hasOnMobSpawned"},
+				{chaiscript::fun(&EntityScriptInterface::hasOnMobDestroyed), "hasOnMobDestroyed"},
+				{chaiscript::fun(&EntityScriptInterface::invokeOnMobSpawned), "invokeOnMobSpawned"},
+				{chaiscript::fun(&EntityScriptInterface::invokeOnMobDestroyed), "invokeOnMobDestroyed"},
+
+				{chaiscript::fun(&EntityScriptInterface::invokeOnSelected), "invokeOnSelected"},
+				{chaiscript::fun(&EntityScriptInterface::invokeOnDeselected), "invokeOnDeselected"},
 			}
 		);
+
+
+
+		chaiscript::utility::add_class<e2::ScriptRef<e2::Mob>>(*m_scriptModule,
+			"MobRef",
+			{
+				chaiscript::constructor<e2::ScriptRef<e2::Mob>()>(),
+				chaiscript::constructor<e2::ScriptRef<e2::Mob>(e2::Mob*)>(),
+				chaiscript::constructor<e2::ScriptRef<e2::Mob>(e2::ScriptRef<e2::Mob> const &)>(),
+			},
+			{
+				{chaiscript::fun(&e2::ScriptRef<e2::Mob>::operator=), "="},
+				{chaiscript::fun(&e2::ScriptRef<e2::Mob>::equals), "=="},
+				{chaiscript::fun(&e2::ScriptRef<e2::Mob>::value), "value"},
+				{chaiscript::fun(&e2::ScriptRef<e2::Mob>::clear), "clear"},
+				{chaiscript::fun(&e2::ScriptRef<e2::Mob>::isNull), "isNull"},
+
+			}
+			);
+
 
 		m_scriptModule->add(chaiscript::type_conversion<e2::Name, std::string>([](const e2::Name& asName) { return asName.cstring(); }));
 		m_scriptModule->add(chaiscript::type_conversion<std::string, e2::Name>([](const std::string & asString) { return e2::Name(asString); }));
@@ -936,6 +1025,8 @@ void e2::Game::initializeScriptEngine()
 		m_scriptEngine = e2::create<chaiscript::ChaiScript>();
 		m_scriptEngine->add(m_scriptModule);
 
+		
+
 		m_scriptEngine->add_global(chaiscript::var(this), "game");
 	}
 	catch (std::exception& e)
@@ -973,6 +1064,7 @@ void e2::Game::initialize()
 	}
 
 	e2::EntitySpecification::initializeSpecifications(this);
+	e2::MobSpecification::initializeSpecifications(this);
 
 	m_bootBegin = e2::timeNow();
 
@@ -999,12 +1091,38 @@ void e2::Game::initialize()
 			am->prescribeALJ(alj, pose.animationAssetPath);
 		}
 
+		for (auto& [name, asset] : spec->assets)
+		{
+			am->prescribeALJ(alj, asset.path);
+		}
 	}
-	am->prescribeALJ(alj, "assets/UI_ResourceIcons.e2a");
-	am->prescribeALJ(alj, "assets/kloofendal_irr.e2a");
-	am->prescribeALJ(alj, "assets/kloofendal_rad.e2a");
 
-	am->prescribeALJ(alj, "assets/audio/S_Test.e2a");
+	for (size_t i = 0; i < e2::MobSpecification::specificationCount(); i++)
+	{
+		e2::MobSpecification* spec = e2::MobSpecification::specification(i);
+
+		am->prescribeALJ(alj, spec->meshAssetPath);
+
+		if (spec->skeletonAssetPath.size() > 0)
+			am->prescribeALJ(alj, spec->skeletonAssetPath);
+
+		if (spec->runPoseAssetPath.size() > 0)
+			am->prescribeALJ(alj, spec->runPoseAssetPath);
+
+
+		if (spec->diePoseAssetPath.size() > 0)
+			am->prescribeALJ(alj, spec->diePoseAssetPath);
+	}
+
+	am->prescribeALJ(alj, "assets/UI_ResourceIcons.e2a");
+	am->prescribeALJ(alj, "assets/hdri/courtyard_irr.e2a");
+	am->prescribeALJ(alj, "assets/hdri/courtyard_rad.e2a");
+
+	am->prescribeALJ(alj, "assets/sound/city_damage.e2a");
+
+	am->prescribeALJ(alj, "assets/ui/minimap_water.e2a");
+	am->prescribeALJ(alj, "assets/ui/minimap_forest.e2a");
+	am->prescribeALJ(alj, "assets/ui/minimap_mountain.e2a");
 
 	am->prescribeALJ(alj, "assets/SM_HexBase.e2a");
 	am->prescribeALJ(alj, "assets/SM_HexBaseHigh.e2a");
@@ -1020,77 +1138,32 @@ void e2::Game::initialize()
 
 	am->prescribeALJ(alj, "assets/ui/S_UI_Icons.e2a");
 
+	am->prescribeALJ(alj, "assets/ui/S_Icons.e2a");
+	am->prescribeALJ(alj, "assets/ui/S_Units.e2a");
+
 	;
 	am->prescribeALJ(alj, "assets/environment/resources/SM_ResourceMesh_Stone_LOD0.e2a");
-	am->prescribeALJ(alj, "assets/environment/SM_PineTree001_LOD0.e2a");
-	am->prescribeALJ(alj, "assets/environment/SM_PineTree001_LOD1.e2a");
-	am->prescribeALJ(alj, "assets/environment/SM_PineTree001_LOD2.e2a");
 
-	am->prescribeALJ(alj, "assets/environment/SM_PineTree002_LOD0.e2a");
-	am->prescribeALJ(alj, "assets/environment/SM_PineTree002_LOD1.e2a");
-	am->prescribeALJ(alj, "assets/environment/SM_PineTree002_LOD2.e2a");
+	am->prescribeALJ(alj, "assets/environment/SM_PineTreeNew0.e2a");
+	am->prescribeALJ(alj, "assets/environment/SM_PineTreeNew1.e2a");
+	am->prescribeALJ(alj, "assets/environment/SM_PineTreeNew2.e2a");
+	am->prescribeALJ(alj, "assets/environment/SM_PineTreeNew3.e2a");
 
-	am->prescribeALJ(alj, "assets/environment/SM_PineTree003_LOD0.e2a");
-	am->prescribeALJ(alj, "assets/environment/SM_PineTree003_LOD1.e2a");
-	am->prescribeALJ(alj, "assets/environment/SM_PineTree003_LOD2.e2a");
+	//am->prescribeALJ(alj, "assets/environment/SM_PineTree001_LOD0.e2a");
+	//am->prescribeALJ(alj, "assets/environment/SM_PineTree001_LOD1.e2a");
+	//am->prescribeALJ(alj, "assets/environment/SM_PineTree001_LOD2.e2a");
 
-	am->prescribeALJ(alj, "assets/environment/SM_PineTree004_LOD0.e2a");
-	am->prescribeALJ(alj, "assets/environment/SM_PineTree004_LOD1.e2a");
-	am->prescribeALJ(alj, "assets/environment/SM_PineTree004_LOD2.e2a");
+	//am->prescribeALJ(alj, "assets/environment/SM_PineTree002_LOD0.e2a");
+	//am->prescribeALJ(alj, "assets/environment/SM_PineTree002_LOD1.e2a");
+	//am->prescribeALJ(alj, "assets/environment/SM_PineTree002_LOD2.e2a");
 
+	//am->prescribeALJ(alj, "assets/environment/SM_PineTree003_LOD0.e2a");
+	//am->prescribeALJ(alj, "assets/environment/SM_PineTree003_LOD1.e2a");
+	//am->prescribeALJ(alj, "assets/environment/SM_PineTree003_LOD2.e2a");
 
-	/*am->prescribeALJ(alj, "assets/environment/trees/SM_PalmTree001.e2a");
-	am->prescribeALJ(alj, "assets/environment/trees/SM_PalmTree002.e2a");
-	am->prescribeALJ(alj, "assets/environment/trees/SM_PalmTree003.e2a");
-	am->prescribeALJ(alj, "assets/environment/trees/SM_PalmTree004.e2a");
-	am->prescribeALJ(alj, "assets/environment/SM_Mine.e2a");
-	am->prescribeALJ(alj, "assets/environment/SM_GoldMine.e2a");
-	am->prescribeALJ(alj, "assets/environment/SM_UraniumMine.e2a");
-	am->prescribeALJ(alj, "assets/environment/SM_Quarry.e2a");
-	am->prescribeALJ(alj, "assets/environment/SM_SawMill.e2a");
-
-
-
-	am->prescribeALJ(alj, "assets/characters/SM_Gus.e2a");
-	am->prescribeALJ(alj, "assets/characters/SK_Gus.e2a");
-	am->prescribeALJ(alj, "assets/characters/A_GusWave.e2a");
-
-	am->prescribeALJ(alj, "assets/characters/SK_Soldier.e2a");
-	am->prescribeALJ(alj, "assets/characters/SM_Soldier.e2a");
-	am->prescribeALJ(alj, "assets/characters/A_SoldierDance.e2a");
-	am->prescribeALJ(alj, "assets/characters/A_SoldierIdle.e2a");
-	am->prescribeALJ(alj, "assets/characters/A_SoldierHit.e2a");
-	am->prescribeALJ(alj, "assets/characters/A_SoldierFire.e2a");
-	am->prescribeALJ(alj, "assets/characters/A_SoldierDie.e2a");
-	am->prescribeALJ(alj, "assets/characters/A_SoldierRun.e2a");
-
-
-	am->prescribeALJ(alj, "assets/characters/SK_Engineer.e2a");
-	am->prescribeALJ(alj, "assets/characters/SM_Engineer.e2a");
-	am->prescribeALJ(alj, "assets/characters/A_EngineerIdle.e2a");
-	am->prescribeALJ(alj, "assets/characters/A_EngineerBuild.e2a");
-	am->prescribeALJ(alj, "assets/characters/A_EngineerDie.e2a");
-	am->prescribeALJ(alj, "assets/characters/A_EngineerRun.e2a");
-
-
-
-
-
-	am->prescribeALJ(alj, "assets/vehicles/SK_Boat.e2a");
-	am->prescribeALJ(alj, "assets/vehicles/SM_Boat.e2a");
-	am->prescribeALJ(alj, "assets/vehicles/A_BoatIdle.e2a");
-	am->prescribeALJ(alj, "assets/vehicles/A_BoatDriving.e2a");
-
-	am->prescribeALJ(alj, "assets/vehicles/SK_Tank.e2a");
-	am->prescribeALJ(alj, "assets/vehicles/SM_Tank.e2a");
-	am->prescribeALJ(alj, "assets/vehicles/A_Tank_Idle.e2a");
-	am->prescribeALJ(alj, "assets/vehicles/A_Tank_Moving.e2a");
-	am->prescribeALJ(alj, "assets/vehicles/A_Tank_Fire.e2a");
-
-
-	am->prescribeALJ(alj, "assets/vehicles/SM_MobileMob.e2a");
-
-	am->prescribeALJ(alj, "assets/structures/SM_BuildingPlaceholder.e2a");*/
+	//am->prescribeALJ(alj, "assets/environment/SM_PineTree004_LOD0.e2a");
+	//am->prescribeALJ(alj, "assets/environment/SM_PineTree004_LOD1.e2a");
+	//am->prescribeALJ(alj, "assets/environment/SM_PineTree004_LOD2.e2a");
 
 	m_bootTicket = am->queueALJ(alj);
 	
@@ -1107,18 +1180,22 @@ void e2::Game::shutdown()
 	
 
 	e2::EntitySpecification::destroySpecifications();
+	e2::MobSpecification::destroySpecifications();
 
 	destroyScriptEngine();
 
 	e2::destroy(m_session);
 	uiManager()->unregisterGlobalSpritesheet("gameUi");
+	uiManager()->unregisterGlobalSpritesheet("icons");
+	uiManager()->unregisterGlobalSpritesheet("units");
 
 
 	m_irradianceMap = nullptr;
 	m_radianceMap = nullptr;
 	m_uiTextureResources = nullptr;
 	m_uiIconsSheet = nullptr;
-
+	m_uiIconsSheet2 = nullptr;
+	m_uiUnitsSheet = nullptr;
 
 }
 
@@ -1136,6 +1213,8 @@ void e2::Game::update(double seconds)
 
 	renderer->setSun(sunRot, { 1.0f, 0.9f, 0.85f }, m_sunStrength);
 	renderer->setIbl(m_iblStrength);
+	renderer->whitepoint(glm::vec3(m_whitepoint));
+	renderer->exposure(m_exposure);
 
 	if (m_globalState == GlobalState::Boot)
 	{
@@ -1143,7 +1222,7 @@ void e2::Game::update(double seconds)
 
 		glm::vec2 winSize = m_session->window()->size();
 		float textWidth = m_session->uiContext()->calculateSDFTextWidth(FontFace::Serif, 22.0f, "Loading... ");
-		m_session->uiContext()->drawSDFTextCarousel(FontFace::Serif, 22.f, 0xFFFFFFFF, { winSize.x - textWidth - 16.f, winSize.y - 32.0f }, "Loading... ", 8.0f, m_bootBegin.durationSince().seconds() * 4.0f);
+		m_session->uiContext()->drawSDFTextCarousel(FontFace::Serif, 22.f, 0xFFFFFFFF, { winSize.x - textWidth - 16.f, winSize.y - 32.0f }, "Loading... ", 8.0f, (float)m_bootBegin.durationSince().seconds() * 4.0f);
 
 #if defined(E2_SHIPPING)
 		bool bootPredicate = assetManager()->queryALJ(m_bootTicket).status == ALJStatus::Completed && m_bootBegin.durationSince().seconds() > 4.0f;
@@ -1166,20 +1245,6 @@ void e2::Game::update(double seconds)
 		session->window()->setFullscreen(!session->window()->isFullscreen());
 	}
 
-	if (kb.pressed(e2::Key::O))
-	{
-		FMOD_RESULT result = audioManager()->coreSystem()->playSound(m_testSound->fmodSound(), nullptr, false, nullptr);
-		if (result != FMOD_OK)
-		{
-			LogError("Fmod: {}: {}", int32_t(result), FMOD_ErrorString(result));
-		}
-		else
-		{
-			LogError("Fmod OK!");
-		}
-	}
-
-
 	m_timeDelta = seconds;
 	if (m_globalState == GlobalState::Menu)
 		updateMenu(seconds);
@@ -1189,11 +1254,8 @@ void e2::Game::update(double seconds)
 		updateInGameMenu(seconds);
 
 	auto view = renderer->view();
-	glm::dmat4 listenerTransform = glm::mat4(1.0f);
-	listenerTransform = glm::translate(listenerTransform, view.origin);
-	listenerTransform = listenerTransform * glm::toMat4(view.orientation);
 
-	audioManager()->setListenerTransform(listenerTransform);
+	audioManager()->setListenerTransform(glm::inverse(view.calculateViewMatrix()));
 
 	std::unordered_set<e2::GameEntity*> cpy = m_dyingEntities;
 	for (e2::GameEntity* entity : cpy)
@@ -1327,7 +1389,7 @@ void e2::Game::updateGame(double seconds)
 	m_cursor = mouse.relativePosition;
 	m_cursorUnit = (m_cursor / resolution);
 	m_cursorNdc = m_cursorUnit * 2.0f - 1.0f;
-	m_cursorPlane = renderer->view().unprojectWorldPlane(renderer->resolution(), m_cursorNdc);
+	m_cursorPlane = renderer->view().unprojectWorldPlane(renderer->resolution(), m_cursorNdc, 0.0);
 	e2::Hex newHex = e2::Hex(m_cursorPlane);
 	m_hexChanged = newHex != m_prevCursorHex;
 	m_prevCursorHex = m_cursorHex;
@@ -1346,6 +1408,8 @@ void e2::Game::updateGame(double seconds)
 		{
 			m_altViewOrigin =glm::vec3(m_viewOrigin.x, -5.0f, m_viewOrigin.y);
 		}
+
+		m_hexGrid->debugDraw(m_altView);
 			
 
 	}
@@ -1415,6 +1479,26 @@ void e2::Game::updateGame(double seconds)
 
 	updateAnimation(seconds);
 
+	m_hexGrid->clearOutline();
+	glm::ivec2 chunkIndex = m_hexGrid->chunkIndexFromPlanarCoords(m_cursorPlane);
+	//e2::ChunkState* state = m_hexGrid->getOrCreateChunk(chunkIndex);
+	m_hexGrid->pushOutline(OutlineLayer::Attack, m_cursorHex);
+	for (int32_t y = 0; y < e2::hexChunkResolution; y++)
+	{
+		for (int32_t x = 0; x < e2::hexChunkResolution; x++)
+		{
+			//glm::vec3 tileOffset = e2::Hex(glm::ivec2(x, y)).localCoords();
+			//glm::mat4 transform = glm::translate(glm::identity<glm::mat4>(), tileOffset);
+
+			glm::ivec2 tileHex = (chunkIndex * glm::ivec2(e2::hexChunkResolution)) + glm::ivec2(x, y);
+			m_hexGrid->pushOutline(OutlineLayer::Movement, tileHex);
+		}
+	}
+
+	
+
+	//m_cursorHex
+
 	//m_hexGrid->assertChunksWithinRangeVisible(m_viewOrigin, m_viewPoints, m_viewVelocity);
 	m_hexGrid->updateStreaming(m_viewOrigin, m_viewPoints, m_viewVelocity);
 	m_hexGrid->updateWorldBounds();
@@ -1428,55 +1512,11 @@ void e2::Game::updateGame(double seconds)
 
 	//ui->drawTexturedQuad({}, resolution, 0xFFFFFFFF, m_hexGrid->outlineTexture(renderManager()->frameIndex()));
 
-	drawUI();
+	if(!kb.state(Key::C))
+		drawUI();
 
-	/*
-	if (m_selectedUnit)
-	{
-		int32_t i = 0;
-		e2::Hex prev;
-		for (e2::Hex h : m_unitHoverPath)
-		{
-			if (i++ == 0)
-			{
-				prev = h;
-				continue;
-			}
 
-			glm::vec3 start = prev.localCoords();
-			glm::vec3 end = h.localCoords();
-			renderer->debugLine({ 0.0, 0.0, 1.0 }, start + e2::worldUp() * 0.2f , end + e2::worldUp() * 0.2f);
-			prev = h;
-		}
-
-		for (auto& [index, hexAS] : m_unitAS.hexIndex)
-		{
-			if (!hexAS->towardsOrigin)
-				continue;
-
-			glm::vec3 start = e2::Hex(hexAS->index).localCoords();
-			glm::vec3 end = e2::Hex(hexAS->towardsOrigin->index).localCoords();
-			renderer->debugLine({ 1.0, 0.0, 0.0 }, start, end);
-		}
-	}*/
-
-	//ui->drawTexturedQuad({}, resolution, 0xFFFFFFFF, m_hexGrid->fogOfWarMask());
-
-	/*
-	renderer->debugLine(glm::vec3(1.0f), m_viewPoints.topLeft, m_viewPoints.topRight);
-	renderer->debugLine(glm::vec3(1.0f), m_viewPoints.topRight, m_viewPoints.bottomRight);
-	renderer->debugLine(glm::vec3(1.0f), m_viewPoints.bottomRight, m_viewPoints.bottomLeft);
-	renderer->debugLine(glm::vec3(1.0f), m_viewPoints.bottomLeft, m_viewPoints.topLeft);
-
-	renderer->debugLine(glm::vec3(1.0f, 0.0f, 0.0f), m_viewPoints.leftRay.position, m_viewPoints.leftRay.position  + m_viewPoints.leftRay.parallel);
-	renderer->debugLine(glm::vec3(1.0f, 0.0f, 0.0f), m_viewPoints.topRay.position, m_viewPoints.topRay.position + m_viewPoints.topRay.parallel);
-	renderer->debugLine(glm::vec3(1.0f, 0.0f, 0.0f), m_viewPoints.rightRay.position, m_viewPoints.rightRay.position + m_viewPoints.rightRay.parallel);
-	renderer->debugLine(glm::vec3(1.0f, 0.0f, 0.0f), m_viewPoints.bottomRay.position, m_viewPoints.bottomRay.position + m_viewPoints.bottomRay.parallel);
-	renderer->debugLine(glm::vec3(0.0f, 1.0f, 0.0f), m_viewPoints.leftRay.position, m_viewPoints.leftRay.position + m_viewPoints.leftRay.perpendicular);
-	renderer->debugLine(glm::vec3(0.0f, 1.0f, 0.0f), m_viewPoints.topRay.position, m_viewPoints.topRay.position + m_viewPoints.topRay.perpendicular);
-	renderer->debugLine(glm::vec3(0.0f, 1.0f, 0.0f), m_viewPoints.rightRay.position, m_viewPoints.rightRay.position + m_viewPoints.rightRay.perpendicular);
-	renderer->debugLine(glm::vec3(0.0f, 1.0f, 0.0f), m_viewPoints.bottomRay.position, m_viewPoints.bottomRay.position + m_viewPoints.bottomRay.perpendicular);*/
-
+	ui->drawRasterText(e2::FontFace::Sans, 14, 0xFFFFFFFF, { 32.0f, 128.f }, std::format("cursorHex: {}, chunkIndex: {}", m_cursorHex, chunkIndex));
 
 }
 
@@ -1501,15 +1541,15 @@ void e2::Game::updateMenu(double seconds)
 		timer = 20.0;
 
 #if !defined(E2_SHIPPING)
-	if (timer < 20.0)
-		timer = 20.0;
+	//if (timer < 20.0)
+	//	timer = 20.0;
 #endif
 
 	m_viewZoom = 0.5f;
 
 
 	m_view = calculateRenderView(m_viewOrigin);
-	m_viewPoints = e2::Viewpoints2D(renderer->resolution(), m_view);
+	m_viewPoints = e2::Viewpoints2D(renderer->resolution(), m_view, 0.0);
 	renderer->setView(m_view);
 
 
@@ -1699,14 +1739,18 @@ void e2::Game::updateMenu(double seconds)
 		// spawn local empire
 		m_localEmpireId = spawnEmpire();
 		m_localEmpire = m_empires[m_localEmpireId];
-		discoverEmpire(m_localEmpireId);
+		m_localEmpire->resources.funds.gold = 100.0f;
+		//discoverEmpire(m_localEmpireId);
 
 		m_nomadEmpireId = spawnEmpire();
 		m_nomadEmpire = m_empires[m_nomadEmpireId];
-		discoverEmpire(m_nomadEmpireId);
+		//discoverEmpire(m_nomadEmpireId);
 		m_nomadEmpire->ai = e2::create<e2::NomadAI>(this, m_nomadEmpireId);
 
-		spawnEntity("mobile_mob", m_startLocation, m_localEmpireId);
+		spawnEntity("city", m_startLocation, m_localEmpireId);
+		//spawnCity(m_localEmpireId, m_startLocation);
+
+		//spawnEntity("mobile_mob", m_startLocation, m_localEmpireId);
 
 	}
 	if (m_haveStreamedStart)
@@ -1787,7 +1831,7 @@ bool e2::Game::findStartLocation(glm::ivec2 const& offset, glm::ivec2 const& ran
 			continue;
 
 		constexpr bool ignoreVisibility = true;
-		auto as = e2::create<e2::PathFindingAS>(this, e2::Hex(startLocation), 64, ignoreVisibility, e2::PassableFlags::Land);
+		auto as = e2::create<e2::PathFindingAS>(this, e2::Hex(startLocation), 64, ignoreVisibility, e2::PassableFlags::Land, false, nullptr);
 		uint64_t numWalkableHexes = as->hexIndex.size();
 		e2::destroy(as);
 
@@ -1822,6 +1866,11 @@ void e2::Game::startGame()
 	onStartOfTurn();
 
 
+}
+
+void e2::Game::addScreenShake(float intensity)
+{
+	m_shakeIntensity = glm::max(intensity, m_shakeIntensity);
 }
 
 glm::vec2 e2::Game::worldToPixels(glm::vec3 const& world)
@@ -1885,6 +1934,12 @@ void e2::Game::updateGameState()
 			updateTarget();
 		else if (m_turnState == TurnState::EntityAction_Generic)
 			updateCustomAction();
+		else if (m_turnState == TurnState::WavePreparing)
+			updateWavePreparing();
+		else if (m_turnState == TurnState::WaveEnding)
+			updateWaveEnding();
+		else if (m_turnState == TurnState::Wave)
+			updateWave();
 			
 	}
 	else if (m_state == GameState::TurnEnding)
@@ -1897,29 +1952,31 @@ void e2::Game::updateGameState()
 
 		// flip through to next empire to let the mhave its turn, if it doesnt exist, keep doing it until we find one or we run out
 
-		m_empireTurn++;
-		if (m_empireTurn >= e2::maxNumEmpires)
-		{
-			m_empireTurn = 0;
-			m_turn++;
-		}
-		else
-		{
-			while (m_empireTurn < e2::maxNumEmpires)
-			{
-				if (!m_empires[m_empireTurn])
-				{
-					m_empireTurn++;
-				}
-				else break;
-			}
+		//m_empireTurn++;
+		//if (m_empireTurn >= e2::maxNumEmpires)
+		//{
+		//	m_empireTurn = 0;
+		//	m_turn++;
+		//}
+		//else
+		//{
+		//	while (m_empireTurn < e2::maxNumEmpires)
+		//	{
+		//		if (!m_empires[m_empireTurn])
+		//		{
+		//			m_empireTurn++;
+		//		}
+		//		else break;
+		//	}
 
-			if (m_empireTurn >= e2::maxNumEmpires)
-			{
-				m_empireTurn = 0;
-				m_turn++;
-			}
-		}
+		//	if (m_empireTurn >= e2::maxNumEmpires)
+		//	{
+		//		m_empireTurn = 0;
+		//		m_turn++;
+		//	}
+		//}
+
+		m_turn++;
 
 		
 		m_state = GameState::TurnPreparing;
@@ -1930,25 +1987,92 @@ void e2::Game::updateGameState()
 void e2::Game::updateTurn()
 {
 	// if local is making turn
-	if (m_empireTurn == m_localEmpireId)
+	//if (m_empireTurn == m_localEmpireId)
 		updateTurnLocal();
-	else
-		updateTurnAI();
+	//else
+		//updateTurnAI();
 }
 
-/*void e2::Game::updateAuto()
+void e2::Game::updateWavePreparing()
 {
-	if (m_localAutoEntities.size() == 0)
+	for (e2::GameEntity* entity : m_waveEntities)
+	{
+		entity->onWaveUpdate(m_timeDelta);
+	}
+
+	m_waveDeforestTimer += m_timeDelta;
+	while (m_waveDeforestTimer > 0.2f)
+	{
+		m_waveDeforestTimer -= 0.2f;
+		if (m_waveDeforestIndex < m_wave->path.size())
+		{
+			glm::ivec2 currHex = m_wave->path[m_waveDeforestIndex].offsetCoords();
+			if(!m_hexGrid->getExistingTileData(currHex))
+				m_hexGrid->discover(currHex);
+
+			removeWood(currHex);
+			m_waveDeforestIndex++;
+		}
+	}
+
+	// on predicate do this:
+	if (m_waveDeforestIndex >= m_wave->path.size() - 1)
+	{
+		m_turnState = TurnState::Wave;
+		for (e2::GameEntity* entity : m_waveEntities)
+		{
+			entity->onWaveStart();
+		}
+	}
+}
+
+void e2::Game::updateWave()
+{
+	if (!m_wave)
 	{
 		m_turnState = TurnState::Unlocked;
+		return;
 	}
-	else
+
+	m_wave->update(m_timeDelta);
+
+	if (m_wave->completed())
 	{
-		e2::GameEntity* firstEntity = *m_localAutoEntities.begin();
-		selectEntity(firstEntity);
-		moveSelectedEntityTo(firstEntity->autoMoveTarget);
+
+		for (e2::GameEntity* entity : m_waveEntities)
+		{
+			entity->onWaveEnding();
+		}
+
+		m_turnState = TurnState::WaveEnding; 
+
+		return;
 	}
-}*/
+
+	for (e2::GameEntity *entity : m_waveEntities)
+	{
+		entity->onWaveUpdate(m_timeDelta);
+	}
+}
+
+
+void e2::Game::updateWaveEnding()
+{
+	for (e2::GameEntity* entity : m_waveEntities)
+	{
+		entity->onWaveUpdate(m_timeDelta);
+	}
+
+	// @todo on predicate  do this :
+	for (e2::GameEntity* entity : m_waveEntities)
+	{
+		entity->onWaveEnd();
+	}
+
+	e2::destroy(m_wave);
+	m_wave = nullptr;
+	m_turnState = TurnState::Unlocked;
+}
 
 void e2::Game::updateTurnLocal()
 {
@@ -1967,6 +2091,22 @@ void e2::Game::updateTurnLocal()
 	// turn logic here
 	if (!m_uiHovered && leftMouse.clicked && leftMouse.dragDistance <= 2.0f)
 	{
+		if (kb.state(e2::Key::LeftAlt))
+		{
+			// ugly line of code, no I wont fix it 
+			bool onLand = m_cursorTile ? m_cursorTile->getWater() == TileFlags::WaterNone : m_hexGrid->getCalculatedTileData(m_cursorHex).getWater() == TileFlags::WaterNone;
+			bool unitSlotTaken = entityAtHex(e2::EntityLayerIndex::Unit, m_cursorHex) != nullptr;
+
+			if (!unitSlotTaken)
+			{
+				if (onLand)
+					spawnEntity("hive", m_cursorHex, m_nomadEmpireId);
+				else
+					spawnEntity("cb90", m_cursorHex, m_nomadEmpireId);
+			}
+			return;
+		}
+
 		if (kb.state(e2::Key::LeftControl))
 		{
 			// ugly line of code, no I wont fix it 
@@ -1976,7 +2116,7 @@ void e2::Game::updateTurnLocal()
 			if (!unitSlotTaken)
 			{
 				if (onLand)
-					spawnEntity("grunt", m_cursorHex, m_nomadEmpireId);
+					spawnEntity("nimble", m_cursorHex, m_localEmpireId);
 				else
 					spawnEntity("cb90", m_cursorHex, m_nomadEmpireId);
 			}
@@ -2027,12 +2167,12 @@ void e2::Game::updateTurnLocal()
 	}
 }
 
-void e2::Game::updateTurnAI()
-{
-	e2::GameEmpire* empire = m_empires[m_empireTurn];
-	if (empire->ai)
-		empire->ai->grugBrainTick(game()->timeDelta());
-}
+//void e2::Game::updateTurnAI()
+//{
+//	e2::GameEmpire* empire = m_empires[m_empireTurn];
+//	if (empire->ai)
+//		empire->ai->grugBrainTick(game()->timeDelta());
+//}
 
 
 void e2::Game::endTurn()
@@ -2058,10 +2198,10 @@ void e2::Game::onTurnPreparingEnd()
 void e2::Game::onStartOfTurn()
 {
 	// ignore visibility for AI since we dont want to see what theyre up to 
-	if (m_empireTurn == m_localEmpireId)
-	{
-		while (m_undiscoveredEmpires.size() < 3)
-			spawnAIEmpire();
+	//if (m_empireTurn == m_localEmpireId)
+	//{
+	//	while (m_undiscoveredEmpires.size() < 3)
+	//		spawnAIEmpire();
 
 
 		// clear and calculate visibility
@@ -2072,30 +2212,22 @@ void e2::Game::onStartOfTurn()
 			entity->spreadVisibility();
 		}
 
-	}
+	//}
 
-	m_empires[m_empireTurn]->resources.onNewTurn();
+	//m_empires[m_empireTurn]->resources.onNewTurn();
+	m_empires[m_localEmpireId]->resources.onNewTurn();
 
-	for (e2::GameEntity* entity : m_empires[m_empireTurn]->entities)
+	for (e2::GameEntity* entity : m_empires[m_localEmpireId]->entities)
 	{
 		entity->onTurnStart();
 	}
 
 
-	if (m_empireTurn == m_localEmpireId)
-	{
+	//if (m_empireTurn == m_localEmpireId)
+	//{
 		m_localTurnEntities.clear();
-		//m_localAutoEntities.clear();
 		for (e2::GameEntity* entity : m_localEmpire->entities)
 		{
-			//if (entity->sleeping)
-				//continue;
-
-			/*if (entity->autoMove)
-			{
-				m_localAutoEntities.insert(entity);
-			} else */
-
 			entity->updateGrugVariables();
 
 			if (entity->playerRelevant())
@@ -2106,22 +2238,22 @@ void e2::Game::onStartOfTurn()
 		
 		if (m_localTurnEntities.size() > 0)
 			nextLocalEntity();
-	}
-	else if (m_empires[m_empireTurn]->ai)
-	{
-		m_empires[m_empireTurn]->ai->grugBrainWakeUp();
-	}
+	//}
+	//else if (m_empires[m_empireTurn]->ai)
+	//{
+	//	m_empires[m_empireTurn]->ai->grugBrainWakeUp();
+	//}
 }
 
 void e2::Game::onEndOfTurn()
 {
-	for (e2::GameEntity* entity : m_empires[m_empireTurn]->entities)
+	for (e2::GameEntity* entity : m_empires[m_localEmpireId]->entities)
 	{
 		entity->onTurnEnd();
 	}
 
-	if (m_empires[m_empireTurn]->ai)
-		m_empires[m_empireTurn]->ai->grugBrainGoSleep();
+	if (m_empires[m_localEmpireId]->ai)
+		m_empires[m_localEmpireId]->ai->grugBrainGoSleep();
 
 }
 
@@ -2137,10 +2269,9 @@ void e2::Game::onTurnEndingEnd()
 
 void e2::Game::updateUnitMove()
 {
-
 	if (m_selectedEntity->specification->moveType == EntityMoveType::Linear)
 	{
-		m_unitMoveDelta += float(m_timeDelta) * m_selectedEntity->specification->moveSpeed * (m_ffwMove?100.0f : 1.0f);
+		m_unitMoveDelta += float(m_timeDelta) * m_selectedEntity->specification->moveSpeed * (m_ffwMove ? 100.0f : 1.0f);
 
 		while (m_unitMoveDelta > 1.0f)
 		{
@@ -2342,6 +2473,11 @@ e2::GameEntity* e2::Game::spawnEntity(e2::Name entityId, glm::ivec2 const& locat
 	// insert into global entity set 
 	m_entities.insert(asEntity);
 
+	if (asEntity->specification->waveRelevant)
+	{
+		m_waveEntities.insert(asEntity);
+	}
+
 	// insert into entity layer index
 	m_entityLayers[size_t(asEntity->specification->layerIndex)].entityIndex[asEntity->tileIndex] = asEntity;
 
@@ -2360,7 +2496,7 @@ e2::GameEntity* e2::Game::spawnEntity(e2::Name entityId, glm::ivec2 const& locat
 		}
 	}
 
-
+	asEntity->onSpawned();
 
 	return asEntity;
 }
@@ -2388,7 +2524,7 @@ void e2::Game::drawUI()
 		if(debugShadows)
 		{
 			glm::vec2 offset{ 300.0f, 40.0f };
-			glm::vec2 size{ 120, 80.0f };
+			glm::vec2 size{ 120, 220.0f };
 
 			e2::UIContext* ui = gameSession()->uiContext();
 			auto& mouse = ui->mouseState();
@@ -2408,7 +2544,19 @@ void e2::Game::drawUI()
 			ui->sliderFloat("sunAngleA", m_sunAngleA, -180.0f, 180.0f);
 			ui->sliderFloat("sunAngleB", m_sunAngleB, 0.0f, 90.0f);
 			ui->sliderFloat("sunStr", m_sunStrength, 0.0f, 10.0f);
-			ui->sliderFloat("iblStr", m_iblStrength, 0.0f, 10.0f);
+			ui->sliderFloat("iblStr", m_iblStrength, 0.0f, 10.0f); 
+
+			ui->sliderFloat("exposure", m_exposure, 0.0f, 20.0f);
+			ui->sliderFloat("whitepoint", m_whitepoint, 0.0f, 20.0f);
+
+			ui->sliderFloat("mtnFreqScale", e2::mtnFreqScale, 0.001f, 0.1f, "%.6f");
+			ui->sliderFloat("mtnScale", e2::mtnScale, 0.25f, 10.0f, "%.6f");
+			ui->sliderFloat("mtnPow", e2::mtnPow, 0.1f, 4.0f, "%.6f");
+			ui->sliderFloat("mtnDist", e2::mtnDist, 0.01f, 4.0f, "%.6f");
+
+			e2::GameSession* session = gameSession();
+			e2::Renderer* renderer = session->renderer();
+
 			ui->endStackV();
 			ui->popFixedPanel();
 		}
@@ -2561,85 +2709,100 @@ void e2::Game::drawStatusUI()
 	e2::IWindow* wnd = session->window();
 	glm::vec2 winSize = wnd->size();
 
-	ui->drawQuadShadow({ -2.0f, -2.0f }, { winSize.x + 4.0f, 30.0f }, 2.0f, 0.9f, 2.0f);
+	//ui->drawQuadShadow({ -2.0f, -2.0f }, { winSize.x + 4.0f, 30.0f }, 2.0f, 0.9f, 2.0f);
+	ui->drawGamePanel({}, { winSize.x, 32.0f }, false, 0.75f);
 
 	float xCursor = 0.0f;
-	uint8_t fontSize = 12;
+	uint8_t fontSize = 14;
 
 	std::string str;
 	float strWidth;
 
 	e2::GameResources& resources = m_empires[m_localEmpireId]->resources;
 
+	float textBaseline = 16.0f;
+
 	// Gold
-	xCursor += 2.0f;
-	ui->drawTexturedQuad({ xCursor, 2.0f }, { 24.0f, 24.0f }, 0xFFFFFFFF, m_uiTextureResources->handle(), { (1.0f / 7.0f) * 0.0f, 0.0f }, { 1.0f / 7.0f, 1.0f });
-	xCursor += 26.0f;
-	str = std::format("{:} ({:+})", resources.funds.gold, resources.profits.gold);
-	strWidth = ui->calculateTextWidth(e2::FontFace::Serif, fontSize, str);
-	ui->drawRasterText(e2::FontFace::Serif, fontSize, 0xFFFFFFFF, { xCursor, 14.0f}, str);
+	e2::Sprite* goldSprite = getIconSprite("gold");
+	xCursor += 20.0f;
+	ui->drawSprite({ xCursor, 6.0f }, *goldSprite, 0xFFFFFFFF, 20.0f / goldSprite->size.y);
+	xCursor += 24.0f;
+	xCursor += 8.0f;
+
+	str = std::format("{:}", resources.funds.gold);
+	strWidth = ui->calculateTextWidth(e2::FontFace::Sans, fontSize, str);
+	ui->drawRasterText(e2::FontFace::Sans, fontSize, 0xFFFFFFFF, { xCursor, textBaseline }, str);
 	xCursor += strWidth;
 
 	// Wood
-	xCursor += 2.0f;
-	ui->drawTexturedQuad({ xCursor, 2.0f }, { 24.0f, 24.0f }, 0xFFFFFFFF, m_uiTextureResources->handle(), { (1.0f / 7.0f) * 1.0f, 0.0f }, { 1.0f / 7.0f, 1.0f });
-	xCursor += 26.0f;
-	str = std::format("{:} ({:+})", resources.funds.wood, resources.profits.wood);
-	strWidth = ui->calculateTextWidth(e2::FontFace::Serif, fontSize, str);
-	ui->drawRasterText(e2::FontFace::Serif, fontSize, 0xFFFFFFFF, { xCursor, 14.0f }, str);
+	e2::Sprite* woodSprite = getIconSprite("wood");
+	xCursor += 44.0f;
+	ui->drawSprite({ xCursor, 6.0f }, *woodSprite, 0xFFFFFFFF, 20.0f / goldSprite->size.y);
+	xCursor += 24.0f;
+	xCursor += 8.0f;
+
+	str = std::format("{:} *({:+})*", resources.funds.wood, resources.profits.wood);
+	strWidth = ui->calculateTextWidth(e2::FontFace::Sans, fontSize, str);
+	ui->drawRasterText(e2::FontFace::Sans, fontSize, 0xFFFFFFFF, { xCursor, textBaseline }, str);
 	xCursor += strWidth;
 
-	// Stone
-	xCursor += 2.0f;
-	ui->drawTexturedQuad({ xCursor, 2.0f }, { 24.0f, 24.0f }, 0xFFFFFFFF, m_uiTextureResources->handle(), { (1.0f / 7.0f) * 2.0f, 0.0f }, { 1.0f / 7.0f, 1.0f });
-	xCursor += 26.0f;
-	str = std::format("{:} ({:+})", resources.funds.stone, resources.profits.stone);
-	strWidth = ui->calculateTextWidth(e2::FontFace::Serif, fontSize, str);
-	ui->drawRasterText(e2::FontFace::Serif, fontSize, 0xFFFFFFFF, { xCursor, 14.0f }, str);
+	// Iron
+	e2::Sprite* oreSprite = getIconSprite("ore");
+	xCursor += 44.0f;
+	ui->drawSprite({ xCursor, 6.0f }, *oreSprite, 0xFFFFFFFF, 20.0f / goldSprite->size.y);
+	xCursor += 24.0f;
+	xCursor += 8.0f;
+
+	str = std::format("{:} *({:+})*", resources.funds.iron, resources.profits.iron);
+	strWidth = ui->calculateTextWidth(e2::FontFace::Sans, fontSize, str);
+	ui->drawRasterText(e2::FontFace::Sans, fontSize, 0xFFFFFFFF, { xCursor, textBaseline }, str);
 	xCursor += strWidth;
 
-	// Metal
-	xCursor += 2.0f;
-	ui->drawTexturedQuad({ xCursor, 2.0f }, { 24.0f, 24.0f }, 0xFFFFFFFF, m_uiTextureResources->handle(), { (1.0f / 7.0f) * 3.0f, 0.0f }, { 1.0f / 7.0f, 1.0f });
-	xCursor += 26.0f;
-	str = std::format("{:} ({:+})", resources.funds.metal, resources.profits.metal);
-	strWidth = ui->calculateTextWidth(e2::FontFace::Serif, fontSize, str);
-	ui->drawRasterText(e2::FontFace::Serif, fontSize, 0xFFFFFFFF, { xCursor, 14.0f }, str);
-	xCursor += strWidth;
+	// Steel
+	e2::Sprite* steelSprite = getIconSprite("beam");
+	xCursor += 44.0f;
+	ui->drawSprite({ xCursor, 6.0f }, *steelSprite, 0xFFFFFFFF, 20.0f / goldSprite->size.y);
+	xCursor += 24.0f;
+	xCursor += 8.0f;
 
-	// Oil
-	xCursor += 2.0f;
-	ui->drawTexturedQuad({ xCursor, 2.0f }, { 24.0f, 24.0f }, 0xFFFFFFFF, m_uiTextureResources->handle(), { (1.0f / 7.0f) * 4.0f, 0.0f }, { 1.0f / 7.0f, 1.0f });
-	xCursor += 26.0f;
-	str = std::format("{:} ({:+})", resources.funds.oil, resources.profits.oil);
-	strWidth = ui->calculateTextWidth(e2::FontFace::Serif, fontSize, str);
-	ui->drawRasterText(e2::FontFace::Serif, fontSize, 0xFFFFFFFF, { xCursor, 14.0f }, str);
-	xCursor += strWidth;
-
-	// Uranium
-	xCursor += 2.0f;
-	ui->drawTexturedQuad({ xCursor, 2.0f }, { 24.0f, 24.0f }, 0xFFFFFFFF, m_uiTextureResources->handle(), { (1.0f / 7.0f) * 5.0f, 0.0f }, { 1.0f / 7.0f, 1.0f });
-	xCursor += 26.0f;
-	str = std::format("{:} ({:+})", resources.funds.uranium, resources.profits.uranium);
-	strWidth = ui->calculateTextWidth(e2::FontFace::Serif, fontSize, str);
-	ui->drawRasterText(e2::FontFace::Serif, fontSize, 0xFFFFFFFF, { xCursor, 14.0f }, str);
-	xCursor += strWidth;
-
-	// Meteorite
-	xCursor += 2.0f;
-	ui->drawTexturedQuad({ xCursor, 2.0f }, { 24.0f, 24.0f }, 0xFFFFFFFF, m_uiTextureResources->handle(), { (1.0f / 7.0f) * 6.0f, 0.0f }, { 1.0f / 7.0f, 1.0f });
-	xCursor += 26.0f;
-	str = std::format("{:} ({:+})", resources.funds.meteorite, resources.profits.meteorite);
-	strWidth = ui->calculateTextWidth(e2::FontFace::Serif, fontSize, str);
-	ui->drawRasterText(e2::FontFace::Serif, fontSize, 0xFFFFFFFF, { xCursor, 14.0f }, str);
+	str = std::format("{:}", resources.funds.steel);
+	strWidth = ui->calculateTextWidth(e2::FontFace::Sans, fontSize, str);
+	ui->drawRasterText(e2::FontFace::Sans, fontSize, 0xFFFFFFFF, { xCursor, textBaseline }, str);
 	xCursor += strWidth;
 
 
 	str = std::format("Turn {}", m_turn);
-	strWidth = ui->calculateTextWidth(e2::FontFace::Serif, fontSize, str);
-	xCursor = winSize.x - strWidth - 16.0f;
-	ui->drawRasterText(e2::FontFace::Serif, fontSize, 0xFFFFFFFF, { xCursor, 14.0f }, str);
+	strWidth = ui->calculateTextWidth(e2::FontFace::Sans, fontSize, str);
+	xCursor = winSize.x - strWidth - 8.0f - 20.0f - 8.0f - 20.0f - 8.0f;
+	ui->drawRasterText(e2::FontFace::Sans, fontSize, 0xFFFFFFFF, { xCursor, textBaseline }, str);
 	
+	e2::Sprite* nextSprite = getUiSprite("endturn");
+	xCursor = winSize.x - 20.0f - 8.0f - 20.0f;
+	glm::vec2 nextOffset{ xCursor, 6.0f };
+	glm::vec2 nextSize{ 20.0f, 20.0f };
+	ui->drawSprite(nextOffset, *nextSprite, 0xFFFFFFFF, 20.0f / nextSprite->size.y);
+
+	if (mouse.relativePosition.x > nextOffset.x && mouse.relativePosition.x < nextOffset.x + nextSize.x &&
+		mouse.relativePosition.y > nextOffset.y && mouse.relativePosition.y < nextOffset.y + nextSize.y)
+	{
+		m_uiHovered = true;
+		if (leftMouse.pressed)
+			endTurn();
+	}
+
+	e2::Sprite* menuSprite = getIconSprite("menu");
+	xCursor = winSize.x - 20.0f - 8.0f;
+	glm::vec2 menuOffset{xCursor, 6.0f};
+	glm::vec2 menuSize{20.0f, 20.0f};
+	ui->drawSprite(menuOffset, *menuSprite, 0xFFFFFFFF, 20.0f / menuSprite->size.y);
+
+	if (mouse.relativePosition.x > menuOffset.x && mouse.relativePosition.x < menuOffset.x + menuSize.x &&
+		mouse.relativePosition.y > menuOffset.y && mouse.relativePosition.y < menuOffset.y + menuSize.y)
+	{
+		m_uiHovered = true;
+		if (leftMouse.pressed)
+			m_globalState = GlobalState::InGameMenu;
+	}
 
 	/*ui->drawRasterText(e2::FontFace::Serif, 11, 0xFFFFFFFF, { 4.0f + (160.0f * 1.0f), 14.0f }, std::format("Wood: {0:10} ({0:+})", m_resources.funds.wood, m_resources.profits.wood));
 	ui->drawRasterText(e2::FontFace::Serif, 11, 0xFFFFFFFF, { 4.0f + (160.0f * 2.0f), 14.0f }, std::format("Stone: {0:10} ({0:+})", m_resources.funds.stone, m_resources.profits.stone));
@@ -2668,8 +2831,8 @@ void e2::Game::drawUnitUI()
 
 	float alpha = glm::mix( 1.0f,  0.75f, m_viewZoom);
 	e2::UIColor bgColor = e2::UIColor(glm::vec4{0.0f, 0.0f, 0.0f, alpha});
-	e2::UIColor bgColorNomad = e2::UIColor(166, 28, 0, (alpha * 255.f));
-	e2::UIColor bgColorEnemy = e2::UIColor(7, 82, 163, (alpha*255.f));
+	e2::UIColor bgColorNomad = e2::UIColor(166, 28, 0, uint8_t(alpha * 255.f));
+	e2::UIColor bgColorEnemy = e2::UIColor(7, 82, 163, uint8_t(alpha*255.f));
 	for (e2::GameEntity* entity : m_entitiesInView)
 	{
 		if (!m_hexGrid->isVisible(entity->tileIndex))
@@ -2686,32 +2849,39 @@ void e2::Game::drawUnitUI()
 		bool selected = entity == m_selectedEntity;
 
 		if (!selected)
-			bg.a = bg.a * 0.8;
+			bg.a = uint8_t((float)bg.a * 0.8f);
 
 
 		static const e2::Name badgeBgName = "badge";
 		e2::Sprite* badgeBg = getUiSprite(badgeBgName);
-		e2::Sprite* badgeSprite = getUiSprite(entity->specification->badgeId);
-
+		e2::Sprite* badgeSprite;
+		
+		bool isGlobal = entity->specification->badgeId.string().contains('.');
+		if(isGlobal)
+			badgeSprite = uiManager()->globalSprite(entity->specification->badgeId);
+		else 
+			badgeSprite = getUiSprite(entity->specification->badgeId);
 		
 
-		if (badgeBg && badgeSprite)
+		
+		 
+		if (!selected && badgeBg && badgeSprite)
 		{
 			
 			float uiScale = float(winSize.y) / 1080.0f;
-			uiScale *= selected ? 1.0f : 0.80f;
+			uiScale *= 1.0;
 
-			glm::vec2 badgeSize = glm::vec2( 32.0f, 32.0f) * uiScale;
+			glm::vec2 badgeSize = glm::vec2( 32.0f * (badgeSprite->size.x / badgeSprite->size.y), 32.0f) * uiScale;
 
-			glm::vec2 badgeShieldSize = badgeSize * 2.0f;
+			glm::vec2 badgeShieldSize = glm::vec2(64.0f * (badgeBg->size.x / badgeBg->size.y), 64.0f) * uiScale;
 
 			
 
 			glm::vec2 badgePos = worldToPixels( entity->meshPosition + e2::worldUpf() * 0.75f);
 		
-			ui->drawSprite(badgePos - badgeShieldSize / 2.0f, *badgeBg, bg, (64.0f/80.0f) * uiScale);
+			ui->drawSprite(badgePos - badgeShieldSize / 2.0f, *badgeBg, bg, (64.0f/ badgeBg->size.y) * uiScale);
 
-			ui->drawSprite(badgePos - badgeSize / 2.0f, *badgeSprite, 0xFFFFFFFF, (32.0f / 40.0f) * uiScale);
+			ui->drawSprite(badgePos - badgeSize / 2.0f, *badgeSprite, 0xFFFFFFFF, (32.0f / badgeSprite->size.y) * uiScale);
 		}
 
 	}
@@ -2801,7 +2971,7 @@ void e2::Game::drawMinimapUI()
 	float width = (float)miniSize.x;
 	float height = (float)miniSize.y;
 
-	glm::vec2 offset = {  16.0f , winSize.y - height - 16.0f };
+	glm::vec2 offset = { winSize.x - width - 16.0f , 48.0f };
 
 	bool hovered = !m_viewDragging && 
 		(mouse.relativePosition.x > offset.x && mouse.relativePosition.x < offset.x + width &&
@@ -2812,9 +2982,9 @@ void e2::Game::drawMinimapUI()
 	}
 
 
-	ui->drawQuadShadow(offset- glm::vec2(4.0f, 4.0f), {width + 8.0f, height + 8.0f}, 8.0f, 0.9f, 4.0f);
+	//ui->drawQuadShadow(offset- glm::vec2(4.0f, 4.0f), {width + 8.0f, height + 8.0f}, 8.0f, 0.9f, 4.0f);
 	ui->drawTexturedQuad(offset, { width, height }, 0xFFFFFFFF, m_hexGrid->minimapTexture(renderManager()->frameIndex()));
-
+	ui->drawFrame(offset, { width, height }, e2::gamePanelDarkHalf, 1.0f);
 	if (hovered && leftMouse.state)
 	{
 		e2::Aabb2D viewBounds = m_hexGrid->viewBounds();
@@ -2822,6 +2992,49 @@ void e2::Game::drawMinimapUI()
 		glm::vec2 worldMouse = viewBounds.min + normalizedMouse * (viewBounds.max - viewBounds.min);
 		m_viewOrigin = worldMouse;
 	}
+
+	{
+		glm::vec2 pos = offset + glm::vec2(0.0f, height + 4.0f);
+		glm::vec2 size = { width, 24 };
+
+		static bool grid = false;
+		ui->pushFixedPanel("zxccc", pos, size);
+		if (ui->checkbox("toggleGrid", grid, "Show Grid"));
+		{
+			renderer->setDrawGrid(grid);
+		}
+		ui->popFixedPanel();
+	}
+
+	glm::vec2 pos = offset + glm::vec2(0.0f, height + 32.0f);
+	glm::vec2 size = { width, 80 };
+
+	bool btnHovered = (mouse.relativePosition.x > pos.x && mouse.relativePosition.x < pos.x + size.x &&
+		mouse.relativePosition.y > pos.y && mouse.relativePosition.y < pos.y + size.y);
+	ui->drawGamePanel(pos, size, btnHovered, 0.75f);
+	if(btnHovered)
+		ui->drawFrame(pos, size, e2::gameAccentHalf, 1.0f);
+	else 
+		ui->drawFrame(pos, size, e2::gamePanelDarkHalf, 1.0f);
+
+	e2::Sprite* droneSprite = getUnitSprite("drone");
+	ui->drawSprite(pos + glm::vec2{8.f, 8.f}, * droneSprite, 0xFFFFFFFF, 64.0f / 200.0f);
+
+	ui->drawRasterText(e2::FontFace::Sans, 14, 0xFFFFFFFF, pos + glm::vec2(80.0f, 20.f), "Train Drone", false);
+
+	ui->drawRasterText(e2::FontFace::Sans, 10, 0xFFFFFF7F, pos + glm::vec2(80.0f, 36.f), "Builds districts and turrets.", false);
+
+	e2::Sprite* goldSprite = getIconSprite("gold");
+	ui->drawSprite(pos + glm::vec2(80.0f, 40.0f + 10.0f), *goldSprite, 0xFFFFFFFF, 20.0f / goldSprite->size.y);
+	float w = ui->calculateTextWidth(FontFace::Sans, 14, "20");
+	ui->drawRasterText(FontFace::Sans, 14, 0xFFFFFFFF, pos + glm::vec2(80.0f + 20.0f + 10.0f, 40.0f + 20.0f), "20");
+
+	e2::Sprite* steelSprite = getIconSprite("beam");
+	ui->drawSprite(pos + glm::vec2(80.0f + 20.0f + 10.0f + w + 20.0f , 40.0f + 10.0f), *steelSprite, 0xFFFFFFFF, 20.0f / steelSprite->size.y);
+	float w2 = ui->calculateTextWidth(FontFace::Sans, 14, "5");
+	ui->drawRasterText(FontFace::Sans, 14, 0xFFFFFFFF, pos + glm::vec2(80.0f + 20.0f + 10.0f + w + 20.0f + 20.0f + 10.0f, 40.0f + 20.0f), "5");
+
+	
 }
 
 void e2::Game::drawDebugUI()
@@ -2852,9 +3065,10 @@ void e2::Game::drawDebugUI()
 
 
 
-	//ui->drawTexturedQuad({ xOffset, yOffset + 18.0f * 11.0f }, { 384.f, 384.f }, 0xFFFFFFFF, renderer->shadowTarget());
+	ui->drawTexturedQuad({ xOffset, yOffset + 18.0f * 11.0f }, { 384.f, 384.f }, 0xFFFFFFFF, renderer->shadowTarget());
 #endif
 }
+
 
 void e2::Game::drawFinalUI()
 {
@@ -2869,39 +3083,75 @@ void e2::Game::drawFinalUI()
 	e2::IWindow* wnd = session->window();
 	glm::vec2 winSize = wnd->size();
 
-	float width = 180.0f;
-	float height = 180.0f;
+	glm::vec2 btnSize(80.0f, 80.0f);
+	float width = 368.0f;
+	float height = 144.0f;
+	float topA = 32.0f;
+	float topB = 24.0f;
+	float topHeight = 32.0f + 24.0f;
+	float topBottomDelimiter = height - btnSize.y - topHeight;
+	// 736 x 160
 
 	glm::vec2 offset = { winSize.x - width - 16.0f, winSize.y - height - 16.0f };
+	glm::vec2 cursor = offset;
 
 	if (mouse.relativePosition.x > offset.x && mouse.relativePosition.x < offset.x + width &&
 		mouse.relativePosition.y > offset.y && mouse.relativePosition.y < offset.y + height)
 		m_uiHovered = true;
 
+	e2::Sprite* citySprite = getUnitSprite("city");
+
+	ui->drawQuad(cursor, { width, topA }, e2::gamePanelLight.withOpacity(0.75f));
+	ui->drawQuad(cursor + glm::vec2(0.0f, topA), { width, topB }, e2::gamePanelDark.withOpacity(0.75f));
+
+	float spriteScale = topA / citySprite->size.y;
+	ui->drawSprite(cursor + glm::vec2(4.0f, 0.0f), *citySprite, 0xFFFFFFFF, spriteScale);
+	ui->drawRasterText(e2::FontFace::Sans, 14, 0xFFFFFFFF, cursor + glm::vec2(4.0f, 0.0f) + glm::vec2(citySprite->size.x * spriteScale, topA / 2.0f), "City of **Mikkeli**");
+
+	ui->drawRasterText(e2::FontFace::Sans, 10, 0xFFFFFFFF, cursor + glm::vec2(4.0f, topA + topB / 2.0f), "2 districts, researching **Diligence** (13 turns)");
+
+	cursor.y += topHeight + topBottomDelimiter;
+
+	glm::vec2 iconSize(44.f, 44.f);
+	float iconOffsetY = 6.0f;
+	float buttonPadding = 16.0f;
+	float infoOpacity = 0.75f;
+
+
+	auto drawBtn = [&](std::string const& textLabel, e2::Name spriteName) {
+		bool hovered = (mouse.relativePosition.x > cursor.x && mouse.relativePosition.x < cursor.x + btnSize.x &&
+			mouse.relativePosition.y > cursor.y && mouse.relativePosition.y < cursor.y + btnSize.y);
+
+
+		e2::Sprite* sprite = getIconSprite(spriteName);
+		ui->drawGamePanel(cursor, btnSize, hovered, infoOpacity);
+		ui->drawFrame(cursor, btnSize, e2::UIColor(hovered ? e2::gameAccentHalf : e2::gamePanelDark).withOpacity(infoOpacity), 1.0f);
+		ui->drawSprite(cursor + glm::vec2(btnSize.x / 2.0f - iconSize.x / 2.0f, iconOffsetY), *sprite, e2::UIColor(0xFFFFFFFF).withOpacity(infoOpacity), iconSize.y / sprite->size.y);
+		float tw = ui->calculateTextWidth(FontFace::Sans, 14, textLabel);
+		ui->drawRasterText(FontFace::Sans, 14, e2::UIColor(0xFFFFFFFF).withOpacity(infoOpacity), cursor + glm::vec2(btnSize.x / 2.0f - tw / 2.0f, 64.0f), textLabel);
+		cursor.x += btnSize.x + buttonPadding;
+	};
+
+	drawBtn("*Details*", "info");
+	drawBtn("*Research*", "research");
+	drawBtn("*Upgrades*", "upgrade");
+	drawBtn("*Economy*", "cash");
+
+
+	/*
 	ui->drawQuadShadow(offset, { width, height }, 8.0f, 0.9f, 4.0f);
-	//uint8_t fontSize = 12;
-	//std::string str = m_selectedUnit->displayName;
-	//ui->drawRasterText(e2::FontFace::Serif, 14, 0xFFFFFFFF, offset + glm::vec2(8.f, 14.f), str);
 
 	ui->pushFixedPanel("test", offset + glm::vec2(4.0f, 4.0f), glm::vec2(width - 8.0f, height - 8.0f));
 	ui->beginStackH("test2", 40.0f);
 
-	if (m_empireTurn == m_localEmpireId)
-	{
-		
 		if (ui->gameGridButton("nextent", "gameUi.nextunit", "Next unit..", m_localTurnEntities.size() > 0))
 			nextLocalEntity();
 		
 		if (ui->gameGridButton("endturn", "gameUi.endturn", "End turn", true))
 			endTurn();
-	}
-	else
-	{
-		ui->gameLabel("Please wait, AI turn..");
-	}
 
 	ui->endStackH();
-	ui->popFixedPanel();
+	ui->popFixedPanel();*/
 }
 
 void e2::Game::onNewCursorHex()
@@ -2926,7 +3176,7 @@ e2::EmpireId e2::Game::spawnEmpire()
 		if (!m_empires[i])
 		{
 			m_empires[i] = e2::create<e2::GameEmpire>(this, i);
-			m_undiscoveredEmpires.insert(m_empires[i]);
+			//m_undiscoveredEmpires.insert(m_empires[i]);
 			return i;
 		}
 	}
@@ -2943,9 +3193,9 @@ void e2::Game::destroyEmpire(EmpireId empireId)
 	if (!empire)
 		return;
 
-	m_aiEmpires.erase(empire);
-	m_discoveredEmpires.erase(empire);
-	m_undiscoveredEmpires.erase(empire);
+	//m_aiEmpires.erase(empire);
+	//m_discoveredEmpires.erase(empire);
+	//m_undiscoveredEmpires.erase(empire);
 
 	if (empire->ai)
 		e2::destroy(empire->ai);
@@ -2953,57 +3203,57 @@ void e2::Game::destroyEmpire(EmpireId empireId)
 	e2::destroy(empire);
 }
 
-void e2::Game::spawnAIEmpire()
-{
-	e2::EmpireId newEmpireId = spawnEmpire();
-	if (newEmpireId == 0)
-		return;
-
-	e2::GameEmpire* newEmpire = m_empires[newEmpireId];
-	m_aiEmpires.insert(newEmpire);
-
-	newEmpire->ai = e2::create<e2::CommanderAI>(this, newEmpireId);
-
-	e2::Aabb2D worldBounds = m_hexGrid->worldBounds();
-	bool foundLocation = false;
-	glm::ivec2 aiStartLocation;
-	do
-	{
-		glm::vec2 random = e2::randomVec2(worldBounds.min, worldBounds.max);
-		float distLeft = glm::abs(worldBounds.min.x - random.x);
-		float distRight = glm::abs(worldBounds.max.x - random.x);
-		float distUp = glm::abs(worldBounds.min.y - random.y);
-		float distDown = glm::abs(worldBounds.max.y - random.y);
-		glm::vec2 offsetDir{};
-
-		if (distLeft < distRight && distLeft < distUp && distLeft < distDown)
-		{
-			random.x = worldBounds.min.x;
-			offsetDir = { -1.0f, 0.0f };
-		}
-		else if (distRight < distLeft && distRight < distUp && distRight < distDown)
-		{
-			random.x = worldBounds.max.x;
-			offsetDir = { 1.0f, 0.0f };
-		}
-		else if (distUp < distRight && distUp < distLeft && distUp < distDown)
-		{
-			random.y = worldBounds.min.y;
-			offsetDir = { 0.0f, -1.0f };
-		}
-		else
-		{
-			random.y = worldBounds.max.y;
-			offsetDir = { 0.0f, 1.0f };
-		}
-
-		glm::vec2 offsetPoint = random + offsetDir * 64.0f;
-
-		foundLocation = findStartLocation(e2::Hex(offsetPoint).offsetCoords(), { 64, 64 }, aiStartLocation, true);
-	} while (!foundLocation);
-
-	spawnEntity("mob", aiStartLocation, newEmpireId);
-}
+//void e2::Game::spawnAIEmpire()
+//{
+//	e2::EmpireId newEmpireId = spawnEmpire();
+//	if (newEmpireId == 0)
+//		return;
+//
+//	e2::GameEmpire* newEmpire = m_empires[newEmpireId];
+//	m_aiEmpires.insert(newEmpire);
+//
+//	newEmpire->ai = e2::create<e2::CommanderAI>(this, newEmpireId);
+//
+//	e2::Aabb2D worldBounds = m_hexGrid->worldBounds();
+//	bool foundLocation = false;
+//	glm::ivec2 aiStartLocation;
+//	do
+//	{
+//		glm::vec2 random = e2::randomVec2(worldBounds.min, worldBounds.max);
+//		float distLeft = glm::abs(worldBounds.min.x - random.x);
+//		float distRight = glm::abs(worldBounds.max.x - random.x);
+//		float distUp = glm::abs(worldBounds.min.y - random.y);
+//		float distDown = glm::abs(worldBounds.max.y - random.y);
+//		glm::vec2 offsetDir{};
+//
+//		if (distLeft < distRight && distLeft < distUp && distLeft < distDown)
+//		{
+//			random.x = worldBounds.min.x;
+//			offsetDir = { -1.0f, 0.0f };
+//		}
+//		else if (distRight < distLeft && distRight < distUp && distRight < distDown)
+//		{
+//			random.x = worldBounds.max.x;
+//			offsetDir = { 1.0f, 0.0f };
+//		}
+//		else if (distUp < distRight && distUp < distLeft && distUp < distDown)
+//		{
+//			random.y = worldBounds.min.y;
+//			offsetDir = { 0.0f, -1.0f };
+//		}
+//		else
+//		{
+//			random.y = worldBounds.max.y;
+//			offsetDir = { 0.0f, 1.0f };
+//		}
+//
+//		glm::vec2 offsetPoint = random + offsetDir * 64.0f;
+//
+//		foundLocation = findStartLocation(e2::Hex(offsetPoint).offsetCoords(), { 64, 64 }, aiStartLocation, true);
+//	} while (!foundLocation);
+//
+//	spawnEntity("mob", aiStartLocation, newEmpireId);
+//}
 
 e2::GameEmpire* e2::Game::empireById(EmpireId id)
 {
@@ -3049,6 +3299,18 @@ void e2::Game::nextLocalEntity()
 	entity = *m_localTurnEntities.begin();
 	selectEntity(entity);
 	m_viewOrigin = entity->meshPlanarCoords();
+}
+
+
+e2::Name e2::Game::getCityName()
+{
+	if (m_cityNames.size() == 0)
+		return e2::Name("Nomansland");
+
+	e2::Name returner = m_cityNames.back();
+	m_cityNames.pop_back();
+
+	return returner;
 }
 
 void e2::Game::applyDamage(e2::GameEntity* entity, e2::GameEntity* instigator, float damage)
@@ -3120,12 +3382,15 @@ void e2::Game::selectEntity(e2::GameEntity* entity)
 	m_selectedEntity = entity;
 
 	resolveSelectedEntity();
+	m_selectedEntity->specification->scriptInterface.invokeOnSelected(m_selectedEntity);
 }
 
 void e2::Game::deselectEntity()
 {
 	if (!m_selectedEntity)
 		return;
+
+	m_selectedEntity->specification->scriptInterface.invokeOnDeselected(m_selectedEntity);
 
 	unresolveSelectedEntity();
 
@@ -3136,7 +3401,7 @@ void e2::Game::moveSelectedEntityTo(glm::ivec2 const& to)
 {
 	
 
-	if (m_state != GameState::Turn || (m_turnState != TurnState::Unlocked/* && m_turnState != TurnState::Auto*/) || !m_selectedEntity)
+	if ((m_state != GameState::Turn && m_turnState != TurnState::Unlocked) || !m_selectedEntity)
 		return;
 
 	if (m_selectedEntity->movePointsLeft < 1 || m_selectedEntity->specification->moveType == e2::EntityMoveType::Static)
@@ -3189,6 +3454,56 @@ void e2::Game::updateCustomAction()
 	m_selectedEntity->updateCustomAction(m_timeDelta);
 }
 
+bool e2::Game::attemptBeginWave(e2::GameEntity* hiveEntity, std::string const& prefabPath)
+{
+	if (m_wave)
+		return false;
+
+	e2::GameEntity* closestEntity = nullptr;
+	int32_t tileDist = 40;
+	for (e2::GameEntity* entity : m_localEmpire->entities)
+	{
+		int32_t newDist = e2::Hex::distance(entity->tileIndex, hiveEntity->tileIndex);
+		if (newDist > tileDist)
+			continue;
+
+		if (entity->specification->layerIndex != e2::EntityLayerIndex::Structure)
+			continue;
+
+		if (!entity->specification->waveRelevant)
+			continue;
+
+		closestEntity = entity;
+	}
+
+	if (!closestEntity)
+		return false;
+	
+	m_wave = e2::create<e2::Wave>(this, hiveEntity, closestEntity);
+	if (m_wave->path.size() == 0)
+	{
+		e2::destroy(m_wave);
+		m_wave = nullptr;
+		return false;
+	}
+
+	deselectEntity();
+
+	m_wave->pushMobs(prefabPath);
+
+	m_waveDeforestIndex = 0;
+	m_waveDeforestTimer = 0.0f;
+
+	m_turnState = TurnState::WavePreparing;
+
+	for (e2::GameEntity* entity : m_waveEntities)
+	{
+		entity->onWavePreparing();
+	}
+
+	return true;
+}
+
 void e2::Game::beginTargeting()
 {
 	if (m_turnState == TurnState::Unlocked)
@@ -3205,7 +3520,12 @@ void e2::Game::endTargeting()
 
 void e2::Game::updateMainCamera(double seconds)
 {
-	constexpr float moveSpeed = 5.0f;
+	if (m_shakeIntensity > 0.0f)
+		m_shakeIntensity -= (float)seconds;
+	else
+		m_shakeIntensity = 0.0f;
+
+	constexpr float moveSpeed = 25.0f;
 	constexpr float viewSpeed = .3f;
 
 	e2::GameSession* session = gameSession();
@@ -3251,7 +3571,7 @@ void e2::Game::updateMainCamera(double seconds)
 	{
 		m_dragView = calculateRenderView(m_viewDragOrigin);
 		// save where in world we pressed
-		m_cursorDragOrigin = m_dragView.unprojectWorldPlane(renderer->resolution(), m_cursorNdc);
+		m_cursorDragOrigin = m_dragView.unprojectWorldPlane(renderer->resolution(), m_cursorNdc, 0.0);
 		m_viewDragOrigin = m_viewOrigin;
 		m_viewDragging = true;
 	}
@@ -3262,7 +3582,7 @@ void e2::Game::updateMainCamera(double seconds)
 	{
 		if (m_viewDragging)
 		{
-			glm::vec2 newDrag = m_dragView.unprojectWorldPlane(renderer->resolution(), m_cursorNdc);
+			glm::vec2 newDrag = m_dragView.unprojectWorldPlane(renderer->resolution(), m_cursorNdc, 0.0);
 			glm::vec2 dragOffset = newDrag - m_cursorDragOrigin;
 
 			m_viewOrigin = m_viewDragOrigin - dragOffset;
@@ -3280,10 +3600,15 @@ void e2::Game::updateMainCamera(double seconds)
 	m_viewVelocity = m_viewOrigin - oldOrigin;
 
 	m_view = calculateRenderView(m_viewOrigin);
-	m_viewPoints = e2::Viewpoints2D(renderer->resolution(), m_view);
+	m_viewPoints = e2::Viewpoints2D(renderer->resolution(), m_view, 0.0);
 	if (!m_altView)
 	{
-		renderer->setView(m_view);
+		e2::RenderView shakyView = m_view;
+		shakyView.origin += e2::randomInUnitSphere() * m_shakeIntensity * 0.5f;
+		glm::dquat shakyRight = glm::angleAxis(e2::randomFloat(-1.f, 1.f) * m_shakeIntensity * glm::radians(4.0f), e2::worldRightf());
+		glm::dquat shakyUp = glm::angleAxis(e2::randomFloat(-1.f, 1.f) * m_shakeIntensity * glm::radians(4.0f), e2::worldUpf());
+		shakyView.orientation = shakyRight * shakyUp * shakyView.orientation;
+		renderer->setView(shakyView);
 	}
 }
 
@@ -3327,6 +3652,7 @@ void e2::Game::destroyEntity(e2::GameEntity* entity)
 
 	m_localTurnEntities.erase(entity);
 	m_entityLayers[size_t(entity->specification->layerIndex)].entityIndex.erase(entity->tileIndex);
+	m_waveEntities.erase(entity);
 	m_entities.erase(entity);
 
 	if (m_empires[entity->empireId])
@@ -3422,10 +3748,42 @@ bool e2::Game::entityRelevantForPlay(e2::GameEntity* entity)
 	return !entityInvalid;
 }
 
+e2::Wave* e2::Game::wave()
+{
+	return m_wave;
+}
+
+void e2::Game::onMobSpawned(e2::Mob* mob)
+{
+	for (e2::GameEntity* entity : m_waveEntities)
+	{
+		entity->onMobSpawned(mob);
+	}
+}
+
+void e2::Game::onMobDestroyed(e2::Mob* mob)
+{
+	for (e2::GameEntity* entity : m_waveEntities)
+	{
+		entity->onMobDestroyed(mob);
+	}
+}
+
 e2::Sprite* e2::Game::getUiSprite(e2::Name name)
 {
 	return m_uiIconsSheet->getSprite(name);
 }
+
+e2::Sprite* e2::Game::getIconSprite(e2::Name name)
+{
+	return m_uiIconsSheet2->getSprite(name);
+}
+
+e2::Sprite* e2::Game::getUnitSprite(e2::Name name)
+{
+	return m_uiUnitsSheet->getSprite(name);
+}
+
 
 void e2::Game::harvestWood(glm::ivec2 const& location, EmpireId empire)
 {
@@ -3446,7 +3804,7 @@ void e2::Game::harvestWood(glm::ivec2 const& location, EmpireId empire)
 		e2::destroy(tileData->forestProxy);
 
 	tileData->forestProxy = nullptr;
-	tileData->forestLods = nullptr;
+	tileData->forestMesh = nullptr;
 
 }
 
@@ -3466,7 +3824,10 @@ void e2::Game::removeWood(glm::ivec2 const& location)
 		e2::destroy(tileData->forestProxy);
 
 	tileData->forestProxy = nullptr;
-	tileData->forestLods = nullptr;
+	tileData->forestMesh = nullptr;
+
+	e2::ChunkState* state = m_hexGrid->getOrCreateChunk(location);
+	m_hexGrid->refreshChunkMeshes(state);
 }
 
 void e2::Game::removeResource(glm::ivec2 const& location)
@@ -3487,13 +3848,13 @@ void e2::Game::removeResource(glm::ivec2 const& location)
 	tileData->resourceProxy = nullptr;
 	tileData->resourceMesh = nullptr;
 }
-
-void e2::Game::discoverEmpire(EmpireId empireId)
-{
-	// @todo optimize
-	m_discoveredEmpires.insert(m_empires[empireId]);
-	m_undiscoveredEmpires.erase(m_empires[empireId]);
-}
+//
+//void e2::Game::discoverEmpire(EmpireId empireId)
+//{
+//	// @todo optimize
+//	m_discoveredEmpires.insert(m_empires[empireId]);
+//	m_undiscoveredEmpires.erase(m_empires[empireId]);
+//}
 
 void e2::Game::updateAltCamera(double seconds)
 {
@@ -3552,7 +3913,7 @@ void e2::Game::updateAltCamera(double seconds)
 
 		e2::RenderView newView{};
 		newView.fov = 65.0;
-		newView.clipPlane = { 0.1, 100.0 };
+		newView.clipPlane = { 1.0, 2000.0 };
 		newView.origin = m_altViewOrigin;
 		newView.orientation = altRotation;
 		renderer->setView(newView);
@@ -3585,7 +3946,8 @@ void e2::Game::updateAnimation(double seconds)
 	{
 		// update inView, first check aabb to give chance for implicit early exit
 		glm::vec2 unitCoords = entity->meshPlanarCoords();
-		entity->inView = viewAabb.isWithin(unitCoords) && m_viewPoints.isWithin(unitCoords, 1.0f);
+		bool entityRelevant = (m_turnState == e2::TurnState::Wave && entity->specification->waveRelevant) || m_turnState != e2::TurnState::Wave;
+		entity->inView = viewAabb.isWithin(unitCoords) && m_viewPoints.isWithin(unitCoords, 1.0f) && entityRelevant;
 
 		if (entity->inView)
 		{
@@ -3665,7 +4027,7 @@ e2::PathFindingAS::PathFindingAS(e2::GameEntity* entity)
 
 		for (e2::Hex nextHex : currHexEntry->index.neighbours())
 		{
-			if (currHexEntry->stepsFromOrigin + 1 > entity->movePointsLeft)
+			if (int32_t(currHexEntry->stepsFromOrigin + 1) > entity->movePointsLeft)
 				continue;
 
 			if (processed.contains(nextHex))
@@ -3863,7 +4225,7 @@ e2::PathFindingAS::PathFindingAS(e2::GameEntity* entity)
 //	}
 //}
 
-e2::PathFindingAS::PathFindingAS(e2::Game* game, e2::Hex const& start, uint64_t range, bool ignoreVisibility, e2::PassableFlags passableFlags)
+e2::PathFindingAS::PathFindingAS(e2::Game* game, e2::Hex const& start, uint64_t range, bool ignoreVisibility, e2::PassableFlags passableFlags, bool onlyWaveRelevant, e2::Hex* stopWhenFound)
 {
 	e2::HexGrid* grid = game->hexGrid();
 	glm::ivec2 tileIndex = start.offsetCoords();
@@ -3909,7 +4271,10 @@ e2::PathFindingAS::PathFindingAS(e2::Game* game, e2::Hex const& start, uint64_t 
 
 			// ignore hexes that are occupied by units
 			e2::GameEntity* otherUnit = game->entityAtHex(e2::EntityLayerIndex::Unit, coords);
-			if (otherUnit)
+			if (!onlyWaveRelevant && otherUnit)
+				continue;
+
+			if (onlyWaveRelevant && otherUnit && otherUnit->specification->waveRelevant)
 				continue;
 
 			e2::PathFindingHex* newHex = e2::create<e2::PathFindingHex>(n);
@@ -3922,6 +4287,9 @@ e2::PathFindingAS::PathFindingAS(e2::Game* game, e2::Hex const& start, uint64_t 
 		}
 
 		processed.insert(curr->index);
+
+		if (stopWhenFound && *stopWhenFound == curr->index)
+			return;
 	}
 }
 

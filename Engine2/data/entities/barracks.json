@@ -8,10 +8,10 @@
             "layerIndex": "structure",
             "passableFlags": ["none"],
             "moveType": "static",
-            "sightRange": 2,
+            "sightRange": 5,
             "defensiveStrength": 400.0,
             "script": "data/entities/barracks.chai",
-            "mesh": "assets/structures/SM_BuildingPlaceholder.e2a",
+            "mesh": "assets/resources/SM_IronOre.e2a",
             "revenue": {
                 "gold": 2
             }

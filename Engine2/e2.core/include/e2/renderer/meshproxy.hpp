@@ -144,6 +144,10 @@ namespace e2
 
 		virtual Engine* engine() override;
 
+		void setScale(float newScale);
+		void setPosition(glm::vec3 const& position);
+		void setRotation(float rotation);
+
 		e2::Session* session{};
 
 		/** The unique identifier we got from session when registering. Used for things like modelmatrix buffer offsets etc. */

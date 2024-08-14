@@ -16,7 +16,7 @@ void main()
 	vec3 frontColor = getFrontColor(screenUv);
 	vec3 frontPosition = getFrontPosition(screenUv);
 
-	float fogHeight = 1.0 -sampleFogHeight(frontPosition.xz,  renderer.time.x);
+	float fogHeight = pow(1.0 -sampleFogHeight(frontPosition.xz,  renderer.time.x), 3.0);
 	vec4 fragPos = vec4(frontPosition.xyz, 1.0);
 	fragPos.y -= fogHeight;
 
@@ -35,7 +35,7 @@ void main()
 
 	outColor.rgb = fogOfWar(outColor.rgb,fragPos.xyz, visibility, renderer.time.x, depth, fogHeight);
 
-	//outColor.rgb = vec3(fogHeight);
+	//outColor.rgb = vec3(pow(fogHeight,3.0));
 
 	//outColor.rgb = vec3(renderer.time.x);
 

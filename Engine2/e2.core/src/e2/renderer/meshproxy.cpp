@@ -5,7 +5,9 @@
 #include "e2/assets/mesh.hpp"
 #include "e2/assets/material.hpp"
 #include "e2/game/session.hpp"
+#include "e2/transform.hpp"
 
+#include <glm/gtx/matrix_decompose.hpp>
 
 e2::MaterialProxy::MaterialProxy(e2::Session* inSession, e2::MaterialPtr materialAsset)
 {
@@ -134,6 +136,40 @@ e2::Engine* e2::MeshProxy::engine()
 	return session->engine();
 }
 
+void e2::MeshProxy::setScale(float newScale)
+{
+	glm::vec3 translation, scale, skew;
+	glm::vec4 perspective;
+	glm::quat rotation;
+	glm::decompose(modelMatrix, scale, rotation, translation, skew, perspective);
+	scale = glm::vec3(newScale);
+	modelMatrix = e2::recompose(translation, scale, skew, perspective, rotation);
+	modelMatrixDirty = true;
+}
+
+void e2::MeshProxy::setPosition(glm::vec3 const& newPosition)
+{
+	glm::vec3 translation, scale, skew;
+	glm::vec4 perspective;
+	glm::quat rotation;
+	glm::decompose(modelMatrix, scale, rotation, translation, skew, perspective);
+	translation = newPosition;
+	modelMatrix = e2::recompose(translation, scale, skew, perspective, rotation);
+	modelMatrixDirty = true;
+}
+
+void e2::MeshProxy::setRotation(float newRotation)
+{
+	glm::vec3 translation, scale, skew;
+	glm::vec4 perspective;
+	glm::quat rotation;
+	glm::decompose(modelMatrix, scale, rotation, translation, skew, perspective);
+	rotation = glm::angleAxis(newRotation, e2::worldUpf());
+
+	modelMatrix = e2::recompose(translation, scale, skew, perspective, rotation);
+	modelMatrixDirty = true;
+}
+
 bool e2::MeshProxy::lodTest(uint8_t lod, float distance)
 {
 	for (uint8_t i = 0; i < lods.size(); i++)
@@ -141,6 +177,8 @@ bool e2::MeshProxy::lodTest(uint8_t lod, float distance)
 		if (distance <= lods[i].maxDistance || lods[i].maxDistance <= 0.0001f)
 			return lod == i;
 	}
+
+	return false;
 }
 
 e2::MeshProxyLOD* e2::MeshProxy::lodByDistance(float distance)

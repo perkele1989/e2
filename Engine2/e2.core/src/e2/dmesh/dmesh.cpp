@@ -332,6 +332,121 @@ void e2::DynamicMesh::cutSlack()
 	//m_triangles.resize(m_triangleOffset);
 }
 
+using _Lookup = std::map<std::pair<uint32_t, uint32_t>, uint32_t>;
+using _VertexList = std::vector<e2::Vertex>;
+using _TriangleList = std::vector<e2::Triangle>;
+
+
+namespace ico
+{
+	const float X = .525731112119133606f;
+	const float Z = .850650808352039932f;
+	const float N = 0.f;
+
+	static const _VertexList vertices =
+	{
+	  {{-X,N,Z}}, {{X,N,Z}}, {{-X,N,-Z}}, {{X,N,-Z}},
+	  {{N,Z,X}}, {{N,Z,-X}}, {{N,-Z,X}}, {{N,-Z,-X}},
+	  {{Z,X,N}}, {{-Z,X, N}}, {{Z,-X,N}}, {{-Z,-X, N}}
+	};
+
+	static const _TriangleList triangles =
+	{
+	  {0,4,1},{0,9,4},{9,5,4},{4,5,8},{4,8,1},
+	  {8,10,1},{8,3,10},{5,3,8},{5,2,3},{2,7,3},
+	  {7,10,3},{7,6,10},{7,11,6},{11,0,6},{0,1,6},
+	  {6,1,10},{9,0,11},{9,11,2},{9,2,5},{7,2,11}
+	};
+}
+
+
+uint32_t _vertexForEdge(_Lookup& lookup, _VertexList& vertices, uint32_t first, uint32_t second)
+{
+	_Lookup::key_type key(first, second);
+	if (key.first > key.second)
+		std::swap(key.first, key.second);
+
+	auto inserted = lookup.insert({ key, vertices.size() });
+	if (inserted.second)
+	{
+		auto& edge0 = vertices[first];
+		auto& edge1 = vertices[second];
+		auto point = glm::normalize(edge0.position + edge1.position);
+		vertices.push_back({ point });
+	}
+
+	return inserted.first->second;
+}
+
+
+
+_TriangleList subdivide(_VertexList& vertices, _TriangleList triangles)
+{
+	_Lookup lookup;
+	_TriangleList result;
+
+	for (auto&& each : triangles)
+	{
+		std::array<uint32_t, 3> mid;
+		for (int edge = 0; edge < 3; ++edge)
+		{
+			mid[edge] = _vertexForEdge(lookup, vertices, each.vertexIds[edge], each.vertexIds[(edge + 1) % 3]);
+		}
+
+		result.push_back({ each.vertexIds[0], mid[0], mid[2] });
+		result.push_back({ each.vertexIds[1], mid[1], mid[0] });
+		result.push_back({ each.vertexIds[2], mid[2], mid[1] });
+		result.push_back({ mid[0], mid[1], mid[2] });
+	}
+
+	return result;
+}
+
+
+
+void e2::DynamicMesh::buildIcoSphere(uint32_t subdivisions, bool flipWinding, glm::mat4 const& transform /*= glm::identity<glm::mat4>()*/)
+{
+	glm::mat3 normalMatrix = glm::transpose(glm::inverse(transform));
+
+	_VertexList verts = ico::vertices;
+	_TriangleList tris = ico::triangles;
+
+	for (uint32_t i = 0; i < subdivisions; ++i)
+	{
+		tris = subdivide(verts, tris);
+	}
+
+	for (auto& v : verts)
+	{
+		e2::Vertex newVertex = v;
+
+		newVertex.position = transform * glm::vec4(newVertex.position, 1.0f);
+		newVertex.normal = normalMatrix * glm::vec4(newVertex.normal, 0.0f);
+		newVertex.tangent = normalMatrix * glm::vec4(newVertex.tangent, 0.0f);
+		m_vertices.push_back(newVertex);
+	}
+
+	if (flipWinding)
+	{
+		for (auto& t : tris)
+		{
+			e2::Triangle newTriangle = t;
+			newTriangle.flipWinding();
+			m_triangles.push_back(newTriangle);
+		}
+	}
+	else
+	{
+		m_triangles = tris;
+	}
+
+	mergeDuplicateVertices();
+
+	calculateFaceNormals();
+	calculateVertexNormals();
+	calculateVertexTangents();
+}
+
 void e2::DynamicMesh::addMesh(e2::DynamicMesh const* other, glm::mat4 const& transform)
 {
 	glm::mat3 normalMatrix = glm::transpose(glm::inverse(transform));

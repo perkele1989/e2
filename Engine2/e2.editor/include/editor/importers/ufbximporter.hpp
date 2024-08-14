@@ -97,11 +97,13 @@ namespace e2
 	struct UfbxImportChannel
 	{
 		glm::vec3 samplePosition(float time);
+		glm::vec3 sampleScale(float time);
 
 		glm::quat sampleRotation(float time);
 
 		std::vector<UfbxVec3Key> positionKeys;
 		std::vector<UfbxQuatKey> rotationKeys;
+		std::vector<UfbxVec3Key> scaleKeys;
 	};
 
 	struct UfbxImportAnimation

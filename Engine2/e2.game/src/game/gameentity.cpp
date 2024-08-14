@@ -3,12 +3,22 @@
 #include "e2/renderer/meshproxy.hpp"
 #include "game/game.hpp"
 #include "e2/game/gamesession.hpp"
+#include "game/wave.hpp"
+
+#include "e2/managers/audiomanager.hpp"
 
 #include <e2/e2.hpp>
 #include <e2/utils.hpp>
 #include <e2/transform.hpp>
 #include <glm/gtx/quaternion.hpp>
 #include <glm/ext/matrix_transform.hpp>
+
+#include <glm/gtx/intersect.hpp>
+#include <glm/gtx/vector_angle.hpp>
+
+#include <glm/gtc/noise.hpp>
+#include <glm/gtx/spline.hpp>
+#include <glm/gtx/easing.hpp>
 
 #include <nlohmann/json.hpp>
 
@@ -86,23 +96,32 @@ void e2::GameEntity::updateAnimation(double seconds)
 
 	// never need to do these basic things if not in view
 	if (inView)
-	{
 		meshRotation = glm::slerp(meshRotation, meshTargetRotation, glm::min(1.0f, float(10.0f * seconds)));
 
-		if (skinProxy)
-		{
+	if (skinProxy)
+	{
+		if(inView)
 			m_mainPose->applyBindPose();
 
-			double poseBlend = glm::clamp(m_lastChangePose.durationSince().seconds() / m_lerpTime, 0.0, 1.0);
+		double blendTime = m_lastChangePose.durationSince().seconds();
+		double poseBlend = 0.0;
+		if (m_lerpTime >= 0.0001)
+		{
+			poseBlend = glm::clamp(blendTime / m_lerpTime, 0.0, 1.0);
 			if (poseBlend >= 1.0)
 				m_oldPose = nullptr;
+		}
+		else
+			m_oldPose = nullptr;
 
-			if (m_oldPose)
-				m_oldPose->updateAnimation(seconds, !inView);
+		if (m_oldPose)
+			m_oldPose->updateAnimation(seconds, !inView);
 
-			if (m_currentPose)
-				m_currentPose->updateAnimation(seconds, !inView);
+		if (m_currentPose)
+			m_currentPose->updateAnimation(seconds * m_poseSpeed, !inView);
 
+		if (inView)
+		{
 			if (m_oldPose && m_currentPose)
 			{
 				m_mainPose->applyBlend(m_oldPose, m_currentPose, poseBlend);
@@ -111,72 +130,78 @@ void e2::GameEntity::updateAnimation(double seconds)
 			{
 				m_mainPose->applyPose(m_currentPose);
 			}
+		}
 
-			if (m_actionPose)
+		if (m_actionPose)
+		{
+			m_actionPose->updateAnimation(seconds * m_actionSpeed, !inView);
+			if (m_actionPose->playing())
 			{
-				if (m_actionPose->playing())
+				double actionCurrentTime = m_actionPose->time();
+
+				if (m_currentAction)
 				{
-					m_actionPose->updateAnimation(seconds * m_actionSpeed, !inView);
-
-					double actionCurrentTime = m_actionPose->time();
-
-					if (m_currentAction)
+					for (e2::EntityAnimationActionTrigger& trigger : m_currentAction->triggers)
 					{
-						for (e2::EntityAnimationActionTrigger& trigger : m_currentAction->triggers)
+						bool triggerInRange = trigger.time <= actionCurrentTime && trigger.time >= m_lastActionTime;
+						if (triggerInRange && !trigger.triggered)
 						{
-							bool triggerInRange = trigger.time <= actionCurrentTime && trigger.time >= m_lastActionTime;
-							if (triggerInRange && !trigger.triggered)
-							{
-								onActionTrigger(m_currentAction->id, trigger.id);
-								trigger.triggered = true;
-							}
+							onActionTrigger(m_currentAction->id, trigger.id);
+							trigger.triggered = true;
 						}
 					}
+				}
 
 
-					// 
-					m_lastActionTime = actionCurrentTime;
+				// 
+				m_lastActionTime = actionCurrentTime;
 
+				if (inView)
+				{
 					double actionTotalTime = m_actionPose->animation()->timeSeconds();
 					double blendInCoeff = glm::smoothstep(0.0, m_actionBlendInTime, actionCurrentTime);
 					double blendOutCoeff = 1.0 - glm::smoothstep(actionTotalTime - m_actionBlendOutTime, actionTotalTime, actionCurrentTime);
 					double actionBlendCoeff = blendInCoeff * blendOutCoeff;
+
+
 					m_mainPose->blendWith(m_actionPose, actionBlendCoeff);
 				}
-				else
+			}
+			else
+			{
+				m_actionPose = nullptr;
+
+				if (m_currentAction)
 				{
-					m_actionPose = nullptr;
-
-					if (m_currentAction)
+					// trigger any untriggered events (may be last frame or smth)
+					// and then set triggered to false for all of them
+					for (e2::EntityAnimationActionTrigger& trigger : m_currentAction->triggers)
 					{
-						// trigger any untriggered events (may be last frame or smth)
-						// and then set triggered to false for all of them
-						for (e2::EntityAnimationActionTrigger& trigger : m_currentAction->triggers)
+						if (!trigger.triggered)
 						{
-							if (!trigger.triggered)
-							{
-								onActionTrigger(m_currentAction->id, trigger.id);
-							}
-
-							trigger.triggered = false;
+							onActionTrigger(m_currentAction->id, trigger.id);
 						}
-					}
-					m_currentAction = nullptr;
-				}
 
+						trigger.triggered = false;
+					}
+				}
+				m_currentAction = nullptr;
 			}
 
-			m_mainPose->updateSkin();
+		}
 
+		if (inView)
+		{
+			m_mainPose->updateSkin();
 			skinProxy->applyPose(m_mainPose);
 		}
+	}
 
-		if (meshProxy)
-		{
-			meshProxy->modelMatrix = glm::translate(glm::mat4(1.0), meshPosition + glm::vec3(e2::worldUp()) * specification->meshHeightOffset);
-			meshProxy->modelMatrix = meshProxy->modelMatrix * glm::toMat4(meshRotation) * glm::scale(glm::mat4(1.0f), specification->meshScale * e2::globalMeshScale);
-			meshProxy->modelMatrixDirty = true;
-		}
+	if (meshProxy)
+	{
+		meshProxy->modelMatrix = glm::translate(glm::mat4(1.0), meshPosition + glm::vec3(e2::worldUp()) * specification->meshHeightOffset);
+		meshProxy->modelMatrix = meshProxy->modelMatrix * glm::toMat4(meshRotation) * glm::scale(glm::mat4(1.0f), specification->meshScale * e2::globalMeshScale);
+		meshProxy->modelMatrixDirty = true;
 	}
 
 	if (specification->scriptInterface.hasUpdateAnimation())
@@ -211,6 +236,69 @@ void e2::GameEntity::updateCustomAction(double seconds)
 	if (specification->scriptInterface.hasUpdateCustomAction())
 	{
 		specification->scriptInterface.invokeUpdateCustomAction(this, seconds);
+		return;
+	}
+}
+
+void e2::GameEntity::onWavePreparing()
+{
+	if (specification->scriptInterface.hasOnWavePreparing())
+	{
+		specification->scriptInterface.invokeOnWavePreparing(this);
+		return;
+	}
+}
+
+void e2::GameEntity::onWaveStart()
+{
+	if (specification->scriptInterface.hasOnWaveStart())
+	{
+		specification->scriptInterface.invokeOnWaveStart(this);
+		return;
+	}
+}
+
+void e2::GameEntity::onWaveUpdate(double seconds)
+{
+	if (specification->scriptInterface.hasOnWaveUpdate())
+	{
+		specification->scriptInterface.invokeOnWaveUpdate(this, seconds);
+		return;
+	}
+}
+
+void e2::GameEntity::onWaveEnding()
+{
+	if (specification->scriptInterface.hasOnWaveEnding())
+	{
+		specification->scriptInterface.invokeOnWaveEnding(this);
+		return;
+	}
+}
+
+void e2::GameEntity::onWaveEnd()
+{
+	if (specification->scriptInterface.hasOnWaveEnd())
+	{
+		specification->scriptInterface.invokeOnWaveEnd(this);
+		return;
+	}
+}
+
+void e2::GameEntity::onMobSpawned(e2::Mob* mob)
+{
+	if (specification->scriptInterface.hasOnMobSpawned())
+	{
+		specification->scriptInterface.invokeOnMobSpawned(this, mob);
+		return;
+	}
+}
+
+void e2::GameEntity::onMobDestroyed(e2::Mob* mob)
+{
+	if (specification->scriptInterface.hasOnMobDestroyed())
+	{
+		specification->scriptInterface.invokeOnMobDestroyed(this, mob);
 		return;
 	}
 }
@@ -277,7 +365,9 @@ void e2::GameEntity::initialize()
 		m_mainPose = e2::create<e2::Pose>(specification->skeletonAsset);
 	}
 
-	setPose("idle");
+	if(specification->defaultPose.index() > 0)
+		setPose(specification->defaultPose);
+
 	movePointsLeft = specification->movePoints;
 	attackPointsLeft = specification->attackPoints;
 	buildPointsLeft = specification->buildPoints;
@@ -331,6 +421,10 @@ e2::GameEntity::GameEntity()
 e2::GameEntity::~GameEntity()
 {
 	destroyProxy();
+
+	for (e2::MeshProxy* proxy : m_meshes)
+		destroyMesh(proxy);
+
 
 	for (e2::EntityAnimationAction &action : m_animationActions)
 		e2::destroy(action.pose);
@@ -392,6 +486,7 @@ void e2::GameEntity::postConstruct(e2::GameContext* ctx, e2::EntitySpecification
 		newPose.id = id;
 		newPose.pose = e2::create<e2::AnimationPose>(specification->skeletonAsset, pose.animationAsset, true);
 		newPose.blendTime = pose.blendTime;
+		newPose.speed = pose.speed;
 
 		m_animationPoses.push(newPose);
 	}
@@ -520,6 +615,28 @@ void e2::GameEntity::updateGrugVariables()
 
 }
 
+e2::Mob* e2::GameEntity::closestMobWithinRange(float range)
+{
+	e2::Wave* wave = game()->wave();
+	if (!wave)
+		return nullptr;
+
+	float closestDistance = std::numeric_limits<float>::max();
+	e2::Mob* closestMob = nullptr;
+
+	for (e2::Mob* mob : wave->mobs)
+	{
+		float currentDistance = glm::distance(mob->meshPlanarCoords(), meshPlanarCoords());
+		if (!mob || currentDistance < closestDistance)
+		{
+			closestMob = mob;
+			closestDistance = currentDistance;
+		}
+	}
+
+	return closestMob;
+}
+
 glm::vec2 e2::GameEntity::meshPlanarCoords()
 {
 	return glm::vec2(meshPosition.x, meshPosition.z);
@@ -544,7 +661,11 @@ void e2::GameEntity::setPose2(e2::Pose* pose, double lerpTime)
 	if (!skinProxy)
 		return;
 
-	m_oldPose = m_currentPose;
+	if (lerpTime <= 0.00001)
+		m_oldPose = nullptr;
+	else 
+		m_oldPose = m_currentPose;
+
 	m_currentPose = pose;
 
 	m_lerpTime = lerpTime;
@@ -596,6 +717,12 @@ bool e2::GameEntity::isAnyActionPlaying()
 	return m_actionPose && m_actionPose->playing();
 }
 
+void e2::GameEntity::stopAction()
+{
+	if (m_actionPose)
+		m_actionPose->stop();
+}
+
 void e2::GameEntity::playAction2(e2::AnimationPose* anim, double blendIn /*= 0.2f*/, double blendOut /*= 0.2f*/, double speed)
 {
 	if (!skinProxy)
@@ -610,6 +737,61 @@ void e2::GameEntity::playAction2(e2::AnimationPose* anim, double blendIn /*= 0.2
 }
 
 
+
+void e2::GameEntity::playSound(e2::Name assetName, float volume,float spatiality)
+{
+	auto finder = specification->assets.find(assetName);
+	if (finder == specification->assets.end())
+		return;
+
+	
+	m_game->audioManager()->playOneShot(finder->second.asset.cast<e2::Sound>(), volume, spatiality, meshPosition);
+}
+
+e2::MeshProxy* e2::GameEntity::createMesh(e2::Name assetName)
+{
+	auto finder = specification->assets.find(assetName);
+	if (finder == specification->assets.end())
+	{
+		LogError("no such asset name in entity specification: {}", assetName);
+		return nullptr;
+	}
+
+	e2::AssetPtr asset = finder->second.asset;
+	if (!asset)
+	{
+		LogError("asset was registered in entity specification but was null: {}", assetName);
+		return nullptr;
+	}
+
+	MeshLodConfiguration lod;
+	lod.mesh = asset.cast<e2::Mesh>();
+
+	if (!lod.mesh)
+	{
+		LogError("asset found but of wrong type: {} (needs a e2::Mesh but was actually type {})", assetName, asset->type()->fqn);
+		return nullptr;
+	}
+
+	e2::MeshProxyConfiguration conf;
+	conf.lods.push(lod);
+
+	e2::MeshProxy* newProxy = e2::create<e2::MeshProxy>(game()->gameSession(), conf);
+	newProxy->modelMatrix = glm::translate(glm::identity<glm::mat4>(), meshPosition);
+	newProxy->modelMatrixDirty = true;
+	m_meshes.push(newProxy);
+
+	return newProxy;
+}
+
+void e2::GameEntity::destroyMesh(e2::MeshProxy* mesh)
+{
+	if (!mesh)
+		return;
+
+	m_meshes.removeFirstByValueFast(mesh);
+	e2::destroy(mesh);
+}
 
 void e2::GameEntity::setPose(e2::Name poseName)
 {
@@ -708,9 +890,21 @@ void e2::GameEntity::onEndMove()
 	setPose("idle");
 }
 
-void e2::GameEntity::turnTowards(glm::ivec2 hex)
+void e2::GameEntity::onSpawned()
+{
+	if (specification->scriptInterface.hasOnSpawned())
+		specification->scriptInterface.invokeOnSpawned(this);
+}
+
+void e2::GameEntity::turnTowards(glm::ivec2 const& hex)
 {	
 	float angle = e2::radiansBetween(e2::Hex(hex).localCoords(), e2::Hex(tileIndex).localCoords());
+	meshTargetRotation = glm::angleAxis(angle, glm::vec3(e2::worldUp()));
+}
+
+void e2::GameEntity::turnTowardsPlanar(glm::vec3 const& planar)
+{
+	float angle = e2::radiansBetween(planar, meshPosition);
 	meshTargetRotation = glm::angleAxis(angle, glm::vec3(e2::worldUp()));
 }
 
@@ -724,22 +918,16 @@ bool e2::GameEntity::canBuild(e2::UnitBuildAction& action)
 	e2::ResourceTable const& funds = empire->resources.funds;
 	e2::ResourceTable const& cost = action.specification->cost;
 	bool affordCost = funds.gold >= cost.gold
-		&& funds.metal >= cost.metal
-		&& funds.meteorite >= cost.meteorite
-		&& funds.oil >= cost.oil
-		&& funds.stone >= cost.stone
-		&& funds.uranium >= cost.uranium
-		&& funds.wood >= cost.wood;
+		&& funds.wood >= cost.wood
+		&& funds.iron >= cost.iron
+		&& funds.steel >= cost.steel;
 
 	e2::ResourceTable const& profits = empire->resources.profits;
 	e2::ResourceTable const& upkeep = action.specification->upkeep;
 	bool affordUpkeep = profits.gold >= upkeep.gold
-		&& profits.metal >= upkeep.metal
-		&& profits.meteorite >= upkeep.meteorite
-		&& profits.oil >= upkeep.oil
-		&& profits.stone >= upkeep.stone
-		&& profits.uranium >= upkeep.uranium
-		&& profits.wood >= upkeep.wood;
+		&& profits.wood >= upkeep.wood
+		&& profits.iron >= upkeep.iron
+		&& profits.steel >= upkeep.steel;
 
 	return affordCost && affordUpkeep;
 }
@@ -835,6 +1023,7 @@ namespace
 	std::vector<e2::EntitySpecification> specifications;
 	std::map<e2::Name, size_t> specificationIndex;
 
+
 }
 
 void e2::EntitySpecification::initializeSpecifications(e2::GameContext* ctx)
@@ -906,6 +1095,11 @@ void e2::EntitySpecification::initializeSpecifications(e2::GameContext* ctx)
 			}
 
 			newSpec.displayName = entity.at("displayName").template get<std::string>();
+
+			if (entity.contains("waveRelevant"))
+			{
+				newSpec.waveRelevant = entity.at("waveRelevant").template get<bool>();
+			}
 
 			if (entity.contains("passableFlags"))
 			{
@@ -1008,64 +1202,52 @@ void e2::EntitySpecification::initializeSpecifications(e2::GameContext* ctx)
 			if (entity.contains("upkeep"))
 			{
 				json& upkeep = entity.at("upkeep");
-				if (upkeep.contains("wood"))
-					newSpec.upkeep.wood = upkeep.at("wood").template get<float>();
-				if (upkeep.contains("metal"))
-					newSpec.upkeep.metal = upkeep.at("metal").template get<float>();
 				if (upkeep.contains("gold"))
 					newSpec.upkeep.gold = upkeep.at("gold").template get<float>();
-				if (upkeep.contains("stone"))
-					newSpec.upkeep.stone = upkeep.at("stone").template get<float>();
-				if (upkeep.contains("uranium"))
-					newSpec.upkeep.uranium = upkeep.at("uranium").template get<float>();
-				if (upkeep.contains("oil"))
-					newSpec.upkeep.oil = upkeep.at("oil").template get<float>();
-				if (upkeep.contains("meteorite"))
-					newSpec.upkeep.meteorite = upkeep.at("meteorite").template get<float>();
+				if (upkeep.contains("wood"))
+					newSpec.upkeep.wood = upkeep.at("wood").template get<float>();
+				if (upkeep.contains("iron"))
+					newSpec.upkeep.iron = upkeep.at("iron").template get<float>();
+				if (upkeep.contains("steel"))
+					newSpec.upkeep.steel = upkeep.at("steel").template get<float>();
 			}
 
 			if (entity.contains("cost"))
 			{
 				json& cost = entity.at("cost");
-				if (cost.contains("wood"))
-					newSpec.cost.wood = cost.at("wood").template get<float>();
-				if (cost.contains("metal"))
-					newSpec.cost.metal = cost.at("metal").template get<float>();
+
 				if (cost.contains("gold"))
 					newSpec.cost.gold = cost.at("gold").template get<float>();
-				if (cost.contains("stone"))
-					newSpec.cost.stone = cost.at("stone").template get<float>();
-				if (cost.contains("uranium"))
-					newSpec.cost.uranium = cost.at("uranium").template get<float>();
-				if (cost.contains("oil"))
-					newSpec.cost.oil = cost.at("oil").template get<float>();
-				if (cost.contains("meteorite"))
-					newSpec.cost.meteorite = cost.at("meteorite").template get<float>();
+				if (cost.contains("wood"))
+					newSpec.cost.wood = cost.at("wood").template get<float>();
+				if (cost.contains("iron"))
+					newSpec.cost.iron = cost.at("iron").template get<float>();
+				if (cost.contains("steel"))
+					newSpec.cost.steel = cost.at("steel").template get<float>();
 			}
 
 			if (entity.contains("revenue"))
 			{
 				json& revenue = entity.at("revenue");
-				if (revenue.contains("wood"))
-					newSpec.revenue.wood = revenue.at("wood").template get<float>();
-				if (revenue.contains("metal"))
-					newSpec.revenue.metal = revenue.at("metal").template get<float>();
 				if (revenue.contains("gold"))
 					newSpec.revenue.gold = revenue.at("gold").template get<float>();
-				if (revenue.contains("stone"))
-					newSpec.revenue.stone = revenue.at("stone").template get<float>();
-				if (revenue.contains("uranium"))
-					newSpec.revenue.uranium = revenue.at("uranium").template get<float>();
-				if (revenue.contains("oil"))
-					newSpec.revenue.oil = revenue.at("oil").template get<float>();
-				if (revenue.contains("meteorite"))
-					newSpec.revenue.meteorite = revenue.at("meteorite").template get<float>();
+				if (revenue.contains("wood"))
+					newSpec.revenue.wood = revenue.at("wood").template get<float>();
+				if (revenue.contains("iron"))
+					newSpec.revenue.iron = revenue.at("iron").template get<float>();
+				if (revenue.contains("steel"))
+					newSpec.revenue.steel = revenue.at("steel").template get<float>();
 			}
 
 
 			newSpec.meshAssetPath = entity.at("mesh").template get<std::string>();
 			if (entity.contains("skeleton"))
 				newSpec.skeletonAssetPath = entity.at("skeleton").template get<std::string>();
+
+			if (entity.contains("defaultPose"))
+			{
+				newSpec.defaultPose = entity.at("defaultPose").template get<std::string>();
+			}
 
 			if (entity.contains("poses"))
 			{
@@ -1084,6 +1266,9 @@ void e2::EntitySpecification::initializeSpecifications(e2::GameContext* ctx)
 
 					std::string poseName = pose.at("name").template get<std::string>();
 					newSpec.poses[poseName] = newPose;
+
+					if (pose.contains("speed"))
+						newPose.speed = pose.at("speed").template get<float>();
 				}
 			}
 
@@ -1152,6 +1337,22 @@ void e2::EntitySpecification::initializeSpecifications(e2::GameContext* ctx)
 					LogError("{}", e.what());
 				}
 			}
+			if (entity.contains("extraAssets"))
+			{
+				json& assets = entity.at("extraAssets");
+				for (json& asset : assets)
+				{
+					if (!asset.contains("name") || !asset.contains("path"))
+					{
+						LogError("extra assets require both a name and a path");
+						continue;
+					}
+
+					std::string assetName = asset.at("name").template get<std::string>();
+					std::string assetPath = asset.at("path").template get<std::string>();
+					newSpec.assets[assetName] = {assetName, assetPath, nullptr};
+				}
+			}
 
 			::specifications.push_back(newSpec);
 			::specificationIndex[newSpec.id] = ::specifications.size() - 1;
@@ -1179,6 +1380,11 @@ void e2::EntitySpecification::finalizeSpecifications(e2::Context* ctx)
 		for (auto& [name, action] : spec.actions)
 		{
 			action.animationAsset = am->get(action.animationAssetPath).cast<e2::Animation>();
+		}
+
+		for (auto& [name, asset] : spec.assets)
+		{
+			asset.asset = am->get(asset.path);
 		}
 	}
 }
@@ -1318,6 +1524,66 @@ void e2::EntityScriptInterface::invokeOnEndMove(e2::GameEntity* entity)
 	INVOKE_SCRIPT_HANDLE(onEndMove, entity);
 }
 
+void e2::EntityScriptInterface::invokeOnWaveUpdate(e2::GameEntity* entity, double seconds)
+{
+	E2_PROFILE_SCOPE_CTX(Scripting, entity->game());
+	INVOKE_SCRIPT_HANDLE(onWaveUpdate, entity, seconds);
+}
+
+void e2::EntityScriptInterface::invokeOnWavePreparing(e2::GameEntity* entity)
+{
+	E2_PROFILE_SCOPE_CTX(Scripting, entity->game());
+	INVOKE_SCRIPT_HANDLE(onWavePreparing, entity);
+}
+
+void e2::EntityScriptInterface::invokeOnWaveStart(e2::GameEntity* entity)
+{
+	E2_PROFILE_SCOPE_CTX(Scripting, entity->game());
+	INVOKE_SCRIPT_HANDLE(onWaveStart, entity);
+}
+
+void e2::EntityScriptInterface::invokeOnWaveEnding(e2::GameEntity* entity)
+{
+	E2_PROFILE_SCOPE_CTX(Scripting, entity->game());
+	INVOKE_SCRIPT_HANDLE(onWaveEnding, entity);
+}
+
+void e2::EntityScriptInterface::invokeOnWaveEnd(e2::GameEntity* entity)
+{
+	E2_PROFILE_SCOPE_CTX(Scripting, entity->game());
+	INVOKE_SCRIPT_HANDLE(onWaveEnd, entity);
+}
+
+void e2::EntityScriptInterface::invokeOnSpawned(e2::GameEntity* entity)
+{
+	E2_PROFILE_SCOPE_CTX(Scripting, entity->game());
+	INVOKE_SCRIPT_HANDLE(onSpawned, entity);
+}
+
+void e2::EntityScriptInterface::invokeOnMobSpawned(e2::GameEntity* entity, e2::Mob* mob)
+{
+	E2_PROFILE_SCOPE_CTX(Scripting, entity->game());
+	INVOKE_SCRIPT_HANDLE(onMobSpawned, entity, mob);
+}
+
+void e2::EntityScriptInterface::invokeOnMobDestroyed(e2::GameEntity* entity, e2::Mob* mob)
+{
+	E2_PROFILE_SCOPE_CTX(Scripting, entity->game());
+	INVOKE_SCRIPT_HANDLE(onMobSpawned, entity, mob);
+}
+
+void e2::EntityScriptInterface::invokeOnSelected(e2::GameEntity* entity)
+{
+	E2_PROFILE_SCOPE_CTX(Scripting, entity->game());
+	INVOKE_SCRIPT_HANDLE(onSelected, entity);
+}
+
+void e2::EntityScriptInterface::invokeOnDeselected(e2::GameEntity* entity)
+{
+	E2_PROFILE_SCOPE_CTX(Scripting, entity->game());
+	INVOKE_SCRIPT_HANDLE(onDeselected, entity);
+}
+
 void e2::EntityScriptInterface::setCreateState(scriptFunc_createState func)
 {
 	createState = func;
@@ -1406,6 +1672,56 @@ void e2::EntityScriptInterface::setOnBeginMove(scriptFunc_onBeginMove func)
 void e2::EntityScriptInterface::setOnEndMove(scriptFunc_onEndMove func)
 {
 	onEndMove = func;
+}
+
+void e2::EntityScriptInterface::setOnWaveUpdate(scriptFunc_onWaveUpdate func)
+{
+	onWaveUpdate = func;
+}
+
+void e2::EntityScriptInterface::setOnSpawned(scriptFunc_onSpawned func)
+{
+	onSpawned = func;
+}
+
+void e2::EntityScriptInterface::setOnWavePreparing(scriptFunc_onWavePreparing func)
+{
+	onWavePreparing = func;
+}
+
+void e2::EntityScriptInterface::setOnWaveStart(scriptFunc_onWaveStart func)
+{
+	onWaveStart = func;
+}
+
+void e2::EntityScriptInterface::setOnWaveEnding(scriptFunc_onWaveEnding func)
+{
+	onWaveEnding = func;
+}
+
+void e2::EntityScriptInterface::setOnWaveEnd(scriptFunc_onWaveEnd func)
+{
+	onWaveEnd = func;
+}
+
+void e2::EntityScriptInterface::setOnMobSpawned(scriptFunc_onMobSpawned func)
+{
+	onMobSpawned = func;
+}
+
+void e2::EntityScriptInterface::setOnMobDestroyed(scriptFunc_onMobDestroyed func)
+{
+	onMobDestroyed = func;
+}
+
+void e2::EntityScriptInterface::setOnSelected(scriptFunc_onSelected func)
+{
+	onSelected = func;
+}
+
+void e2::EntityScriptInterface::setOnDeselected(scriptFunc_onDeselected func)
+{
+	onDeselected = func;
 }
 
 bool e2::EntityScriptInterface::hasCreateState()
@@ -1497,4 +1813,55 @@ bool e2::EntityScriptInterface::hasOnBeginMove()
 bool e2::EntityScriptInterface::hasOnEndMove()
 {
 	return onEndMove != nullptr;
+}
+
+
+bool e2::EntityScriptInterface::hasOnWaveUpdate()
+{
+	return onWaveUpdate != nullptr;
+}
+
+bool e2::EntityScriptInterface::hasOnWavePreparing()
+{
+	return onWavePreparing != nullptr;
+}
+
+bool e2::EntityScriptInterface::hasOnWaveStart()
+{
+	return onWaveStart != nullptr;
+}
+
+bool e2::EntityScriptInterface::hasOnWaveEnding()
+{
+	return onWaveEnding != nullptr;
+}
+
+bool e2::EntityScriptInterface::hasOnWaveEnd()
+{
+	return onWaveEnd != nullptr;
+}
+
+bool e2::EntityScriptInterface::hasOnSpawned()
+{
+	return onSpawned != nullptr;
+}
+
+bool e2::EntityScriptInterface::hasOnMobSpawned()
+{
+	return onMobSpawned != nullptr;
+}
+
+bool e2::EntityScriptInterface::hasOnMobDestroyed()
+{
+	return onMobDestroyed != nullptr;
+}
+
+bool e2::EntityScriptInterface::hasOnSelected()
+{
+	return onSelected != nullptr;
+}
+
+bool e2::EntityScriptInterface::hasOnDeselected()
+{
+	return onDeselected != nullptr;
 }

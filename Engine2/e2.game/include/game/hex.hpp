@@ -19,6 +19,10 @@
 
 namespace e2
 {
+	inline float mtnDist = 1.5f;
+	inline float mtnPow = 0.5f;
+	inline float mtnFreqScale = 1.0f;
+	inline float mtnScale = 1.0f;
 
 	class GameUnit;
 
@@ -118,7 +122,7 @@ namespace e2
 
 		// optional forest proxy, if this tile is discovered it shows: forest abundance if unbuilt on forest, partly forest if built on forest, nothing if not on forest or if undiscovered (undiscovered tile meshes lives on chunk array)
 		e2::MeshProxy* forestProxy{};
-		e2::MeshTreeLods* forestLods{};
+		e2::MeshPtr forestMesh{};
 
 		e2::MeshProxy* resourceProxy{};
 		e2::MeshPtr resourceMesh;
@@ -427,7 +431,7 @@ namespace e2
 
 		e2::MeshPtr getResourceMeshForFlags(e2::TileFlags flags);
 
-		e2::MeshTreeLods* getForestMeshForFlags(e2::TileFlags flags);
+		e2::MeshPtr getForestMeshForFlags(e2::TileFlags flags);
 
 		e2::MeshProxy* createResourceProxyForTile(e2::TileData* tileData, glm::ivec2 const& hex);
 		e2::MeshProxy* createForestProxyForTile(e2::TileData* tileData, glm::ivec2 const& hex);
@@ -482,7 +486,8 @@ namespace e2
 		std::unordered_map<glm::ivec2, size_t> m_tileIndex;
 
 		e2::MeshPtr m_resourceMeshStone;
-		MeshTreeLods m_pineForestMeshes[3];
+		e2::MeshPtr m_pineForestMeshes[3];
+		//MeshTreeLods m_pineForestMeshes[3];
 
 		e2::MeshPtr m_baseHex;
 		e2::DynamicMesh m_dynaHex;
@@ -500,6 +505,10 @@ namespace e2
 
 		e2::MeshPtr m_waterChunk;
 		e2::MeshPtr m_fogChunk;
+
+		e2::Texture2DPtr m_waterTexture;
+		e2::Texture2DPtr m_forestTexture;
+		e2::Texture2DPtr m_mountainTexture;
 
 
 		std::vector<glm::ivec2> m_outlineTiles[size_t(e2::OutlineLayer::Count)];
@@ -617,6 +626,10 @@ namespace e2
 private:
 	void debugDraw();
 	void updateViewBounds();
+
+	bool m_debugDraw{ false };
+	public:
+		void debugDraw(bool newValue);
 	};
 
 }

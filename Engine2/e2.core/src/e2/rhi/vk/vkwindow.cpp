@@ -97,22 +97,30 @@ bool e2::IWindow_Vk::wantsClose() const
 
 void e2::IWindow_Vk::setFullscreen(bool newFullscreen)
 {
+	GLFWvidmode const* mode = glfwGetVideoMode(glfwGetPrimaryMonitor());
 	if (newFullscreen)
 	{
-		GLFWvidmode const* vidMode = glfwGetVideoMode(glfwGetPrimaryMonitor());
-		glfwSetWindowMonitor(m_glfwHandle,  glfwGetPrimaryMonitor() , 0, 0, vidMode->width, vidMode->height, vidMode->refreshRate);
+		glfwSetWindowAttrib(m_glfwHandle, GLFW_RESIZABLE, GLFW_FALSE);
+		glfwSetWindowAttrib(m_glfwHandle, GLFW_DECORATED, GLFW_FALSE);
+		glfwSetWindowSize(m_glfwHandle, mode->width, mode->height+1);
+		glfwSetWindowPos(m_glfwHandle, 0, 0);
+		//GLFWvidmode const* vidMode = glfwGetVideoMode(glfwGetPrimaryMonitor());
+		//glfwSetWindowMonitor(m_glfwHandle,  glfwGetPrimaryMonitor() , 0, 0, vidMode->width, vidMode->height, vidMode->refreshRate);
 		
 	}
 	else
 	{
-
-		glfwSetWindowMonitor(m_glfwHandle, nullptr, 64, 64, 1280, 720, GLFW_DONT_CARE);
+		glfwSetWindowAttrib(m_glfwHandle, GLFW_DECORATED, GLFW_TRUE);
+		glfwSetWindowAttrib(m_glfwHandle, GLFW_RESIZABLE, GLFW_TRUE);
+		glfwSetWindowSize(m_glfwHandle, 1280, 720);
+		glfwSetWindowPos(m_glfwHandle, mode->width / 2 - 1280 / 2, mode->height / 2 - 720 / 2);
+		//glfwSetWindowMonitor(m_glfwHandle, nullptr, 64, 64, 1280, 720, GLFW_DONT_CARE);
 	}
 }
 
 bool e2::IWindow_Vk::isFullscreen()
 {
-	return glfwGetWindowMonitor(m_glfwHandle) != nullptr;
+	return glfwGetWindowAttrib(m_glfwHandle, GLFW_DECORATED) == GLFW_FALSE;
 }
 
 void e2::IWindow_Vk::wantsClose(bool newValue)
@@ -553,7 +561,7 @@ void e2::IWindow_Vk::createSwapchain()
 			{
 				selectedFormat = currFormat;
 				found = true;
-				//LogNotice("surface format: G8G8R8A8_SRGB VK_COLOR_SPACE_SRGB_NONLINEAR_KHR (preferred)");
+				//LogNotice("surface format: VK_FORMAT_B8G8R8A8_SRGB VK_COLOR_SPACE_SRGB_NONLINEAR_KHR (preferred)");
 				break;
 			}
 		}
@@ -562,7 +570,11 @@ void e2::IWindow_Vk::createSwapchain()
 		if (!found)
 		{
 			selectedFormat = swapchainCapabilities.surfaceFormats[0];
-			//LogNotice("surface format: defined but unpreferred");
+			LogNotice("surface format: defined but unpreferred");
+		}
+		else
+		{
+			LogNotice("surface format: VK_FORMAT_B8G8R8A8_SRGB VK_COLOR_SPACE_SRGB_NONLINEAR_KHR (preferred)");
 		}
 	}
 
@@ -816,10 +828,7 @@ void e2::IWindow_Vk::destroyTemp()
 
 void e2::IWindow_Vk::recreateTemp()
 {
-	//m_renderContextVk->waitIdle();
 	destroyTemp();
-
-
 
 	createTemp();
 }

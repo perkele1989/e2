@@ -36,6 +36,16 @@ bool e2::ShaderModel::supportsShadows()
 	return false;
 }
 
+void e2::ShaderModel::active(bool newValue)
+{
+	m_active = newValue;
+}
+
+bool e2::ShaderModel::active()
+{
+	return m_active;
+}
+
 bool e2::ShaderModelSpecification::isCompatible(e2::SubmeshSpecification const& mesh)
 {
 	return (requiredAttributes & mesh.attributeFlags) == requiredAttributes;

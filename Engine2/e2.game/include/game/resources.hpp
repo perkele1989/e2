@@ -16,13 +16,10 @@ namespace e2
 		virtual void write(e2::Buffer& destination) const override;
 		virtual bool read(e2::Buffer& source) override;
 
-		float wood{};
-		float stone{};
-		float metal{};
 		float gold{};
-		float oil{};
-		float uranium{};
-		float meteorite{};
+		float wood{};
+		float iron{};
+		float steel{};
 
 		void clear();
 

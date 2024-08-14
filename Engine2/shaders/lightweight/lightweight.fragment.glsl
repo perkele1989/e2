@@ -47,16 +47,24 @@ void main()
 #if defined(Material_AlbedoTexture)
 	vec4 albedoTexel = texture(sampler2D(albedoTexture, repeatSampler), uv).rgba;
 #if defined(Material_AlphaClip)
-	if(albedoTexel.a < 0.5)
+	if(albedoTexel.a < 0.35)
 		discard;
 #endif 
-	vec3 albedo = albedoTexel.rgb *  pow(material.albedo.rgb, vec3(1.0));// * 0.65;
-	//albedo = mix(vec3(dot(vec3(1.0/3.0), albedo)), albedo, 0.5);
+	vec3 albedo = albedoTexel.rgb *  material.albedo.rgb;
+
+	// DEBUG 
+	float ss = sampleSimplex(fragmentPosition.xz);
+	albedo.rgb = shiftHue(albedo.rgb, mix(-0.15, 0.0, ss));
+	albedo = mix(vec3(dot(vec3(1.0/3.0), albedo)), albedo, 0.7);
+	albedo *= 0.65;
+	//albedo = pow(albedo, vec3(1.4));
 
 #else
 	vec3 albedo = pow(material.albedo.rgb, vec3(1.0));
 
 #endif 
+//albedo = pow(albedo, vec3(0.9));
+//albedo = pow(vec3(0.364, 0.945, 0.184)*0.14, vec3(2.0));// DEBUG
 
 	vec3 emissive = pow(material.emissive.rgb, vec3(1.0)) * material.emissive.a;
 
@@ -69,14 +77,19 @@ void main()
 	float roughness = texture(sampler2D(roughnessTexture, repeatSampler), uv).r;
 #else
 	float roughness = material.rmxx.x;
-	//roughness = 0.4;
 #endif 
 
+//roughness = pow(roughness, 1.0/2.2);
+
+roughness = 0.7;
+
 #if defined(Material_MetalnessTexture)
-	float metalness = texture(sampler2D(roughnessTexture, repeatSampler), uv).r;
+	float metalness = texture(sampler2D(metalnessTexture, repeatSampler), uv).r;
 #else
 	float metalness = material.rmxx.y;
 #endif 
+
+	//metalness = 0.0;
 
 #if defined(Vertex_Normals)
 
@@ -91,19 +104,21 @@ void main()
 #else 
 	vec3 worldNormal = normalize(fragmentNormal);
 #endif
+	//worldNormal = fragmentNormal; // DEBUG
 
 	vec3 viewVector= getViewVector(fragmentPosition.xyz);
 
 	outColor.rgb = vec3(0.0, 0.0, 0.0);
 	outColor.rgb += getIblColor(fragmentPosition.xyz, albedo, worldNormal, roughness, metalness, viewVector);
-	outColor.rgb += getSunColor(fragmentPosition.xyz, worldNormal, albedo);
-	outColor.rgb *= getCloudShadows(fragmentPosition.xyz);
-	//outColor.rgb = mix(outColor.rgb, albedo, 0.95);
-	//outColor.rgb += outColor.rgb * getRimColor(worldNormal, viewVector, vec3(1.0, 1.0, 1.0));
+	outColor.rgb += getSunColor(fragmentPosition.xyz, worldNormal, albedo, roughness, metalness, viewVector) * getCloudShadows(fragmentPosition.xyz);
+
 	outColor.rgb += emissive;
 #else 
 	outColor.rgb = albedo + emissive;
 #endif
+
+
+	//outColor.rgb = vec3(albedo);
 
 	// debug refl
 	//outColor.rgb = F;

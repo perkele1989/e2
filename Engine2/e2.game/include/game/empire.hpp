@@ -15,6 +15,9 @@ namespace e2
 	class GameStructure;
 	class EmpireAI;
 
+
+	class City;
+
 	/** @tags(arena, arenaSize=e2::maxNumEmpires) */
 	class GameEmpire : public e2::Object, public e2::GameContext, public e2::Data
 	{
@@ -31,6 +34,10 @@ namespace e2
 		virtual void write(Buffer& destination) const override;
 		virtual bool read(Buffer& source) override;
 
+
+		e2::City* capital;
+		std::unordered_set<e2::City*> cities;
+
 		std::unordered_set<e2::GameEntity*> entities;
 
 		// optional
@@ -40,7 +47,6 @@ namespace e2
 	protected:
 		e2::Game* m_game{};
 
-		
 	};
 
 	class GameEntity;

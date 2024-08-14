@@ -8,7 +8,7 @@
             "layerIndex": "structure",
             "passableFlags": ["none"],
             "moveType": "static",
-            "sightRange": 2,
+            "sightRange": 5,
             "defensiveStrength": 600.0,
             "script": "data/entities/navalbase.chai",
             "mesh": "assets/structures/SM_BuildingPlaceholder.e2a",

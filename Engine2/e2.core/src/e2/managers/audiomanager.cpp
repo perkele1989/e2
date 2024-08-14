@@ -80,9 +80,38 @@ void e2::AudioManager::update(double deltaTime)
 	attribs.up = ::glmToFmod(up);
 	attribs.velocity = ::glmToFmod({}); // @todo
 	m_studioSystem->setListenerAttributes(0, &attribs);
+	m_studioSystem->update();
 }
 
 void e2::AudioManager::setListenerTransform(glm::mat4 const& transform)
 {
 	m_listenerTransform = transform;
+}
+
+void e2::AudioManager::playOneShot(e2::Ptr<e2::Sound> sound, float volume,  float spatiality, glm::vec3 const& position)
+{
+	if (!sound)
+		return;
+
+	FMOD::Channel* channel{};
+	FMOD_RESULT result = audioManager()->coreSystem()->playSound(sound->fmodSound(), nullptr, false, nullptr);
+	if (result != FMOD_OK)
+	{
+		LogError("Fmod: {}: {}", int32_t(result), FMOD_ErrorString(result));
+		return;
+	}
+
+	LogNotice("playing with volume {}, spatiality {}, and position {}", volume, spatiality, position);
+
+	channel->setVolume(volume);
+	channel->set3DLevel(spatiality);
+	FMOD_VECTOR pos = ::glmToFmod(position);
+
+	FMOD_VECTOR vel;
+	vel.x = 0.0f;
+	vel.y = 0.0f;
+	vel.z = 0.0f;
+
+	channel->set3DMinMaxDistance(0.0f, 1.0f);
+	channel->set3DAttributes(&pos, &vel);
 }

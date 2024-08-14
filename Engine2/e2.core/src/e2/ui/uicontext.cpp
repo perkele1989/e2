@@ -606,8 +606,36 @@ bool e2::UIContext::inputText(e2::Name id, std::string& buffer)
 
 bool e2::UIContext::sliderInt(e2::Name id, int32_t& value, int32_t min, int32_t max, char const* format /*= "%d"*/)
 {
-	constexpr glm::vec2 minSize(100.0f, 20.0f);
+	e2::UIStyle const& style = uiManager()->workingStyle();
+
+	constexpr glm::vec2 minSize(200.0f, 20.0f);
 	e2::UIWidgetState* widgetState = reserve(id, minSize);
+
+
+	bool mouseDown = widgetState->active && m_mouseState.buttons[0].held;
+
+	drawQuad(widgetState->position, widgetState->size, style.windowFgColor);
+
+	float mouseX = (m_mouseState.relativePosition - widgetState->position).x;
+	float mouseNormalized = glm::clamp(mouseX / widgetState->size.x, 0.0f, 1.0f);
+
+	float valueRange = max - min;
+	float valueBegin = min;
+
+	if (mouseDown)
+	{
+		value = glm::clamp(valueBegin + valueRange * mouseNormalized, (float)min, (float)max);
+	}
+
+	float valueNormalized = (value - valueBegin) / valueRange;
+
+	drawQuad(widgetState->position + glm::vec2(1.0f, 1.0f), glm::vec2((widgetState->size.x * valueNormalized) - 2.0f, widgetState->size.y - 2.0f), style.accents[0]);
+
+	drawRasterText(e2::FontFace::Serif, 9, style.windowBgColorInactive, widgetState->position + glm::vec2(0.0f, widgetState->size.y / 2.0f), id.string());
+
+	std::string valueStr = std::format("{}", value);
+	float textWidth = calculateTextWidth(e2::FontFace::Monospace, 9, valueStr);
+	drawRasterText(e2::FontFace::Monospace, 9, style.windowBgColor, widgetState->position + glm::vec2(widgetState->size.x, widgetState->size.y / 2.0f) - glm::vec2(textWidth, 0.0f), valueStr);
 	return false;
 }
 
@@ -640,7 +668,7 @@ bool e2::UIContext::sliderFloat(e2::Name id, float& value, float min, float max,
 
 	drawRasterText(e2::FontFace::Serif, 9, style.windowBgColorInactive, widgetState->position + glm::vec2(0.0f, widgetState->size.y / 2.0f), id.string());
 
-	std::string valueStr = std::format("{:.2f}", value);
+	std::string valueStr = std::format("{:.3f}", value);
 	float textWidth = calculateTextWidth(e2::FontFace::Monospace, 9, valueStr);
 	drawRasterText(e2::FontFace::Monospace, 9, style.windowBgColor, widgetState->position + glm::vec2(widgetState->size.x, widgetState->size.y / 2.0f) - glm::vec2(textWidth, 0.0f), valueStr);
 	return false;
@@ -691,6 +719,18 @@ void e2::UIContext::drawQuad(glm::vec2 position, glm::vec2 size, e2::UIColor col
 
 	
 	
+}
+
+void e2::UIContext::drawFrame(glm::vec2 position, glm::vec2 size, e2::UIColor color, float thickness, float zoffset /*= 0.0f*/)
+{
+	glm::vec2 vt = glm::vec2(thickness);
+	float t2 = thickness * 2.0f;
+	drawQuad(position - vt, glm::vec2(size.x + t2, thickness), color, zoffset);
+	drawQuad(position + glm::vec2(-thickness, size.y), glm::vec2(size.x + t2, thickness), color, zoffset);
+
+	drawQuad(position + glm::vec2(-thickness, 0.0f), glm::vec2(thickness, size.y), color, zoffset);
+	drawQuad(position + glm::vec2(size.x, 0.0f) , glm::vec2(thickness, size.y), color, zoffset);
+
 }
 
 void e2::UIContext::drawTexturedQuad(glm::vec2 position, glm::vec2 size, e2::UIColor color, e2::ITexture* texture, glm::vec2 uvOffset /*= { 0.0f, 0.0f }*/, glm::vec2 uvScale /*= {1.0f, 1.0f}*/, e2::UITexturedQuadType type, float zoffset)
@@ -763,6 +803,45 @@ void e2::UIContext::drawQuadFancy(glm::vec2 position, glm::vec2 size, e2::UIColo
 	pushConstants.cornerRadius = cornerRadius;
 	pushConstants.bevelStrength = bevelStrength;
 	pushConstants.type = windowBorder ? 1 : 0;
+	pushConstants.pixelScale = ui->workingStyle().scale;
+
+	// @todo optimize this by queue'ing quads and then on submit render them. 
+	// profile first so we know its nececssary
+	buff->bindVertexLayout(ui->quadVertexLayout);
+	buff->bindIndexBuffer(ui->quadIndexBuffer);
+	buff->bindVertexBuffer(0, ui->quadVertexBuffer);
+	buff->bindPipeline(ui->m_fancyQuadPipeline.pipeline);
+	buff->pushConstants(ui->m_fancyQuadPipeline.layout, 0, sizeof(e2::UIFancyQuadPushConstants), reinterpret_cast<uint8_t*>(&pushConstants));
+
+	buff->draw(6, 1);
+
+	m_hasRecordedData = true;
+}
+
+void e2::UIContext::drawGamePanel(glm::vec2 position, glm::vec2 size, bool highlighted, float alpha)
+{
+	position.x = glm::floor(position.x);
+	position.y = glm::floor(position.y);
+
+	size.x = glm::ceil(size.x);
+	size.y = glm::ceil(size.y);
+
+	uint8_t frameIndex = renderManager()->frameIndex();
+	e2::ICommandBuffer* buff = m_commandBuffers[frameIndex];
+	e2::UIManager* ui = uiManager();
+
+	constexpr float epsilon = 0.0001f;
+	m_currentZ -= epsilon;
+
+	e2::UIFancyQuadPushConstants pushConstants{};
+	pushConstants.quadColor = e2::UIColor(0xf59b14ff).toVec4();
+	pushConstants.quadPosition = position;
+	pushConstants.quadSize = size;
+	pushConstants.quadZ = m_currentZ;
+	pushConstants.surfaceSize = glm::vec2(m_renderTargetSize);
+	pushConstants.cornerRadius = alpha;
+	pushConstants.bevelStrength = highlighted ? 1.0f : 0.0f;
+	pushConstants.type = 2;
 	pushConstants.pixelScale = ui->workingStyle().scale;
 
 	// @todo optimize this by queue'ing quads and then on submit render them. 

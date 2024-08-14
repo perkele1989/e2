@@ -38,7 +38,7 @@ bool e2::Sound::read(Buffer& source)
 	exInfo.cbsize = sizeof(FMOD_CREATESOUNDEXINFO);
 	exInfo.length = m_fmodDataSize;
 
-	FMOD_RESULT result = audioManager()->coreSystem()->createSound(reinterpret_cast<char*>(m_fmodData), FMOD_OPENMEMORY_POINT, &exInfo, &m_fmodSound);
+	FMOD_RESULT result = audioManager()->coreSystem()->createSound(reinterpret_cast<char*>(m_fmodData), FMOD_OPENMEMORY_POINT | FMOD_3D, &exInfo, &m_fmodSound);
 	if (result != FMOD_OK)
 	{
 		LogError("Fmod: {}: {}", int32_t(result), FMOD_ErrorString(result));

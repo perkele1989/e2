@@ -134,6 +134,8 @@ e2::Renderer::Renderer(e2::Session* session, glm::uvec2 const& resolution)
 	: m_session(session)
 	, m_resolution(resolution)
 {
+
+	m_tonemap.constants.parameters = glm::vec4(10.0f, 10.0f, 10.0f, 1.0f);
 	// Setup command buffers 
 	e2::CommandBufferCreateInfo commandBufferInfo{};
 	m_commandBuffers[0] = renderManager()->framePool(0)->createBuffer(commandBufferInfo);
@@ -165,12 +167,10 @@ e2::Renderer::Renderer(e2::Session* session, glm::uvec2 const& resolution)
 		textureCreateInfo.mips = 1;
 		textureCreateInfo.arrayLayers = 1;
 		textureCreateInfo.type = TextureType::Texture2D;
-		textureCreateInfo.format = TextureFormat::RGBA8;
-
 		textureCreateInfo.initialLayout = TextureLayout::ShaderRead; // we use shader read as default for this, and then swithc when rendering
-		m_renderBuffers[i].colorTexture = renderContext()->createTexture(textureCreateInfo);
 
 		textureCreateInfo.format = TextureFormat::RGBA32;
+		m_renderBuffers[i].colorTexture = renderContext()->createTexture(textureCreateInfo);
 		m_renderBuffers[i].positionTexture = renderContext()->createTexture(textureCreateInfo);
 
 		textureCreateInfo.format = TextureFormat::D32;
@@ -200,8 +200,34 @@ e2::Renderer::Renderer(e2::Session* session, glm::uvec2 const& resolution)
 		m_renderBuffers[i].renderTarget = renderContext()->createRenderTarget(renderTargetInfo);
 
 
+
 		m_renderBuffers[i].sets[0] = renderManager()->rendererPool()->createDescriptorSet(renderManager()->rendererSetLayout());
 		m_renderBuffers[i].sets[1] = renderManager()->rendererPool()->createDescriptorSet(renderManager()->rendererSetLayout());
+
+
+
+
+
+		textureCreateInfo.format = TextureFormat::RGBA8;
+		m_tonemap.outputTexture = renderContext()->createTexture(textureCreateInfo);
+
+
+		e2::RenderTargetCreateInfo tonemapTargetInfo{};
+		tonemapTargetInfo.areaExtent = resolution;
+
+		e2::RenderAttachment tonemapAttachment{};
+		tonemapAttachment.target = m_tonemap.outputTexture;
+		tonemapAttachment.clearMethod = ClearMethod::ColorFloat;
+		tonemapAttachment.clearValue.clearColorf32 = { 0.f, 0.f, 0.f, 1.0f };
+		tonemapAttachment.loadOperation = LoadOperation::Load;
+		tonemapAttachment.storeOperation = StoreOperation::Store;
+		tonemapTargetInfo.colorAttachments.push(tonemapAttachment);
+
+		m_tonemap.renderTarget = renderContext()->createRenderTarget(tonemapTargetInfo);
+
+
+		m_tonemap.sets[0] = renderManager()->tonemapPool()->createDescriptorSet(renderManager()->tonemapSetLayout());
+		m_tonemap.sets[1] = renderManager()->tonemapPool()->createDescriptorSet(renderManager()->tonemapSetLayout());
 	}
 
 	// bind interdependencies 
@@ -274,7 +300,7 @@ e2::Renderer::Renderer(e2::Session* session, glm::uvec2 const& resolution)
 	e2::PipelineCreateInfo lineCreateInfo{};
 	lineCreateInfo.layout = renderManager()->linePipelineLayout();
 	lineCreateInfo.topology = PrimitiveTopology::Line;
-	lineCreateInfo.colorFormats = { TextureFormat::RGBA8 , e2::TextureFormat::RGBA32 };
+	lineCreateInfo.colorFormats = { TextureFormat::RGBA32 , e2::TextureFormat::RGBA32 };
 	lineCreateInfo.depthFormat = TextureFormat::D32;
 	lineCreateInfo.shaders.push(m_lineVertexShader);
 	lineCreateInfo.shaders.push(m_lineFragmentShader);
@@ -300,11 +326,15 @@ e2::Renderer::~Renderer()
 	e2::discard(m_rendererBuffers[0]);
 	e2::discard(m_rendererBuffers[1]);
 	e2::discard(m_renderBuffers[0].renderTarget);
+	e2::discard(m_tonemap.renderTarget);
 	e2::discard(m_renderBuffers[0].colorTexture);
+	e2::discard(m_tonemap.outputTexture);
 	e2::discard(m_renderBuffers[0].positionTexture);
 	e2::discard(m_renderBuffers[0].depthTexture);
 	e2::discard(m_renderBuffers[0].sets[0]);
 	e2::discard(m_renderBuffers[0].sets[1]);
+	e2::discard(m_tonemap.sets[0]);
+	e2::discard(m_tonemap.sets[1]);
 	e2::discard(m_renderBuffers[1].renderTarget);
 	e2::discard(m_renderBuffers[1].colorTexture);
 	e2::discard(m_renderBuffers[1].positionTexture);
@@ -343,7 +373,8 @@ void e2::Renderer::prepareFrame(double deltaTime)
 	{
 		float yMin = m_view.origin.y;
 		float yMax = 5.0f; // 5 meter below ground seems decent
-		e2::Aabb2D planarAabb = m_viewPoints.toAabb();
+		e2::Aabb2D planarAabb = m_viewPoints.toAabb(); // 20 meters max view depth
+		//e2::Aabb2D planarAabb = m_viewPoints.toAabb(); // 20 meters max view depth
 		e2::Aabb3D worldAabb(planarAabb, yMin, yMax);
 		//e2::Aabb3D worldAabb(planarAabb, 0.0f, 0.0f);
 
@@ -373,7 +404,7 @@ void e2::Renderer::prepareFrame(double deltaTime)
 
 		//m_rendererData.shadowView= glm::lookAt(frustumCenter + m_sunDirection * radius, frustumCenter, e2::worldUpf());
 
-		m_rendererData.shadowProjection = glm::ortho(-radius, radius, -radius, radius, 0.000f, radius*2.0f);
+		m_rendererData.shadowProjection = glm::ortho(-radius, radius, -radius, radius, 0.0f, radius * 2.0f);
 	}
 
 
@@ -437,6 +468,9 @@ void e2::Renderer::recordShadows(double deltaTime, e2::ICommandBuffer* buff)
 
 		e2::MeshProxyLOD* meshProxyLOD = &meshProxy->lods[lodEntry.lod];
 		uint8_t submeshIndex = lodEntry.submesh;
+
+		if (!meshProxyLOD->materialProxies[submeshIndex]->asset->model()->active())
+			continue;
 
 		if (!meshProxyLOD->shadowPipelines[submeshIndex])
 			continue;
@@ -573,6 +607,9 @@ void e2::Renderer::recordRenderLayers(double deltaTime, e2::ICommandBuffer* buff
 			e2::MeshProxyLOD* meshProxyLOD = &meshProxy->lods[lodEntry.lod];
 			uint8_t submeshIndex = lodEntry.submesh;
 
+			if (!meshProxyLOD->materialProxies[submeshIndex]->asset->model()->active())
+				continue;
+
 
 			if (!meshProxyLOD->pipelines[submeshIndex])
 				continue;
@@ -588,6 +625,7 @@ void e2::Renderer::recordRenderLayers(double deltaTime, e2::ICommandBuffer* buff
 			e2::PushConstantData pushConstantData;
 			pushConstantData.normalMatrix = glm::transpose(glm::inverse(meshProxy->modelMatrix));
 			pushConstantData.resolution = m_resolution;
+			pushConstantData.gridParams = { m_drawGrid ? 1 : 0, 0 };
 			buff->pushConstants(pipelineLayout, 0, sizeof(e2::PushConstantData), reinterpret_cast<uint8_t*>(&pushConstantData));
 
 			// Bind vertex states
@@ -687,6 +725,26 @@ void e2::Renderer::recordDebugLines(double deltaTime, e2::ICommandBuffer* buff)
 	}
 }
 
+void e2::Renderer::recordTonemap(double deltaTime, e2::ICommandBuffer* buff)
+{
+	uint8_t frameIndex = renderManager()->frameIndex();
+	m_tonemap.sets[frameIndex]->writeTexture(0, m_renderBuffers[frontBuffer()].colorTexture);
+	m_tonemap.sets[frameIndex]->writeSampler(1, renderManager()->clampSampler());
+
+
+	buff->setFrontFace(e2::FrontFace::CW);
+	buff->useAsAttachment(m_tonemap.outputTexture);
+	buff->beginRender(m_tonemap.renderTarget);
+	buff->bindPipeline(renderManager()->tonemapPipeline());
+	buff->bindDescriptorSet(renderManager()->tonemapLayout(), 0, m_tonemap.sets[frameIndex]);
+	buff->nullVertexLayout();
+	buff->pushConstants(renderManager()->tonemapLayout(), 0, sizeof(e2::TonemapConstants), reinterpret_cast<uint8_t*>(&m_tonemap.constants));
+	buff->drawNonIndexed(3, 1);
+	buff->endRender();
+	buff->useAsDefault(m_tonemap.outputTexture);
+	buff->setFrontFace(e2::FrontFace::CCW);
+}
+
 void e2::Renderer::recordFrame(double deltaTime)
 {
 	uint8_t frameIndex = renderManager()->frameIndex();
@@ -699,10 +757,23 @@ void e2::Renderer::recordFrame(double deltaTime)
 	recordShadows(deltaTime, buff);
 	recordRenderLayers(deltaTime, buff);
 	recordDebugLines(deltaTime, buff);
+	recordTonemap(deltaTime, buff);
 	buff->endRecord();
 
 	renderManager()->queue(buff, nullptr, nullptr);
 	m_debugLines.clear();
+}
+
+void e2::Renderer::exposure(float newExposure)
+{
+	m_tonemap.constants.parameters.w = newExposure;
+}
+
+void e2::Renderer::whitepoint(glm::vec3 const& newWhitepoint)
+{
+	m_tonemap.constants.parameters.x = newWhitepoint.x;
+	m_tonemap.constants.parameters.y = newWhitepoint.y;
+	m_tonemap.constants.parameters.z = newWhitepoint.z;
 }
 
 e2::Session* e2::Renderer::session() const
@@ -714,7 +785,7 @@ void e2::Renderer::setView(e2::RenderView const& renderView)
 {
 	m_view = renderView;
 
-	m_viewPoints = e2::Viewpoints2D(m_resolution, m_view);
+	m_viewPoints = e2::Viewpoints2D(m_resolution, m_view, 0.0);
 
 }
 
@@ -741,7 +812,7 @@ glm::dvec3 e2::RenderView::findWorldspaceViewRayFromNdc(glm::dvec2 const& resolu
 	return ray;
 }
 
-glm::dvec2 e2::RenderView::unprojectWorldPlane(glm::dvec2 const& resolution, glm::dvec2 const& xyCoords) const
+glm::dvec2 e2::RenderView::unprojectWorldPlane(glm::dvec2 const& resolution, glm::dvec2 const& xyCoords, double limitDistance) const
 {
 	//if(glm::abs(xyCoords.x) != 1.0f && glm::abs(xyCoords.y) != 1.0f)
 	//	LogNotice("mouse {}", xyCoords);
@@ -754,13 +825,16 @@ glm::dvec2 e2::RenderView::unprojectWorldPlane(glm::dvec2 const& resolution, glm
 	glm::dvec3 far = glm::unProject(glm::dvec3(xyCoords.x, xyCoords.y, 1.0), viewMatrix, projectionMatrix, glm::dvec4(-1.0, -1.0, 2.0, 2.0));
 	glm::dvec3 viewRay = glm::normalize(far - origin);
 
-	constexpr double renderDistance = 100.0;
+	//constexpr double renderDistance = 100.0;
 	double rayDistanceToPlane = 0.0f;
 	if (!glm::intersectRayPlane(origin, viewRay, { 0.0, 0.0, 0.0 }, e2::worldUp(), rayDistanceToPlane))
 	{
-		rayDistanceToPlane = renderDistance;
+		rayDistanceToPlane = clipPlane.y;
 		//LogNotice("failed");
 	}
+
+	if (limitDistance > 0.0 && rayDistanceToPlane > limitDistance)
+		rayDistanceToPlane = limitDistance;
 
 	
 	glm::dvec3 offset = origin + viewRay * (rayDistanceToPlane);
@@ -810,6 +884,11 @@ void e2::Renderer::setOutlineTextures(e2::ITexture* textures[2])
 	}
 }
 
+void e2::Renderer::setDrawGrid(bool newDrawGrid)
+{
+	m_drawGrid = newDrawGrid;
+}
+
 void e2::Renderer::swapRenderBuffers()
 {
 	m_backBuffer = frontBuffer();
@@ -825,18 +904,23 @@ void e2::Renderer::debugLine(glm::vec3 const& color, glm::vec2 const& start, glm
 	debugLine(color, { start.x, 0.0f, start.y }, { end.x, 0.0f, end.y });
 }
 
-e2::Viewpoints2D::Viewpoints2D(glm::vec2 const& _resolution, e2::RenderView const& _view)
+e2::Viewpoints2D::Viewpoints2D(glm::vec2 const& _resolution, e2::RenderView const& _view, double limitDistance)
 	: view(_view)
 	, resolution(_resolution)
 {
-	topLeft = view.unprojectWorldPlane(resolution, { -1.0f, -1.0f });
-	topRight = view.unprojectWorldPlane(resolution, { 1.0f, -1.0f });
-	bottomRight = view.unprojectWorldPlane(resolution, { 1.0f,  1.0f });
-	bottomLeft = view.unprojectWorldPlane(resolution, { -1.0f,  1.0f });
+	topLeft = view.unprojectWorldPlane(resolution, { -1.0f, -1.0f }, limitDistance);
+	topRight = view.unprojectWorldPlane(resolution, { 1.0f, -1.0f }, limitDistance);
+	bottomRight = view.unprojectWorldPlane(resolution, { 1.0f,  1.0f }, limitDistance);
+	bottomLeft = view.unprojectWorldPlane(resolution, { -1.0f,  1.0f }, limitDistance);
 
 	calculateDerivatives();
 }
 
+
+e2::Viewpoints2D e2::Viewpoints2D::limited(double limitDistance)
+{
+	return e2::Viewpoints2D(resolution, view, limitDistance);
+}
 
 e2::ConvexShape2D e2::Viewpoints2D::combine(Viewpoints2D const& other)
 {

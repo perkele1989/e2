@@ -9,6 +9,7 @@
 #include "game/gamecontext.hpp"
 #include "game/resources.hpp"
 #include "game/gameentity.hpp"
+#include "game/mob.hpp"
 #include "game/empire.hpp"
 #include "game/shared.hpp"
 
@@ -16,6 +17,50 @@
 
 namespace e2
 {
+
+	template<typename T>
+	class ScriptRef 
+	{
+	public:
+
+		ScriptRef() = default;
+
+		ScriptRef(ScriptRef<T> const& other)
+			: value(other.value)
+		{
+			
+		}
+
+		ScriptRef(T* v)
+			: value(v)
+		{
+
+		}
+
+		ScriptRef<T>& operator=(ScriptRef<T> const &other)
+		{
+			value = other.value;
+			return *this;
+		}
+
+
+		static bool equals(ScriptRef<T> const& lhs, ScriptRef<T> const& rhs)
+		{
+			return lhs.value == rhs.value;
+		}
+
+		void clear()
+		{
+			value = nullptr;
+		}
+
+		bool isNull()
+		{
+			return value == nullptr;
+		}
+
+		T* value{};
+	};
 
 
 	/** @tags(arena, arenaSize=16384*128) */
@@ -46,7 +91,7 @@ namespace e2
 		ObjectDeclaration();
 	public:
 		PathFindingAS();
-		PathFindingAS(e2::Game* game, e2::Hex const& start, uint64_t range, bool ignoreVisibility = false, e2::PassableFlags passableFlags = PassableFlags::Land);
+		PathFindingAS(e2::Game* game, e2::Hex const& start, uint64_t range, bool ignoreVisibility = false, e2::PassableFlags passableFlags = PassableFlags::Land, bool onlyWaveRelevant = false, e2::Hex *stopWhenFound = nullptr);
 		PathFindingAS(e2::GameEntity* unit);
 		// for long range targets
 		//PathFindingAS(e2::GameEntity* unit, glm::ivec2 const& target);
@@ -72,6 +117,7 @@ namespace e2
 		
 		
 	};
+
 
 
 	class Game : public e2::Application, public e2::GameContext
@@ -113,9 +159,13 @@ namespace e2
 		void resumeWorldStreaming();
 		void forceStreamLocation(glm::vec2 const& planarCoords);
 		void beginStartGame();
-		bool findStartLocation(glm::ivec2 const& offset, glm::ivec2 const& rangeSize, glm::ivec2 &outLocation, bool forAi);
+		bool findStartLocation(glm::ivec2 const& offset, glm::ivec2 const& rangeSize, glm::ivec2& outLocation, bool forAi);
 		void startGame();
 
+		void addScreenShake(float intensity);
+	protected:
+		float m_shakeIntensity{};
+	public:
 
 
 		glm::vec2 worldToPixels(glm::vec3 const& world);
@@ -131,11 +181,18 @@ namespace e2
 
 		void updateGameState();
 		void updateTurn();
-		void updateAuto();
-		
+		void updateWavePreparing();
+		void updateWave();
+		void updateWaveEnding();
+		//void updateAuto();
+
+	protected:
+		uint32_t m_waveDeforestIndex{};
+		float m_waveDeforestTimer{};
+	public:
 
 		void updateTurnLocal();
-		void updateTurnAI();
+		//void updateTurnAI();
 
 		//void updateUnitAttack();
 
@@ -168,7 +225,7 @@ namespace e2
 			return m_timeDelta;
 		}
 
-		void discoverEmpire(EmpireId empireId);
+		//void discoverEmpire(EmpireId empireId);
 
 
 		inline uint64_t turn() const
@@ -206,7 +263,7 @@ namespace e2
 		uint64_t m_turn{};
 
 		// which empire has current turn
-		EmpireId m_empireTurn{};
+		//EmpireId m_empireTurn{};
 
 		TurnState m_turnState{ TurnState::Unlocked };
 		TurnState m_moveTurnStateFallback{ TurnState::Unlocked };
@@ -243,7 +300,7 @@ namespace e2
 		EmpireId spawnEmpire();
 		void destroyEmpire(EmpireId empireId);
 
-		void spawnAIEmpire();
+		//void spawnAIEmpire();
 
 		e2::GameEmpire* localEmpire()
 		{
@@ -264,27 +321,28 @@ namespace e2
 		{
 			return m_nomadEmpireId;
 		}
-		
+
 
 		e2::GameEmpire* empireById(EmpireId id);
 
 		void resolveLocalEntity();
 		void nextLocalEntity();
 
+		e2::Name getCityName();
+
 	protected:
 		e2::EmpireId m_localEmpireId{};
 		e2::GameEmpire* m_localEmpire{};
 
 		std::unordered_set<e2::GameEntity*> m_localTurnEntities;
-		//std::unordered_set<e2::GameEntity*> m_localAutoEntities;
 
 		e2::EmpireId m_nomadEmpireId{};
 		e2::GameEmpire* m_nomadEmpire{};
 		e2::StackVector<e2::GameEmpire*, e2::maxNumEmpires> m_empires;
-		std::unordered_set<e2::GameEmpire*> m_aiEmpires;
 
-		std::unordered_set<e2::GameEmpire*> m_discoveredEmpires;
-		std::unordered_set<e2::GameEmpire*> m_undiscoveredEmpires;
+		std::vector<e2::Name> m_cityNames;
+
+		std::unordered_map<e2::GameEntity*, e2::City*> m_entityToCity;
 
 	public:
 
@@ -312,7 +370,7 @@ namespace e2
 		e2::GameEntity* getSelectedEntity();
 		void selectEntity(e2::GameEntity* entity);
 		void deselectEntity();
-		
+
 		void moveSelectedEntityTo(glm::ivec2 const& to);
 		void updateUnitMove();
 
@@ -320,10 +378,15 @@ namespace e2
 		void endCustomAction();
 		void updateCustomAction();
 
+		bool attemptBeginWave(e2::GameEntity* hiveEntity, std::string const& prefabPath);
+
+
+	public:
+
 		void beginTargeting();
 		void endTargeting();
 		void updateTarget();
-		
+
 		e2::GameEntity* spawnEntity(e2::Name entityId, glm::ivec2 const& location, EmpireId empire);
 		void destroyEntity(e2::GameEntity* entity);
 		void queueDestroyEntity(e2::GameEntity* entity);
@@ -344,7 +407,15 @@ namespace e2
 
 		bool entityRelevantForPlay(e2::GameEntity* entity);
 
+		e2::Wave* wave();
+
+
+		virtual void onMobSpawned(e2::Mob* mob);
+		virtual void onMobDestroyed(e2::Mob* mob);
+
 	protected:
+
+		e2::Wave* m_wave{};
 
 		e2::PathFindingAS* m_unitAS{};
 		std::vector<e2::Hex> m_unitHoverPath;
@@ -355,6 +426,7 @@ namespace e2
 
 		GameEntity* m_selectedEntity{};
 		std::unordered_set<GameEntity*> m_entities;
+		std::unordered_set<GameEntity*> m_waveEntities;
 		std::array<EntityLayer, size_t(EntityLayerIndex::Count)> m_entityLayers;
 		std::unordered_set<GameEntity*> m_entitiesPendingDestroy;
 		std::unordered_set<GameEntity*> m_dyingEntities;
@@ -405,16 +477,21 @@ namespace e2
 		chaiscript::ChaiScript* m_scriptEngine{};
 		chaiscript::ModulePtr m_scriptModule;
 
-		float m_sunStrength{ 6.75f };
-		float m_iblStrength{ 0.3f };
-		float m_sunAngleA{ 33.0f };
-		float m_sunAngleB{ 15.75f };
-
+		float m_sunStrength{ 10.0f };
+		float m_iblStrength{ 5.00f };
+		float m_sunAngleA{ -75.0f };
+		float m_sunAngleB{ 21.75f };
+		float m_exposure{ 1.0f };
+		float m_whitepoint{5.0f};
 
 	public:
 		e2::Sprite* getUiSprite(e2::Name name);
+		e2::Sprite* getIconSprite(e2::Name name);
+		e2::Sprite* getUnitSprite(e2::Name name);
 	protected:
 		e2::SpritesheetPtr m_uiIconsSheet;
+		e2::SpritesheetPtr m_uiIconsSheet2;
+		e2::SpritesheetPtr m_uiUnitsSheet;
 	};
 
 

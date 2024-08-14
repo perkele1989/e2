@@ -12,10 +12,10 @@ out vec4 fragmentPosition;
 void main()
 {
 	vec4 worldPos = mesh.modelMatrix * vertexPosition;
-	float f = sampleFogHeight(worldPos.xz, renderer.time.x);
+	float f = 1.0 - sampleFogHeight(worldPos.xz, renderer.time.x);
 
 	vec4 vertexPos = vertexPosition;
-	vertexPos.y -= f * 0.0;
+	//vertexPos.y -= (f * 1.0) - 1.0;
 
 	fragmentPosition = mesh.modelMatrix * vertexPos;
 

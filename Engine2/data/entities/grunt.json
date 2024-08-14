@@ -9,9 +9,9 @@
             "passableFlags": ["land"],
             "attackFlags": ["land"],
             "moveType": "smooth",
-            "sightRange": 4,
+            "sightRange": 10,
             "showMovePoints": true,
-            "movePoints": 3,
+            "movePoints": 7,
             "showAttackPoints": true,
             "attackPoints": 1,
             "showBuildPoints": false,
@@ -68,10 +68,10 @@
             ],
             "buildTurns": 4,
             "upkeep": {
-                "gold": 0.25
+                "gold": 0.0
             },
             "cost": {
-                "gold": 2.0
+                "gold": 0.0
             }
         }
     ]

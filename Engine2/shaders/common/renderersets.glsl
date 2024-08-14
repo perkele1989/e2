@@ -14,6 +14,7 @@ layout(push_constant) uniform ConstantData
 {
     mat4 normalMatrix;
     uvec2 resolution;
+	uvec2 gridParams;
 };
 
 // Begin Set0: Renderer
@@ -160,20 +161,30 @@ float getSunDelta(vec3 fragPos, vec3 fragNormal)
     return ndotl * shadow;
 }
 
-vec3 getSunColor(vec3 fragPos, vec3 fragNormal, vec3 fragAlbedo)
+vec3 getSunColor(vec3 fragPos, vec3 fragNormal, vec3 fragAlbedo, float roughness, float metalness, vec3 viewVector)
 {
+
+
+	vec3 F0 = vec3(0.04); 
+    vec3 specularCoeff = mix(F0, fragAlbedo, vec3(metalness)); 
+	//specularCoeff = vec3(1.0);
+
     float shadow = calculateSunShadow(vec4(fragPos, 1.0));
-    vec3 ndotl = vec3(clamp(dot(fragNormal, -renderer.sun1.xyz), 0.0, 1.0));
-    return ndotl * renderer.sun2.xyz * renderer.sun2.w * fragAlbedo * shadow;
+    vec3 diffuse = vec3(clamp(dot(fragNormal, -renderer.sun1.xyz), 0.0, 1.0))*fragAlbedo * (1.0 - metalness);
+	vec3 specular = cookTorranceSpecular(-renderer.sun1.xyz, -viewVector, fragNormal, roughness, specularCoeff );
+    return   (diffuse + specular) * renderer.sun2.xyz * renderer.sun2.w * shadow;
 }
+
+//vec3 cookTorranceSpecular(vec3 lightDirection, vec3 viewDirection, vec3 surfaceNormal, float roughness, vec3 F0)
 
 vec3 getIrradiance(vec3 fragNormal)
 {
-	return texture(sampler2D(irradianceCube, equirectSampler), equirectangularUv(fragNormal)).rgb * renderer.ibl1.x;
+	return textureLod(sampler2D(irradianceCube, equirectSampler), equirectangularUv(fragNormal), 0.0).rgb * renderer.ibl1.x;
 }
 
 vec3 getIblColor(vec3 fragPosition, vec3 fragAlbedo, vec3 fragNormal,float fragRoughness, float fragMetalness, vec3 viewVector)
 {
+	fragRoughness = pow(fragRoughness, 1.0/2.2);
     // 0.2
     vec3 reflectionVector = reflect(viewVector, fragNormal);
 	 
@@ -181,14 +192,19 @@ vec3 getIblColor(vec3 fragPosition, vec3 fragAlbedo, vec3 fragNormal,float fragR
     vec3 specularCoeff = mix(F0, fragAlbedo, vec3(fragMetalness)); 
 	vec3 diffuseCoeff = fragAlbedo * (1.0 - F0) * (1.0 - fragMetalness);
 
-	vec3 irradiance = texture(sampler2D(irradianceCube, equirectSampler), equirectangularUv(fragNormal)).rgb;
+	vec2 irrUv = equirectangularUv(fragNormal);
+	//vec3 irradiance = pow(textureLod(sampler2D(irradianceCube, equirectSampler), irrUv, 0.0).rgb, vec3(1.0/2.2));
+	//vec3 radiance = pow(textureLod(sampler2D(radianceCube, equirectSampler), equirectangularUv(reflectionVector), fragRoughness * 6.0).rgb, vec3(1.0/2.2));
+	vec3 irradiance = textureLod(sampler2D(irradianceCube, equirectSampler), irrUv, 0.0).rgb;
 	vec3 radiance = textureLod(sampler2D(radianceCube, equirectSampler), equirectangularUv(reflectionVector), fragRoughness * 6.0).rgb;
 	vec2 brdf = textureLod(sampler2D(integratedBrdf, clampSampler), vec2(clamp(dot(fragNormal, -viewVector), 0.0, 1.0), 1.0 - fragRoughness), 0.0).xy;
-		
+	//vec2 brdf = pow(textureLod(sampler2D(integratedBrdf, clampSampler), vec2(clamp(dot(fragNormal, -viewVector), 0.0, 1.0), 1.0 - fragRoughness), 0.0).xy, vec2(1.0/2.2));
+	
+
+
     vec3 returner = vec3(0.0, 0.0, 0.0);
 	returner += irradiance * diffuseCoeff;
-    returner += radiance * specularCoeff * (brdf.x + brdf.y);	
-
+    returner += radiance * specularCoeff*  (brdf.x + brdf.y);
     returner *= renderer.ibl1.x;
 
     return returner;
@@ -197,17 +213,17 @@ vec3 getIblColor(vec3 fragPosition, vec3 fragAlbedo, vec3 fragNormal,float fragR
 vec3 getRimColor(vec3 fragNormal, vec3 viewVector, vec3 rimLight)
 {
     vec3 flatViewVector = viewVector;
-	flatViewVector.y = 0.0;
+	flatViewVector.y *= 0.05;
 	flatViewVector = normalize(flatViewVector);
-	float rimCoeff = max(0.0, pow(dot(flatViewVector, fragNormal), 1.0 / 16.0));
+	float rimCoeff = pow(clamp(dot(flatViewVector, fragNormal), 0.0, 1.0), 1.0 /1.0);
     return rimLight * rimCoeff; 
 }
 
 float getCloudShadows(vec3 fragPosition)
 {
-	float shadowSimplex = (simplex((fragPosition.xz * 0.1) - vec2(0.4, 0.6) * renderer.time.x * 0.05 ) * 0.5 + 0.5);
-	float shadowCoeff = pow(shadowSimplex, 0.62);
+	float shadowSimplex = (simplex((fragPosition.xz * 0.051) - vec2(0.4, 0.6) * renderer.time.x * 0.05 ) * 0.5 + 0.5);
+	float shadowCoeff = pow(shadowSimplex, 0.72);
 	shadowCoeff = smoothstep(0.4, 0.7, shadowCoeff) * 0.5 + 0.5;
-    return shadowCoeff;
+    return 0.25 + shadowCoeff*0.75;
 }
 #endif

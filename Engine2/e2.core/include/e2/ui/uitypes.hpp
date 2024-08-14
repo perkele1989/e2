@@ -26,6 +26,13 @@ namespace e2
 			a = c.w;
 		}
 
+		e2::UIColor withOpacity(float newOpacity) const
+		{
+			e2::UIColor newColor = *this;
+			newColor.a = uint8_t(newOpacity * 255.f);
+			return newColor;
+		}
+
 		UIColor(uint32_t inHex);
 
 		UIColor(uint8_t inR, uint8_t inG, uint8_t inB, uint8_t inA)
@@ -36,7 +43,7 @@ namespace e2
 			a = inA;
 		}
 
-		glm::vec4 toVec4()
+		glm::vec4 toVec4() const
 		{
 			glm::vec4 returner;
 			returner.x = glm::pow(float(r) / 255.f, 2.2f);

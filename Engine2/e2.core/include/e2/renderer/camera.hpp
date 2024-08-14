@@ -17,7 +17,7 @@ namespace e2
 		glm::dmat4 calculateViewMatrix() const;
 		glm::dmat4 calculateProjectionMatrix(glm::dvec2 const& resolution) const;
 		glm::dvec3 findWorldspaceViewRayFromNdc(glm::dvec2 const& resolution, glm::dvec2 const& xyPlane) const;
-		glm::dvec2 unprojectWorldPlane(glm::dvec2 const& resolution, glm::dvec2 const& xyCoords) const;
+		glm::dvec2 unprojectWorldPlane(glm::dvec2 const& resolution, glm::dvec2 const& xyCoords, double limitDistance) const;
 	};
 
 }

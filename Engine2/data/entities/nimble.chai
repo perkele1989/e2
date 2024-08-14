@@ -1,0 +1,70 @@
+var nimbleScript = EntityScript();
+
+class NimbleState 
+{
+    var targetMob;
+    var baseMesh;
+    var timeSinceFire;
+    def NimbleState(entity)
+    {
+        this.targetMob = MobRef();
+        this.timeSinceFire = 0.0f;
+    }
+
+}
+
+nimbleScript.setCreateState(fun(entity){
+    return NimbleState(entity);
+});
+
+
+nimbleScript.setOnSpawned(fun(entity){
+    entity.scriptState.baseMesh = entity.createMesh("base");
+    entity.scriptState.baseMesh.setScale(0.5);
+    entity.setPose("idle");
+});
+
+nimbleScript.setOnWaveUpdate(fun(entity, dt){
+    if(entity.scriptState.targetMob.isNull())
+    {
+        var newTarget = MobRef(entity.closestMobWithinRange(100.0));
+        if(newTarget.isNull())
+        {
+            return;
+        }
+
+        entity.scriptState.targetMob = newTarget;
+    }
+
+    entity.turnTowardsPlanar(entity.scriptState.targetMob.value.meshPosition);
+
+    entity.scriptState.timeSinceFire = entity.scriptState.timeSinceFire + dt;
+    if(entity.scriptState.timeSinceFire > 2.0f)
+    {
+        entity.scriptState.timeSinceFire = 0.0f;
+        entity.playAction("fire");
+    }
+
+});
+
+nimbleScript.setOnMobSpawned(fun(entity, mob){
+    
+});
+
+nimbleScript.setOnMobDestroyed(fun(entity, mob){
+    if(entity.scriptState.targetMob.value == mob)
+    {
+        entity.scriptState.targetMob.clear();
+    }
+});
+
+
+nimbleScript.setOnWaveStart(fun(entity){
+    entity.scriptState.targetMob.clear();
+});
+
+nimbleScript.setOnWaveEnd(fun(entity){
+    entity.scriptState.targetMob.clear();
+});
+
+nimbleScript;

@@ -265,6 +265,7 @@ namespace e2
 
 		/** Draws a quad */
 		void drawQuad(glm::vec2 position, glm::vec2 size, e2::UIColor color, float zoffset = 0.0f);
+		void drawFrame(glm::vec2 position, glm::vec2 size, e2::UIColor color, float thickness, float zoffset = 0.0f);
 
 		void drawTexturedQuad(glm::vec2 position, glm::vec2 size, e2::UIColor color, e2::ITexture* texture, glm::vec2 uvOffset = { 0.0f, 0.0f }, glm::vec2 uvScale = {1.0f, 1.0f}, e2::UITexturedQuadType type = UITexturedQuadType::Default, float zoffset = 0.0f);
 
@@ -273,6 +274,7 @@ namespace e2
 
 		/** Draws a fancy quad with corner radius and thin bevel */
 		void drawQuadFancy(glm::vec2 position, glm::vec2 size, e2::UIColor color, float cornerRadius, float bevelStrength, bool windowBorder = false);
+		void drawGamePanel(glm::vec2 position, glm::vec2 size, bool highlighted, float alpha);
 
 		/** Draws the shadow for a fancy quad */
 		void drawQuadShadow(glm::vec2 position, glm::vec2 size, float cornerRadius, float shadowStrength, float shadowSize);

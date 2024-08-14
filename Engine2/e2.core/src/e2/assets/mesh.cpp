@@ -17,45 +17,6 @@
 
 
 
-namespace
-{
-	glm::mat4 recompose(glm::vec3 const& translation, glm::vec3 const& scale, glm::vec3 const& skew, glm::vec4 const& perspective, glm::quat const& rotation)
-	{
-		glm::mat4 m = glm::mat4(1.f);
-
-		m[0][3] = perspective.x;
-		m[1][3] = perspective.y;
-		m[2][3] = perspective.z;
-		m[3][3] = perspective.w;
-
-		m *= glm::translate(translation);
-		m *= glm::mat4_cast(rotation);
-
-		if (skew.x) {
-			glm::mat4 tmp{ 1.f };
-			tmp[2][1] = skew.x;
-			m *= tmp;
-		}
-
-		if (skew.y) {
-			glm::mat4 tmp{ 1.f };
-			tmp[2][0] = skew.y;
-			m *= tmp;
-		}
-
-		if (skew.z) {
-			glm::mat4 tmp{ 1.f };
-			tmp[1][0] = skew.z;
-			m *= tmp;
-		}
-
-		m *= glm::scale(scale);
-
-		return m;
-	}
-}
-
-
 e2::Mesh::Mesh()
 {
 }
@@ -436,6 +397,7 @@ e2::AnimationBinding* e2::Skeleton::getOrCreateBinding(e2::Ptr<Animation> anim)
 
 		newBinding->rotationTracks.resize(numBones(), {});
 		newBinding->translationTracks.resize(numBones(), {});
+		newBinding->scaleTracks.resize(numBones(), {});
 
 		for (uint32_t boneId = 0; boneId < numBones(); boneId++)
 		{
@@ -446,6 +408,9 @@ e2::AnimationBinding* e2::Skeleton::getOrCreateBinding(e2::Ptr<Animation> anim)
 
 			e2::Name trackName_rot = std::format("{}.rotation", bone->name.cstring());
 			newBinding->rotationTracks[boneId] = anim->trackByName(trackName_rot, e2::AnimationType::Quat);
+
+			e2::Name trackName_sca = std::format("{}.scale", bone->name.cstring());
+			newBinding->scaleTracks[boneId] = anim->trackByName(trackName_sca, e2::AnimationType::Vec3);
 		}
 
 		m_animationBindings[anim->uuid] = newBinding;
@@ -560,7 +525,7 @@ std::pair<uint32_t, double> e2::AnimationTrack::getFrameDelta(double time, doubl
 	return { frameIndex, frameDelta };
 }
 
-float e2::AnimationTrack::getFloat(double time, double frameRate)
+float e2::AnimationTrack::getFloat(double time, double frameRate, bool wrap)
 {
 	if (type != AnimationType::Float)
 		LogWarning("using non-float animtrack as float");
@@ -569,14 +534,14 @@ float e2::AnimationTrack::getFloat(double time, double frameRate)
 
 	uint32_t nextFrame = frameIndex + 1;
 	if (nextFrame >= frames.size())
-		nextFrame = 0;
+		nextFrame = wrap ? 0 : frameIndex;
 
 	float a = frames[frameIndex].asFloat();
 	float b = frames[nextFrame].asFloat();
 	return glm::mix(a, b, (float)frameDelta);
 }
 
-glm::vec2 e2::AnimationTrack::getVec2(double time, double frameRate)
+glm::vec2 e2::AnimationTrack::getVec2(double time, double frameRate, bool wrap)
 {
 	if (type != AnimationType::Vec2)
 		LogWarning("using non-vec2 animtrack as vec2");
@@ -585,14 +550,14 @@ glm::vec2 e2::AnimationTrack::getVec2(double time, double frameRate)
 
 	uint32_t nextFrame = frameIndex + 1;
 	if (nextFrame >= frames.size())
-		nextFrame = 0;
+		nextFrame = wrap ? 0 : frameIndex;
 
 	glm::vec2 a = frames[frameIndex].asVec2();
 	glm::vec2 b = frames[nextFrame].asVec2();
 	return glm::mix(a, b, (float)frameDelta);
 }
 
-glm::vec3 e2::AnimationTrack::getVec3(double time, double frameRate)
+glm::vec3 e2::AnimationTrack::getVec3(double time, double frameRate, bool wrap)
 {
 	if (type != AnimationType::Vec3)
 		LogWarning("using non-vec3 animtrack as vec3");
@@ -601,14 +566,14 @@ glm::vec3 e2::AnimationTrack::getVec3(double time, double frameRate)
 
 	uint32_t nextFrame = frameIndex + 1;
 	if (nextFrame >= frames.size())
-		nextFrame = 0;
+		nextFrame = wrap ? 0 : frameIndex;
 
 	glm::vec3 a = frames[frameIndex].asVec3();
 	glm::vec3 b = frames[nextFrame].asVec3();
 	return glm::mix(a, b, (float)frameDelta);
 }
 
-glm::quat e2::AnimationTrack::getQuat(double time, double frameRate)
+glm::quat e2::AnimationTrack::getQuat(double time, double frameRate, bool wrap)
 {
 	if (type != AnimationType::Quat)
 		LogWarning("using non-quat animtrack as quat");
@@ -617,7 +582,7 @@ glm::quat e2::AnimationTrack::getQuat(double time, double frameRate)
 
 	uint32_t nextFrame = frameIndex + 1;
 	if (nextFrame >= frames.size())
-		nextFrame = 0;
+		nextFrame = wrap ? 0 : frameIndex;
 
 	glm::quat a = frames[frameIndex].asQuat();
 	glm::quat b = frames[nextFrame].asQuat();
@@ -764,7 +729,7 @@ void e2::Pose::applyBlend(Pose* a, Pose* b, double alpha)
 		perspectiveC = glm::mix(perspectiveA, perspectiveB, alpha);
 		rotationC = glm::slerp(rotationA, rotationB, (float)alpha);
 
-		poseBone->localTransform = recompose(translationC, scaleC, skewC, perspectiveC, rotationC);
+		poseBone->localTransform = e2::recompose(translationC, scaleC, skewC, perspectiveC, rotationC);
 
 
 		//poseBone->localTransform = glm::interpolate(a->poseBoneById(boneId)->localTransform, b->poseBoneById(boneId)->localTransform, alpha);
@@ -872,10 +837,11 @@ void e2::AnimationPose::updateAnimation(double timeDelta, bool onlyTickTime)
 
 		e2::AnimationTrack* posTrack = m_binding->translationTracks[boneId];
 		e2::AnimationTrack* rotTrack = m_binding->rotationTracks[boneId];
+		e2::AnimationTrack* scaTrack = m_binding->scaleTracks[boneId];
 
 		//poseBone->localTransform = poseBone->assetBone->localTransform;
 
-		if (!posTrack && !rotTrack)
+		if (!posTrack && !rotTrack && !scaTrack)
 		{
 			poseBone->localTransform = poseBone->assetBone->localTransform;
 			continue;
@@ -887,10 +853,13 @@ void e2::AnimationPose::updateAnimation(double timeDelta, bool onlyTickTime)
 		glm::decompose(poseBone->assetBone->localTransform, scale, rotation, translation, skew, perspective);
 
 		if (posTrack)
-			translation = posTrack->getVec3(m_time, m_animation->frameRate());
+			translation = posTrack->getVec3(m_time, m_animation->frameRate(), m_loop);
 
 		if (rotTrack)
-			rotation = rotTrack->getQuat(m_time, m_animation->frameRate());
+			rotation = rotTrack->getQuat(m_time, m_animation->frameRate(), m_loop);
+
+		if (scaTrack)
+			scale = scaTrack->getVec3(m_time, m_animation->frameRate(), m_loop);
 
 		poseBone->localTransform = recompose(translation, scale, skew, perspective, rotation);
 	}

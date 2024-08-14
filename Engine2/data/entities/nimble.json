@@ -1,0 +1,43 @@
+
+{
+    "entities":[
+        {
+            "id": "nimble",
+            "typeName": "e2::GameEntity",
+            "displayName": "Nimble",
+            "badgeId": "units.nimble",
+            "layerIndex": "unit",
+            "waveRelevant": true,
+            "passableFlags": ["none"],
+            "moveType": "static",
+            "sightRange": 10,
+            "defensiveStrength": 100.0,
+            "script": "data/entities/nimble.chai",
+            "mesh": "assets/towers/nimble/SM_Nimble_LOD0.e2a",
+            "skeleton": "assets/towers/nimble/SK_Nimble_LOD0.e2a",
+            "meshScale": [0.5, 0.5, 0.5],
+            "extraAssets": [
+                {
+                    "name": "base",
+                    "path": "assets/towers/SM_MazeWall_LOD0.e2a"
+                }
+            ],
+            "poses": [
+                {
+                    "name": "idle",
+                    "asset": "assets/towers/nimble/SK_NimbleIdle.e2a",
+                    "blendTime": 0.0
+                }
+            ],
+            "actions": [
+                {
+                    "name": "fire",
+                    "asset": "assets/towers/nimble/SK_NimbleFire.e2a",
+                    "blendInTime": 0.0,
+                    "blendOutTime": 0.25
+                }
+            ]
+        }
+    ]
+
+}

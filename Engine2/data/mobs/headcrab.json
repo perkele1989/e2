@@ -1,0 +1,27 @@
+
+{
+    "mobs":[
+        {
+            "id": "headcrab",
+            "displayName": "Headcrab",
+            "layerIndex": "unit",
+            "passableFlags": ["land"],
+            "moveType": "smooth",
+            "maxHealth": 100.0,
+            "attackStrength": 5.0,
+            "defensiveStrength": 50.0,
+            "moveSpeed": 0.5,
+            "meshScale": [0.25, 0.25, 0.25],
+            "script": "data/mobs/headcrab.chai",
+            "mesh": "assets/mobs/SM_Headcrab.e2a",
+            "skeleton": "assets/mobs/SK_Headcrab.e2a",
+            "runPoseAsset": "assets/mobs/A_Headcrab_Walk.e2a",
+            "diePoseAsset": "assets/mobs/A_Headcrab_Die.e2a",
+            "reward": {
+                "gold": 2.0,
+                "steel": 1.0
+            }
+        }
+    ]
+
+}

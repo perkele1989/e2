@@ -83,7 +83,7 @@ namespace e2
 	 * Utility for doublebuffered parameters (perfect for source data for descriptor sets)
 	 */
 	template<typename DataType>
-	class E2_API DirtyParameter
+	class DirtyParameter
 	{
 	public:
 
@@ -145,6 +145,8 @@ namespace e2
 	{
 		return lhs.data < rhs.data;
 	}
+
+	E2_API glm::mat4 recompose(glm::vec3 const& translation, glm::vec3 const& scale, glm::vec3 const& skew, glm::vec4 const& perspective, glm::quat const& rotation);
 
 	E2_API glm::vec2 rotate2d(glm::vec2 const& vec, float angleDegrees);
 

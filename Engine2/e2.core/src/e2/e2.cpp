@@ -76,8 +76,8 @@ void e2::Engine::run(e2::Application* app)
 	double deltaTime{};
 	m_running = true;
 
-	//constexpr double targetMsPerFrame = 6.944444444444444; // 144 fps
-	constexpr double targetMsPerFrame = 3.33333333333; // 300 fps
+	constexpr double targetMsPerFrame = 6.944444444444444; // 144 fps
+	//constexpr double targetMsPerFrame = 3.33333333333; // 300 fps
 
 
 	m_application->initialize();

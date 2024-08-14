@@ -60,11 +60,14 @@ namespace e2
 
 		virtual bool supportsShadows();
 
+		void active(bool newValue);
+		bool active();
+
 	protected:
 		e2::Engine* m_engine{};
 
 		ShaderModelSpecification m_specification{};
-
+		bool m_active{ true };
 
 
 	public:

@@ -23,13 +23,13 @@ bool e2::AssetManager::prescribeALJ(e2::ALJDescription& target, std::string cons
 	e2::AssetEntry* entry = m_database.entryFromPath(assetPath);
 	if (!entry)
 	{
-		LogError("Failed to prescribe asset, asset entry does not exist");
+		LogError("Failed to prescribe asset, asset entry does not exist: {}", assetPath);
 		return false;
 	}
 
 	if (!entry->uuid.valid())
 	{
-		LogError("Failed to prescribe asset, asset UUID invalid (broken asset database) ");
+		LogError("Failed to prescribe asset, asset UUID invalid (broken asset database): {} ", assetPath);
 		return false;
 	}
 
@@ -296,7 +296,7 @@ e2::AssetPtr e2::AssetManager::get(std::string const& assetPath)
 	e2::AssetEntry* entry = m_database.entryFromPath(assetPath);
 	if (!entry)
 	{
-		LogError("Asset does not exist");
+		LogError("Asset does not exist: {}", assetPath);
 		return nullptr;
 	}
 

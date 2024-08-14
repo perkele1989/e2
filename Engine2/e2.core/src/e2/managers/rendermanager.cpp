@@ -152,6 +152,26 @@ e2::IShader* e2::RenderManager::fullscreenTriangleShader()
 	return m_fullscreenTriangleShader;
 }
 
+e2::IPipeline* e2::RenderManager::tonemapPipeline()
+{
+	return m_tonemapPipeline;
+}
+
+e2::IPipelineLayout* e2::RenderManager::tonemapLayout()
+{
+	return m_tonemapLayout;
+}
+
+e2::IDescriptorSetLayout* e2::RenderManager::tonemapSetLayout()
+{
+	return m_tonemapSetLayout;
+}
+
+e2::IDescriptorPool* e2::RenderManager::tonemapPool()
+{
+	return m_tonemapPool;
+}
+
 void e2::RenderManager::invalidatePipelines()
 {
 	// Invalidate all shader models, this effectively discards all current pipelines
@@ -329,13 +349,51 @@ void e2::RenderManager::initialize()
 	shaderInfo.source = srcData.c_str();
 	m_fullscreenTriangleShader = m_renderContext->createShader(shaderInfo);
 
+
+	srcData.clear();
+	e2::readFileWithIncludes("shaders/tonemap.fragment.glsl", srcData);
+	shaderInfo.stage = e2::ShaderStage::Fragment;
+	shaderInfo.source = srcData.c_str();
+	m_tonemapShader = m_renderContext->createShader(shaderInfo);
+
+
+
+	e2::DescriptorSetLayoutCreateInfo setLayoutInf{};
+	setLayoutInf.bindings.push({ e2::DescriptorBindingType::Texture, 1, false, true });
+	setLayoutInf.bindings.push({ e2::DescriptorBindingType::Sampler, 1, false, true });
+	m_tonemapSetLayout = renderContext()->createDescriptorSetLayout(setLayoutInf);
+
+	e2::PipelineLayoutCreateInfo layInf{};
+	layInf.pushConstantSize = sizeof(e2::TonemapConstants);
+	layInf.sets.push(m_tonemapSetLayout);
+	m_tonemapLayout = renderContext()->createPipelineLayout(layInf);
+
+
+	e2::PipelineCreateInfo pipeInf{};
+	pipeInf.shaders.push(m_fullscreenTriangleShader);
+	pipeInf.shaders.push(m_tonemapShader);
+	pipeInf.colorFormats = { e2::TextureFormat::RGBA8 };
+	pipeInf.layout = m_tonemapLayout;
+	m_tonemapPipeline = renderContext()->createPipeline(pipeInf);
+
+
+	e2::DescriptorPoolCreateInfo poolInf{};
+	poolInf.maxSets = 2 * e2::maxNumRenderers * e2::maxNumSessions;
+	poolInf.numTextures = 2 * e2::maxNumRenderers * e2::maxNumSessions;
+	poolInf.numSamplers = 2 * e2::maxNumRenderers * e2::maxNumSessions;
+	poolInf.allowUpdateAfterBind = true;
+	m_tonemapPool = renderContext()->mainThreadContext()->createDescriptorPool(poolInf);
 }
 
 void e2::RenderManager::shutdown()
 {
 	m_renderContext->waitIdle();
-
+	e2::destroy(m_tonemapPool);
+	e2::destroy(m_tonemapPipeline);
+	e2::destroy(m_tonemapSetLayout);
+	e2::destroy(m_tonemapLayout);
 	e2::destroy(m_fullscreenTriangleShader);
+	e2::destroy(m_tonemapShader);
 	e2::destroy(m_defaultMaterial);
 
 	e2::destroy(m_shadowSampler);

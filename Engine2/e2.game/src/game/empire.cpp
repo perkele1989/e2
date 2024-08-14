@@ -27,11 +27,13 @@ e2::Game* e2::GameEmpire::game()
 void e2::GameEmpire::write(Buffer& destination) const
 {
 	destination << resources;
+
 }
 
 bool e2::GameEmpire::read(Buffer& source)
 {
 	source >> resources;
+
 
 	return true;
 }

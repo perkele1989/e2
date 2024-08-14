@@ -275,7 +275,7 @@ e2::IPipeline* e2::LightweightModel::getOrCreatePipeline(e2::MeshProxy* proxy, u
 		if(shadows)
 			pipelineInfo.colorFormats = { };
 		else 
-			pipelineInfo.colorFormats = { e2::TextureFormat::RGBA8, e2::TextureFormat::RGBA32 };
+			pipelineInfo.colorFormats = { e2::TextureFormat::RGBA32, e2::TextureFormat::RGBA32 };
 
 		pipelineInfo.depthFormat = { e2::TextureFormat::D32 };
 		newEntry.pipeline = renderContext()->createPipeline(pipelineInfo);

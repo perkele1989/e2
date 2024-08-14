@@ -38,15 +38,29 @@ out vec4 fragmentColor;
 
 void main()
 {
+
+	#if defined(Renderer_Shadow)
+		vec4 fragmentColor;
+	#endif
+
+	vec4 worldPosition = mesh.modelMatrix * vertexPosition;
+
+#if defined(Vertex_Color) 
+	fragmentColor = vertexColor;
+	//float tundraCoeff = fragmentColor.b;
+	//worldPosition.y -= tundraCoeff * 0.05f;
+#endif
+
+
 #if defined(Renderer_Shadow)
-	gl_Position = shadowViewProjection * mesh.modelMatrix * vertexPosition;
+	gl_Position = shadowViewProjection * worldPosition;
 #else 
-	gl_Position = renderer.projectionMatrix * renderer.viewMatrix * mesh.modelMatrix * vertexPosition;	
+	gl_Position = renderer.projectionMatrix * renderer.viewMatrix * worldPosition;	
 #endif
 
 #if !defined(Renderer_Shadow)
-	fragmentPosition = mesh.modelMatrix * vertexPosition;
-
+	fragmentPosition = worldPosition;
+	
 #if defined(Vertex_Normals)
 
 	fragmentNormal = normalize(mesh.modelMatrix * normalize(vertexNormal)).xyz;
@@ -63,8 +77,6 @@ void main()
 	fragmentUv23 = vertexUv23;
 #endif
 
-#if defined(Vertex_Color) 
-	fragmentColor = vertexColor;
-#endif
+
 #endif
 }
