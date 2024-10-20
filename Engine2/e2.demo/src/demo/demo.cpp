@@ -105,8 +105,8 @@ void e2::Demo::setupStages() {
 
 	stages.resize((uint64_t)DemoStageIndex::Count);
 	stages[(uint64_t)DemoStageIndex::FinalRender].id = "FinalRender";
-	stages[(uint64_t)DemoStageIndex::FinalRender].layerName = "Final Result";
-	stages[(uint64_t)DemoStageIndex::FinalRender].description = "The final water shader, with all bells and whistles.";
+	stages[(uint64_t)DemoStageIndex::FinalRender].layerName = "";
+	stages[(uint64_t)DemoStageIndex::FinalRender].description = "";
 	stages[(uint64_t)DemoStageIndex::FinalRender].shaderIndex = 0;
 	stages[(uint64_t)DemoStageIndex::FinalRender].shaderSubIndex = 0;
 	
@@ -723,7 +723,7 @@ void e2::Demo::update(double seconds)
 
 	view.fov = viewFov;
 	view.clipPlane = { 0.1f, 1000.0f };
-	view.origin = glm::vec3(0.0f, isNormalView  || true? -waterHeight_Curr : 0.0f, 0.0f) + (currOrientation * glm::vec3(e2::worldForward()) * -viewDistance);
+	view.origin = glm::vec3(0.0f, isNormalView  && false? -waterHeight_Curr : 0.0f, 0.0f) + (currOrientation * glm::vec3(e2::worldForward()) * -viewDistance);
 	view.orientation = currOrientation;
 	renderer->setView(view);
 
@@ -766,6 +766,7 @@ void e2::Demo::update(double seconds)
 	d.water.w = waterScale;
 	d.water2.x = waterStage;
 	d.water2.y = waterStage2;
+	d.water2.z = drawGrid + (drawGrid && animateGrid);
 	d.albedo.x = refractionStrength;
 	waterProxy->uniformData.set(d);
 
@@ -792,7 +793,7 @@ void e2::Demo::update(double seconds)
 		return offset;
 	};
 
-	if (isNormalView)
+	if (isNormalView && renderExtra)
 	{
 		glm::vec2 c = worldToPixels({ 0.0f, -waterHeight_Curr, 0.0f });
 		float cW = ui->calculateTextWidth(FontFace::Monospace, 12, "**O**");
@@ -827,13 +828,15 @@ void e2::Demo::update(double seconds)
 	glm::vec2 layerNamePosition;
 	layerNamePosition.x = (winSize.x / 2.0f) - (layerNameWidth / 2.0f);
 	layerNamePosition.y = 80.0f;
-	ui->drawRasterText(FontFace::Serif, 24, style.windowFgColor, layerNamePosition, stage.layerName);
+	if(renderExtra)
+		ui->drawRasterText(FontFace::Serif, 24, style.windowFgColor, layerNamePosition, stage.layerName);
 
 	float layerDescriptionWidth = ui->calculateTextWidth(FontFace::Serif, 12, stage.description);
 	glm::vec2 layerDescriptionPosition;
 	layerDescriptionPosition.x = (winSize.x / 2.0f) - (layerDescriptionWidth / 2.0f);
 	layerDescriptionPosition.y = 80.0f + 36.0f;
-	ui->drawRasterText(FontFace::Serif, 14, style.windowFgColor, layerDescriptionPosition, stage.description);
+	if(renderExtra)
+		ui->drawRasterText(FontFace::Serif, 14, style.windowFgColor, layerDescriptionPosition, stage.description);
 
 
 
@@ -864,7 +867,7 @@ void e2::Demo::update(double seconds)
 		}
 	}
 	else*/
-	if(stage.codeSnippets.size() > 0)
+	if(renderExtra && stage.codeSnippets.size() > 0)
 	{
 		float maxX = 0.0f;
 		for (auto str : stage.codeSnippets)
@@ -930,7 +933,8 @@ e2::ToolWindow::ToolWindow(e2::Demo* demo)
 
 e2::ToolWindow::~ToolWindow()
 {
-
+	glm::vec2 a;
+	glm::normalize(a);
 }
 
 void e2::ToolWindow::update(double deltaTime)
@@ -1016,6 +1020,12 @@ void e2::ToolWindow::update(double deltaTime)
 		else
 			m_demo->nimbleMesh->disable();
 	}
+
+
+	ui->checkbox("zxfsdfgg", m_demo->drawGrid, "Render Grid");
+	ui->checkbox("zxfsdfgg2", m_demo->animateGrid, "Animate Grid");
+	ui->checkbox("renderextra", m_demo->renderExtra, "Render Extra");
+
 
 	ui->label("d", "-");
 	ui->label("e", "Water:");
@@ -1242,7 +1252,6 @@ e2::DemoModel::~DemoModel()
 void e2::DemoModel::postConstruct(e2::Context* ctx)
 {
 	e2::ShaderModel::postConstruct(ctx);
-	m_specification.requiredAttributes = e2::VertexAttributeFlags::Normal | e2::VertexAttributeFlags::TexCoords01;
 
 	e2::DescriptorSetLayoutCreateInfo setLayoutCreateInfo{};
 	setLayoutCreateInfo.bindings = {
@@ -1515,7 +1524,6 @@ e2::SkyModel::~SkyModel()
 void e2::SkyModel::postConstruct(e2::Context* ctx)
 {
 	e2::ShaderModel::postConstruct(ctx);
-	m_specification.requiredAttributes = e2::VertexAttributeFlags::None;
 
 	e2::PipelineLayoutCreateInfo pipelineLayoutCreateInfo{};
 	pipelineLayoutCreateInfo.sets = {

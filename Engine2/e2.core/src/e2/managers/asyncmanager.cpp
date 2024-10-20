@@ -13,13 +13,7 @@ e2::AsyncManager::AsyncManager(Engine* owner)
 	: e2::Manager(owner)
 {
 	m_mainId = std::this_thread::get_id();
-	
-	// optimize for 4-16 cores 
-	// 4 threads: worker gets 2
-	// 8 threads: worker gets 3
-	// 12 threads: worker gets 6 
-	// 16 threads: worker gets 8 
-	// if you change htis, make sure the above array of names have enough names for the threads
+
 	uint32_t hwThreads = std::thread::hardware_concurrency();
 	uint32_t numThreads = 1;
 

@@ -399,7 +399,7 @@ uint32_t e2::calculateMipLevels(glm::uvec2 const& resolution)
 }
 
 
-e2::Object* e2::createDynamic(Name typeName)
+e2::Object* e2::createDynamic(e2::Name typeName)
 {
 	e2::Type* type = e2::Type::fromName(typeName);
 	if (!type)
@@ -430,12 +430,12 @@ std::string e2::UUID::string() const
 }
 
 
-void e2::UUID::write(Buffer& destination) const
+void e2::UUID::write(e2::IStream& destination) const
 {
 	destination.write(data.data(), 16);
 }
 
-bool e2::UUID::read(Buffer& source)
+bool e2::UUID::read(e2::IStream& source)
 {
 	uint8_t const *dataPtr = source.read(16);
 	if (!dataPtr)
@@ -533,12 +533,12 @@ e2::Name::~Name()
 
 }
 
-void e2::Name::write(Buffer& destination) const
+void e2::Name::write(e2::IStream& destination) const
 {
 	destination << string();
 }
 
-bool e2::Name::read(Buffer& source)
+bool e2::Name::read(e2::IStream& source)
 {
 	std::string buff;
 	source >> buff;

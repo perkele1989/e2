@@ -121,8 +121,8 @@ namespace e2
 		UUID(std::string const& str);
 		std::string string() const;
 
-		virtual void write(Buffer& destination) const override;
-		virtual bool read(Buffer& source) override;
+		virtual void write(e2::IStream& destination) const override;
+		virtual bool read(e2::IStream& source) override;
 
 		bool valid();
 
@@ -641,8 +641,8 @@ namespace e2
 
 		~Name();
 
-		virtual void write(Buffer& destination) const override;
-		virtual bool read(Buffer& source) override;
+		virtual void write(e2::IStream& destination) const override;
+		virtual bool read(e2::IStream& source) override;
 
 		inline uint32_t const index() const
 		{

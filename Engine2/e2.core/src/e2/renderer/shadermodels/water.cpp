@@ -43,7 +43,6 @@ e2::WaterModel::~WaterModel()
 void e2::WaterModel::postConstruct(e2::Context* ctx)
 {
 	e2::ShaderModel::postConstruct(ctx);
-	m_specification.requiredAttributes = e2::VertexAttributeFlags::Normal | e2::VertexAttributeFlags::TexCoords01;
 
 	e2::DescriptorSetLayoutCreateInfo setLayoutCreateInfo{};
 	setLayoutCreateInfo.bindings = {

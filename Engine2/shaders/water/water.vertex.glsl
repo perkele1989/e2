@@ -40,7 +40,7 @@ void main()
 	vec4 waterPosition = vertexPosition;
     float wh = sampleWaterHeight(vertexWorld.xz, time);
 	waterPosition.y -= wh * heightScale;
-	waterPosition.y += 0.05;
+	waterPosition.y += 0.15;
 
 	fragmentNormal = sampleWaterNormal(vertexWorld.xz, time);
 

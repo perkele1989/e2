@@ -20,6 +20,7 @@ namespace e2
 {
 	class Engine;
 	class ShaderModel;
+	class CustomModel;
 	class IRenderContext;
 	class IThreadContext;
 	class IFence;
@@ -163,6 +164,7 @@ namespace e2
 		e2::Pair<bool> m_queueOpen{false};
 
 		e2::StackVector<e2::ShaderModel*, e2::maxNumShaderModels> m_shaderModels;
+		e2::StackVector<e2::CustomModel*, e2::maxNumCustomModels> m_customModels;
 
 		/** descriptor pool and set layout for model sets (modelmatrices) */
 		e2::IDescriptorPool* m_modelPool{};

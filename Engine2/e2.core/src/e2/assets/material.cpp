@@ -14,12 +14,12 @@ e2::Material::~Material()
 	}
 }
 
-void e2::Material::write(Buffer& destination) const
+void e2::Material::write(e2::IStream& destination) const
 {
 
 }
 
-bool e2::Material::read(Buffer& source)
+bool e2::Material::read(e2::IStream& source)
 {
 	e2::Name modelName;
 	source >> modelName;
@@ -33,6 +33,7 @@ bool e2::Material::read(Buffer& source)
 
 	if (version < e2::AssetVersion::AddMaterialParameters)
 		return true;
+
 
 	uint8_t numDefines{};
 	source >> numDefines;

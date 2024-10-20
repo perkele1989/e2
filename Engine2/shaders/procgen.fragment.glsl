@@ -85,14 +85,14 @@ void main()
 	else 
 		o = 1.0;
 
-	float f = sampleBaseHeight((position + vec2(32.14, 29.28)) * 8.0 );
-	if(f > 0.7 && h > 0.6)
+	float f = sampleBaseHeight((position + vec2(32.14, 29.28)) * 7.5 );
+	if(f > 0.6 && h > 0.75)
 		f = 1.0;
 	else
 		f = 0.0;
 
 	f = f * g;
-	g = g - f;
+
 	//f = 0.0;
 
 

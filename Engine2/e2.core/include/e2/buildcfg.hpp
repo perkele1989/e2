@@ -117,7 +117,8 @@ namespace e2
 	/// --- Begin Rendering
 
 	/** Maximum number of registerable shader models */
-	constexpr uint32_t maxNumShaderModels = 8;
+	constexpr uint32_t maxNumShaderModels = 32;
+	constexpr uint32_t maxNumCustomModels = 128;
 
 	/** The maximum number of renderers in a session */
 	constexpr uint32_t maxNumRenderers = 8;

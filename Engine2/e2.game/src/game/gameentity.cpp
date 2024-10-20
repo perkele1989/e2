@@ -515,7 +515,7 @@ void e2::GameEntity::drawUI(e2::UIContext* ctx)
 	ctx->endStackV();
 }
 
-void e2::GameEntity::writeForSave(e2::Buffer& toBuffer)
+void e2::GameEntity::writeForSave(e2::IStream& toBuffer)
 {
 	toBuffer << meshRotation;
 	toBuffer << meshTargetRotation;
@@ -523,7 +523,7 @@ void e2::GameEntity::writeForSave(e2::Buffer& toBuffer)
 
 }
 
-void e2::GameEntity::readForSave(e2::Buffer& fromBuffer)
+void e2::GameEntity::readForSave(e2::IStream& fromBuffer)
 {
 
 	fromBuffer >> meshRotation;

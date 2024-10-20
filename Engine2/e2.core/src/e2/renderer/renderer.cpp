@@ -312,6 +312,8 @@ e2::Renderer::Renderer(e2::Session* session, glm::uvec2 const& resolution)
 	m_outlineTextures[1] = fallback;
 
 
+	setView({});
+
 }
 
 e2::Renderer::~Renderer()
@@ -364,16 +366,20 @@ void e2::Renderer::prepareFrame(double deltaTime)
 	m_rendererData.sun2 = glm::vec4(m_sunColor, m_sunStrength);
 
 	m_rendererData.ibl1 = glm::vec4(m_iblStrength, 0.0f, 0.0f, 0.0f);
-	m_rendererData.cameraPosition = glm::vec4(glm::vec3(m_view.origin), 0.0f);
+	m_rendererData.cameraPosition = glm::vec4(glm::vec3(m_view.origin), 1.0f);
 
 	m_rendererData.projectionMatrix = m_view.calculateProjectionMatrix(m_resolution);
 	m_rendererData.viewMatrix = m_view.calculateViewMatrix();
 
 	// calculate shadow matrices 
 	{
+		float maxDist = 40.0f;
 		float yMin = m_view.origin.y;
 		float yMax = 5.0f; // 5 meter below ground seems decent
-		e2::Aabb2D planarAabb = m_viewPoints.toAabb(); // 20 meters max view depth
+		e2::Aabb2D planarAabb = m_viewPoints.limited(maxDist).toAabb(); // 20 meters max view depth
+
+		
+
 		//e2::Aabb2D planarAabb = m_viewPoints.toAabb(); // 20 meters max view depth
 		e2::Aabb3D worldAabb(planarAabb, yMin, yMax);
 		//e2::Aabb3D worldAabb(planarAabb, 0.0f, 0.0f);
@@ -1122,13 +1128,13 @@ bool e2::Ray2D::edgeTest(glm::vec2 const& circleOrigin, float circleRadius) cons
 	return glm::dot(perpendicular, circleOrigin - position) < circleRadius;
 }
 
-void e2::Aabb2D::write(Buffer& destination) const
+void e2::Aabb2D::write(e2::IStream& destination) const
 {
 	destination << min;
 	destination << max;
 }
 
-bool e2::Aabb2D::read(Buffer& source)
+bool e2::Aabb2D::read(e2::IStream& source)
 {
 	source >> min;
 	source >> max;
@@ -1177,13 +1183,13 @@ e2::Aabb3D::Aabb3D(Aabb2D const& fromPlanar, float yMin, float yMax)
 	max = { fromPlanar.max.x, yMax, fromPlanar.max.y };
 }
 
-void e2::Aabb3D::write(Buffer& destination) const
+void e2::Aabb3D::write(e2::IStream& destination) const
 {
 	destination << min;
 	destination << max;
 }
 
-bool e2::Aabb3D::read(Buffer& source)
+bool e2::Aabb3D::read(e2::IStream& source)
 {
 	source >> min;
 	source >> max;

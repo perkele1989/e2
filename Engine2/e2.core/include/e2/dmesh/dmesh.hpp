@@ -52,17 +52,6 @@ namespace e2
 				color.x, color.y, color.z, color.w,
 				weights.x, weights.y, weights.z, weights.w,
 				bones.x, bones.y, bones.z, bones.w);
-
-			/*return std::tie(
-				granularPosition.x, granularPosition.y, granularPosition.z,
-				granularNormal.x, granularNormal.y, granularNormal.z,
-				granularTangent.x, granularTangent.y, granularTangent.z,
-				granularSign,
-				uv01.x, uv01.y, uv01.z, uv01.w,
-				uv23.x, uv23.y, uv23.z, uv23.w,
-				color.x, color.y, color.z, color.w,
-				weights.x, weights.y, weights.z, weights.w,
-				bones.x, bones.y, bones.z, bones.w);*/
 		}
 
 		bool operator<(const Vertex& o) const

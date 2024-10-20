@@ -26,8 +26,8 @@ namespace e2
 		Spritesheet() = default;
 		virtual ~Spritesheet();
 
-		virtual void write(Buffer& destination) const override;
-		virtual bool read(Buffer& source) override;
+		virtual void write(e2::IStream& destination) const override;
+		virtual bool read(e2::IStream& source) override;
 
 		e2::Sprite *getSprite(e2::Name name);
 

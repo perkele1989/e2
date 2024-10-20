@@ -65,8 +65,8 @@ namespace e2
 
 		virtual Engine* engine() override;
 
-		virtual void write(Buffer& destination) const override;
-		virtual bool read(Buffer& source) override;
+		virtual void write(e2::IStream& destination) const override;
+		virtual bool read(e2::IStream& source) override;
 		virtual bool finalize();
 
 		e2::UUID findDependencyByName(e2::Name name);

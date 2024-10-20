@@ -21,8 +21,8 @@ namespace e2
 	struct E2_API AssetHeader : public e2::Data
 	{
 
-		virtual void write(Buffer& destination) const override;
-		virtual bool read(Buffer& source) override;
+		virtual void write(e2::IStream& destination) const override;
+		virtual bool read(e2::IStream& source) override;
 
 		e2::Name assetType;
 		e2::AssetVersion version{ e2::AssetVersion::Latest };
@@ -61,8 +61,8 @@ namespace e2
 	public:
 		AssetEntry();
 
-		virtual void write(Buffer& destination) const override;
-		virtual bool read(Buffer& source) override;
+		virtual void write(e2::IStream& destination) const override;
+		virtual bool read(e2::IStream& source) override;
 
 		e2::UUID uuid;
 		uint64_t timestamp{};
@@ -103,8 +103,8 @@ namespace e2
 
 		void validate(bool forceSave);
 
-		virtual void write(Buffer& destination) const override;
-		virtual bool read(Buffer& source) override;
+		virtual void write(e2::IStream& destination) const override;
+		virtual bool read(e2::IStream& source) override;
 
 		AssetEntry *entryFromPath(std::string const &path);
 		AssetEntry* entryFromUUID(e2::UUID const &uuid);

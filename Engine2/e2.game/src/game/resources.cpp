@@ -1,7 +1,7 @@
 
 #include "game/resources.hpp"
 
-void e2::ResourceTable::write(e2::Buffer& destination) const
+void e2::ResourceTable::write(e2::IStream& destination) const
 {
 	destination << gold;
 	destination << wood;
@@ -9,7 +9,7 @@ void e2::ResourceTable::write(e2::Buffer& destination) const
 	destination << steel;
 }
 
-bool e2::ResourceTable::read(e2::Buffer& source)
+bool e2::ResourceTable::read(e2::IStream& source)
 {
 	source >> gold;
 	source >> wood;
@@ -70,12 +70,12 @@ e2::ResourceTable& e2::ResourceTable::operator+=(ResourceTable const& other)
 	return *this;
 }
 
-void e2::GameResources::write(e2::Buffer& destination) const
+void e2::GameResources::write(e2::IStream& destination) const
 {
 	destination << funds;
 }
 
-bool e2::GameResources::read(e2::Buffer& source)
+bool e2::GameResources::read(e2::IStream& source)
 {
 	source >> funds;
 

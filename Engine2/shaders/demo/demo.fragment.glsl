@@ -36,12 +36,37 @@ void main()
 	vec3 waterNormal = sampleWaterNormal(fragmentPosition.xz, time);
 	vec3 waterViewNormal = (renderer.viewMatrix * vec4(waterNormal, 0.0)).xyz;
 
+
+
+	vec2 gridPosition = fragmentPosition.xz * 10.0;
+	vec2 gridIndex = floor(gridPosition);
+	vec2 gridFraction = gridPosition - gridIndex;
+	float gridWidth = 0.025;
+	float gridDistA = step(gridFraction.x, 1.0 - gridWidth);
+	float gridDistB = step(gridFraction.y, 1.0 - gridWidth);
+	float gridDistC = step(gridWidth, gridFraction.x);
+	float gridDistD = step(gridWidth, gridFraction.y);
+	float gridDist = 1.0 - (gridDistA * gridDistB * gridDistC * gridDistD);
+
+	if(material.water2.z > 0)
+	{
+		outColor = vec4(vec3(iblStrength), gridDist);
+		return;
+	}
+
+
+	outColor.a = 1.0;
+
+
+
+
 	// HEIGHT
 	if(stage == 1)
 	{
 		//n.y = -n.y;
 		outColor.rgb = vec3(waterHeight);
 		outColor.rgb *= iblStrength;
+		// outColor.rgb *= 1.0 - gridDist;
 		return;
 	}
 
@@ -52,7 +77,7 @@ void main()
 		//n.y = -n.y;
 		outColor.rgb = clamp(vec3(waterNormal.x, waterNormal.z, -waterNormal.y) * 0.5 + 0.5, vec3(0.0), vec3(1.0));
 		outColor.rgb *= iblStrength;
-
+		// outColor.rgb *= 1.0 - gridDist;
 		return;
 	}
 
@@ -75,6 +100,7 @@ void main()
 		if(substage == 3)
 		{
 			outColor.rgb = vec3(refractFixCoeff);
+			// outColor.rgb *= 1.0 - gridDist;
 			return;
 		}
 	}
@@ -140,6 +166,8 @@ void main()
 			outColor.rgb = baseColor* iblStrength;
 		}
 		
+		// outColor.rgb *= 1.0 - gridDist;
+
 		return;
 	}
 
@@ -188,6 +216,8 @@ void main()
 			outColor.rgb = baseColor* iblStrength;
 			outColor.rgb += hdr * vdotn * reflectionStrength * sunStrength* reflCoeff;
 		}
+
+		// outColor.rgb *= 1.0 - gridDist;
 		return;
 	}
 
@@ -231,6 +261,7 @@ void main()
 			
 		}
 
+		// outColor.rgb *= 1.0 - gridDist;
 		return;
 	}
 
@@ -269,7 +300,7 @@ void main()
 			outColor.rgb += hdr * vdotn * reflectionStrength * sunStrength* reflCoeff;
 		}
 
-
+		// outColor.rgb *= 1.0 - gridDist;
 		return;
 	}
 
@@ -286,7 +317,12 @@ void main()
 		{
 			outColor.rgb = frontColor.rgb;
 		}
+
+		// outColor.rgb *= 1.0 - gridDist;
 		return;
 	}
+
+	// outColor.rgb *= 1.0 - gridDist;
+
 
 }

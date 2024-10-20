@@ -89,17 +89,23 @@ float sampleSimplex(vec2 position)
 
 
 
-vec3 shiftHue(vec3 col, float shift)
-{
-    vec3 P = vec3(0.55735)*dot(vec3(0.55735), col);
+// vec3 shiftHue(vec3 col, float shift)
+// {
+//     vec3 P = vec3(0.55735)*dot(vec3(0.55735), col);
     
-    vec3 U = col-P;
+//     vec3 U = col-P;
     
-    vec3 V = cross(vec3(0.55735),U);    
+//     vec3 V = cross(vec3(0.55735),U);    
 
-    col = U*cos(shift*6.2832) + V*sin(shift*6.2832) + P;
+//     col = U*cos(shift*6.2832) + V*sin(shift*6.2832) + P;
     
-    return col;
+//     return col;
+// }
+
+vec3 shiftHue(vec3 color, float hue) {
+    const vec3 k = vec3(0.57735, 0.57735, 0.57735);
+    float cosAngle = cos(hue);
+    return clamp(vec3(color * cosAngle + cross(k, color) * sin(hue) + k * dot(k, color) * (1.0 - cosAngle)), vec3(0.0), vec3(1.0));
 }
 
 
@@ -148,6 +154,11 @@ float desaturate(vec3 color)
 {
     float bw = (min(color.r, min(color.g, color.b)) + max(color.r, max(color.g, color.b))) * 0.5;
     return bw;
+}
+
+vec3 desaturate_blend(vec3 color, float alpha)
+{
+    return mix(color, vec3(desaturate(color)), alpha);
 }
 
 

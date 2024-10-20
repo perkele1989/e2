@@ -44,7 +44,6 @@ e2::TerrainModel::~TerrainModel()
 void e2::TerrainModel::postConstruct(e2::Context* ctx)
 {
 	e2::ShaderModel::postConstruct(ctx);
-	m_specification.requiredAttributes = e2::VertexAttributeFlags::Normal | e2::VertexAttributeFlags::TexCoords01;
 
 	e2::DescriptorSetLayoutCreateInfo setLayoutCreateInfo{};
 	setLayoutCreateInfo.bindings = {

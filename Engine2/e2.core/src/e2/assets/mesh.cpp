@@ -34,12 +34,12 @@ e2::Mesh::~Mesh()
 	}
 }
 
-void e2::Mesh::write(Buffer& destination) const
+void e2::Mesh::write(e2::IStream& destination) const
 {
 
 }
 
-bool e2::Mesh::read(Buffer& source)
+bool e2::Mesh::read(e2::IStream& source)
 {
 	if (!e2::Asset::read(source))
 		return false;
@@ -90,21 +90,20 @@ bool e2::Mesh::read(Buffer& source)
 			bufferCreateInfo.type = BufferType::IndexBuffer;
 			e2::IDataBuffer* newBuffer = renderContext()->createDataBuffer(bufferCreateInfo);
 
-			uint32_t* indexBuffer = reinterpret_cast<uint32_t*>(source.current());
-			for (uint32_t ti = 0; ti < (newSpecification.indexCount / 3); ti++)
-			{
-				uint32_t a = indexBuffer[ti * 3 + 0];
-				uint32_t b = indexBuffer[ti * 3 + 1];
-				uint32_t c = indexBuffer[ti * 3 + 2];
+			uint8_t const* readCurrent = source.read(bufferSize);
+			//uint32_t* indexBuffer = reinterpret_cast<uint32_t const*>(readCurrent);
+			//for (uint32_t ti = 0; ti < (newSpecification.indexCount / 3); ti++)
+			//{
+			//	uint32_t a = indexBuffer[ti * 3 + 0];
+			//	uint32_t b = indexBuffer[ti * 3 + 1];
+			//	uint32_t c = indexBuffer[ti * 3 + 2];
 
-				if (a >= newSpecification.vertexCount || b >= newSpecification.vertexCount || c >= newSpecification.vertexCount)
-					LogError("corrupt data detected");
-			}
+			//	if (a >= newSpecification.vertexCount || b >= newSpecification.vertexCount || c >= newSpecification.vertexCount)
+			//		LogError("corrupt data detected");
+			//}
 
 			// upload data direct from source buffer, and then use consume to skip 
-			newBuffer->upload(source.current(), bufferSize, 0, 0);
-			uint64_t oldCursor{};
-			source.consume(bufferSize, oldCursor);
+			newBuffer->upload(readCurrent, bufferSize, 0, 0);
 
 			newSpecification.indexBuffer = newBuffer;
 		};
@@ -120,9 +119,8 @@ bool e2::Mesh::read(Buffer& source)
 			e2::IDataBuffer* newBuffer = renderContext()->createDataBuffer(bufferCreateInfo);
 
 			// upload data direct from source buffer, and then use consume to skip 
-			newBuffer->upload(source.current(), bufferSize, 0, 0);
-			uint64_t oldCursor{};
-			source.consume(bufferSize, oldCursor);
+			uint8_t const* readCurrent = source.read(bufferSize);
+			newBuffer->upload(readCurrent, bufferSize, 0, 0);
 
 			newSpecification.vertexAttributes.push(newBuffer);
 		};
@@ -297,12 +295,12 @@ e2::Skeleton::~Skeleton()
 	m_animationBindings.clear();
 }
 
-void e2::Skeleton::write(Buffer& destination) const
+void e2::Skeleton::write(e2::IStream& destination) const
 {
 
 }
 
-bool e2::Skeleton::read(Buffer& source)
+bool e2::Skeleton::read(e2::IStream& source)
 {
 	uint32_t numBones{};
 	source >> numBones;
@@ -425,12 +423,12 @@ e2::Animation::~Animation()
 
 }
 
-void e2::Animation::write(Buffer& destination) const
+void e2::Animation::write(e2::IStream& destination) const
 {
 
 }
 
-bool e2::Animation::read(Buffer& source)
+bool e2::Animation::read(e2::IStream& source)
 {
 	source >> m_numFrames;
 	float readFrameRate = 0.0f;
@@ -744,36 +742,6 @@ void e2::Pose::blendWith(Pose* b, double alpha)
 	// gg ez
 	applyBlend(this, b, alpha);
 }
-
-/*void e2::Pose::applyAnimation(e2::Ptr<e2::Animation> anim, double time)
-{
-	E2_PROFILE_SCOPE(Animation);
-	for (uint32_t boneId = 0; boneId < m_poseBones.size(); boneId++)
-	{
-		e2::PoseBone* poseBone = &m_poseBones[boneId];
-		e2::Bone* bone = m_skeleton->boneById(boneId);
-		
-		e2::Name trackName_pos = std::format("{}.position", bone->name.cstring());
-		e2::AnimationTrack* track_pos = anim->trackByName(trackName_pos, e2::AnimationType::Vec3);
-
-		e2::Name trackName_rot = std::format("{}.rotation", bone->name.cstring());
-		e2::AnimationTrack* track_rot = anim->trackByName(trackName_rot, e2::AnimationType::Quat);
-
-
-		glm::vec3 translation, scale, skew;
-		glm::vec4 perspective;
-		glm::quat rotation;
-		glm::decompose(poseBone->localTransform, scale, rotation, translation, skew, perspective);
-
-		if (track_pos)
-			translation = track_pos->getVec3(time, anim->frameRate());
-
-		if (track_rot)
-			rotation = track_rot->getQuat(time, anim->frameRate());
-
-		poseBone->localTransform = recompose(translation, scale, skew, perspective, rotation);
-	}
-}*/
 
 e2::StackVector<glm::mat4, e2::maxNumSkeletonBones> const& e2::Pose::skin()
 {

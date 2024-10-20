@@ -19,10 +19,14 @@
 
 namespace e2
 {
-	inline float mtnDist = 1.5f;
-	inline float mtnPow = 0.5f;
-	inline float mtnFreqScale = 1.0f;
-	inline float mtnScale = 1.0f;
+	inline float mtnFreqScale = 0.1f;
+	inline float mtnScale = 0.9f;
+
+	inline float treeScale = 0.623f;
+	inline float treeSpread = 1.0f;
+	inline int32_t treeNum1 = 4;
+	inline int32_t treeNum2 = 7;
+	inline int32_t treeNum3 = 15;
 
 	class GameUnit;
 
@@ -122,7 +126,6 @@ namespace e2
 
 		// optional forest proxy, if this tile is discovered it shows: forest abundance if unbuilt on forest, partly forest if built on forest, nothing if not on forest or if undiscovered (undiscovered tile meshes lives on chunk array)
 		e2::MeshProxy* forestProxy{};
-		e2::MeshPtr forestMesh{};
 
 		e2::MeshProxy* resourceProxy{};
 		e2::MeshPtr resourceMesh;
@@ -287,9 +290,10 @@ namespace e2
 		virtual e2::Engine* engine() override;
 		virtual e2::Game* game() override;
 
+		void rebuildForestMeshes();
 
-		void saveToBuffer(e2::Buffer& toBuffer);
-		void loadFromBuffer(e2::Buffer& fromBuffer);
+		void saveToBuffer(e2::IStream& toBuffer);
+		void loadFromBuffer(e2::IStream& fromBuffer);
 
 		/// Chunks Begin (and World Streaming)
 

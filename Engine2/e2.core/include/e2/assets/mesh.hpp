@@ -78,8 +78,8 @@ namespace e2
 		Animation() = default;
 		virtual ~Animation();
 
-		virtual void write(Buffer& destination) const override;
-		virtual bool read(Buffer& source) override;
+		virtual void write(e2::IStream& destination) const override;
+		virtual bool read(e2::IStream& source) override;
 
 
 		e2::AnimationTrack* trackByName(e2::Name name, AnimationType type);
@@ -114,8 +114,8 @@ namespace e2
 		Skeleton();
 		virtual ~Skeleton();
 
-		virtual void write(Buffer& destination) const override;
-		virtual bool read(Buffer& source) override;
+		virtual void write(e2::IStream& destination) const override;
+		virtual bool read(e2::IStream& source) override;
 
 		e2::Bone* boneByName(e2::Name name);
 		uint32_t numBones();
@@ -182,13 +182,6 @@ namespace e2
 
 		/** Blends this pose directly with b, applying it to this pose */
 		void blendWith(Pose* b, double alpha);
-
-		/** 
-		 * Apply the given animation to this pose, at the given time in seconds
-		 * Ignores any bones not driven by animation
-		 * SLOW
-		 */
-		//void applyAnimation(e2::Ptr<e2::Animation> anim, double time);
 
 		e2::StackVector<glm::mat4, e2::maxNumSkeletonBones> const& skin();
 		e2::Ptr<e2::Skeleton> skeleton();
@@ -303,8 +296,8 @@ namespace e2
 		Mesh();
 		virtual ~Mesh();
 
-		virtual void write(Buffer& destination) const override;
-		virtual bool read(Buffer& source) override;
+		virtual void write(e2::IStream& destination) const override;
+		virtual bool read(e2::IStream& source) override;
 
 		e2::SubmeshSpecification const& specification(uint8_t subIndex);
 

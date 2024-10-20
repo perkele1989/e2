@@ -26,8 +26,8 @@ namespace e2
 		virtual ~Material();
 
 
-		virtual void write(Buffer& destination) const override;
-		virtual bool read(Buffer& source) override;
+		virtual void write(e2::IStream& destination) const override;
+		virtual bool read(e2::IStream& source) override;
 
 		virtual bool finalize() override;
 
@@ -44,12 +44,30 @@ namespace e2
 		e2::Name getDefine(e2::Name key, e2::Name fallback);
 		bool hasDefine(e2::Name key);
 
+
+
+
+		inline std::unordered_map<e2::Name, e2::Ptr<e2::Texture2D>>& textures()
+		{
+			return m_textureIndex;
+		}
+
+		inline std::unordered_map<e2::Name, glm::vec4>& vectors()
+		{
+			return m_vectorIndex;
+		}
+
+		inline std::unordered_map<e2::Name, e2::Name>& defines()
+		{
+			return m_defines;
+		}
+
+
 		std::unordered_set<e2::Session*> sessions;
 
 	protected:
 		e2::ShaderModel* m_model{};
 		
-
 		std::unordered_map<e2::Name, e2::Ptr<e2::Texture2D>> m_textureIndex;
 		std::unordered_map<e2::Name, glm::vec4> m_vectorIndex;
 		std::unordered_map<e2::Name, e2::Name> m_defines;

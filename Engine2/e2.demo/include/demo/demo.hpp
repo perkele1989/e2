@@ -221,11 +221,11 @@ namespace e2
 		float viewFov{ 20.0f };
 		float sunAngleA{ -75.0f };
 		float sunAngleB{ 21.75f };
-		float sunStrength{ 8.6f };
-		float iblStrength{ 4.66f };
-		float exposure{ 1.33f };
-		float whitepoint{ 5.0f };
-		float waterHeight{ 0.25f };
+		float sunStrength{ 10.2f };
+		float iblStrength{ 8.2f };
+		float exposure{ 1.0f };
+		float whitepoint{ 10.0f };
+		float waterHeight{ 0.20f };
 
 		glm::quat currOrientationA{ glm::identity<glm::quat>()};
 		glm::quat currOrientationB{ glm::identity<glm::quat>() };
@@ -257,6 +257,11 @@ namespace e2
 		bool renderWater{ true };
 		bool renderNimble{ false };
 
+		bool drawGrid{ false };
+		bool animateGrid{ false };
+		bool renderExtra{ true };
+
+
 		e2::StackVector<DemoStage, (uint64_t)DemoStageIndex::Count> stages;
 		DemoStageIndex currentStage{ DemoStageIndex::Height_Basic };
 
@@ -265,7 +270,7 @@ namespace e2
 		float waterScale{ 0.125 };
 		float normalStrength{ 20.0 };
 		float normalDistance{ 0.015 };
-		float refractionStrength{ 20.0 };
+		float refractionStrength{ 30.0 };
 	protected:
 
 		e2::GameSession* m_session{};

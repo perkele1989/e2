@@ -72,8 +72,8 @@ namespace e2
 	struct E2_API Aabb2D : public e2::Data
 	{
 
-		virtual void write(Buffer& destination) const override;
-		virtual bool read(Buffer& source) override;
+		virtual void write(e2::IStream& destination) const override;
+		virtual bool read(e2::IStream& source) override;
 
 		glm::vec2 min{};
 		glm::vec2 max{};
@@ -90,8 +90,8 @@ namespace e2
 
 		Aabb3D(Aabb2D const& fromPlanar, float yMin, float yMax);
 
-		virtual void write(Buffer& destination) const override;
-		virtual bool read(Buffer& source) override;
+		virtual void write(e2::IStream& destination) const override;
+		virtual bool read(e2::IStream& source) override;
 
 		glm::vec3 min{};
 		glm::vec3 max{};

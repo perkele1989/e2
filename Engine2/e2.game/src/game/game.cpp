@@ -93,7 +93,7 @@ void e2::Game::saveGame(uint8_t slot)
 	newMeta.timestamp = std::time(nullptr);
 	newMeta.slot = slot;
 
-	e2::Buffer buf;
+	e2::FileStream buf(newMeta.fileName(), true);
 
 	buf << int64_t(newMeta.timestamp);
 
@@ -121,8 +121,6 @@ void e2::Game::saveGame(uint8_t slot)
 		entity->writeForSave(buf);
 	}
 
-	buf.writeToFile(newMeta.fileName());
-
 	saveSlots[slot] = newMeta;
 
 }
@@ -136,9 +134,8 @@ e2::SaveMeta e2::Game::readSaveMeta(uint8_t slot)
 	// header is just int64_t timestamp
 	constexpr uint64_t headerSize = 8 ;
 
-	e2::Buffer buf;
-	uint64_t bytesRead = buf.readFromFile(meta.cachedFileName, 0, headerSize);
-	if (bytesRead != headerSize)
+	e2::FileStream buf(meta.cachedFileName, false);
+	if (!buf.valid())
 	{
 		meta.cachedDisplayName = meta.displayName();
 		saveSlots[slot] = meta;
@@ -172,9 +169,8 @@ void e2::Game::loadGame(uint8_t slot)
 	// header is just uint64_t discoveredTiles + int64_t timestamp
 	constexpr uint64_t headerSize = 8 ;
 
-	e2::Buffer buf;
-	uint64_t readBytes = buf.readFromFile(saveSlots[slot].fileName(), headerSize, 0);
-	if (readBytes == 0)
+	e2::FileStream buf(saveSlots[slot].fileName(), false);
+	if (!buf.valid())
 	{
 		LogError("save slot missing or corrupted"); 
 		return;
@@ -182,6 +178,8 @@ void e2::Game::loadGame(uint8_t slot)
 
 	nukeGame();
 	setupGame();
+
+	buf.read(sizeof(int64_t));
 
 	m_hexGrid->loadFromBuffer(buf);
 
@@ -1418,6 +1416,7 @@ void e2::Game::updateGame(double seconds)
 
 	if (kb.keys[int16_t(e2::Key::F1)].pressed)
 	{
+		m_hexGrid->rebuildForestMeshes();
 		m_hexGrid->clearAllChunks();
 	}
 
@@ -1478,23 +1477,6 @@ void e2::Game::updateGame(double seconds)
 	updateGameState();
 
 	updateAnimation(seconds);
-
-	m_hexGrid->clearOutline();
-	glm::ivec2 chunkIndex = m_hexGrid->chunkIndexFromPlanarCoords(m_cursorPlane);
-	//e2::ChunkState* state = m_hexGrid->getOrCreateChunk(chunkIndex);
-	m_hexGrid->pushOutline(OutlineLayer::Attack, m_cursorHex);
-	for (int32_t y = 0; y < e2::hexChunkResolution; y++)
-	{
-		for (int32_t x = 0; x < e2::hexChunkResolution; x++)
-		{
-			//glm::vec3 tileOffset = e2::Hex(glm::ivec2(x, y)).localCoords();
-			//glm::mat4 transform = glm::translate(glm::identity<glm::mat4>(), tileOffset);
-
-			glm::ivec2 tileHex = (chunkIndex * glm::ivec2(e2::hexChunkResolution)) + glm::ivec2(x, y);
-			m_hexGrid->pushOutline(OutlineLayer::Movement, tileHex);
-		}
-	}
-
 	
 
 	//m_cursorHex
@@ -1514,9 +1496,6 @@ void e2::Game::updateGame(double seconds)
 
 	if(!kb.state(Key::C))
 		drawUI();
-
-
-	ui->drawRasterText(e2::FontFace::Sans, 14, 0xFFFFFFFF, { 32.0f, 128.f }, std::format("cursorHex: {}, chunkIndex: {}", m_cursorHex, chunkIndex));
 
 }
 
@@ -2541,18 +2520,24 @@ void e2::Game::drawUI()
 
 			ui->pushFixedPanel("envParams", offset, size);
 			ui->beginStackV("envParamStack");
+
 			ui->sliderFloat("sunAngleA", m_sunAngleA, -180.0f, 180.0f);
 			ui->sliderFloat("sunAngleB", m_sunAngleB, 0.0f, 90.0f);
-			ui->sliderFloat("sunStr", m_sunStrength, 0.0f, 10.0f);
-			ui->sliderFloat("iblStr", m_iblStrength, 0.0f, 10.0f); 
+			//ui->sliderFloat("sunStr", m_sunStrength, 0.0f, 10.0f);
+			//ui->sliderFloat("iblStr", m_iblStrength, 0.0f, 10.0f); 
 
-			ui->sliderFloat("exposure", m_exposure, 0.0f, 20.0f);
-			ui->sliderFloat("whitepoint", m_whitepoint, 0.0f, 20.0f);
+			//ui->sliderFloat("exposure", m_exposure, 0.0f, 20.0f);
+			//ui->sliderFloat("whitepoint", m_whitepoint, 0.0f, 20.0f);
 
-			ui->sliderFloat("mtnFreqScale", e2::mtnFreqScale, 0.001f, 0.1f, "%.6f");
-			ui->sliderFloat("mtnScale", e2::mtnScale, 0.25f, 10.0f, "%.6f");
-			ui->sliderFloat("mtnPow", e2::mtnPow, 0.1f, 4.0f, "%.6f");
-			ui->sliderFloat("mtnDist", e2::mtnDist, 0.01f, 4.0f, "%.6f");
+			//ui->sliderFloat("mtnFreqScale", e2::mtnFreqScale, 0.001f, 0.1f, "%.6f");
+			//ui->sliderFloat("mtnScale", e2::mtnScale, 0.25f, 10.0f, "%.6f");
+
+			ui->sliderFloat("treeScale", e2::treeScale, 0.1f, 2.0f);
+			ui->sliderFloat("treeSpread", e2::treeSpread, 0.1f, 2.0f);
+			ui->sliderInt("treeNum1", e2::treeNum1, 1, 50);
+			ui->sliderInt("treeNum2", e2::treeNum2, 1, 50);
+			ui->sliderInt("treeNum3", e2::treeNum3, 1, 50);
+
 
 			e2::GameSession* session = gameSession();
 			e2::Renderer* renderer = session->renderer();
@@ -2999,7 +2984,7 @@ void e2::Game::drawMinimapUI()
 
 		static bool grid = false;
 		ui->pushFixedPanel("zxccc", pos, size);
-		if (ui->checkbox("toggleGrid", grid, "Show Grid"));
+		if (ui->checkbox("toggleGrid", grid, "Show Grid"))
 		{
 			renderer->setDrawGrid(grid);
 		}
@@ -3804,7 +3789,6 @@ void e2::Game::harvestWood(glm::ivec2 const& location, EmpireId empire)
 		e2::destroy(tileData->forestProxy);
 
 	tileData->forestProxy = nullptr;
-	tileData->forestMesh = nullptr;
 
 }
 
@@ -3824,7 +3808,6 @@ void e2::Game::removeWood(glm::ivec2 const& location)
 		e2::destroy(tileData->forestProxy);
 
 	tileData->forestProxy = nullptr;
-	tileData->forestMesh = nullptr;
 
 	e2::ChunkState* state = m_hexGrid->getOrCreateChunk(location);
 	m_hexGrid->refreshChunkMeshes(state);

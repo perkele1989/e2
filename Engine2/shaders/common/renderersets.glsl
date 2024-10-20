@@ -119,7 +119,7 @@ float calculateSunShadow(vec4 fragPosWS)
 	float depthComp = (fragPosLS.z) - bias;
 	
 	// If the shadow UV is out of bounds, return 1.0. Needed for directional lights
-	if(shadowUV.x < 0 || shadowUV.y < 0 ||shadowUV.x > 1 ||shadowUV.y > 1)
+	if(shadowUV.x <= 0.00 || shadowUV.y <= 0.00 || shadowUV.x >= 1.0 ||shadowUV.y >= 1.0 || fragPosLS.z >= 1.0)
 	{
 		return 1.0;
 	}
@@ -142,10 +142,9 @@ float calculateSunShadow(vec4 fragPosWS)
 	ivec2 shadowSize = textureSize(shadowMap, 0);
 	vec2 shadowFragSize = vec2(1.0) / vec2(shadowSize.x, shadowSize.y);
 
-	
 	for(int i = 0; i < SHADOWSAMPLES; i++)
 	{
-		vec2 offsetUV = shadowUV + (sampleOffsets[i] * shadowFragSize);
+		vec2 offsetUV = shadowUV.xy + (sampleOffsets[i] * shadowFragSize);
 		float shadowDepth = texture(sampler2DShadow(shadowMap, shadowSampler), vec3(offsetUV.x, offsetUV.y, depthComp));
 		returner += shadowDepth;
 	}
@@ -206,6 +205,8 @@ vec3 getIblColor(vec3 fragPosition, vec3 fragAlbedo, vec3 fragNormal,float fragR
 	returner += irradiance * diffuseCoeff;
     returner += radiance * specularCoeff*  (brdf.x + brdf.y);
     returner *= renderer.ibl1.x;
+
+	//returner = radiance *  (brdf.x + brdf.y) *  renderer.ibl1.x;
 
     return returner;
 }

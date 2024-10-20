@@ -11,22 +11,13 @@
 #include <vector>
 #include <cstdint>
 #include <bit>
+#include <fstream>
 
 namespace e2
 {
 
 
-	class Buffer;
-
-	class E2_API Data
-	{
-	public:
-		virtual ~Data();
-		virtual void write(Buffer& destination) const = 0;
-		virtual bool read(Buffer& source) = 0;
-
-	protected:
-	};
+	class Data;
 
 	template <typename T>
 	concept PlainOldData = std::is_integral_v<T> || std::is_floating_point_v<T> || std::is_enum_v<T>;
@@ -34,86 +25,72 @@ namespace e2
 	template <typename T>
 	concept SpecifiedData = std::is_base_of_v<e2::Data, T>;
 
-	/** 
-	 * @todo rewrite into several classes
-	 * e2::AlignedReader
-	 */
-	class E2_API Buffer
+	
+	class E2_API IStream
 	{
 	public:
-		Buffer(bool encode = true, uint64_t slack = 0);
-		~Buffer();
+		IStream(bool transcode = true);
+		virtual ~IStream() = default;
 
-		void reserve(uint64_t extraSlack);
+		virtual bool growable() = 0;
+		virtual uint64_t size() const = 0;
+		
+		virtual uint8_t const* read(uint64_t numBytes) = 0;
+		virtual bool write(uint8_t const* data, uint64_t size) = 0;
 
-		bool consume(uint64_t size, uint64_t &oldCursor); 
 
+		bool consume(uint64_t size, uint64_t& oldCursor);
 		void seek(uint64_t newCursor);
 		uint64_t cursor() const;
 		uint64_t remaining() const;
-		uint64_t size() const;
 
-		uint8_t* begin() const;
-		uint8_t* current() const;
-		uint8_t* at(uint64_t cur) const;
+		IStream& operator<<(std::string const& value);
+		IStream& operator>>(std::string& value);
 
-		/** read up to `size` bytes from file, starting at `offset`. returns number of bytes read. if size is 0, it will read until eof */
-		uint64_t readFromFile(std::string const& fromFile, uint64_t offset = 0, uint64_t size = 0);
+		IStream& operator<<(glm::uvec2 const& value);
+		IStream& operator>>(glm::uvec2& value);
 
-		/** writes entire buffer to file by default, can be specified by setting from, for example, to cursor() */
-		bool writeToFile(std::string const& toFile, uint64_t from = 0) const;
+		IStream& operator<<(glm::uvec3 const& value);
+		IStream& operator>>(glm::uvec3& value);
 
+		IStream& operator<<(glm::uvec4 const& value);
+		IStream& operator>>(glm::uvec4& value);
 
-		uint8_t const * read(uint64_t numBytes);
-		void write(uint8_t const* data, uint64_t size);
+		IStream& operator<<(glm::ivec2 const& value);
+		IStream& operator>>(glm::ivec2& value);
 
-		Buffer& operator<<(std::string const& value);
-		Buffer& operator>>(std::string& value);
+		IStream& operator<<(glm::ivec3 const& value);
+		IStream& operator>>(glm::ivec3& value);
 
-		Buffer& operator<<(glm::uvec2 const& value);
-		Buffer& operator>>(glm::uvec2& value);
+		IStream& operator<<(glm::ivec4 const& value);
+		IStream& operator>>(glm::ivec4& value);
 
-		Buffer& operator<<(glm::uvec3 const& value);
-		Buffer& operator>>(glm::uvec3& value);
+		IStream& operator<<(glm::vec2 const& value);
+		IStream& operator>>(glm::vec2& value);
 
-		Buffer& operator<<(glm::uvec4 const& value);
-		Buffer& operator>>(glm::uvec4& value);
+		IStream& operator<<(glm::vec3 const& value);
+		IStream& operator>>(glm::vec3& value);
 
-		Buffer& operator<<(glm::ivec2 const& value);
-		Buffer& operator>>(glm::ivec2& value);
+		IStream& operator<<(glm::vec4 const& value);
+		IStream& operator>>(glm::vec4& value);
 
-		Buffer& operator<<(glm::ivec3 const& value);
-		Buffer& operator>>(glm::ivec3& value);
+		IStream& operator<<(glm::quat const& value);
+		IStream& operator>>(glm::quat& value);
 
-		Buffer& operator<<(glm::ivec4 const& value);
-		Buffer& operator>>(glm::ivec4& value);
+		IStream& operator<<(glm::mat3 const& value);
+		IStream& operator>>(glm::mat3& value);
 
-		Buffer& operator<<(glm::vec2 const& value);
-		Buffer& operator>>(glm::vec2& value);
-
-		Buffer& operator<<(glm::vec3 const& value);
-		Buffer& operator>>(glm::vec3& value);
-
-		Buffer& operator<<(glm::vec4 const& value);
-		Buffer& operator>>(glm::vec4& value);
-
-		Buffer& operator<<(glm::quat const& value);
-		Buffer& operator>>(glm::quat& value);
-
-		Buffer& operator<<(glm::mat3 const& value);
-		Buffer& operator>>(glm::mat3& value);
-
-		Buffer& operator<<(glm::mat4 const& value);
-		Buffer& operator>>(glm::mat4& value);
+		IStream& operator<<(glm::mat4 const& value);
+		IStream& operator>>(glm::mat4& value);
 
 
 
 		template <e2::PlainOldData PODType>
-		Buffer& operator<<(PODType const& value)
+		IStream& operator<<(PODType const& value)
 		{
 			static_assert (sizeof(value) == 1 || sizeof(value) == 2 || sizeof(value) == 4 || sizeof(value) == 8);
 
-			if (!m_encode)
+			if (!m_transcode)
 			{
 				write(reinterpret_cast<uint8_t const*>(&value), sizeof(PODType));
 			}
@@ -152,43 +129,44 @@ namespace e2
 		}
 
 		template <e2::PlainOldData PODType>
-		Buffer& operator>>(PODType& value)
+		IStream& operator>>(PODType& value)
 		{
 			static_assert(sizeof(value) == 1 || sizeof(value) == 2 || sizeof(value) == 4 || sizeof(value) == 8);
 
-			uint64_t oldCursor{};
-			if (!consume(sizeof(PODType), oldCursor))
+			uint8_t const* readData = read(sizeof(PODType));
+
+			if (!readData)
 			{
-				LogError("Failed to read {} bytes from stream, not enough data remaining", remaining());
+				LogError("Failed to read {} bytes from stream, not enough data remaining", sizeof(PODType));
 				return *this;
 			}
 
-			if (!m_encode)
+			if (!m_transcode)
 			{
-				value = *reinterpret_cast<PODType const*>(at(oldCursor));
+				value = *reinterpret_cast<PODType const*>(readData);
 			}
 			else if constexpr (std::endian::native == std::endian::little)
 			{
 				// This crap is needed when working on non integer types (we want this for floats and doubles too
 				if constexpr (sizeof(PODType) == 1)
 				{
-					value = *reinterpret_cast<PODType const*>(at(oldCursor));
+					value = *reinterpret_cast<PODType const*>(readData);
 				}
 				else if constexpr (sizeof(PODType) == 2)
 				{
-					uint16_t tmp = *reinterpret_cast<uint16_t const*>(at(oldCursor));
+					uint16_t tmp = *reinterpret_cast<uint16_t const*>(readData);
 					tmp = std::byteswap(tmp);
 					value = *reinterpret_cast<PODType*>(&tmp);
 				}
 				else if constexpr (sizeof(PODType) == 4)
 				{
-					uint32_t tmp = *reinterpret_cast<uint32_t const*>(at(oldCursor));
+					uint32_t tmp = *reinterpret_cast<uint32_t const*>(readData);
 					tmp = std::byteswap(tmp);
 					value = *reinterpret_cast<PODType*>(&tmp);
 				}
 				else if constexpr (sizeof(PODType) == 8)
 				{
-					uint64_t tmp = *reinterpret_cast<uint64_t const*>(at(oldCursor));
+					uint64_t tmp = *reinterpret_cast<uint64_t const*>(readData);
 					tmp = std::byteswap(tmp);
 					value = *reinterpret_cast<PODType*>(&tmp);
 				}
@@ -196,22 +174,158 @@ namespace e2
 			else // big endian, just read raw
 			{
 
-				value = *reinterpret_cast<PODType const*>(at(oldCursor));
+				value = *reinterpret_cast<PODType const*>(readData);
 			}
 
 			return *this;
 		}
 
-		Buffer& operator<<(Data const& value);
-		Buffer& operator>>(Data& value);
+		IStream& operator<<(Data const& value);
+		IStream& operator>>(Data& value);
 
-		Buffer& operator<<(Buffer const& value);
+		/** Writes any remaining data of value to this stream */
+		IStream& operator<<(IStream& value);
+
+		/** Writes any remianing data of this stream to value*/
+		IStream& operator>>(IStream& value);
+
+	protected:
+		bool m_transcode{}; // true if this stream transcodes data on read/write
+		uint64_t m_cursor{}; // the cursor of this stream in bytes
+	};
+
+
+	class E2_API Data
+	{
+	public:
+		virtual ~Data();
+		virtual void write(IStream& destination) const = 0;
+		virtual bool read(IStream& source) = 0;
+
+	protected:
+	};
+
+
+	/**
+	 * Raw memory pointing to provided data (backed by user)
+	 */
+	class E2_API RawMemoryStream : public e2::IStream
+	{
+	public:
+		RawMemoryStream(uint8_t* data, uint64_t size, bool transcode = true);
+		~RawMemoryStream() = default;
+		virtual bool growable() override;
+		virtual uint64_t size() const override;
+		virtual uint8_t const* read(uint64_t numBytes) override;
+		virtual bool write(uint8_t const* data, uint64_t size) override;
+
+	protected:
+	
+		mutable uint8_t* m_data;
+		uint64_t m_size;
+	};
+
+
+
+	/** 
+	 * Allocates memory on the heap using an std::vector, and backs this stream from that
+	 * 
+	 */
+	class E2_API HeapStream : public e2::IStream
+	{
+	public:
+		HeapStream(bool transcode = true, uint64_t slack = 0);
+		~HeapStream() = default;
+
+		void reserve(uint64_t extraSlack);
+
+		virtual bool growable() override;
+		virtual uint64_t size() const override;
+		virtual uint8_t const* read(uint64_t numBytes) override;
+		virtual bool write(uint8_t const* data, uint64_t size) override;
+
+	protected:
+		mutable std::vector<uint8_t> m_data;
+	};
+
+	template<uint64_t byteSize>
+	class E2_API StackStream : public e2::IStream
+	{
+	public:
+		StackStream(bool transcode = true)
+		{
+
+		}
+
+		~StackStream() = default;
+
+		virtual bool growable() override
+		{
+			return false;
+		}
+
+		virtual uint64_t size() const override
+		{
+			return byteSize;
+		}
+
+		virtual uint8_t const* read(uint64_t numBytes) override
+		{
+			uint64_t oldCursor;
+			if (consume(numBytes, oldCursor))
+			{
+				return &m_data[oldCursor];
+			}
+
+			LogError("failed to read {} bytes from stream", numBytes);
+
+			return nullptr;
+		}
+
+		virtual bool write(uint8_t const* data, uint64_t size) override
+		{
+			uint64_t oldCursor;
+			if (consume(size, oldCursor))
+			{
+				memcpy(&m_data[oldCursor], data, size);
+				return true;
+			}
+
+			return false;
+		}
+
+	protected:
+		mutable std::array<uint8_t, byteSize> m_data;
+	};
+
+
+	/**
+	 * Filestream
+	 */
+	class E2_API FileStream : public e2::IStream
+	{
+	public:
+		FileStream(std::string const& path, bool create, bool transcode = true);
+		~FileStream();
+		virtual bool growable() override;
+		virtual uint64_t size() const override;
+		virtual uint8_t const* read(uint64_t numBytes) override;
+		virtual bool write(uint8_t const* data, uint64_t size) override;
+
+		inline bool valid() const
+		{
+			return m_valid;
+		}
 
 	protected:
 
-		bool m_encode{};
-		mutable std::vector<uint8_t> m_data; 
-		uint64_t m_cursor{};
+		void updateSize();
+
+		std::vector<uint8_t> m_readBuffer;
+		mutable std::fstream m_handle;
+		uint64_t m_size;
+		bool m_valid;
 	};
+
 
 }

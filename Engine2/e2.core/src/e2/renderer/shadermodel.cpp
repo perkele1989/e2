@@ -45,8 +45,3 @@ bool e2::ShaderModel::active()
 {
 	return m_active;
 }
-
-bool e2::ShaderModelSpecification::isCompatible(e2::SubmeshSpecification const& mesh)
-{
-	return (requiredAttributes & mesh.attributeFlags) == requiredAttributes;
-}

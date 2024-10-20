@@ -44,8 +44,7 @@ e2::LightweightModel::~LightweightModel()
 void e2::LightweightModel::postConstruct(e2::Context* ctx)
 {
 	e2::ShaderModel::postConstruct(ctx);
-	m_specification.requiredAttributes = e2::VertexAttributeFlags::Normal | e2::VertexAttributeFlags::TexCoords01;
-
+	
 	e2::DescriptorSetLayoutCreateInfo setLayoutCreateInfo{};
 	setLayoutCreateInfo.bindings = {
 		{ e2::DescriptorBindingType::UniformBuffer , 1}, // ubo params
@@ -154,6 +153,13 @@ e2::IPipelineLayout* e2::LightweightModel::getOrCreatePipelineLayout(e2::MeshPro
 e2::IPipeline* e2::LightweightModel::getOrCreatePipeline(e2::MeshProxy* proxy, uint8_t lodIndex, uint8_t submeshIndex, e2::RendererFlags rendererFlags)
 {
 
+
+	e2::SubmeshSpecification const& spec = proxy->lods[lodIndex].asset->specification(submeshIndex);
+	e2::LightweightProxy* lwProxy = static_cast<e2::LightweightProxy*>(proxy->lods[lodIndex].materialProxies[submeshIndex]);
+	e2::MaterialPtr material = lwProxy->asset;
+
+
+
 	if (!m_shadersReadFromDisk)
 	{
 		m_shadersOnDiskOK = true;
@@ -183,8 +189,6 @@ e2::IPipeline* e2::LightweightModel::getOrCreatePipeline(e2::MeshProxy* proxy, u
 
 
 
-	e2::SubmeshSpecification const &spec = proxy->lods[lodIndex].asset->specification(submeshIndex);
-	e2::LightweightProxy* lwProxy = static_cast<e2::LightweightProxy*>(proxy->lods[lodIndex].materialProxies[submeshIndex]);
 
 	uint16_t geometryFlags = (uint16_t)spec.attributeFlags;
 	

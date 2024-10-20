@@ -83,8 +83,8 @@ namespace e2
 		OptikusGraph()=default;
 		virtual ~OptikusGraph();
 
-		virtual void write(Buffer& destination) const override;
-		virtual bool read(Buffer& source) override;
+		virtual void write(e2::IStream& destination) const override;
+		virtual bool read(e2::IStream& source) override;
 		virtual bool finalize() override;
 
 

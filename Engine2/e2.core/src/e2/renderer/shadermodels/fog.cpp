@@ -43,12 +43,12 @@ e2::FogModel::~FogModel()
 void e2::FogModel::postConstruct(e2::Context* ctx)
 {
 	e2::ShaderModel::postConstruct(ctx);
-	m_specification.requiredAttributes = e2::VertexAttributeFlags::Normal | e2::VertexAttributeFlags::TexCoords01;
 
 	e2::DescriptorSetLayoutCreateInfo setLayoutCreateInfo{};
 	setLayoutCreateInfo.bindings = {
 		{ e2::DescriptorBindingType::UniformBuffer , 1}, // ubo params
 		{ e2::DescriptorBindingType::Texture, 1}, // visibilityMask
+		{ e2::DescriptorBindingType::Texture, 2}, // irradianceHdr
 	};
 	m_descriptorSetLayout = renderContext()->createDescriptorSetLayout(setLayoutCreateInfo);
 
@@ -79,6 +79,14 @@ void e2::FogModel::postConstruct(e2::Context* ctx)
 	m_proxyUniformBuffers[0] = renderContext()->createDataBuffer(bufferCreateInfo);
 	m_proxyUniformBuffers[1] = renderContext()->createDataBuffer(bufferCreateInfo);
 
+	std::string cubemapName = "assets/hdri/courtyard_irr.e2a";
+
+	e2::ALJDescription aljDesc;
+	assetManager()->prescribeALJ(aljDesc, cubemapName);
+	assetManager()->queueWaitALJ(aljDesc);
+
+	m_cubemap = assetManager()->get(cubemapName).cast<e2::Texture2D>();
+
 }
 
 e2::MaterialProxy* e2::FogModel::createMaterialProxy(e2::Session* session, e2::MaterialPtr material)
@@ -90,6 +98,7 @@ e2::MaterialProxy* e2::FogModel::createMaterialProxy(e2::Session* session, e2::M
 		newProxy->sets[i] = m_descriptorPool->createDescriptorSet(m_descriptorSetLayout);
 		newProxy->sets[i]->writeUniformBuffer(0, m_proxyUniformBuffers[i], sizeof(e2::FogData), renderManager()->paddedBufferSize(sizeof(e2::FogData)) * newProxy->id);
 		//newProxy->sets[i]->writeTexture(1, m_visibilityMask);
+		newProxy->sets[i]->writeTexture(2, m_cubemap->handle());
 	}
 
 	e2::FogData newData;
@@ -257,4 +266,13 @@ void e2::FogProxy::invalidate(uint8_t frameIndex)
 		if (tex)
 			sets[frameIndex]->writeTexture(1, tex);
 	}
+
+
+	if (irradianceHdr.invalidate(frameIndex))
+	{
+		e2::ITexture* tex = irradianceHdr.data();
+		if (tex)
+			sets[frameIndex]->writeTexture(2, tex);
+	}
+
 }

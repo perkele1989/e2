@@ -24,13 +24,13 @@ e2::Game* e2::GameEmpire::game()
 	return m_game;
 }
 
-void e2::GameEmpire::write(Buffer& destination) const
+void e2::GameEmpire::write(IStream& destination) const
 {
 	destination << resources;
 
 }
 
-bool e2::GameEmpire::read(Buffer& source)
+bool e2::GameEmpire::read(IStream& source)
 {
 	source >> resources;
 

@@ -11,11 +11,15 @@
 
 #include "e2/managers/gamemanager.hpp"
 
+#include "e2/renderer/shadermodels/custom.hpp"
+
 #include "e2/rhi/vk/vkrendercontext.hpp"
 
 #include "e2/e2.hpp"
 #include "e2/log.hpp"
 
+#include <filesystem>
+ 
 
 uint32_t e2::RenderManager::paddedBufferSize(uint32_t originalSize)
 {
@@ -109,6 +113,10 @@ e2::ShaderModel* e2::RenderManager::getShaderModel(e2::Name modelName)
 		if (m_shaderModels[i]->type()->fqn == modelName)
 			return m_shaderModels[i];
 
+	for (uint32_t i = 0; i < m_customModels.size(); i++)
+		if (m_customModels[i]->name() == modelName)
+			return m_customModels[i];
+
 	return nullptr;
 }
 
@@ -176,6 +184,12 @@ void e2::RenderManager::invalidatePipelines()
 {
 	// Invalidate all shader models, this effectively discards all current pipelines
 	for (e2::ShaderModel* model : m_shaderModels)
+	{
+		model->invalidatePipelines();
+	}
+
+	// Invalidate all shader models, this effectively discards all current pipelines
+	for (e2::ShaderModel* model : m_customModels)
 	{
 		model->invalidatePipelines();
 	}
@@ -288,6 +302,9 @@ void e2::RenderManager::initialize()
 			LogNotice("Skipped shadermodel as it's abstract/not fully implemented: {}", currModel->fqn);
 			continue;
 		}
+
+		if (currModel == e2::CustomModel::staticType())
+			continue;
 			
 
 		e2::Object* rawModel = currModel->create();
@@ -305,6 +322,30 @@ void e2::RenderManager::initialize()
 
 		LogNotice("Registered shadermodel: {}", currModel->fqn);
 	}
+
+
+
+	for (const std::filesystem::directory_entry& entry : std::filesystem::recursive_directory_iterator("shadermodels/"))
+	{
+		if (!entry.is_regular_file())
+			continue;
+		if (entry.path().extension() != ".json")
+			continue;
+
+		e2::CustomModel* newModel = e2::create<e2::CustomModel>();
+		newModel->source(entry.path().string());
+		newModel->postConstruct(this);
+		if (!newModel->valid())
+		{
+			LogError("Custom shader model couldn't be loaded: {}", entry.path().string());
+			e2::destroy(newModel);
+			continue;
+		}
+
+		m_customModels.push(newModel);
+		LogNotice("Registered custom shader model {} from path: {}", newModel->name(), entry.path().string());
+	}
+
 
 
 	bool aljSuccess = true;

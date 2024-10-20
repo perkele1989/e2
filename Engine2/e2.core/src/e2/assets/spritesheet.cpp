@@ -8,12 +8,12 @@ e2::Spritesheet::~Spritesheet()
 
 }
 
-void e2::Spritesheet::write(Buffer& destination) const
+void e2::Spritesheet::write(e2::IStream& destination) const
 {
 	e2::Asset::write(destination);
 }
 
-bool e2::Spritesheet::read(Buffer& source)
+bool e2::Spritesheet::read(e2::IStream& source)
 {
 	if (!e2::Asset::read(source))
 		return false;

@@ -18,8 +18,8 @@ namespace e2
 		Texture2D();
 		virtual ~Texture2D();
 
-		virtual void write(Buffer& destination) const override;
-		virtual bool read(Buffer& source) override;
+		virtual void write(e2::IStream& destination) const override;
+		virtual bool read(e2::IStream& source) override;
 
 		inline e2::ITexture* handle()
 		{

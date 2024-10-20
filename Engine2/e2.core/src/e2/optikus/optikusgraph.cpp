@@ -35,12 +35,12 @@ e2::OptikusGraph::~OptikusGraph()
 
 }
 
-void e2::OptikusGraph::write(Buffer& destination) const
+void e2::OptikusGraph::write(e2::IStream& destination) const
 {
 
 }
 
-bool e2::OptikusGraph::read(Buffer& source)
+bool e2::OptikusGraph::read(e2::IStream& source)
 {
 	return true;
 }

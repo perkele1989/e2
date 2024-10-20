@@ -13,8 +13,8 @@ namespace e2
 
 	struct ResourceTable : public e2::Data
 	{
-		virtual void write(e2::Buffer& destination) const override;
-		virtual bool read(e2::Buffer& source) override;
+		virtual void write(e2::IStream& destination) const override;
+		virtual bool read(e2::IStream& source) override;
 
 		float gold{};
 		float wood{};
@@ -40,8 +40,8 @@ namespace e2
 
 	struct GameResources : public e2::Data
 	{
-		virtual void write(e2::Buffer& destination) const override;
-		virtual bool read(e2::Buffer& source) override;
+		virtual void write(e2::IStream& destination) const override;
+		virtual bool read(e2::IStream& source) override;
 
 		void collectRevenue();
 		void collectExpenditures();

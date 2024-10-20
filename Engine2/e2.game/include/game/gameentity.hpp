@@ -448,8 +448,8 @@ namespace e2
 
 		virtual void drawUI(e2::UIContext* ctx);
 
-		virtual void writeForSave(e2::Buffer& toBuffer);
-		virtual void readForSave(e2::Buffer& fromBuffer);
+		virtual void writeForSave(e2::IStream& toBuffer);
+		virtual void readForSave(e2::IStream& fromBuffer);
 
 		virtual bool playerRelevant();
 

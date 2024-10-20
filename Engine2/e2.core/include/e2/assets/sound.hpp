@@ -19,8 +19,8 @@ namespace e2
 		Sound();
 		virtual ~Sound();
 
-		virtual void write(Buffer& destination) const override;
-		virtual bool read(Buffer& source) override;
+		virtual void write(e2::IStream& destination) const override;
+		virtual bool read(e2::IStream& source) override;
 
 		inline FMOD::Sound* fmodSound()
 		{

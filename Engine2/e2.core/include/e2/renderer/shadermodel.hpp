@@ -25,12 +25,6 @@ namespace e2
 	class Engine;
 	class MeshProxy;
 
-	struct E2_API ShaderModelSpecification
-	{
-		bool isCompatible(e2::SubmeshSpecification const& mesh);
-
-		e2::VertexAttributeFlags requiredAttributes { };
-	};
 
 	/** @tags() */
 	class E2_API ShaderModel : public e2::Context, public e2::ManagedObject
@@ -42,10 +36,6 @@ namespace e2
 
 		virtual void postConstruct(e2::Context* ctx);
 
-		inline ShaderModelSpecification const& specification() const
-		{
-			return m_specification;
-		}
 
 		virtual Engine* engine() override;
 
@@ -66,7 +56,6 @@ namespace e2
 	protected:
 		e2::Engine* m_engine{};
 
-		ShaderModelSpecification m_specification{};
 		bool m_active{ true };
 
 

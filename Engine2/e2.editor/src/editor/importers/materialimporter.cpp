@@ -110,6 +110,7 @@ bool e2::MaterialImporter::writeAssets()
 	e2::Buffer materialData;
 
 	materialData << model;
+
 	materialData << uint8_t(defines.size());
 	for (std::pair<std::string, std::string> p : defines)
 	{

@@ -18,12 +18,12 @@ e2::Texture2D::~Texture2D()
 
 
 
-void e2::Texture2D::write(Buffer& destination) const
+void e2::Texture2D::write(e2::IStream& destination) const
 {
 
 }
 
-bool e2::Texture2D::read(Buffer& source)
+bool e2::Texture2D::read(e2::IStream& source)
 {
 	if (m_texture)
 		e2::destroy(m_texture);
@@ -64,9 +64,7 @@ bool e2::Texture2D::read(Buffer& source)
 		{
 			uint64_t dataSize{};
 			source >> dataSize;
-			m_texture->upload(i, glm::uvec3(0, 0, 0), glm::uvec3(res, 1), source.current(), dataSize);
-			uint64_t oldCursor;
-			source.consume(dataSize, oldCursor);
+			m_texture->upload(i, glm::uvec3(0, 0, 0), glm::uvec3(res, 1), source.read(dataSize), dataSize);
 
 			res /= 2;
 		}
@@ -75,9 +73,7 @@ bool e2::Texture2D::read(Buffer& source)
 	{
 		uint64_t dataSize{};
 		source >> dataSize;
-		m_texture->upload(0, glm::uvec3(0, 0, 0), glm::uvec3(m_resolution, 1), source.current(), dataSize);
-		uint64_t oldCursor;
-		source.consume(dataSize, oldCursor);
+		m_texture->upload(0, glm::uvec3(0, 0, 0), glm::uvec3(m_resolution, 1), source.read(dataSize), dataSize);
 	}
 
 	if (generateMips)

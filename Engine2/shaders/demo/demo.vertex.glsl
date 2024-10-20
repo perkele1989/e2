@@ -39,7 +39,11 @@ void main()
 	vec4 vertexWorld = mesh.modelMatrix * vertexPosition;
 	vec4 waterPosition = vertexPosition;
     float wh = sampleWaterHeight(vertexWorld.xz, time);
-	waterPosition.y -= wh * material.water.w;
+
+	if(material.water2.z != 1)
+	{
+		waterPosition.y -= wh * material.water.w;
+	}
 	waterPosition.y -= material.water.x;
 
 	fragmentNormal = sampleWaterNormal(vertexWorld.xz, time);

@@ -76,6 +76,8 @@ namespace e2
 		e2::DirtyParameter<FogData> uniformData{};
 		e2::DirtyParameter<e2::ITexture*> visibilityMasks[2];
 
+		e2::DirtyParameter<e2::ITexture*> irradianceHdr;
+
 	};
 
 	/** @tags(dynamic, arena, arenaSize=1) */

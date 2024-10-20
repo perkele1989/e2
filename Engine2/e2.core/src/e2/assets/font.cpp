@@ -65,12 +65,12 @@ e2::Font::~Font()
 }
 
 
-void e2::Font::write(Buffer& destination) const
+void e2::Font::write(e2::IStream& destination) const
 {
 
 }
 
-bool e2::Font::read(Buffer& source)
+bool e2::Font::read(e2::IStream& source)
 {
 	if (m_buildId != UINT64_MAX)
 	{

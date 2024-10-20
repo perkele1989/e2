@@ -31,8 +31,8 @@ namespace e2
 
 		virtual e2::Game* game() override;
 
-		virtual void write(Buffer& destination) const override;
-		virtual bool read(Buffer& source) override;
+		virtual void write(IStream& destination) const override;
+		virtual bool read(IStream& source) override;
 
 
 		e2::City* capital;

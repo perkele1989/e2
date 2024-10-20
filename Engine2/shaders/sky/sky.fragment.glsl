@@ -12,7 +12,8 @@ out vec4 outPosition;
 void main()
 {
     vec3 viewToSurface = normalize(fragmentPosition.xyz - (inverse(renderer.viewMatrix) * vec4(0.0, 0.0, 0.0, 1.0)).xyz);
-    outColor.rgb = textureLod(sampler2D(radianceCube, equirectSampler), equirectangularUv(viewToSurface), 4.0).rgb * renderer.ibl1.x;
+    outColor.rgb = textureLod(sampler2D(irradianceCube, equirectSampler), equirectangularUv(viewToSurface), 0.0).rgb * renderer.ibl1.x * 0.5 *  vec3(0.1, 0.4, 1.0);
+
 
     outColor.a = 1.0;
 

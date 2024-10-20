@@ -19,7 +19,7 @@ namespace e2
 		alignas(16) glm::vec4 parameters; // exposure, whitepoint, etc etc
 	};
 
-	enum class RenderLayer : uint32_t
+	enum class RenderLayer : uint64_t
 	{
 		Sky = 512,
 

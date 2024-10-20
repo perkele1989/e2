@@ -479,8 +479,8 @@ namespace e2
 
 		float m_sunStrength{ 10.0f };
 		float m_iblStrength{ 5.00f };
-		float m_sunAngleA{ -75.0f };
-		float m_sunAngleB{ 21.75f };
+		float m_sunAngleA{ -33.0f };
+		float m_sunAngleB{ 15.75f };
 		float m_exposure{ 1.0f };
 		float m_whitepoint{5.0f};
 

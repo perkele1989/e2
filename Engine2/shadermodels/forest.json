@@ -1,0 +1,25 @@
+{
+    "name": "forest",
+    "renderLayer": 1024,
+    "vertexShader": "shaders/forest/forest.vertex.glsl",
+    "fragmentShader": "shaders/forest/forest.fragment.glsl",
+    "textures": [
+        {
+            "name": "albedoMap"
+        }
+    ],
+    "parameters": [
+        {
+            "name": "albedo",
+            "defaultValue": [1.0, 1.0, 1.0, 1.0]
+        },
+        {
+            "name": "emissive",
+            "defaultValue": [0.0, 0.0, 0.0, 0.0]
+        },
+        {
+            "name": "rmxx",
+            "defaultValue": [1.0, 0.0, 0.0, 0.0]
+        }
+    ]
+}

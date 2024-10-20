@@ -253,9 +253,10 @@ void e2::AssetManager::initialize()
 
 void e2::AssetManager::shutdown()
 {
-	e2::Buffer fileBuffer;
-	fileBuffer << m_database;
-	fileBuffer.writeToFile("./assets/registry.db");
+	{
+		e2::FileStream fileHandle("./assets/registry.db", true);
+		fileHandle << m_database;
+	}
 
 	m_uuidIndex.clear();
 	m_database.clear();
@@ -362,17 +363,16 @@ bool e2::AssetTask::prepare()
 
 bool e2::AssetTask::execute()
 {
-	e2::Buffer fileBuffer;
+	e2::FileStream fileStream(m_entry->path, false);
 
-	uint64_t bytesRead = fileBuffer.readFromFile(m_entry->path);
-	if (bytesRead == 0)
+	if (!fileStream.valid())
 	{
 		LogError("Asset file not readable or doesn't exist");
 		return false;
 	}
 
 	e2::AssetHeader header;
-	fileBuffer >> header;
+	fileStream >> header;
 
 	// Copy deps over to the asset instance, since this isn't read in the actual asset
 	m_asset->dependencies = header.dependencies;
@@ -380,7 +380,7 @@ bool e2::AssetTask::execute()
 
 	// @todo data compression
 
-	if (!m_asset->read(fileBuffer))
+	if (!m_asset->read(fileStream))
 	{
 		LogError("Asset data corrupted");
 		return false;
@@ -522,9 +522,9 @@ void e2::AssetDatabase::validate(bool forceSave)
 
 void e2::AssetDatabase::readFromDisk()
 {
-	e2::Buffer fileBuffer;
+	e2::FileStream fileBuffer("./assets/registry.db", false);
 	bool forceSave{};
-	if (fileBuffer.readFromFile("./assets/registry.db") > 0)
+	if (fileBuffer.valid())
 	{
 		read(fileBuffer);
 	}
@@ -543,21 +543,20 @@ void e2::AssetDatabase::readFromDisk()
 
 void e2::AssetDatabase::writeToDisk()
 {
-	e2::Buffer fileBuffer;
+	e2::FileStream fileBuffer("./assets/registry.db", true);
 	write(fileBuffer);
-	fileBuffer.writeToFile("./assets/registry.db");
 }
 
 
 
-void e2::AssetDatabase::write(Buffer& destination) const
+void e2::AssetDatabase::write(e2::IStream& destination) const
 {
 	destination << uint32_t(m_assets.size());
 	for (e2::AssetEntry *entry : m_assets)
 		destination << *entry;
 }
 
-bool e2::AssetDatabase::read(Buffer& source)
+bool e2::AssetDatabase::read(e2::IStream& source)
 {
 	uint32_t numEntries{};
 	source >> numEntries;
@@ -622,9 +621,8 @@ bool e2::AssetDatabase::readHeader(std::string const& path, e2::AssetHeader& out
 {
 	std::string clean = cleanPath(path);
 
-	// @todo we read 1kb here but maybe we should adjust this. It's unpredictable due to variable e2::Name members, and variable dep array size
-	e2::Buffer dataBuffer;
-	if (dataBuffer.readFromFile(clean, 0, 1024) == 0)
+	e2::FileStream dataBuffer(clean, false);
+	if (!dataBuffer.valid())
 	{
 		return false;
 	}
@@ -713,7 +711,7 @@ e2::AssetEntry::AssetEntry()
 
 }
 
-void e2::AssetEntry::write(Buffer& destination) const
+void e2::AssetEntry::write(e2::IStream& destination) const
 {
 	destination << uuid;
 	destination << path;
@@ -721,7 +719,7 @@ void e2::AssetEntry::write(Buffer& destination) const
 	destination << header;
 }
 
-bool e2::AssetEntry::read(Buffer& source)
+bool e2::AssetEntry::read(e2::IStream& source)
 {
 	source >> uuid;
 	source >> path;
@@ -732,7 +730,7 @@ bool e2::AssetEntry::read(Buffer& source)
 }
 
 
-void e2::AssetHeader::write(Buffer& destination) const
+void e2::AssetHeader::write(e2::IStream& destination) const
 {
 	destination << e2::AssetMagic;
 	destination << assetType;
@@ -746,7 +744,7 @@ void e2::AssetHeader::write(Buffer& destination) const
 	}
 }
 
-bool e2::AssetHeader::read(Buffer& source)
+bool e2::AssetHeader::read(e2::IStream& source)
 {
 	uint64_t magic{};
 	source >> magic;

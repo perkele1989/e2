@@ -10,6 +10,7 @@ layout(set = MaterialSetIndex, binding = 0) uniform MaterialData
 } material;
 
 layout(set = MaterialSetIndex, binding = 1) uniform texture2D visibilityMask;
+layout(set = MaterialSetIndex, binding = 2) uniform texture2D irradianceHdr;
 //layout(set = MaterialSetIndex, binding = 3) uniform texture2D visibilityMask;
 // End Set2
 
@@ -60,7 +61,7 @@ vec3 undiscovered(float f,vec3 n, vec3 color, vec3 position, float depth)
     float fogSaturation = 1.0;
     float fogBrightness = 0.25;
     vec3 fogColor = vec3(250, 187, 107) / 255.0;
-    float fogDustiness = 0.8;// * vary;
+    float fogDustiness = 0.0;// * vary;
     
     fogColor = mix(vec3(1.0), fogColor, fogDustiness);
 
@@ -68,8 +69,8 @@ vec3 undiscovered(float f,vec3 n, vec3 color, vec3 position, float depth)
     fogColor = mix(fogColorDesaturate, fogColor, fogSaturation) * fogBrightness;
 
 
-    vec3 irr_back = getIrradiance(-n);
-    vec3 irr_front = getIrradiance(n);
+    vec3 irr_back = textureLod(sampler2D(irradianceHdr, equirectSampler), equirectangularUv(-n), 0.0).rgb ;
+    vec3 irr_front =  textureLod(sampler2D(irradianceHdr, equirectSampler), equirectangularUv(n), 0.0).rgb;
 
     float ratio = 0.5;
     float ratio_half = ratio / 2.0;
@@ -84,7 +85,7 @@ vec3 undiscovered(float f,vec3 n, vec3 color, vec3 position, float depth)
 
 	vec3 lightVector = normalize(renderer.sun1.xyz);
     float ndl = clamp(dot(n, -lightVector), 0.0, 1.0);
-    vec3 ndotl = renderer.sun2.xyz * renderer.sun2.w * ndl;
+    //vec3 ndotl = ndl;
 
 /*
     vec3 lvv = -lightVector;
@@ -95,7 +96,7 @@ vec3 undiscovered(float f,vec3 n, vec3 color, vec3 position, float depth)
 
     //ndotl *= vary*0.75 + 0.25;
 
-    vec3 fogResult = (irradiance * fogColor) + (fogColor * ndotl);
+    vec3 fogResult = (irradiance * fogColor * renderer.ibl1.x) + (fogColor * irradiance * renderer.sun2.xyz * renderer.sun2.w * ndl);
 
     float heightCoeff = smoothstep(0.0, 1.0, depth);
     vec3 undis = mix(color, fogResult, heightCoeff);

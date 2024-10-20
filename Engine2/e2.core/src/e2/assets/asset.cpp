@@ -19,12 +19,12 @@ e2::Engine* e2::Asset::engine()
 	return m_engine;
 }
 
-void e2::Asset::write(Buffer& destination) const
+void e2::Asset::write(e2::IStream& destination) const
 {
 
 }
 
-bool e2::Asset::read(Buffer& source)
+bool e2::Asset::read(e2::IStream& source)
 {
 	return true;
 }

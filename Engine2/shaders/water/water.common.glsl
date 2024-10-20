@@ -48,7 +48,7 @@ float sampleWaterHeight(vec2 position, float time)
     return (height1 * weight1 + height2 * weight2);
 }
 
-const float heightScale = 0.1;
+const float heightScale = 0.25;
 
 vec3 sampleWaterNormal(vec2 position, float time)
 {

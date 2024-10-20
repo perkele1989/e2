@@ -631,4 +631,5 @@ Engine2/*/reflection/
 Engine2/sourcecontent
 Engine2/sourcecontent/*
 Engine2/sourcecontent/**/*
+Engine2/design/**/*
 !templates/project.vcxproj.user

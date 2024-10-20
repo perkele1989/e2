@@ -21,12 +21,12 @@ e2::Sound::~Sound()
 	}
 }
 
-void e2::Sound::write(Buffer& destination) const
+void e2::Sound::write(e2::IStream& destination) const
 {
 
 }
 
-bool e2::Sound::read(Buffer& source)
+bool e2::Sound::read(e2::IStream& source)
 {
 	source >> m_fmodDataSize;
 	uint8_t const* srcData = source.read(m_fmodDataSize);
@@ -36,7 +36,7 @@ bool e2::Sound::read(Buffer& source)
 
 	FMOD_CREATESOUNDEXINFO exInfo{};
 	exInfo.cbsize = sizeof(FMOD_CREATESOUNDEXINFO);
-	exInfo.length = m_fmodDataSize;
+	exInfo.length = (unsigned int)m_fmodDataSize;
 
 	FMOD_RESULT result = audioManager()->coreSystem()->createSound(reinterpret_cast<char*>(m_fmodData), FMOD_OPENMEMORY_POINT | FMOD_3D, &exInfo, &m_fmodSound);
 	if (result != FMOD_OK)

@@ -31,9 +31,6 @@ namespace e2
 	struct E2_API VkThreadLocals
 	{
 		bool initialized{};
-		//e2::IThreadContext* threadContext{}; would be cool to cache this but no use for it yet
-		// the IThreadContext is userspace utility across RHI's, VkThreadLocals is specific to Vulkan RHI implementation and opaque to user. 
-		// Additionally, RHI implementation shouldn't mess with userspace functionality (including utilizing RHI interface objects)
 
 		/** Transient pool, fence and buffer. This is for transient one-off commands, that have to wait for eaech other to finish. */
 		VkCommandPool vkTransientPool{};
