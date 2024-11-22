@@ -87,6 +87,17 @@ void e2::CustomModel::postConstruct(e2::Context* ctx)
 		m_vertexSourcePath = data.at("vertexShader").template get<std::string>();
 		m_fragmentSourcePath = data.at("fragmentShader").template get<std::string>();
 
+		if (data.contains("doubleSided") && data.at("doubleSided").template get<bool>())
+		{
+			m_doubleSided = true;
+		}
+
+
+		if (data.contains("supportsShadows") && !data.at("supportsShadows").template get<bool>())
+		{
+			m_supportsShadows = false;
+		}
+
 		if (data.contains("renderLayer"))
 		{
 			m_renderLayer = data.at("renderLayer").template get<uint64_t>();
@@ -427,7 +438,7 @@ e2::IPipeline* e2::CustomModel::getOrCreatePipeline(e2::MeshProxy* proxy, uint8_
 
 bool e2::CustomModel::supportsShadows()
 {
-	return true;
+	return m_supportsShadows;
 }
 
 void e2::CustomModel::invalidatePipelines()
@@ -536,6 +547,15 @@ void e2::CustomProxy::bind(e2::ICommandBuffer* buffer, uint8_t frameIndex, bool 
 {
 	if (!shadows)
 		buffer->bindDescriptorSet(model->m_pipelineLayout, 2, sets[frameIndex]);
+
+	if(model->m_doubleSided)
+		buffer->setCullMode(e2::CullMode::None);
+}
+
+void e2::CustomProxy::unbind(e2::ICommandBuffer* buffer, uint8_t frameIndex, bool shadows)
+{
+	if (model->m_doubleSided)
+		buffer->setCullMode(e2::CullMode::Back);
 }
 
 void e2::CustomProxy::invalidate(uint8_t frameIndex)

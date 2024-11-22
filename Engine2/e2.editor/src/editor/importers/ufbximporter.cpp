@@ -542,29 +542,31 @@ bool e2::UfbxImporter::writeAssets()
 		tmpIndices.resize(256);
 
 		// Process
+		uint32_t dep_i = 0;
 		for (e2::UfbxImportSubmesh &submesh : m_mesh.submeshes)
 		{
 			e2::UfbxImportSubmesh::IntermediateData& im = submesh.intermediate;
-			im.indexData = e2::Buffer(false);
+			im.indexData = e2::HeapStream(false);
 
 			auto matFinder = m_config.materialMappings.find(submesh.materialName);
 			if (matFinder == m_config.materialMappings.end())
 			{
 				// will reuse if exist
-				im.materialUuid = createMaterial(submesh.materialName);
+				im.materialName = createMaterial(submesh.materialName);
 			}
 			else
 			{
-				im.materialUuid = assetManager()->database().entryFromPath(matFinder->second)->uuid;
-				if (!im.materialUuid.valid())
+				e2::AssetEntry* entry = assetManager()->database().entryFromName(matFinder->second);
+				if (!entry)
 				{
 					LogError("material mapping for {} pointed to invalid material: {}", submesh.materialName, matFinder->second);
 					return false;
 				}
+				im.materialName = entry->name;
 			}
 
-			meshHeader.dependencies.push({ im.materialUuid });
-
+			meshHeader.dependencies.push({ std::format("material_{}", dep_i), im.materialName});
+			dep_i++;
 
 
 			for (uint32_t faceIt = 0; faceIt < submesh.ufbxSubmesh->face_indices.count; faceIt++)
@@ -616,7 +618,7 @@ bool e2::UfbxImporter::writeAssets()
 			// handle positions
 			UfbxImportAttribute attribPos{};
 			
-			attribPos.vertexData = e2::Buffer(false, sizeof(glm::vec4) * im.vertexCount);
+			attribPos.vertexData = e2::HeapStream(false, sizeof(glm::vec4) * im.vertexCount);
 			for (uint32_t i = 0; i < im.vertexCount; i++)
 			{
 				glm::vec3 pos = submesh.newVertices[i].position;
@@ -629,7 +631,7 @@ bool e2::UfbxImporter::writeAssets()
 			if (useNormals)
 			{
 				UfbxImportAttribute attribNormals{};
-				attribNormals.vertexData = e2::Buffer(false, sizeof(glm::vec4) * im.vertexCount);
+				attribNormals.vertexData = e2::HeapStream(false, sizeof(glm::vec4) * im.vertexCount);
 				for (uint32_t i = 0; i < im.vertexCount; i++)
 				{
 					glm::vec3 nrm = submesh.newVertices[i].normal;
@@ -639,7 +641,7 @@ bool e2::UfbxImporter::writeAssets()
 				im.attributes.push_back(attribNormals);
 
 				UfbxImportAttribute attribTangents{};
-				attribTangents.vertexData = e2::Buffer(false, sizeof(glm::vec4) * im.vertexCount);
+				attribTangents.vertexData = e2::HeapStream(false, sizeof(glm::vec4) * im.vertexCount);
 				for (uint32_t i = 0; i < im.vertexCount; i++)
 				{
 					glm::vec3 tan = submesh.newVertices[i].tangent;
@@ -655,7 +657,7 @@ bool e2::UfbxImporter::writeAssets()
 			{
 
 				UfbxImportAttribute attribUv01{};
-				attribUv01.vertexData = e2::Buffer(false, sizeof(glm::vec4) * im.vertexCount);
+				attribUv01.vertexData = e2::HeapStream(false, sizeof(glm::vec4) * im.vertexCount);
 				for (uint32_t i = 0; i < im.vertexCount; i++)
 				{
 					attribUv01.vertexData << submesh.newVertices[i].uv01;
@@ -667,7 +669,7 @@ bool e2::UfbxImporter::writeAssets()
 			if (useColors)
 			{
 				UfbxImportAttribute attribColors{};
-				attribColors.vertexData = e2::Buffer(false, sizeof(glm::vec4) * im.vertexCount);
+				attribColors.vertexData = e2::HeapStream(false, sizeof(glm::vec4) * im.vertexCount);
 				for (uint32_t i = 0; i < im.vertexCount; i++)
 				{
 					attribColors.vertexData << submesh.newVertices[i].color;
@@ -717,7 +719,7 @@ bool e2::UfbxImporter::writeAssets()
 				}
 
 				UfbxImportAttribute attribWeights;
-				attribWeights.vertexData = e2::Buffer(false, sizeof(glm::vec4) * im.vertexCount);
+				attribWeights.vertexData = e2::HeapStream(false, sizeof(glm::vec4) * im.vertexCount);
 				for (uint32_t i = 0; i < im.vertexCount; i++)
 				{
 					attribWeights.vertexData << submesh.newVertices[i].weights;
@@ -726,7 +728,7 @@ bool e2::UfbxImporter::writeAssets()
 				im.attributes.push_back(attribWeights);
 
 				UfbxImportAttribute attribIds;
-				attribIds.vertexData = e2::Buffer(false, sizeof(glm::uvec4) * im.vertexCount);
+				attribIds.vertexData = e2::HeapStream(false, sizeof(glm::uvec4) * im.vertexCount);
 				for (uint32_t i = 0; i < im.vertexCount; i++)
 				{
 					attribIds.vertexData << submesh.newVertices[i].bones;
@@ -739,7 +741,7 @@ bool e2::UfbxImporter::writeAssets()
 		}
 
 		// write the data 
-		e2::Buffer meshData; 
+		e2::HeapStream meshData;
 
 		meshData << uint32_t(m_mesh.skeleton.bones.size());
 		for (uint32_t i = 0; i < m_mesh.skeleton.bones.size(); i++)
@@ -757,25 +759,27 @@ bool e2::UfbxImporter::writeAssets()
 			meshData << im.indexCount;
 			meshData << uint8_t(im.attributeFlags);
 			meshData << uint32_t(im.indexData.size());
-			meshData.write(im.indexData.begin(), im.indexData.size());
-			for (UfbxImportAttribute const& attr : im.attributes)
+			im.indexData.seek(0);
+			meshData << im.indexData;
+			for (UfbxImportAttribute & attr : im.attributes)
 			{
+				attr.vertexData.seek(0);
 				meshData << uint32_t(attr.vertexData.size());
-				meshData.write(attr.vertexData.begin(), attr.vertexData.size());
+				meshData << attr.vertexData;
 			}
 		}
 
+		meshData.seek(0);
 		meshHeader.size = meshData.size();
 
-		e2::Buffer fileBuffer(true, 1024 + meshData.size());
+		std::string outFile = (fs::path(m_config.outputDirectory) / (m_mesh.meshName + ".e2a")).string();
+		e2::FileStream fileBuffer(outFile, e2::FileMode::ReadWrite | e2::FileMode::Truncate, true);
 		fileBuffer << meshHeader;
-		fileBuffer.write(meshData.begin(), meshData.size());
-
-		std::string outFile =(fs::path(m_config.outputDirectory) / (m_mesh.meshName + ".e2a")).string();
-		if (fileBuffer.writeToFile(outFile))
+		fileBuffer << meshData;
+		
+		if (fileBuffer.valid())
 		{
-			auto newRef = assetManager()->database().invalidateAsset(outFile);
-			assetManager()->database().validate(true);
+			assetManager()->database().invalidateAsset(outFile);
 		}
 		else
 		{
@@ -790,7 +794,7 @@ bool e2::UfbxImporter::writeAssets()
 		skeletonHeader.assetType = "e2::Skeleton";
 
 		// write the data 
-		e2::Buffer skeletonData;
+		e2::HeapStream skeletonData;
 
 		skeletonData << uint32_t(m_mesh.skeleton.bones.size());
 		for (uint32_t i = 0; i < m_mesh.skeleton.bones.size(); i++)
@@ -804,17 +808,18 @@ bool e2::UfbxImporter::writeAssets()
 			skeletonData << int32_t(b.parentId);
 		}
 
+		skeletonData.seek(0);
 		skeletonHeader.size = skeletonData.size();
 
-		e2::Buffer fileBuffer(true, 1024 + skeletonData.size());
-		fileBuffer << skeletonHeader;
-		fileBuffer.write(skeletonData.begin(), skeletonData.size());
 
 		std::string outFile = (fs::path(m_config.outputDirectory) / (m_mesh.skeletonName + ".e2a")).string();
-		if (fileBuffer.writeToFile(outFile))
+		e2::FileStream fileBuffer(outFile, e2::FileMode::ReadWrite | e2::FileMode::Truncate, true);
+		fileBuffer << skeletonHeader;
+		fileBuffer << skeletonData;
+
+		if (fileBuffer.valid())
 		{
-			auto newRef = assetManager()->database().invalidateAsset(outFile);
-			assetManager()->database().validate(true);
+			assetManager()->database().invalidateAsset(outFile);
 		}
 		else
 		{
@@ -832,7 +837,7 @@ bool e2::UfbxImporter::writeAssets()
 		animHeader.assetType = "e2::Animation";
 
 		// write the data 
-		e2::Buffer animData;
+		e2::HeapStream animData;
 
 
 		animData << uint32_t(anim.duration);
@@ -899,18 +904,18 @@ bool e2::UfbxImporter::writeAssets()
 			}
 		}
 
-
+		animData.seek(0);
 		animHeader.size = animData.size();
 
-		e2::Buffer fileBuffer(true, 1024 + animData.size());
-		fileBuffer << animHeader;
-		fileBuffer.write(animData.begin(), animData.size());
-
 		std::string outFile = (fs::path(m_config.outputDirectory) / (anim.name + ".e2a")).string();
-		if (fileBuffer.writeToFile(outFile))
+		e2::FileStream fileBuffer(outFile, e2::FileMode::ReadWrite | e2::FileMode::Truncate, true);
+		fileBuffer << animHeader;
+		fileBuffer << animData;
+
+		
+		if (fileBuffer.valid())
 		{
-			auto newRef = assetManager()->database().invalidateAsset(outFile);
-			assetManager()->database().validate(true);
+			assetManager()->database().invalidateAsset(outFile);
 		}
 		else
 		{
@@ -921,19 +926,25 @@ bool e2::UfbxImporter::writeAssets()
 	return true;
 }
 
-e2::UUID e2::UfbxImporter::createMaterial(std::string const& outName)
+e2::Name e2::UfbxImporter::createMaterial(std::string const& outName)
 {
-	std::string outFile = (fs::path(m_config.outputDirectory) / (outName + ".e2a")).string();
+	std::string outFile = outName;
+	
+	if (outFile.size() > 4 && outFile.substr(outFile.size() - 4, 4) != ".e2a")
+	{
+		outFile = outFile + ".e2a";
+	}
+	
 
-	e2::AssetEntry* existing = assetManager()->database().entryFromPath(outFile);
+	e2::AssetEntry* existing = assetManager()->database().entryFromName(outFile);
 	if (existing)
-		return existing->uuid;
+		return existing->name;
 
 	e2::AssetHeader materialHeader;
 	materialHeader.version = e2::AssetVersion::Latest;
 	materialHeader.assetType = "e2::Material";
 
-	e2::Buffer materialData;
+	e2::HeapStream materialData;
 	e2::Name shaderModel = "e2::LightweightModel";
 	materialData << shaderModel.string();
 
@@ -944,20 +955,21 @@ e2::UUID e2::UfbxImporter::createMaterial(std::string const& outName)
 	// numtextures
 	materialData << uint8_t(0);
 
-
+	materialData.seek(0);
 	materialHeader.size = materialData.size();
 
-	e2::Buffer fileBuffer(true, 1024 + materialData.size());
+	e2::FileStream fileBuffer(outFile, e2::FileMode::ReadWrite | e2::FileMode::Truncate, true);
 	fileBuffer << materialHeader;
-	fileBuffer.write(materialData.begin(), materialData.size());
-	if (fileBuffer.writeToFile(outFile))
+	fileBuffer << materialData;
+	if (fileBuffer.valid())
 	{
-		return assetManager()->database().invalidateAsset(outFile);
+		auto r = assetManager()->database().invalidateAsset(outFile);
+		return r;
 	}
 	else
 	{
 		LogError("Failed to create material, could not write to file: {}", outFile);
-		return e2::UUID();
+		return "null";
 	}
 }
 

@@ -33,7 +33,6 @@ namespace e2
 		virtual ~Transform();
 
 		glm::mat4 getTransformMatrix(e2::TransformSpace space);
-		void setTransformMatrix(glm::mat4 newTransform, e2::TransformSpace space);
 		
 		glm::vec3 getTranslation(e2::TransformSpace space);
 		void setTranslation(glm::vec3 newTranslation, e2::TransformSpace space);
@@ -50,6 +49,8 @@ namespace e2
 		Transform* getTransformParent();
 		void setTransformParent(Transform* newParent);
 		
+
+		void lookAt(glm::vec3 const& target, e2::TransformSpace space);
 
 	protected:
 		Transform* m_transformParent{};

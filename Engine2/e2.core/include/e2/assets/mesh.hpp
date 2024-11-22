@@ -134,7 +134,7 @@ namespace e2
 		e2::StackVector<e2::Bone*, maxNumRootBones> m_roots;
 
 		std::unordered_map<e2::Name, e2::Bone*> m_boneMap;
-		std::unordered_map<e2::UUID, e2::AnimationBinding*> m_animationBindings;
+		std::unordered_map<e2::Name, e2::AnimationBinding*> m_animationBindings;
 	};
 
 

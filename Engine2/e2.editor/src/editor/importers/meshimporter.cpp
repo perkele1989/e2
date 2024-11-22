@@ -592,25 +592,27 @@ bool e2::MeshImporter::writeAssets()
 			auto matFinder = m_config.materialMappings.find(submesh.materialName);
 			if (matFinder == m_config.materialMappings.end())
 			{
-				im.materialUuid = createMaterial(submesh.materialName);
+				im.materialName = createMaterial(submesh.materialName);
 			}
 			else
 			{
-				im.materialUuid = assetManager()->database().entryFromPath(matFinder->second)->uuid;
-				if (!im.materialUuid.valid())
+				e2::AssetEntry* entry = assetManager()->database().entryFromName(matFinder->second);
+				if (!entry)
 				{
 					LogError("material mapping for {} pointed to invalid material: {}", submesh.materialName, matFinder->second);
 					return false;
 				}
+				im.materialName = entry->name;
+
 			}
 
-			meshHeader.dependencies.push({ im.materialUuid });
+			meshHeader.dependencies.push({ im.materialName });
 
 			// vertex count
 			im.vertexCount = sm->mNumVertices;
 
 			// handle indices (special care to calculate index count, as its used for rendering)
-			im.indexData = e2::Buffer(false, sizeof(uint32_t) * sm->mNumFaces * 3);
+			im.indexData = e2::HeapStream(false, sizeof(uint32_t) * sm->mNumFaces * 3);
 			for (uint32_t i = 0; i < sm->mNumFaces; i++)
 			{
 				if (sm->mFaces[i].mNumIndices == 3)
@@ -659,7 +661,7 @@ bool e2::MeshImporter::writeAssets()
 
 			// handle positions
 			ImportAttribute attribPos{};
-			attribPos.vertexData = e2::Buffer(false, sizeof(glm::vec4) * sm->mNumVertices);
+			attribPos.vertexData = e2::HeapStream(false, sizeof(glm::vec4) * sm->mNumVertices);
 			for (uint32_t i = 0; i < sm->mNumVertices; i++)
 			{
 				//attribPos.vertexData << float(-sm->mVertices[i].x) << float(-sm->mVertices[i].z) << float(sm->mVertices[i].y) << 1.0f;
@@ -674,7 +676,7 @@ bool e2::MeshImporter::writeAssets()
 			if (useNormals)
 			{
 				ImportAttribute attribNormals{};
-				attribNormals.vertexData = e2::Buffer(false, sizeof(glm::vec4) * sm->mNumVertices);
+				attribNormals.vertexData = e2::HeapStream(false, sizeof(glm::vec4) * sm->mNumVertices);
 
 				for (uint32_t i = 0; i < sm->mNumVertices; i++)
 				{
@@ -685,7 +687,7 @@ bool e2::MeshImporter::writeAssets()
 				im.attributes.push_back(attribNormals);
 
 				ImportAttribute attribTangents{};
-				attribTangents.vertexData = e2::Buffer(false, sizeof(glm::vec4) * sm->mNumVertices);
+				attribTangents.vertexData = e2::HeapStream(false, sizeof(glm::vec4) * sm->mNumVertices);
 
 				for (uint32_t i = 0; i < sm->mNumVertices; i++)
 				{
@@ -716,7 +718,7 @@ bool e2::MeshImporter::writeAssets()
 			{
 
 				ImportAttribute attribUv01{};
-				attribUv01.vertexData = e2::Buffer(false, sizeof(glm::vec4) * sm->mNumVertices);
+				attribUv01.vertexData = e2::HeapStream(false, sizeof(glm::vec4) * sm->mNumVertices);
 				for (uint32_t i = 0; i < sm->mNumVertices; i++)
 				{
 					float x = 0.0f, y = 0.0f, z = 0.0f, w = 0.0f;
@@ -740,7 +742,7 @@ bool e2::MeshImporter::writeAssets()
 			{
 
 				ImportAttribute attribUv23{};
-				attribUv23.vertexData = e2::Buffer(false, sizeof(glm::vec4) * sm->mNumVertices);
+				attribUv23.vertexData = e2::HeapStream(false, sizeof(glm::vec4) * sm->mNumVertices);
 				for (uint32_t i = 0; i < sm->mNumVertices; i++)
 				{
 					float x = 0.0f, y = 0.0f, z = 0.0f, w = 0.0f;
@@ -763,7 +765,7 @@ bool e2::MeshImporter::writeAssets()
 			if (useColors)
 			{
 				ImportAttribute attribColors{};
-				attribColors.vertexData = e2::Buffer(false, sizeof(glm::vec4) * sm->mNumVertices);
+				attribColors.vertexData = e2::HeapStream(false, sizeof(glm::vec4) * sm->mNumVertices);
 				for (uint32_t i = 0; i < sm->mNumVertices; i++)
 				{
 					attribColors.vertexData << float(sm->mColors[0][i].r) << float(sm->mColors[0][i].g) << float(sm->mColors[0][i].b) << float(sm->mColors[0][i].a);
@@ -776,7 +778,7 @@ bool e2::MeshImporter::writeAssets()
 			if (useWeights)
 			{
 				ImportAttribute attribWeights;
-				attribWeights.vertexData = e2::Buffer(false, sizeof(glm::vec4) * sm->mNumVertices);
+				attribWeights.vertexData = e2::HeapStream(false, sizeof(glm::vec4) * sm->mNumVertices);
 
 				for (uint32_t i = 0; i < sm->mNumVertices; i++)
 				{
@@ -786,7 +788,7 @@ bool e2::MeshImporter::writeAssets()
 				im.attributes.push_back(attribWeights);
 
 				ImportAttribute attribIds;
-				attribIds.vertexData = e2::Buffer(false, sizeof(glm::uvec4) * sm->mNumVertices);
+				attribIds.vertexData = e2::HeapStream(false, sizeof(glm::uvec4) * sm->mNumVertices);
 				for (uint32_t i = 0; i < sm->mNumVertices; i++)
 				{
 					attribIds.vertexData << submesh.weightData[i].ids;
@@ -799,7 +801,9 @@ bool e2::MeshImporter::writeAssets()
 		}
 
 		// write the data 
-		e2::Buffer meshData; 
+
+		std::string outFile = (fs::path(m_config.outputDirectory) / (m_mesh.meshName + ".e2a")).string();
+		e2::HeapStream meshData; 
 
 		meshData << uint32_t(m_mesh.skeleton.boneIndex.size());
 		for (auto& pair : m_mesh.skeleton.boneIndex)
@@ -817,25 +821,24 @@ bool e2::MeshImporter::writeAssets()
 			meshData << im.indexCount;
 			meshData << uint8_t(im.attributeFlags);
 			meshData << uint32_t(im.indexData.size());
-			meshData.write(im.indexData.begin(), im.indexData.size());
-			for (ImportAttribute const& attr : im.attributes)
+			meshData << im.indexData;
+			for (ImportAttribute & attr : im.attributes)
 			{
 				meshData << uint32_t(attr.vertexData.size());
-				meshData.write(attr.vertexData.begin(), attr.vertexData.size());
+				meshData << attr.vertexData;
 			}
 		}
 
+		meshData.seek(0);
 		meshHeader.size = meshData.size();
 
-		e2::Buffer fileBuffer(true, 1024 + meshData.size());
+		e2::FileStream fileBuffer(outFile, e2::FileMode::ReadWrite | e2::FileMode::Truncate, true);
 		fileBuffer << meshHeader;
-		fileBuffer.write(meshData.begin(), meshData.size());
+		fileBuffer << meshData;
 
-		std::string outFile =(fs::path(m_config.outputDirectory) / (m_mesh.meshName + ".e2a")).string();
-		if (fileBuffer.writeToFile(outFile))
+		if (fileBuffer.valid())
 		{
-			auto newRef = assetManager()->database().invalidateAsset(outFile);
-			assetManager()->database().validate(true);
+			assetManager()->database().invalidateAsset(outFile);
 		}
 		else
 		{
@@ -850,7 +853,7 @@ bool e2::MeshImporter::writeAssets()
 		skeletonHeader.assetType = "e2::Skeleton";
 
 		// write the data 
-		e2::Buffer skeletonData;
+		e2::HeapStream skeletonData;
 
 		skeletonData << uint32_t(m_mesh.skeleton.bones.size());
 		for (uint32_t i = 0; i < m_mesh.skeleton.bones.size(); i++)
@@ -864,17 +867,17 @@ bool e2::MeshImporter::writeAssets()
 			skeletonData << int32_t(b.parentId);
 		}
 
+		skeletonData.seek(0);
 		skeletonHeader.size = skeletonData.size();
 
-		e2::Buffer fileBuffer(true, 1024 + skeletonData.size());
-		fileBuffer << skeletonHeader;
-		fileBuffer.write(skeletonData.begin(), skeletonData.size());
-
 		std::string outFile = (fs::path(m_config.outputDirectory) / (m_mesh.skeletonName + ".e2a")).string();
-		if (fileBuffer.writeToFile(outFile))
+		e2::FileStream fileBuffer(outFile, e2::FileMode::ReadWrite | e2::FileMode::Truncate, true);
+		fileBuffer << skeletonHeader;
+		fileBuffer << skeletonData;
+		
+		if (fileBuffer.valid())
 		{
-			auto newRef = assetManager()->database().invalidateAsset(outFile);
-			assetManager()->database().validate(true);
+			assetManager()->database().invalidateAsset(outFile);
 		}
 		else
 		{
@@ -892,7 +895,7 @@ bool e2::MeshImporter::writeAssets()
 		animHeader.assetType = "e2::Animation";
 
 		// write the data 
-		e2::Buffer animData;
+		e2::HeapStream animData;
 
 
 		animData << uint32_t(anim.duration);
@@ -940,17 +943,17 @@ bool e2::MeshImporter::writeAssets()
 		}
 
 
+		animData.seek(0);
 		animHeader.size = animData.size();
 
-		e2::Buffer fileBuffer(true, 1024 + animData.size());
-		fileBuffer << animHeader;
-		fileBuffer.write(animData.begin(), animData.size());
-
 		std::string outFile = (fs::path(m_config.outputDirectory) / (anim.name + ".e2a")).string();
-		if (fileBuffer.writeToFile(outFile))
+		e2::FileStream fileBuffer(outFile, e2::FileMode::ReadWrite | e2::FileMode::Truncate, true);
+		fileBuffer << animHeader;
+		fileBuffer << animData;
+
+		if (fileBuffer.valid())
 		{
-			auto newRef = assetManager()->database().invalidateAsset(outFile);
-			assetManager()->database().validate(true);
+			assetManager()->database().invalidateAsset(outFile);
 		}
 		else
 		{
@@ -961,15 +964,19 @@ bool e2::MeshImporter::writeAssets()
 	return true;
 }
 
-e2::UUID e2::MeshImporter::createMaterial(std::string const& outName)
+e2::Name e2::MeshImporter::createMaterial(std::string const& outName)
 {
-	std::string outFile = (fs::path(m_config.outputDirectory) / (outName + ".e2a")).string();
+	std::string outFile = (outName + ".e2a");
+
+	e2::AssetEntry* existing = assetManager()->database().entryFromName(outFile);
+	if (existing)
+		return existing->name;
 
 	e2::AssetHeader materialHeader;
 	materialHeader.version = e2::AssetVersion::Latest;
 	materialHeader.assetType = "e2::Material";
 
-	e2::Buffer materialData;
+	e2::HeapStream materialData;
 	e2::Name shaderModel = "e2::LightweightModel";
 	materialData << shaderModel.string();
 
@@ -980,20 +987,22 @@ e2::UUID e2::MeshImporter::createMaterial(std::string const& outName)
 	// numtextures
 	materialData << uint8_t(0);
 
-
+	materialData.seek(0);
 	materialHeader.size = materialData.size();
 
-	e2::Buffer fileBuffer(true, 1024 + materialData.size());
+	e2::FileStream fileBuffer(outFile, e2::FileMode::ReadWrite | e2::FileMode::Truncate, true);
 	fileBuffer << materialHeader;
-	fileBuffer.write(materialData.begin(), materialData.size());
-	if (fileBuffer.writeToFile(outFile))
+	fileBuffer << materialData;
+
+	if (fileBuffer.valid())
 	{
-		return assetManager()->database().invalidateAsset(outFile);
+		auto r = assetManager()->database().invalidateAsset(outFile);
+		return r;
 	}
 	else
 	{
 		LogError("Failed to create material, could not write to file: {}", outFile);
-		return e2::UUID();
+		return "null";
 	}
 }
 

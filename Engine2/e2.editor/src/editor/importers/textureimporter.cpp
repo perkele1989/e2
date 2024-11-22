@@ -106,7 +106,7 @@ bool e2::TextureImporter::writeAssets()
 	textureHeader.version = e2::AssetVersion::Latest;
 	textureHeader.assetType = "e2::Texture2D";
 
-	e2::Buffer textureData;
+	e2::HeapStream textureData;
 
 	int32_t x, y, n;
 
@@ -159,17 +159,15 @@ bool e2::TextureImporter::writeAssets()
 		stbi_image_free(imageData);
 	}
 
-
+	textureData.seek(0);
 	textureHeader.size = textureData.size();
 
-	e2::Buffer fileBuffer(true, 1024 + textureData.size());
+	e2::FileStream fileBuffer(outFile, e2::FileMode::ReadWrite | e2::FileMode::Truncate, true);
 	fileBuffer << textureHeader;
-	fileBuffer.write(textureData.begin(), textureData.size());
-	if (fileBuffer.writeToFile(outFile))
+	fileBuffer << textureData;
+	if (fileBuffer.valid())
 	{
 		assetManager()->database().invalidateAsset(outFile);
-		assetManager()->database().validate(true);
-
 		return true;
 	}
 	else
@@ -278,7 +276,7 @@ bool e2::SheetImporter::writeAssets()
 	spritesheetHeader.version = e2::AssetVersion::Latest;
 	spritesheetHeader.assetType = "e2::Spritesheet";
 
-	e2::AssetEntry* entr = assetManager()->database().entryFromPath(texture);
+	e2::AssetEntry* entr = assetManager()->database().entryFromName(texture);
 	if (!entr)
 	{
 		LogError("texture asset {} doesn't exist in database", texture);
@@ -286,12 +284,12 @@ bool e2::SheetImporter::writeAssets()
 	}
 
 	e2::DependencySlot newDep;
-	newDep.name = "texture";
-	newDep.uuid = entr->uuid;
+	newDep.dependencyName = "texture";
+	newDep.assetName = entr->name;
 	spritesheetHeader.dependencies.push(newDep);
 
 
-	e2::Buffer spritesheetData;
+	e2::HeapStream spritesheetData;
 
 	spritesheetData << uint32_t(sprites.size());
 	for (_Sprite& s : sprites)
@@ -301,16 +299,15 @@ bool e2::SheetImporter::writeAssets()
 		spritesheetData << s.size;
 	}
 
-
+	spritesheetData.seek(0);
 	spritesheetHeader.size = spritesheetData.size();
 
-	e2::Buffer fileBuffer(true, 1024 + spritesheetData.size());
+	e2::FileStream fileBuffer(outFile, e2::FileMode::ReadWrite | e2::FileMode::Truncate, true);
 	fileBuffer << spritesheetHeader;
-	fileBuffer.write(spritesheetData.begin(), spritesheetData.size());
-	if (fileBuffer.writeToFile(outFile))
+	fileBuffer << spritesheetData;
+	if (fileBuffer.valid())
 	{
 		assetManager()->database().invalidateAsset(outFile);
-		assetManager()->database().validate(true);
 
 		return true;
 	}

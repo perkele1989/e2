@@ -69,14 +69,9 @@ bool e2::Material::read(e2::IStream& source)
 		source >> textureName;
 
 		
-		e2::UUID textureUUID = findDependencyByName(textureName);
-		if (!textureUUID.valid())
-		{
-			LogError("Broken asset, dependency missing");
-			continue;
-		}
+		e2::Name assetName = findDependencyByName(textureName);
 
-		e2::Texture2DPtr textureAsset = assetManager()->get(textureUUID).cast<e2::Texture2D>();
+		e2::Texture2DPtr textureAsset = assetManager()->get(assetName).cast<e2::Texture2D>();
 
 		m_textureIndex[textureName] = textureAsset;
 	}

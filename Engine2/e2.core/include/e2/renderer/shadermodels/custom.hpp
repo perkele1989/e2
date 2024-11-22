@@ -68,6 +68,7 @@ namespace e2
 		virtual ~CustomProxy();
 
 		virtual void bind(e2::ICommandBuffer* buffer, uint8_t frameIndex, bool shadows) override;
+		virtual void unbind(e2::ICommandBuffer* buffer, uint8_t frameIndex, bool shadows) override;
 		virtual void invalidate(uint8_t frameIndex) override;
 
 
@@ -82,7 +83,7 @@ namespace e2
 
 	};
 
-	/** @tags(dynamic, arena, arenaSize=1) */
+	/** @tags(dynamic, arena, arenaSize=32) */
 	class E2_API CustomModel : public e2::ShaderModel
 	{
 		ObjectDeclaration()
@@ -128,6 +129,9 @@ namespace e2
 
 		uint64_t m_renderLayer{(uint64_t)e2::RenderLayer::Default};
 
+		bool m_doubleSided{};
+		bool m_supportsShadows{true};
+
 		// Pipeline layout for creating pipelines 
 		e2::IPipelineLayout* m_pipelineLayout{};
 		e2::IPipelineLayout* m_pipelineLayoutShadows{};
@@ -156,8 +160,10 @@ namespace e2
 		e2::StackVector<glm::vec4, e2::maxNumCustomParameters> m_parameterDefaults;
 		e2::Pair<e2::IDataBuffer*> m_proxyUniformBuffers;
 	};
+
+
+	EnumFlagsDeclaration(e2::CustomFlags);
 }
 
-EnumFlagsDeclaration(e2::CustomFlags)
 
 #include "custom.generated.hpp"

@@ -1,0 +1,11 @@
+{
+    "id": "rope",
+    "dropMesh": {
+        "meshScale": [1.0, 1.0, 1.0],
+        "mesh": "SM_Rope.e2a"
+    },
+    "wieldable": true,
+    "wieldHandler": "e2::RopeHandler",
+    "stackable": false,
+    "iconSprite": "ItemIconRope"
+}

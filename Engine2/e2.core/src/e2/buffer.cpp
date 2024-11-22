@@ -42,13 +42,7 @@ bool e2::IStream::consume(uint64_t size, uint64_t& oldCursor)
 
 void e2::IStream::seek(uint64_t newCursor)
 {
-	if (size() == 0)
-	{
-		m_cursor = 0;
-		return;
-	}
-
-	m_cursor = glm::clamp(newCursor, 0ULL, size() - 1ULL);
+	m_cursor = newCursor;
 }
 
 uint64_t e2::IStream::cursor() const
@@ -366,24 +360,12 @@ uint8_t const* e2::HeapStream::read(uint64_t numBytes)
 
 bool e2::HeapStream::write(uint8_t const* data, uint64_t numBytes)
 {
-	if (m_cursor > size())
+	if (m_data.size() < m_cursor + numBytes)
 	{
-		m_cursor = size() - 1;
+		m_data.resize(m_cursor + numBytes);
 	}
 
-	uint64_t end = m_cursor + numBytes;
-	uint64_t push = end - size();
-	uint64_t ow = numBytes - push;
-
-	if (ow > 0)
-	{
-		memcpy(&m_data[m_cursor], data, ow);
-	}
-
-	if (push > 0)
-	{
-		m_data.insert(m_data.end(), data + ow, data + numBytes);
-	}
+	memcpy(&m_data[m_cursor], data, numBytes);
 
 	seek(m_cursor + numBytes);
 	return true;
@@ -391,40 +373,52 @@ bool e2::HeapStream::write(uint8_t const* data, uint64_t numBytes)
 
 
 
-e2::FileStream::FileStream(std::string const& path, bool create, bool transcode)
+e2::FileStream::FileStream(std::string const& path, e2::FileMode mode, bool transcode)
 	: e2::IStream(transcode)
 {
 	m_valid = false;
 
 	std::filesystem::path p = std::filesystem::absolute(path);
-	if (create)
+	if ((mode & e2::FileMode::WriteMask) == e2::FileMode::ReadWrite)
 	{
 		if (!std::filesystem::exists(p))
 		{
 			if (p.has_parent_path())
 			{
-				try
+				if (!std::filesystem::exists(p.parent_path()))
 				{
-					if (!std::filesystem::create_directories(p.parent_path()))
+					try
+					{
+						if (!std::filesystem::create_directories(p.parent_path()))
+						{
+							return;
+						}
+					}
+					catch (...)
 					{
 						return;
 					}
 				}
-				catch (...)
-				{
-					return;
-				}
-			}
-			
-			std::ofstream n(path, std::ios_base::binary|std::ios_base::out);
-			if (n.fail())
-			{
-				return;
 			}
 		}
 	}
 
-	m_handle = std::fstream(path, std::ios_base::binary | std::ios_base::in | std::ios_base::out | std::ios_base::app);
+	std::ios_base::openmode m = std::ios_base::binary | std::ios_base::in;
+	if ((mode & e2::FileMode::WriteMask) == e2::FileMode::ReadWrite)
+	{
+		m = m | std::ios_base::out;
+
+		if ((mode & e2::FileMode::OpenMask) == e2::FileMode::Append)
+		{
+			m = m | std::ios_base::app;
+		}
+		else if ((mode & e2::FileMode::OpenMask) == e2::FileMode::Truncate)
+		{
+			m = m | std::ios_base::trunc;
+		}
+	}
+
+	m_handle = std::fstream(path, m);
 	if (!m_handle.good())
 	{
 		return;

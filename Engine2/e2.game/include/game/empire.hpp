@@ -38,7 +38,7 @@ namespace e2
 		e2::City* capital;
 		std::unordered_set<e2::City*> cities;
 
-		std::unordered_set<e2::GameEntity*> entities;
+		std::unordered_set<e2::TurnbasedEntity*> entities;
 
 		// optional
 		EmpireAI* ai{};
@@ -48,12 +48,6 @@ namespace e2
 		e2::Game* m_game{};
 
 	};
-
-	class GameEntity;
-	class GameUnit; 
-	class GameStructure;
-	class EmpireAI;
-
 
 	class EmpireAI : public e2::Object, public e2::GameContext
 	{
@@ -73,8 +67,8 @@ namespace e2
 		EmpireId id;
 		e2::GameEmpire* empire{};
 
-		e2::GameEntity* currentEntity{};
-		std::unordered_set<e2::GameEntity*> turnEntities;
+		e2::TurnbasedEntity* currentEntity{};
+		std::unordered_set<e2::TurnbasedEntity*> turnEntities;
 
 	protected:
 		e2::Game* m_game{};

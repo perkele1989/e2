@@ -1,0 +1,12 @@
+{
+    "id": "lumber",
+    "displayName": "Wood",
+    "dropMesh": {
+        "meshScale": [0.3, 0.3, 0.3],
+        "mesh": "SM_Lumber.e2a"
+    },
+    "wieldable": false,
+    "stackable": true,
+    "stackSize": 50,
+    "iconSprite": "ItemIconLumber"
+}

@@ -17,7 +17,8 @@
 #include <atomic>
 
 
-#define EnumFlagsDeclaration(x) constexpr x operator|(x lhs, x rhs) \
+#define EnumFlagsDeclaration(x) \
+constexpr x operator|(x lhs, x rhs) \
 { \
     return static_cast<x>(static_cast<std::underlying_type<x>::type>(lhs) | static_cast<std::underlying_type<x>::type>(rhs)); \
 } \
@@ -665,6 +666,9 @@ namespace e2
 
 	protected:
 		uint32_t m_index{};
+#if defined(E2_DEVELOPMENT)
+		std::string m_debugName;
+#endif
 	};
 
 	/** Single-allocation memory arena, with preallocated memory storage */

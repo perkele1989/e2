@@ -1,0 +1,12 @@
+{
+    "id": "arrow",
+    "displayName": "Arrow",
+    "dropMesh": {
+        "meshScale": [2.0, 2.0, 2.0],
+        "mesh": "SM_Arrow.e2a"
+    },
+    "wieldable": false,
+    "stackable": true,
+    "stackSize": 30,
+    "iconSprite": "ItemIconArrow"
+}

@@ -360,7 +360,7 @@ void e2::Renderer::prepareFrame(double deltaTime)
 	m_rendererData.time.x += (float)deltaTime;
 	m_rendererData.time.y = glm::sin((float)m_rendererData.time.x);
 	m_rendererData.time.z = glm::cos((float)m_rendererData.time.x);
-	m_rendererData.time.w = glm::tan((float)m_rendererData.time.x);
+	m_rendererData.time.w = deltaTime;
 
 	m_rendererData.sun1 = glm::vec4(m_sunRotation * e2::worldForwardf(), 0.0f);
 	m_rendererData.sun2 = glm::vec4(m_sunColor, m_sunStrength);
@@ -373,8 +373,8 @@ void e2::Renderer::prepareFrame(double deltaTime)
 
 	// calculate shadow matrices 
 	{
-		float maxDist = 40.0f;
-		float yMin = m_view.origin.y;
+		float maxDist = 100.0f;
+		float yMin = (float)m_view.origin.y;
 		float yMax = 5.0f; // 5 meter below ground seems decent
 		e2::Aabb2D planarAabb = m_viewPoints.limited(maxDist).toAabb(); // 20 meters max view depth
 
@@ -410,7 +410,7 @@ void e2::Renderer::prepareFrame(double deltaTime)
 
 		//m_rendererData.shadowView= glm::lookAt(frustumCenter + m_sunDirection * radius, frustumCenter, e2::worldUpf());
 
-		m_rendererData.shadowProjection = glm::ortho(-radius, radius, -radius, radius, 0.0f, radius * 2.0f);
+		m_rendererData.shadowProjection = glm::ortho(-radius, radius, -radius, radius, 0.01f, maxDist);
 	}
 
 
@@ -513,6 +513,8 @@ void e2::Renderer::recordShadows(double deltaTime, e2::ICommandBuffer* buff)
 		// Issue drawcall
 		buff->draw(meshSpec.indexCount, 1);
 
+
+		meshProxyLOD->materialProxies[submeshIndex]->unbind(buff, frameIndex, true);
 	}
 
 	buff->endRender();
@@ -656,6 +658,8 @@ void e2::Renderer::recordRenderLayers(double deltaTime, e2::ICommandBuffer* buff
 
 			// Issue drawcall
 			buff->draw(meshSpec.indexCount, 1);
+
+			meshProxyLOD->materialProxies[submeshIndex]->unbind(buff, frameIndex, false);
 
 		}
 
@@ -851,6 +855,92 @@ e2::Viewpoints2D const & e2::Renderer::viewpoints() const
 {
 	return m_viewPoints;
 }
+
+
+
+void e2::Renderer::debugCircle(glm::vec3 const& color, glm::vec3 const& pos, float r)
+{
+	constexpr int32_t resolution = 32;
+	float stepDegrees = 360.0f / float(resolution);
+
+
+	glm::vec3 offset(r, 0.0f, 0.0f);
+
+	for (int32_t i = 1; i <= resolution; i++)
+	{
+		float prevDegrees = float(i - 1) * stepDegrees;
+		float currDegrees = float(i) * stepDegrees;
+
+		glm::quat prevRotation = glm::rotate(glm::identity<glm::quat>(), glm::radians(prevDegrees), e2::worldUpf());
+		glm::quat currRotation = glm::rotate(glm::identity<glm::quat>(), glm::radians(currDegrees), e2::worldUpf());
+
+		glm::vec3 prevPosition = pos + prevRotation * offset;
+		glm::vec3 currPosition = pos + currRotation * offset;
+
+		debugLine(color, prevPosition, currPosition);
+	}
+}
+
+void e2::Renderer::debugSphere(glm::vec3 const& color, glm::vec3 const& pos, float r)
+{
+	constexpr int32_t resolution = 32;
+	float stepDegrees = 360.0f / float(resolution);
+
+
+	for (int32_t i = 1; i <= resolution; i++)
+	{
+		float prevDegrees = float(i - 1) * stepDegrees;
+		float currDegrees = float(i) * stepDegrees;
+
+		glm::quat prevRotation = glm::rotate(glm::identity<glm::quat>(), glm::radians(prevDegrees), e2::worldUpf());
+		glm::quat currRotation = glm::rotate(glm::identity<glm::quat>(), glm::radians(currDegrees), e2::worldUpf());
+
+		glm::vec3 prevPosition = pos + prevRotation * e2::worldRightf() * r;
+		glm::vec3 currPosition = pos + currRotation * e2::worldRightf() * r;
+		debugLine(color, prevPosition, currPosition);
+
+		prevRotation = glm::rotate(glm::identity<glm::quat>(), glm::radians(prevDegrees), e2::worldRightf());
+		currRotation = glm::rotate(glm::identity<glm::quat>(), glm::radians(currDegrees), e2::worldRightf());
+		prevPosition = pos + prevRotation * e2::worldForwardf() * r;
+		currPosition = pos + currRotation * e2::worldForwardf() * r;
+		debugLine(color, prevPosition, currPosition);
+
+		prevRotation = glm::rotate(glm::identity<glm::quat>(), glm::radians(prevDegrees), e2::worldForwardf());
+		currRotation = glm::rotate(glm::identity<glm::quat>(), glm::radians(currDegrees), e2::worldForwardf());
+		prevPosition = pos + prevRotation * e2::worldUpf() * r;
+		currPosition = pos + currRotation * e2::worldUpf() * r;
+		debugLine(color, prevPosition, currPosition);
+	}
+}
+
+
+
+
+void e2::Renderer::debugCircle(glm::vec3 const& color, glm::vec2 const& pos, float r)
+{
+	constexpr int32_t resolution = 32;
+	float stepDegrees = 360.0f / float(resolution);
+
+	glm::vec3 centerPosition(pos.x, 0.0f, pos.y);
+
+	glm::vec3 offset(r, 0.0f, 0.0f);
+
+	for (int32_t i = 1; i <= resolution; i++)
+	{
+		float prevDegrees = float(i - 1) * stepDegrees;
+		float currDegrees = float(i) * stepDegrees;
+
+		glm::quat prevRotation = glm::rotate(glm::identity<glm::quat>(), glm::radians(prevDegrees), e2::worldUpf());
+		glm::quat currRotation = glm::rotate(glm::identity<glm::quat>(), glm::radians(currDegrees), e2::worldUpf());
+
+		glm::vec3 prevPosition = centerPosition + prevRotation * offset;
+		glm::vec3 currPosition = centerPosition + currRotation * offset;
+
+		debugLine(color, prevPosition, currPosition);
+	}
+
+}
+
 
 void e2::Renderer::debugLine(glm::vec3 const& color, glm::vec3 const& start, glm::vec3 const& end)
 {

@@ -51,12 +51,30 @@ namespace e2
 		alignas(16) glm::mat4 shadowProjection{ glm::identity<glm::mat4>() };
 		alignas(16) glm::mat4 viewMatrix{ glm::identity<glm::mat4>() };
 		alignas(16) glm::mat4 projectionMatrix{ glm::identity<glm::mat4>() };
-		alignas(16) glm::vec4 time{0.0f, 0.0f, 0.0f, 0.0f}; // t, sin(t), cos(t), tan(t)
+		alignas(16) glm::vec4 time{0.0f, 0.0f, 0.0f, 0.0f}; // t, sin(t), cos(t), deltaTime
 		alignas(16) glm::vec4 sun1{ 0.0f, 0.0f, 0.0f, 0.0f }; // sun direction.xyz, ???
 		alignas(16) glm::vec4 sun2{ 0.0f, 0.0f, 0.0f, 0.0f }; // sun color.rgb, sun strength
 		alignas(16) glm::vec4 ibl1{ 0.0f, 0.0f, 0.0f, 0.0f }; // ibl strength, ???, ???, ???
 		alignas(16) glm::vec4 cameraPosition{ 0.0f, 0.0f, 0.0f, 0.0f };
 	};
+
+	/*
+	
+layout(set = RendererSetIndex, binding = 0) uniform RendererData
+{
+	mat4 shadowView;
+	mat4 shadowProjection;
+	mat4 viewMatrix;
+	mat4 projectionMatrix;
+	vec4 time; // t, sin(t), cos(t), tan(t)
+	vec4 sun1; // sun dir.xyz, ???
+	vec4 sun2; // sun color.rgb, sun strength
+	vec4 ibl1; // ibl strength, ??, ?? ,??
+	vec4 cameraPosition; // pos.xyz, ??
+} renderer;
+	
+	*/
+
 
 	E2_API bool isCounterClockwise(glm::vec2 const& a, glm::vec2 const& b, glm::vec2 const& c);
 
@@ -217,6 +235,10 @@ namespace e2
 		}
 
 		e2::Viewpoints2D const&  viewpoints() const;
+		void debugCircle(glm::vec3 const& color, glm::vec2 const& pos, float r);
+		void debugCircle(glm::vec3 const& color, glm::vec3 const& pos, float r);
+
+		void debugSphere(glm::vec3 const& color, glm::vec3 const& pos, float r);
 
 		void debugLine(glm::vec3 const& color, glm::vec3 const& start, glm::vec3 const& end);
 		void debugLine(glm::vec3 const& color, glm::vec2 const& start, glm::vec2 const& end);
@@ -284,6 +306,13 @@ namespace e2
 		e2::Pair<e2::ICommandBuffer*> m_commandBuffers {nullptr};
 
 		RendererData m_rendererData;
+
+	public:
+		inline RendererData const& rendererData() const {
+			return m_rendererData;
+		}
+	protected:
+
 		e2::Pair<e2::IDataBuffer*> m_rendererBuffers;
 		
 
@@ -310,8 +339,10 @@ namespace e2
 
 
 	};
+
+
+	EnumFlagsDeclaration(e2::RendererFlags);
 }
 
-EnumFlagsDeclaration(e2::RendererFlags)
 
 #include "renderer.generated.hpp"

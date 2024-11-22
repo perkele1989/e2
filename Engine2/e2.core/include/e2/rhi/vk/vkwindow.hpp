@@ -39,6 +39,8 @@ namespace e2
 
 		virtual void cursor(e2::CursorShape newCursor) override;
 
+		virtual void showCursor(bool show) override;
+
 		void onResized(glm::uvec2 newSize);
 
 		virtual glm::vec2 position() override;
@@ -86,6 +88,7 @@ namespace e2
 
 		bool m_swapchainDirty{};
 
+		bool m_cursorHidden{};
 
 	protected:
 

@@ -8,10 +8,10 @@ e2::Asset::~Asset()
 	//LogNotice("Asset DESTROY: {}", uuid.string());
 }
 
-void e2::Asset::postConstruct(e2::Context* ctx, e2::UUID const& inUuid)
+void e2::Asset::postConstruct(e2::Context* ctx, e2::Name const& inName)
 {
 	m_engine = ctx->engine();
-	uuid = inUuid;
+	name = inName;
 }
 
 e2::Engine* e2::Asset::engine()
@@ -34,24 +34,13 @@ bool e2::Asset::finalize()
 	return true;
 }
 
-e2::UUID e2::Asset::findDependencyByName(e2::Name name)
+e2::Name e2::Asset::findDependencyByName(e2::Name name)
 {
 	for (uint8_t i = 0; i < dependencies.size(); i++)
 	{
-		if (dependencies[i].name == name)
-			return dependencies[i].uuid;
+		if (dependencies[i].dependencyName == name)
+			return dependencies[i].assetName;
 	}
 
-	// return defaultconstructed uuid (zero, counts as invalid)
-	return e2::UUID();
-}
-
-e2::DependencySlot::DependencySlot(e2::UUID inUuid)
-{
-	uuid = inUuid;
-}
-
-e2::DependencySlot::DependencySlot()
-{
-
+	return e2::Name("null");
 }

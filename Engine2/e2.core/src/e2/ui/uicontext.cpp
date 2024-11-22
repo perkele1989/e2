@@ -619,8 +619,8 @@ bool e2::UIContext::sliderInt(e2::Name id, int32_t& value, int32_t min, int32_t 
 	float mouseX = (m_mouseState.relativePosition - widgetState->position).x;
 	float mouseNormalized = glm::clamp(mouseX / widgetState->size.x, 0.0f, 1.0f);
 
-	float valueRange = max - min;
-	float valueBegin = min;
+	float valueRange = float(max - min);
+	float valueBegin = float(min);
 
 	if (mouseDown)
 	{
@@ -657,9 +657,12 @@ bool e2::UIContext::sliderFloat(e2::Name id, float& value, float min, float max,
 	float valueRange = max - min;
 	float valueBegin = min;
 
+	bool wasChanged = false;
+
 	if (mouseDown)
 	{
 		value = valueBegin + valueRange * mouseNormalized;
+		wasChanged = true;
 	}
 
 	float valueNormalized = (value - valueBegin) / valueRange;
@@ -671,7 +674,7 @@ bool e2::UIContext::sliderFloat(e2::Name id, float& value, float min, float max,
 	std::string valueStr = std::format("{:.3f}", value);
 	float textWidth = calculateTextWidth(e2::FontFace::Monospace, 9, valueStr);
 	drawRasterText(e2::FontFace::Monospace, 9, style.windowBgColor, widgetState->position + glm::vec2(widgetState->size.x, widgetState->size.y / 2.0f) - glm::vec2(textWidth, 0.0f), valueStr);
-	return false;
+	return wasChanged;
 }
 
 

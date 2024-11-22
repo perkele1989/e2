@@ -59,6 +59,8 @@ namespace e2
 
 
     };
+
+
+    EnumFlagsDeclaration(e2::VertexAttributeFlags);
 }
 
-EnumFlagsDeclaration(e2::VertexAttributeFlags)

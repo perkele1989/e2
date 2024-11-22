@@ -1,0 +1,21 @@
+{
+    "id": "ironshield",
+    "dropMesh": {
+        "meshScale": [1.0, 1.0, 1.0],
+        "mesh": "SM_IronShield.e2a"
+    },
+    "equipMesh": {
+        "meshScale": [1.0, 1.0, 1.0],
+        "mesh": "SM_IronShield.e2a"
+    },
+    "equippable": true,
+    "equipSlot": "shield",
+    "equipHandler": "e2::ShieldHandler",
+    "equipHandlerData":{
+        "knockback": 5.0,
+        "stun": 10.0
+    },
+    "stackable": false,
+
+    "iconSprite": "ItemIconIronShield"
+}

@@ -3,6 +3,7 @@
 #include "game/game.hpp"
 #include "game/mob.hpp"
 
+#include "game/entities/turnbasedentity.hpp"
 #include <utility>
 
 
@@ -38,14 +39,14 @@ void e2::Wave::pushMobs(std::string const& prefabPath)
 	}
 }
 
-e2::Wave::Wave(e2::Game* game, e2::GameEntity* hiveEntity, e2::GameEntity* targetEntity)
+e2::Wave::Wave(e2::Game* game, e2::TurnbasedEntity* hiveEntity, e2::TurnbasedEntity* targetEntity)
 	: game(game)
 	, hive(hiveEntity)
 	, target(targetEntity)
 {
 	//int32_t dist = e2::Hex::distance(city->entity->tileIndex, hiveEntity->tileIndex);
-	e2::Hex cityHex = target->tileIndex;
-	e2::PathFindingAS *as = e2::create<e2::PathFindingAS>(game, e2::Hex(hive->tileIndex), 1024, true, PassableFlags::Land, true, &cityHex);
+	e2::Hex cityHex = target->getTileIndex();
+	e2::PathFindingAS *as = e2::create<e2::PathFindingAS>(game, e2::Hex(hive->getTileIndex()), 1024, true, PassableFlags::Land, true, &cityHex);
 	path = as->find(cityHex);
 	e2::destroy(as);
 }
@@ -80,7 +81,7 @@ void e2::Wave::update(double seconds)
 
 		game->onMobSpawned(newMob);
 
-		hive->playAction("spawn");
+		hive->meshComponent()->playAction("spawn");
 	}
 
 	// update existing mobs 

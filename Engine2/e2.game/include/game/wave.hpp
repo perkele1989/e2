@@ -13,7 +13,6 @@
 
 namespace e2
 {
-	class GameEntity;
 	struct MobSpecification;
 	class Mob;
 
@@ -22,7 +21,7 @@ namespace e2
 	{
 		ObjectDeclaration();
 	public:
-		Wave(e2::Game* game, e2::GameEntity* hiveEntity, e2::GameEntity* targetEntity);
+		Wave(e2::Game* game, e2::TurnbasedEntity* hiveEntity, e2::TurnbasedEntity* targetEntity);
 		virtual ~Wave();
 
 		void pushMobs(std::string const& prefabPath);
@@ -33,8 +32,8 @@ namespace e2
 		bool completed();
 
 		e2::Game* game;
-		e2::GameEntity* hive;
-		e2::GameEntity* target;
+		e2::TurnbasedEntity* hive;
+		e2::TurnbasedEntity* target;
 
 		double time{};
 

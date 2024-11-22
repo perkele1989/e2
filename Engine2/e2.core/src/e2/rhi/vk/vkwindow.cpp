@@ -256,6 +256,19 @@ void e2::IWindow_Vk::cursor(e2::CursorShape newCursor)
 	glfwSetCursor(m_glfwHandle, ::glfwCursors[size_t(newCursor)]);
 }
 
+void e2::IWindow_Vk::showCursor(bool show)
+{
+	m_cursorHidden = show;
+	int currMode = glfwGetInputMode(m_glfwHandle, GLFW_CURSOR);
+
+	if (currMode == GLFW_CURSOR_DISABLED)
+	{
+		return;
+	}
+
+	glfwSetInputMode(m_glfwHandle, GLFW_CURSOR, m_cursorHidden ? GLFW_CURSOR_NORMAL : GLFW_CURSOR_HIDDEN);
+}
+
 void e2::IWindow_Vk::size(glm::uvec2 const& newSize)
 {
 	if (newSize.x == 0 || newSize.y == 0)
@@ -322,7 +335,8 @@ void e2::IWindow_Vk::mouseLock(bool newMouseLock)
 	}
 	else
 	{
-		glfwSetInputMode(m_glfwHandle, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+
+		glfwSetInputMode(m_glfwHandle, GLFW_CURSOR, m_cursorHidden ? GLFW_CURSOR_NORMAL : GLFW_CURSOR_HIDDEN);
 		if (glfwRawMouseMotionSupported() == GLFW_TRUE)
 		{
 			glfwSetInputMode(m_glfwHandle, GLFW_RAW_MOUSE_MOTION, GLFW_FALSE);

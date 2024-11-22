@@ -86,6 +86,8 @@ namespace e2
 
 		virtual void cursor(e2::CursorShape newCursor) = 0;
 
+		virtual void showCursor(bool show) = 0;
+
 		virtual void maximize() = 0;
 		virtual void restore() = 0;
 		virtual void minimize() = 0;

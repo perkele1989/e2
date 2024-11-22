@@ -35,11 +35,6 @@ glm::mat4 e2::Transform::getTransformMatrix(TransformSpace space /*= TS_Local*/)
 }
 
 
-void e2::Transform::setTransformMatrix(glm::mat4 newTransform, TransformSpace space /*= TS_Local*/)
-{
-	LogError("Implement me");
-}
-
 e2::Transform* e2::Transform::getTransformParent()
 {
 	return m_transformParent;
@@ -50,7 +45,10 @@ void e2::Transform::setTransformParent(Transform* newParent)
 	m_transformParent = newParent;
 }
 
-
+void e2::Transform::lookAt(glm::vec3 const& target, TransformSpace space)
+{
+	setRotation(glm::quatLookAt(glm::normalize(target - getTranslation(space)), e2::worldUpf()), space);
+}
 
 glm::vec3 e2::Transform::getTranslation(TransformSpace space /*= TS_Local*/)
 {
@@ -159,6 +157,13 @@ void e2::Transform::setScale(glm::vec3 newScale, TransformSpace space /*= TS_Loc
 	}
 
 	m_dirty = true;
+}
+
+void e2::Transform::scale(glm::vec3 offset, e2::TransformSpace space)
+{
+	glm::vec3 s = getScale(space);
+	s *= offset;
+	setScale(s, space);
 }
 
 

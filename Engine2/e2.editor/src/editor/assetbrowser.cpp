@@ -20,7 +20,6 @@
 e2::AssetBrowser::AssetBrowser(e2::Editor* ed)
 	: m_editor(ed)
 {
-	m_path = assetManager()->database().rootEditorEntry();
 }
 
 e2::AssetBrowser::~AssetBrowser()
@@ -41,88 +40,96 @@ void e2::AssetBrowser::update(e2::UIContext* ui, double seconds)
 
 	e2::UIMouseState& mouse = ui->mouseState();
 
-	//e2::UIWidgetState* widget = ui->reserve(id_assbro, {});
+	std::shared_ptr<e2::AssetEditorEntry> editorPath = assetManager()->database().rootEditorEntry();
+	if (!editorPath)
+		return;
 
-	//if(widget->hovered)
-		for (std::string file : mouse.drops)
+	std::vector<std::shared_ptr<e2::AssetEditorEntry>> entries;
+	entries.push_back(editorPath);
+
+	for (e2::Name p : m_path)
+	{
+		for (std::shared_ptr<e2::AssetEditorEntry> sp : editorPath->children)
 		{
-			std::string ext = e2::toLower(std::filesystem::path(file).extension().string());
+			if (sp->entry)
+				continue;
 
-			if (ext == ".mesh" || ext == ".fbx" || ext == ".lods" || ext == ".dae")
+			if (sp->name == p.string())
 			{
-				e2::UfbxImportConfig cfg;
-				cfg.input = file;
-				cfg.outputDirectory = std::format(".{}", m_path->fullPath());
-				e2::UfbxImporter* newImporter = e2::create<e2::UfbxImporter>(editor(), cfg);
-				editor()->oneShotImporter(newImporter);
-			}
-			else if (ext == ".mips" || ext == ".png" || ext == ".tga" || ext == ".jpg" || ext == ".jpeg" || ext == ".hdr")
-			{
-
-				e2::TextureImportConfig cfg;
-				cfg.input = file;
-				cfg.outputDirectory = std::format(".{}", m_path->fullPath());
-				e2::TextureImporter *newImporter = e2::create<e2::TextureImporter>(editor(), cfg);
-				if (!newImporter->writeAssets())
-				{
-					LogError("Failed to import file: {} to location {}", cfg.input, cfg.outputDirectory);
-				}
-				editor()->oneShotImporter(newImporter);
-			}
-			else if (ext == ".material")
-			{
-				e2::MaterialImportConfig cfg;
-				cfg.input = file;
-				cfg.outputDirectory = std::format(".{}", m_path->fullPath());
-				e2::MaterialImporter* newImporter = e2::create<e2::MaterialImporter>(editor(), cfg);
-				if (!newImporter->writeAssets())
-				{
-					LogError("Failed to import file: {} to location {}", cfg.input, cfg.outputDirectory);
-				}
-				editor()->oneShotImporter(newImporter);
-			}
-			else if (ext == ".spritesheet")
-			{
-				e2::SheetImportConfig cfg;
-				cfg.input = file;
-				cfg.outputDirectory = std::format(".{}", m_path->fullPath());
-				e2::SheetImporter* newImporter = e2::create<e2::SheetImporter>(editor(), cfg);
-				if (!newImporter->writeAssets())
-				{
-					LogError("Failed to import file: {} to location {}", cfg.input, cfg.outputDirectory);
-				}
-				editor()->oneShotImporter(newImporter);
-			}
-			else if (ext == ".wav")
-			{
-				e2::SoundImportConfig cfg;
-				cfg.input = file;
-				cfg.outputDirectory = std::format(".{}", m_path->fullPath());
-				e2::SoundImporter* newImporter = e2::create<e2::SoundImporter>(editor(), cfg);
-				if (!newImporter->writeAssets())
-				{
-					LogError("Failed to import file: {} to location {}", cfg.input, cfg.outputDirectory);
-				}
-				editor()->oneShotImporter(newImporter);
+				editorPath = sp;
+				entries.push_back(sp);
+				break;
 			}
 		}
 
-
-
-
-
-
-
-	// --- @todo cache this
-	std::vector<e2::AssetEditorEntry*> entries;
-	e2::AssetEditorEntry* curr = m_path;
-	while (curr)
-	{
-		entries.push_back(curr);
-		curr = curr->parent;
 	}
-	std::reverse(entries.begin(), entries.end());
-	// ---
+
+	for (std::string file : mouse.drops)
+	{
+		std::string ext = e2::toLower(std::filesystem::path(file).extension().string());
+
+		if (ext == ".mesh" || ext == ".fbx" || ext == ".lods" || ext == ".dae")
+		{
+			e2::UfbxImportConfig cfg;
+			cfg.input = file;
+			cfg.outputDirectory = std::format(".{}", editorPath->fullPath());
+			e2::UfbxImporter* newImporter = e2::create<e2::UfbxImporter>(editor(), cfg);
+			editor()->oneShotImporter(newImporter);
+		}
+		else if (ext == ".mips" || ext == ".png" || ext == ".tga" || ext == ".jpg" || ext == ".jpeg" || ext == ".hdr")
+		{
+
+			e2::TextureImportConfig cfg;
+			cfg.input = file;
+			cfg.outputDirectory = std::format(".{}", editorPath->fullPath());
+			e2::TextureImporter *newImporter = e2::create<e2::TextureImporter>(editor(), cfg);
+			if (!newImporter->writeAssets())
+			{
+				LogError("Failed to import file: {} to location {}", cfg.input, cfg.outputDirectory);
+			}
+			editor()->oneShotImporter(newImporter);
+		}
+		else if (ext == ".material")
+		{
+			e2::MaterialImportConfig cfg;
+			cfg.input = file;
+			cfg.outputDirectory = std::format(".{}", editorPath->fullPath());
+			e2::MaterialImporter* newImporter = e2::create<e2::MaterialImporter>(editor(), cfg);
+			if (!newImporter->writeAssets())
+			{
+				LogError("Failed to import file: {} to location {}", cfg.input, cfg.outputDirectory);
+			}
+			editor()->oneShotImporter(newImporter);
+		}
+		else if (ext == ".spritesheet")
+		{
+			e2::SheetImportConfig cfg;
+			cfg.input = file;
+			cfg.outputDirectory = std::format(".{}", editorPath->fullPath());
+			e2::SheetImporter* newImporter = e2::create<e2::SheetImporter>(editor(), cfg);
+			if (!newImporter->writeAssets())
+			{
+				LogError("Failed to import file: {} to location {}", cfg.input, cfg.outputDirectory);
+			}
+			editor()->oneShotImporter(newImporter);
+		}
+		else if (ext == ".wav" || ext == ".mp3")
+		{
+			e2::SoundImportConfig cfg;
+			cfg.input = file;
+			cfg.outputDirectory = std::format(".{}", editorPath->fullPath());
+			e2::SoundImporter* newImporter = e2::create<e2::SoundImporter>(editor(), cfg);
+			if (!newImporter->writeAssets())
+			{
+				LogError("Failed to import file: {} to location {}", cfg.input, cfg.outputDirectory);
+			}
+			editor()->oneShotImporter(newImporter);
+		}
+	}
+
+
+
+
 
 
 	float vertSizes[] = {24.0f * style.scale, 0.0f};
@@ -131,8 +138,10 @@ void e2::AssetBrowser::update(e2::UIContext* ui, double seconds)
 	ui->beginStackH(id_entries, 24.0f * style.scale);
 
 	uint32_t i = 0;
-	for (e2::AssetEditorEntry* e : entries)
+	std::vector<e2::Name> newPath;
+	for (std::shared_ptr<e2::AssetEditorEntry> e : entries)
 	{
+		newPath.push_back(e->name);
 
 		if (i == entries.size() - 1)
 		{
@@ -142,7 +151,8 @@ void e2::AssetBrowser::update(e2::UIContext* ui, double seconds)
 		{
 			if (ui->button(std::format("entry{}", i), e->name))
 			{
-				m_path = e;
+
+				m_path = newPath;
 			}
 		}
 
@@ -156,23 +166,23 @@ void e2::AssetBrowser::update(e2::UIContext* ui, double seconds)
 
 	ui->beginWrap(id_browserContent);
 	
-	if (m_path->parent)
+	if (auto p = editorPath->parent.lock())
 	{
 		if (ui->button(id_dotdot, ".."))
 		{
-			m_path = m_path->parent;
+			m_path.pop_back();
 		}
 	}
 
 	i = 0;
-	for (e2::AssetEditorEntry* entry : m_path->children)
+	for (std::shared_ptr<e2::AssetEditorEntry> entry : editorPath->children)
 	{
 		
 		if (ui->button(std::format("file_entry{}", i), entry->name))
 		{
 			if (entry->isFolder())
 			{
-				m_path = entry;
+				m_path.push_back(entry->name);
 				break;
 			}
 		}

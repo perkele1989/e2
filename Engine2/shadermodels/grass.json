@@ -1,0 +1,27 @@
+{
+    "name": "grass",
+    "renderLayer": 1024,
+    "vertexShader": "shaders/grass/grass.vertex.glsl",
+    "fragmentShader": "shaders/grass/grass.fragment.glsl",
+    "doubleSided": true,
+    "supportsShadows": false,
+    "textures": [
+        {
+            "name": "albedoMap"
+        }
+    ],
+    "parameters": [
+        {
+            "name": "albedo",
+            "defaultValue": [1.0, 1.0, 1.0, 1.0]
+        },
+        {
+            "name": "emissive",
+            "defaultValue": [0.0, 0.0, 0.0, 0.0]
+        },
+        {
+            "name": "rmxx",
+            "defaultValue": [1.0, 0.0, 0.0, 0.0]
+        }
+    ]
+}

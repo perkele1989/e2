@@ -18,6 +18,7 @@
 #define E2_BEGIN_SCOPE_CTX(g, x) x->profiler()->beginScope(__FUNCDNAME__, __FUNCTION__, e2::ProfileGroupId::##g);
 #define E2_END_SCOPE_CTX(x) x->profiler()->endScope();
 
+#define E2_TIME_SCOPE(x) TimeBlock __timeBlock__##__LINE__(x);
 
 #define E2_PROFILE_SCOPE(g) ProfileBlock __profileBlock__##__LINE__(profiler(), __FUNCDNAME__, __FUNCTION__, e2::ProfileGroupId::##g)
 #define E2_PROFILE_SCOPE_CTX(g, c) ProfileBlock __profileBlock__##__LINE__(c->profiler(), __FUNCDNAME__, __FUNCTION__, e2::ProfileGroupId::##g)
@@ -80,6 +81,7 @@ namespace e2
 		Animation,
 		Rendering,
 		Scripting,
+		WorldGeneration,
 		Count
 
 	};
@@ -170,6 +172,26 @@ namespace e2
 		std::unordered_map<std::string, e2::ProfileFunction> m_functions;
 		e2::StackVector<e2::ProfileGroup, size_t(e2::ProfileGroupId::Count)> m_groups;
 
+	};
+
+	struct TimeBlock
+	{
+
+		TimeBlock(std::string const& name)
+			: m_name(name)
+		{
+			m_timer.reset();
+		}
+
+		~TimeBlock()
+		{
+			double ms = m_timer.seconds() * 1000.0;
+			LogNotice("TimeBlock {}: {}ms", m_name, ms);
+		}
+
+	protected:
+		e2::Timer m_timer;
+		std::string m_name;
 	};
 
 	struct ProfileBlock

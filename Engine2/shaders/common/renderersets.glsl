@@ -81,6 +81,7 @@ layout(set = MeshSetIndex, binding = 1) uniform SkinData
 
 vec2 getScreenPixelUV(vec2 pixelCoords)
 {
+	//pixelCoords = vec2(ivec2(pixelCoords))  + vec2(0.5, 0.5);
 	return pixelCoords / vec2(resolution.x, resolution.y);
 }
 
@@ -115,7 +116,7 @@ float calculateSunShadow(vec4 fragPosWS)
 	vec2 shadowUV = fragPosLS.xy * vec2(0.5) + vec2(0.5);
 
 	// Use the (biased) z coordinate as the comparative depth to pass to the texture sampling function.
-	const float bias = 0.002;
+	const float bias = 0.0005;
 	float depthComp = (fragPosLS.z) - bias;
 	
 	// If the shadow UV is out of bounds, return 1.0. Needed for directional lights
@@ -184,7 +185,6 @@ vec3 getIrradiance(vec3 fragNormal)
 vec3 getIblColor(vec3 fragPosition, vec3 fragAlbedo, vec3 fragNormal,float fragRoughness, float fragMetalness, vec3 viewVector)
 {
 	fragRoughness = pow(fragRoughness, 1.0/2.2);
-    // 0.2
     vec3 reflectionVector = reflect(viewVector, fragNormal);
 	 
 	vec3 F0 = vec3(0.04); 
@@ -192,22 +192,14 @@ vec3 getIblColor(vec3 fragPosition, vec3 fragAlbedo, vec3 fragNormal,float fragR
 	vec3 diffuseCoeff = fragAlbedo * (1.0 - F0) * (1.0 - fragMetalness);
 
 	vec2 irrUv = equirectangularUv(fragNormal);
-	//vec3 irradiance = pow(textureLod(sampler2D(irradianceCube, equirectSampler), irrUv, 0.0).rgb, vec3(1.0/2.2));
-	//vec3 radiance = pow(textureLod(sampler2D(radianceCube, equirectSampler), equirectangularUv(reflectionVector), fragRoughness * 6.0).rgb, vec3(1.0/2.2));
 	vec3 irradiance = textureLod(sampler2D(irradianceCube, equirectSampler), irrUv, 0.0).rgb;
 	vec3 radiance = textureLod(sampler2D(radianceCube, equirectSampler), equirectangularUv(reflectionVector), fragRoughness * 6.0).rgb;
 	vec2 brdf = textureLod(sampler2D(integratedBrdf, clampSampler), vec2(clamp(dot(fragNormal, -viewVector), 0.0, 1.0), 1.0 - fragRoughness), 0.0).xy;
-	//vec2 brdf = pow(textureLod(sampler2D(integratedBrdf, clampSampler), vec2(clamp(dot(fragNormal, -viewVector), 0.0, 1.0), 1.0 - fragRoughness), 0.0).xy, vec2(1.0/2.2));
-	
-
 
     vec3 returner = vec3(0.0, 0.0, 0.0);
 	returner += irradiance * diffuseCoeff;
     returner += radiance * specularCoeff*  (brdf.x + brdf.y);
     returner *= renderer.ibl1.x;
-
-	//returner = radiance *  (brdf.x + brdf.y) *  renderer.ibl1.x;
-
     return returner;
 }
 
@@ -225,6 +217,7 @@ float getCloudShadows(vec3 fragPosition)
 	float shadowSimplex = (simplex((fragPosition.xz * 0.051) - vec2(0.4, 0.6) * renderer.time.x * 0.05 ) * 0.5 + 0.5);
 	float shadowCoeff = pow(shadowSimplex, 0.72);
 	shadowCoeff = smoothstep(0.4, 0.7, shadowCoeff) * 0.5 + 0.5;
-    return 0.25 + shadowCoeff*0.75;
+	return shadowCoeff;
+    //return 0.25 + shadowCoeff*0.75;
 }
 #endif

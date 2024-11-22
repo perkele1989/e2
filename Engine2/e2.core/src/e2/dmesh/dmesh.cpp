@@ -3,6 +3,8 @@
 
 #include "mikktspace.h"
 
+#include <e2/e2.hpp>
+
 #include <map>
 
 e2::DynamicMesh::DynamicMesh()
@@ -275,7 +277,7 @@ e2::MeshPtr e2::DynamicMesh::bake(e2::MaterialPtr material, e2::VertexAttributeF
 
 
 	e2::MeshPtr newMesh = e2::MeshPtr::create();
-	newMesh->postConstruct(material.get(), e2::UUID());
+	newMesh->postConstruct(material.get(), e2::Name("null"));
 	newMesh->addProceduralSubmesh(submesh);
 	newMesh->flagDone();
 
@@ -366,7 +368,7 @@ uint32_t _vertexForEdge(_Lookup& lookup, _VertexList& vertices, uint32_t first, 
 	if (key.first > key.second)
 		std::swap(key.first, key.second);
 
-	auto inserted = lookup.insert({ key, vertices.size() });
+	auto inserted = lookup.insert({ key, (uint32_t)vertices.size() });
 	if (inserted.second)
 	{
 		auto& edge0 = vertices[first];
@@ -740,3 +742,450 @@ void e2::DynamicMesh::mergeDuplicateVertices()
 {
 	return glm::round(in * stepDenominator / stepNumerator) * stepNumerator / stepDenominator;
 }
+
+
+
+
+
+
+
+
+
+ e2::FastMesh::FastMesh(uint32_t vcap, uint32_t icap, bool withAttributes)
+	 : vertexCapacity(vcap)
+	 , indexCapacity(icap)
+ {
+	 indices = (uint32_t*)malloc(sizeof(uint32_t) * indexCapacity);
+	 positions = (glm::vec4*)malloc(sizeof(glm::vec4) * vertexCapacity);
+
+	 if (withAttributes)
+	 {
+		 normals = (glm::vec4*)malloc(sizeof(glm::vec4) * vertexCapacity);
+		 tangents = (glm::vec4*)malloc(sizeof(glm::vec4) * vertexCapacity);
+		 colors = (glm::vec4*)malloc(sizeof(glm::vec4) * vertexCapacity);
+	 }
+ }
+
+ void e2::FastMesh::initializeFrom(e2::MeshPtr mesh, uint8_t submesh)
+ {
+	 if (indices)
+	 {
+		 free(indices);
+		 indices = nullptr;
+	 }
+
+	 if (positions)
+	 {
+		 free(positions);
+		 positions = nullptr;
+	 }
+
+	 if (normals)
+	 {
+		 free(normals);
+		 normals = nullptr;
+	 }
+
+	 if (tangents)
+	 {
+		 free(tangents);
+		 tangents = nullptr;
+	 }
+
+	 if (colors)
+	 {
+		 free(colors);
+		 colors = nullptr;
+	 }
+
+	 vertexCapacity = mesh->specification(submesh).vertexCount;
+	 indexCapacity = mesh->specification(submesh).indexCount;
+
+	 indices = (uint32_t*)malloc(sizeof(uint32_t) * indexCapacity);
+	 positions = (glm::vec4*)malloc(sizeof(glm::vec4) * vertexCapacity);
+
+	 e2::SubmeshSpecification const& spec = mesh->specification(submesh);
+	 spec.indexBuffer->download(reinterpret_cast<uint8_t*>(indices), sizeof(uint32_t) * indexCapacity, sizeof(uint32_t) * indexCapacity, 0);
+	 spec.vertexAttributes[0]->download(reinterpret_cast<uint8_t*>(positions), sizeof(glm::vec4) * vertexCapacity, sizeof(glm::vec4) * vertexCapacity, 0);
+
+	 numVertices = vertexCapacity;
+	 numIndices = indexCapacity;
+ }
+
+ e2::FastMesh::~FastMesh()
+ {
+	 if(indices)
+		free(indices);
+
+	 if(positions)
+		free(positions);
+
+	 if(normals)
+		free(normals);
+
+	 if(tangents)
+		free(tangents);
+
+	 if(colors)
+		free(colors);
+ }
+
+
+
+ /** MikkTSpace integration */
+ namespace
+ {
+	 int getNumFaces_fast(const SMikkTSpaceContext* pContext)
+	 {
+		 e2::FastMesh* mesh = reinterpret_cast<e2::FastMesh*>(pContext->m_pUserData);
+		 return mesh->numIndices / 3;
+	 }
+
+	 int getNumVerticesOfFace_fast(const SMikkTSpaceContext* pContext, const int iFace)
+	 {
+		 return 3;
+	 }
+
+	 void getPosition_fast(const SMikkTSpaceContext* pContext, float fvPosOut[], const int iFace, const int iVert)
+	 {
+		 e2::FastMesh* mesh = reinterpret_cast<e2::FastMesh*>(pContext->m_pUserData);
+		 uint32_t vertexIndex = mesh->indices[iFace * 3 + iVert];
+		 glm::vec4 pos = mesh->positions[vertexIndex];
+		 fvPosOut[0] = pos.x;
+		 fvPosOut[1] = pos.y;
+		 fvPosOut[2] = pos.z;
+
+	 }
+
+	 void getNormal_fast(const SMikkTSpaceContext* pContext, float fvNormOut[], const int iFace, const int iVert)
+	 {
+		 e2::FastMesh* mesh = reinterpret_cast<e2::FastMesh*>(pContext->m_pUserData);
+		 uint32_t vertexIndex = mesh->indices[iFace * 3 + iVert];
+		 glm::vec4 nrm = mesh->normals[vertexIndex];
+		 fvNormOut[0] = nrm.x;
+		 fvNormOut[1] = nrm.y;
+		 fvNormOut[2] = nrm.z;
+	 }
+
+	 void getTexCoord_fast(const SMikkTSpaceContext* pContext, float fvTexcOut[], const int iFace, const int iVert)
+	 {
+		 e2::FastMesh* mesh = reinterpret_cast<e2::FastMesh*>(pContext->m_pUserData);
+		 uint32_t vertexIndex = mesh->indices[iFace * 3 + iVert];
+		 glm::vec4 pos = mesh->positions[vertexIndex];
+		 fvTexcOut[0] = pos.x;
+		 fvTexcOut[1] = pos.z;
+	 }
+
+	 void setTSpaceBasic_fast(const SMikkTSpaceContext* pContext, const float fvTangent[], const float fSign, const int iFace, const int iVert)
+	 {
+		 e2::FastMesh* mesh = reinterpret_cast<e2::FastMesh*>(pContext->m_pUserData);
+		 uint32_t vertexIndex = mesh->indices[iFace * 3 + iVert];
+		 mesh->tangents[vertexIndex] = {fvTangent[0], fvTangent[1], fvTangent[2], fSign};
+	 }
+
+ }
+
+ bool e2::FastMesh::calculateVertexTangents()
+ {
+	 // Integrate MikkTSpace (https://github.com/mmikk/MikkTSpace)
+	 SMikkTSpaceInterface mikkIf{};
+	 mikkIf.m_getNumFaces = ::getNumFaces_fast;
+	 mikkIf.m_getNumVerticesOfFace = ::getNumVerticesOfFace_fast;
+	 mikkIf.m_getPosition = ::getPosition_fast;
+	 mikkIf.m_getNormal = ::getNormal_fast;
+	 mikkIf.m_getTexCoord = ::getTexCoord_fast;
+	 mikkIf.m_setTSpaceBasic = ::setTSpaceBasic_fast;
+	 mikkIf.m_setTSpace = nullptr;
+
+	 SMikkTSpaceContext mikkCtx;
+	 mikkCtx.m_pInterface = &mikkIf;
+	 mikkCtx.m_pUserData = reinterpret_cast<void*>(this);
+
+	 // guess this is how its supposed to be done ¯\_(ツ)_/¯
+	 if (!genTangSpaceDefault(&mikkCtx))
+	 {
+		 LogError("mikktspace failed");
+		 return false;
+	 }
+
+	 return true;
+ }
+
+ void e2::FastMesh::addMesh(e2::FastMesh& src, glm::vec4 const& position, FastShaderFunction shaderFunc, void* shaderFuncData)
+ {
+	 uint32_t dstVertexOffset = numVertices;
+	 uint32_t dstIndexOffset = numIndices;
+
+
+	 //memcpy((positions + dstVertexOffset), src.positions, sizeof(glm::vec4) * src.numVertices);
+	 {
+		 //E2_TIME_SCOPE("FastMesh.positions");
+		 for (uint32_t i = 0; i < src.numVertices; i++)
+		 {
+			 uint32_t attrIndex = dstVertexOffset + i;
+			 positions[attrIndex] = position + src.positions[i];
+			 positions[attrIndex].w = 1.0f;
+		 }
+	 }
+
+	 {
+		 //E2_TIME_SCOPE("FastMesh.shaderFunc");
+		 for (uint32_t i = 0; i < src.numVertices; i++)
+		 {
+			 uint32_t attrIndex = dstVertexOffset + i;
+			 shaderFunc(positions + attrIndex, normals + attrIndex, colors + attrIndex, shaderFuncData);
+		 }
+	 }
+
+	 {
+		 //E2_TIME_SCOPE("FastMesh.indices");
+		 for (uint32_t i = 0; i < src.numIndices; i++)
+		 {
+			 indices[dstIndexOffset + i] = src.indices[i] + numIndices;
+		 }
+	 }
+
+	 numIndices += src.numIndices;
+	 numVertices += src.numVertices;
+
+ }
+
+ e2::MeshPtr e2::FastMesh::bake(e2::MaterialPtr material)
+ {
+	 e2::ProceduralSubmesh submesh;
+	 submesh.material = material;
+	 submesh.attributes = VertexAttributeFlags::Normal | VertexAttributeFlags::Color;
+	 submesh.numIndices = numIndices;
+	 submesh.numVertices = numVertices;
+	 submesh.sourcePositions = positions;
+	 submesh.sourceNormals = normals;
+	 submesh.sourceTangents = tangents;
+	 submesh.sourceColors = colors;
+	 submesh.sourceIndices = indices;
+
+	 e2::MeshPtr newMesh = e2::MeshPtr::create();
+	 newMesh->postConstruct(material.get(), e2::Name("null"));
+	 newMesh->addProceduralSubmesh(submesh);
+	 newMesh->flagDone();
+
+	 return newMesh;
+ }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ e2::FastMesh2::FastMesh2(uint32_t vcap, uint32_t icap, bool withAttributes)
+	 : vertexCapacity(vcap)
+	 , indexCapacity(icap)
+ {
+	 indices = (uint32_t*)malloc(sizeof(uint32_t) * indexCapacity);
+	 vertices = (e2::FastVertex2*)malloc(sizeof(e2::FastVertex2) * vertexCapacity);
+ }
+
+ void e2::FastMesh2::initializeFrom(e2::MeshPtr mesh, uint8_t submesh)
+ {
+	 if (indices)
+	 {
+		 free(indices);
+		 indices = nullptr;
+	 }
+
+	 if (vertices)
+	 {
+		 free(vertices);
+		 vertices = nullptr;
+	 }
+
+	 vertexCapacity = mesh->specification(submesh).vertexCount;
+	 indexCapacity = mesh->specification(submesh).indexCount;
+
+	 indices = (uint32_t*)malloc(sizeof(uint32_t) * indexCapacity);
+	 vertices = (e2::FastVertex2*)malloc(sizeof(e2::FastVertex2) * vertexCapacity);
+
+	 constexpr size_t maxNumVertices = 262144; // about 64mb*numthreads for these 4 arrays
+	 thread_local glm::vec4 positions[maxNumVertices];
+
+
+	 e2::SubmeshSpecification const& spec = mesh->specification(submesh);
+	 spec.indexBuffer->download(reinterpret_cast<uint8_t*>(indices), sizeof(uint32_t) * indexCapacity, sizeof(uint32_t) * indexCapacity, 0);
+	 spec.vertexAttributes[0]->download(reinterpret_cast<uint8_t*>(positions), sizeof(glm::vec4) * vertexCapacity, sizeof(glm::vec4) * vertexCapacity, 0);
+
+	 numVertices = vertexCapacity;
+	 numIndices = indexCapacity;
+
+	 for (uint32_t i = 0; i < numVertices; i++)
+	 {
+		 vertices[i].position = positions[i];
+	 }
+
+	 
+ }
+
+ e2::FastMesh2::~FastMesh2()
+ {
+	 if (indices)
+		 free(indices);
+
+	 if (vertices)
+		 free(vertices);
+ }
+
+
+
+ /** MikkTSpace integration */
+ namespace
+ {
+	 int getNumFaces_fast2(const SMikkTSpaceContext* pContext)
+	 {
+		 e2::FastMesh2* mesh = reinterpret_cast<e2::FastMesh2*>(pContext->m_pUserData);
+		 return mesh->numIndices / 3;
+	 }
+
+	 int getNumVerticesOfFace_fast2(const SMikkTSpaceContext* pContext, const int iFace)
+	 {
+		 return 3;
+	 }
+
+	 void getPosition_fast2(const SMikkTSpaceContext* pContext, float fvPosOut[], const int iFace, const int iVert)
+	 {
+		 e2::FastMesh2* mesh = reinterpret_cast<e2::FastMesh2*>(pContext->m_pUserData);
+		 uint32_t vertexIndex = mesh->indices[iFace * 3 + iVert];
+		 glm::vec4 const pos = mesh->vertices[vertexIndex].position;
+		 fvPosOut[0] = pos.x;
+		 fvPosOut[1] = pos.y;
+		 fvPosOut[2] = pos.z;
+
+	 }
+
+	 void getNormal_fast2(const SMikkTSpaceContext* pContext, float fvNormOut[], const int iFace, const int iVert)
+	 {
+		 e2::FastMesh2* mesh = reinterpret_cast<e2::FastMesh2*>(pContext->m_pUserData);
+		 uint32_t vertexIndex = mesh->indices[iFace * 3 + iVert];
+		 glm::vec4 const nrm = mesh->vertices[vertexIndex].normal;
+		 fvNormOut[0] = nrm.x;
+		 fvNormOut[1] = nrm.y;
+		 fvNormOut[2] = nrm.z;
+	 }
+
+	 void getTexCoord_fast2(const SMikkTSpaceContext* pContext, float fvTexcOut[], const int iFace, const int iVert)
+	 {
+		 e2::FastMesh2* mesh = reinterpret_cast<e2::FastMesh2*>(pContext->m_pUserData);
+		 uint32_t vertexIndex = mesh->indices[iFace * 3 + iVert];
+		 glm::vec4 const pos = mesh->vertices[vertexIndex].position;
+		 fvTexcOut[0] = pos.x;
+		 fvTexcOut[1] = pos.z;
+	 }
+
+	 void setTSpaceBasic_fast2(const SMikkTSpaceContext* pContext, const float fvTangent[], const float fSign, const int iFace, const int iVert)
+	 {
+		 e2::FastMesh2* mesh = reinterpret_cast<e2::FastMesh2*>(pContext->m_pUserData);
+		 uint32_t vertexIndex = mesh->indices[iFace * 3 + iVert];
+		 mesh->vertices[vertexIndex].tangent = { fvTangent[0], fvTangent[1], fvTangent[2], fSign };
+	 }
+
+ }
+
+ bool e2::FastMesh2::calculateVertexTangents()
+ {
+	 // Integrate MikkTSpace (https://github.com/mmikk/MikkTSpace)
+	 SMikkTSpaceInterface mikkIf{};
+	 mikkIf.m_getNumFaces = ::getNumFaces_fast2;
+	 mikkIf.m_getNumVerticesOfFace = ::getNumVerticesOfFace_fast2;
+	 mikkIf.m_getPosition = ::getPosition_fast2;
+	 mikkIf.m_getNormal = ::getNormal_fast2;
+	 mikkIf.m_getTexCoord = ::getTexCoord_fast2;
+	 mikkIf.m_setTSpaceBasic = ::setTSpaceBasic_fast2;
+	 mikkIf.m_setTSpace = nullptr;
+
+	 SMikkTSpaceContext mikkCtx;
+	 mikkCtx.m_pInterface = &mikkIf;
+	 mikkCtx.m_pUserData = reinterpret_cast<void*>(this);
+
+	 // guess this is how its supposed to be done ¯\_(ツ)_/¯
+	 if (!genTangSpaceDefault(&mikkCtx))
+	 {
+		 LogError("mikktspace failed");
+		 return false;
+	 }
+
+	 return true;
+ }
+
+ void e2::FastMesh2::addMesh(e2::FastMesh2& src, glm::vec4 const& position, FastShaderFunction2 shaderFunc, void* shaderFuncData)
+ {
+	 uint32_t const dstVertexOffset = numVertices;
+	 uint32_t const dstIndexOffset = numIndices;
+
+	 {
+		 //E2_TIME_SCOPE("FastMesh.indices");
+		 for (uint32_t i = 0; i < src.numIndices; i++)
+		 {
+			 indices[dstIndexOffset + i] = src.indices[i] + numIndices;
+		 }
+	 }
+
+	 {
+		 //E2_TIME_SCOPE("FastMesh.positions");
+		 for (uint32_t i = 0; i < src.numVertices; i++)
+		 {
+			 uint32_t const attrIndex = dstVertexOffset + i;
+			 e2::FastVertex2* vertex = &vertices[attrIndex];
+			 vertex->position = position + src.vertices[i].position;
+			 vertex->position.w = 1.0f;
+			 shaderFunc(vertex, shaderFuncData);
+		 }
+	 }
+
+	 numIndices += src.numIndices;
+	 numVertices += src.numVertices;
+
+ }
+
+ e2::MeshPtr e2::FastMesh2::bake(e2::MaterialPtr material)
+ {
+	 constexpr size_t maxNumVertices = 262144; // about 64mb*numthreads for these 4 arrays
+	 thread_local glm::vec4 positions[maxNumVertices];
+	 thread_local glm::vec4 normals[maxNumVertices];
+	 thread_local glm::vec4 tangents[maxNumVertices];
+	 thread_local glm::vec4 colors[maxNumVertices];
+
+	 for (uint32_t i = 0; i < numVertices; i++)
+	 {
+		 e2::FastVertex2 const* const vertex = &vertices[i];
+		 positions[i] = vertex->position;
+		 normals[i] = vertex->normal;
+		 tangents[i] = vertex->tangent;
+		 colors[i] = vertex->color;
+	 }
+
+	 e2::ProceduralSubmesh submesh;
+	 submesh.material = material;
+	 submesh.attributes = VertexAttributeFlags::Normal | VertexAttributeFlags::Color;
+	 submesh.numIndices = numIndices;
+	 submesh.numVertices = numVertices;
+	 submesh.sourcePositions = positions;
+	 submesh.sourceNormals = normals;
+	 submesh.sourceTangents = tangents;
+	 submesh.sourceColors = colors;
+	 submesh.sourceIndices = indices;
+
+	 e2::MeshPtr newMesh = e2::MeshPtr::create();
+	 newMesh->postConstruct(material.get(), e2::Name("null"));
+	 newMesh->addProceduralSubmesh(submesh);
+	 newMesh->flagDone();
+
+	 return newMesh;
+ }

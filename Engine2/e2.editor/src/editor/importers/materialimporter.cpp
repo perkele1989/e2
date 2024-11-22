@@ -107,7 +107,7 @@ bool e2::MaterialImporter::writeAssets()
 	materialHeader.version = e2::AssetVersion::Latest;
 	materialHeader.assetType = "e2::Material";
 
-	e2::Buffer materialData;
+	e2::HeapStream materialData;
 
 	materialData << model;
 
@@ -128,7 +128,7 @@ bool e2::MaterialImporter::writeAssets()
 	materialData << uint8_t(textures.size());
 	for (std::pair<std::string, std::string> p : textures)
 	{
-		e2::AssetEntry* entr = assetManager()->database().entryFromPath(p.second);
+		e2::AssetEntry* entr = assetManager()->database().entryFromName(p.second);
 		if (!entr)
 		{
 			LogNotice("ignoring texture {}, as asset {} doesn't exist in database (did you forget to import the textures for this?)", p.first, p.second);
@@ -139,23 +139,21 @@ bool e2::MaterialImporter::writeAssets()
 		//materialData << entr->uuid;
 
 		e2::DependencySlot newDep;
-		newDep.name = p.first;
-		newDep.uuid = entr->uuid;
+		newDep.dependencyName = p.first;
+		newDep.assetName = entr->name;
 		materialHeader.dependencies.push(newDep);
 	}
 
 
-
+	materialData.seek(0);
 	materialHeader.size = materialData.size();
 
-	e2::Buffer fileBuffer(true, 1024 + materialData.size());
+	e2::FileStream fileBuffer(outFile, e2::FileMode::ReadWrite | e2::FileMode::Truncate, true);
 	fileBuffer << materialHeader;
-	fileBuffer.write(materialData.begin(), materialData.size());
-	if (fileBuffer.writeToFile(outFile))
+	fileBuffer << materialData;
+	if (fileBuffer.valid())
 	{
 		assetManager()->database().invalidateAsset(outFile);
-		assetManager()->database().validate(true);
-
 		return true;
 	}
 	else

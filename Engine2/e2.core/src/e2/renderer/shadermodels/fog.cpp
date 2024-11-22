@@ -79,7 +79,7 @@ void e2::FogModel::postConstruct(e2::Context* ctx)
 	m_proxyUniformBuffers[0] = renderContext()->createDataBuffer(bufferCreateInfo);
 	m_proxyUniformBuffers[1] = renderContext()->createDataBuffer(bufferCreateInfo);
 
-	std::string cubemapName = "assets/hdri/courtyard_irr.e2a";
+	e2::Name cubemapName = "T_Courtyard_Irradiance.e2a";
 
 	e2::ALJDescription aljDesc;
 	assetManager()->prescribeALJ(aljDesc, cubemapName);
@@ -102,7 +102,7 @@ e2::MaterialProxy* e2::FogModel::createMaterialProxy(e2::Session* session, e2::M
 	}
 
 	e2::FogData newData;
-	newData.albedo = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
+	newData.albedo = glm::vec4(0.0f, 1.0f, 1.0f, 1.0f);
 	newProxy->uniformData.set(newData);
 
 	return newProxy;

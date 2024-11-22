@@ -136,6 +136,9 @@ glm::vec2 e2::rotate2d(glm::vec2 const& vec, float angleDegrees)
 
 float e2::radiansBetween(glm::vec3 const& a, glm::vec3 const& b)
 {
+	if (a == b)
+		return 0.0f;
+
 	glm::vec2 a2 = { a.x, a.z };
 	glm::vec2 b2 = { b.x, b.z };
 	glm::vec2 na = glm::normalize(a2 - b2);
@@ -225,12 +228,29 @@ glm::vec3 e2::randomVec3(glm::vec3 min, glm::vec3 max)
 
 glm::vec2 e2::randomOnUnitCircle()
 {
-	return glm::normalize(randomVec2({ -1.0f, -1.0f }, { 1.0f, 1.0f }));
+	glm::vec2 fwd{ 1.0f, 0.0f};
+	return glm::rotate(fwd, glm::radians(e2::randomFloat(0.0f, 359.9999f)));
 }
 
 glm::vec2 e2::randomInUnitCircle()
 {
-	return randomOnUnitCircle() * randomFloat(0.0f, 1.f);
+
+	//r = R * sqrt(random())
+	//theta = random() * 2 * PI
+
+	//(Assuming random() gives a value between 0 and 1 uniformly)
+
+	//If you want to convert this to Cartesian coordinates, you can do
+
+	//x = centerX + r * cos(theta)
+	//y = centerY + r * sin(theta)
+
+	float r = glm::sqrt(e2::randomFloat(0.0f, 1.0f));
+	float theta = e2::randomFloat(0.0f, 1.0f) * 2.0f * glm::pi<float>();
+	return { r * glm::cos(theta), r * glm::sin(theta) };
+
+
+	//return randomOnUnitCircle() * randomFloat(0.0f, 1.f);
 }
 
 glm::vec3 e2::randomOnUnitSphere()
@@ -492,13 +512,15 @@ e2::Name::Name(char const* c)
 
 e2::Name::Name()
 {
-
+#if defined(E2_DEVELOPMENT)
+	m_debugName = "None";
+#endif
 }
 
 e2::Name::Name(std::string_view v)
 	: e2::Name(std::string(v))
 {
-
+	
 }
 
 e2::Name::Name(std::string const& s)
@@ -526,6 +548,10 @@ e2::Name::Name(std::string const& s)
 	{
 		m_index = finder->second;
 	}
+
+#if defined(E2_DEVELOPMENT)
+	m_debugName = string();
+#endif
 }
 
 e2::Name::~Name()

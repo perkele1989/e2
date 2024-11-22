@@ -38,7 +38,7 @@ bool e2::Spritesheet::read(e2::IStream& source)
 	if (dependencies.size() == 0)
 		return false;
 
-	m_texture = assetManager()->get(dependencies[0].uuid).cast<e2::Texture2D>();
+	m_texture = assetManager()->get(dependencies[0].assetName).cast<e2::Texture2D>();
 
 	if (!m_texture)
 		return false;

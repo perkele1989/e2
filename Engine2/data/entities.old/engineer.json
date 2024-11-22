@@ -1,0 +1,73 @@
+
+{
+    "entities":[
+        {
+            "id": "engineer",
+            "typeName": "e2::GameEntity",
+            "displayName": "Drone",
+            "badgeId": "units.drone",
+            "passableFlags": ["land"],
+            "moveType": "smooth",
+            "sightRange": 6,
+            "showMovePoints": true,
+            "showAttackPoints": false,
+            "showBuildPoints": true,
+            "movePoints": 13,
+            "attackPoints": 0,
+            "buildPoints": 3,
+            "buildTurns": 3,
+            "attackStrength": 0.0,
+            "defensiveStrength": 25.0,
+            "moveSpeed": 1.0,
+            "script": "data/entities/engineer.chai",
+
+
+            "meshComponent":  {
+                "scale": [0.5, 0.5, 0.5],
+                "mesh": "assets/units/drone/SM_Drone_LOD0.e2a",
+                "skeleton": "assets/units/drone/SK_Drone_LOD0.e2a",
+                "poses": [
+                    {
+                        "name": "idle",
+                        "asset": "assets/units/drone/A_Engineer_Idle.e2a",
+                        "blendTime": 0.0 
+                    },
+                    {
+                        "name": "sleep",
+                        "asset": "assets/units/drone/A_Engineer_Sleep.e2a",
+                        "blendTime": 0.0
+                    },
+                    {
+                        "name": "walk",
+                        "asset": "assets/units/drone/A_Engineer_Walk.e2a",
+                        "blendTime": 0.0,
+                        "speed": 2.0
+                    }
+                ],
+                "actions": [
+                    {
+                        "name": "nightnight",
+                        "asset": "assets/units/drone/A_Engineer_NightNight.e2a",
+                        "blendInTime": 0.0,
+                        "blendOutTime": 0.0
+                    },
+                    {
+                        "name": "wakeup",
+                        "asset": "assets/units/drone/A_Engineer_WakeUp.e2a",
+                        "blendInTime": 0.0,
+                        "blendOutTime": 0.25
+                    }
+                ]
+            },
+
+
+            "upkeep": {
+                "gold": 0.0
+            },
+            "cost": {
+                "gold": 0.0
+            }
+        }
+    ]
+
+}

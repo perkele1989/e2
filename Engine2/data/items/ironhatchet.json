@@ -1,0 +1,38 @@
+{
+    "id": "ironhatchet",
+    "displayName": "Iron Hatchet",
+    "dropMesh": {
+        "meshScale": [1.0, 1.0, 1.0],
+        "mesh": "SM_IronHatchet.e2a"
+    },
+    "wieldable": true,
+    "wieldHandler": "e2::HatchetHandler",
+    "wieldHandlerData":{
+        "mesh": {
+            "meshScale": [1.0, 1.0, 1.0],
+            "mesh": "SM_IronHatchet.e2a"
+        },
+        "axeSwing":{
+            "assets": [
+                "S_Axe_Swing_001.e2a",
+                "S_Axe_Swing_002.e2a",
+                "S_Axe_Swing_003.e2a",
+                "S_Axe_Swing_004.e2a"
+            ]
+        },
+        "woodChop":{
+            "assets": [
+                "S_Wood_Chop_001.e2a",
+                "S_Wood_Chop_002.e2a",
+                "S_Wood_Chop_003.e2a",
+                "S_Wood_Chop_004.e2a",
+                "S_Wood_Chop_005.e2a",
+                "S_Wood_Chop_006.e2a",
+                "S_Wood_Chop_007.e2a",
+                "S_Wood_Chop_008.e2a"
+            ]
+        }
+    },
+    "stackable": false,
+    "iconSprite": "ItemIconIronHatchet"
+}

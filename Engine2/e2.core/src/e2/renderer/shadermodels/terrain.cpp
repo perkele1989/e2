@@ -93,20 +93,13 @@ void e2::TerrainModel::postConstruct(e2::Context* ctx)
 	bufferCreateInfo.type = BufferType::UniformBuffer;
 	m_proxyUniformBuffers[0] = renderContext()->createDataBuffer(bufferCreateInfo);
 	m_proxyUniformBuffers[1] = renderContext()->createDataBuffer(bufferCreateInfo);
-
-	//std::string cubemapName = "assets/lakeside_4k.e2a";
-	//std::string cubemapName = "assets/the_sky_is_on_fire_4k.e2a";
-	//std::string cubemapName = "assets/studio_small_03_4k.e2a";
-	
-	std::string mountainAlbedoPath = "assets/Landscape_albedo_srgb.e2a";
-	std::string mountainNormalPath = "assets/Landscape_normal_linear.e2a";
-
-	std::string sandAlbedoPath = "assets/T_SandDesert_Albedo.e2a";
-	std::string sandNormalPath = "assets/T_SandDesert_Normal.e2a";
-
-	//std::string greenAlbedoPath = "assets/T_Greenlands_Albedo.e2a";
-	std::string greenAlbedoPath = "assets/environment/T_Greenlands_Albedo.e2a";
-	std::string greenNormalPath = "assets/T_Greenlands_Normal.e2a";
+		
+	std::string mountainAlbedoPath = "T_Mountain_Albedo.e2a";
+	std::string mountainNormalPath = "T_Mountain_Normal.e2a";
+	std::string sandAlbedoPath = "T_Desert_Albedo.e2a";
+	std::string sandNormalPath = "T_Desert_Normal.e2a";
+	std::string greenAlbedoPath = "T_Grass_Albedo.e2a";
+	std::string greenNormalPath = "T_Grass_Normal.e2a";
 
 	e2::ALJDescription aljDesc;
 	assetManager()->prescribeALJ(aljDesc, mountainAlbedoPath);

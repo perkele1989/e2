@@ -121,8 +121,10 @@ namespace e2
 
 		e2::Pair<e2::IDataBuffer*> m_proxyUniformBuffers;
 	};
+
+
+	EnumFlagsDeclaration(e2::WaterFlags);
 }
 
-EnumFlagsDeclaration(e2::WaterFlags)
 
 #include "water.generated.hpp"

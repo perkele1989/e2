@@ -18,22 +18,16 @@ e2::AssetManager::~AssetManager()
 
 }
 
-bool e2::AssetManager::prescribeALJ(e2::ALJDescription& target, std::string const& assetPath)
+bool e2::AssetManager::prescribeALJ(e2::ALJDescription& target, e2::Name name)
 {
-	e2::AssetEntry* entry = m_database.entryFromPath(assetPath);
+	e2::AssetEntry* entry = m_database.entryFromName(name);
 	if (!entry)
 	{
-		LogError("Failed to prescribe asset, asset entry does not exist: {}", assetPath);
+		LogError("Failed to prescribe asset, asset entry does not exist: {}", name);
 		return false;
 	}
 
-	if (!entry->uuid.valid())
-	{
-		LogError("Failed to prescribe asset, asset UUID invalid (broken asset database): {} ", assetPath);
-		return false;
-	}
-
-	target.uuids.insert(entry->uuid);
+	target.names.insert(entry->name);
 	return true;
 }
 
@@ -56,28 +50,33 @@ retry:
 	workingState.groups.reserve(3);
 
 	// seed dependencies with the uuids we want, then process them recursively
-	std::unordered_set<e2::UUID> dependencies = queueEntry.description.uuids;
+	std::unordered_set<e2::Name> dependencies = queueEntry.description.names;
 	while (!dependencies.empty())
 	{
-		std::unordered_set<e2::UUID> newGroup;
-		std::unordered_set<e2::UUID> newDependencies;
-		for (e2::UUID uuid : dependencies)
+		std::unordered_set<e2::Name> newGroup;
+		std::unordered_set<e2::Name> newDependencies;
+		for (e2::Name name : dependencies)
 		{
-			e2::AssetEntry* entry = m_database.entryFromUUID(uuid);
+			e2::AssetEntry* entry = m_database.entryFromName(name);
+			assert(entry);
 
-			bool isLoadedAlready = m_uuidIndex.contains(uuid);
-			bool isDuplicate = newGroup.contains(uuid);
+			bool isLoadedAlready = m_nameIndex.contains(name);
+			bool isDuplicate = newGroup.contains(name);
 			if (!isLoadedAlready && !isDuplicate)
-				newGroup.insert(uuid);
+				newGroup.insert(name);
 
 			// remove it from any sets before this, since any dependency needs to be furthest back in the chain
-			for (std::unordered_set<e2::UUID>& currentGroup : workingState.groups)
-				currentGroup.erase(uuid);
+			for (std::unordered_set<e2::Name>& currentGroup : workingState.groups)
+				currentGroup.erase(name);
 
 			// add dependencies from these assets too
 			for (e2::DependencySlot slot : entry->header.dependencies)
 			{
-				newDependencies.insert(slot.uuid);
+				if (slot.assetName.index() == 0)
+				{
+					LogError("null dependency!");
+				}
+				newDependencies.insert(slot.assetName);
 			}
 		}
 
@@ -155,14 +154,14 @@ void e2::AssetManager::processAlj()
 	{
 		// Since we want the order of this vector reversed, we can just correct the indices instead
 		uint8_t correctedGroupIndex = (uint8_t)workingState.groups.size() - workingState.activeGroupIndex - 1;
-		std::unordered_set<e2::UUID>& workingGroup = workingState.groups[correctedGroupIndex];
+		std::unordered_set<e2::Name>& workingGroup = workingState.groups[correctedGroupIndex];
 
 
 		workingState.taskList.reserve(workingGroup.size());
 
-		for (e2::UUID uuid : workingGroup)
+		for (e2::Name name: workingGroup)
 		{
-			e2::AssetEntry* entry = m_database.entryFromUUID(uuid);
+			e2::AssetEntry* entry = m_database.entryFromName(name);
 			e2::AssetTaskPtr newTask = e2::AssetTaskPtr::create(this, entry);
 			workingState.taskList.push_back(newTask.cast<e2::AsyncTask>());
 		}
@@ -253,13 +252,7 @@ void e2::AssetManager::initialize()
 
 void e2::AssetManager::shutdown()
 {
-	{
-		e2::FileStream fileHandle("./assets/registry.db", true);
-		fileHandle << m_database;
-	}
-
-	m_uuidIndex.clear();
-	m_database.clear();
+	m_nameIndex.clear();
 }
 
 void e2::AssetManager::preUpdate(double deltaTime)
@@ -280,34 +273,16 @@ void e2::AssetManager::update(double deltaTime)
 	}
 }
 
-e2::AssetPtr e2::AssetManager::get(e2::UUID const& uuid)
+e2::AssetPtr e2::AssetManager::get(e2::Name name)
 {
-	auto finder = m_uuidIndex.find(uuid);
-	if (finder != m_uuidIndex.end())
+	auto finder = m_nameIndex.find(name);
+	if (finder != m_nameIndex.end())
 	{
 		return e2::Ptr<e2::Asset>(finder->second);
 	}
 
-	LogError("Attempted to get asset that is not loaded: {}", uuid.string());
+	LogError("Attempted to get asset that is not loaded: {}", name);
 	return nullptr;
-}
-
-e2::AssetPtr e2::AssetManager::get(std::string const& assetPath)
-{
-	e2::AssetEntry* entry = m_database.entryFromPath(assetPath);
-	if (!entry)
-	{
-		LogError("Asset does not exist: {}", assetPath);
-		return nullptr;
-	}
-
-	if (!entry->uuid.valid())
-	{
-		LogError("Asset database not valid (registered but no valid uuid)");
-		return nullptr;
-	}
-
-	return get(entry->uuid);
 }
 
 e2::AssetTask::AssetTask(e2::Context* context, e2::AssetEntry* entry)
@@ -354,16 +329,14 @@ bool e2::AssetTask::prepare()
 		return false;
 	}
 
-	m_asset->postConstruct(this, m_entry->uuid);
-
-	m_asset->debugName = m_entry->path;
+	m_asset->postConstruct(this, m_entry->name);
 
 	return true;
 }
 
 bool e2::AssetTask::execute()
 {
-	e2::FileStream fileStream(m_entry->path, false);
+	e2::FileStream fileStream(m_entry->path, e2::FileMode::ReadOnly);
 
 	if (!fileStream.valid())
 	{
@@ -395,8 +368,8 @@ bool e2::AssetTask::finalize()
 	if (returner)
 	{
 		double fullMs = m_timer.seconds() * 1000.0f;
-		LogNotice("{}: {: >.32s} {:4.1f}ms {:4.1f}ms", m_threadName, m_entry->path, m_asyncTime, fullMs );
-		assetManager()->m_uuidIndex[m_entry->uuid] = m_asset;
+		LogNotice("{}: {} {:4.1f}ms {:4.1f}ms", m_threadName, m_entry->name, m_asyncTime, fullMs );
+		assetManager()->m_nameIndex[m_entry->name] = m_asset;
 		return true;
 	}
 	return false;
@@ -416,7 +389,8 @@ e2::AssetPtr e2::AssetTask::asset()
 e2::AssetDatabase::AssetDatabase(e2::Context* ctx)
 	: m_engine(ctx->engine())
 {
-	readFromDisk();
+	repopulate();
+	dumpAssets();
 
 	populateEditorEntries();
 }
@@ -434,149 +408,50 @@ void e2::AssetDatabase::clear()
 	}
 	m_assets.clear();
 	m_pathIndex.clear();
-	m_uuidIndex.clear();
-
-	if (m_rootEditorEntry)
-	{
-		struct _Unit
-		{
-			e2::AssetEditorEntry* entry{};
-		};
-
-		std::queue<_Unit> q;
-		q.push({ m_rootEditorEntry });
-
-		while (!q.empty())
-		{
-			_Unit u = q.front();
-			q.pop();
-
-			for (e2::AssetEditorEntry* c : u.entry->children)
-			{
-				q.push({ c });
-			}
-
-			e2::destroy(u.entry);
-		}
-
-		m_rootEditorEntry = nullptr;
-	}
+	m_nameIndex.clear();
+	clearEditorEntries();
 	
 }
 
-void e2::AssetDatabase::validate(bool forceSave)
+void e2::AssetDatabase::repopulate()
 {
-	bool saveAfterValidation{};
-	std::set<e2::AssetEntry*> removeList;
-
 	for (e2::AssetEntry* entry : m_assets)
 	{
-		if (!std::filesystem::exists(entry->path))
-		{
-			saveAfterValidation = true;
-
-			LogError("Asset in registry does not exist on disk. Removing from registry. ({}:{})", entry->path, entry->uuid.string());
-			removeList.insert(entry);
-			continue;
-		}
-
-		uint64_t lastWriteTime = std::filesystem::last_write_time(entry->path).time_since_epoch().count();
-		if (entry->timestamp < lastWriteTime)
-		{
-			saveAfterValidation = true;
-
-			if (!readHeader(entry->path, entry->header))
-			{
-				LogError("Asset was out of date, however header could not be read despite file existing. Removing from registry. ({}:{})", entry->path, entry->uuid.string());
-				removeList.insert(entry);
-				continue;
-			}
-
-			entry->timestamp = lastWriteTime;
-
-			LogNotice("Refreshed asset since header was out of date. ({}:{})", entry->path, entry->uuid.string());
-		}
-	}
-
-	for (e2::AssetEntry* entry : removeList)
-	{
-		m_assets.erase(entry);
 		e2::destroy(entry);
 	}
+	m_assets.clear();
 
-	// Regenerate the indices
-	m_pathIndex.clear();
-	m_uuidIndex.clear();
-	for (e2::AssetEntry* entry : m_assets)
+	// regenerate registry  
+	for (const std::filesystem::directory_entry& entry : std::filesystem::recursive_directory_iterator("./assets/"))
 	{
-		m_pathIndex[entry->path] = entry;
-		m_uuidIndex[entry->uuid] = entry;
+		if (!entry.is_regular_file())
+			continue;
+
+		if (entry.path().extension() != ".e2a")
+			continue;
+
+		invalidateAsset(entry.path().string());
 	}
 
-	// Save if needed
-	if (saveAfterValidation || forceSave)
+	for (const std::filesystem::directory_entry& entry : std::filesystem::recursive_directory_iterator("./engine/"))
 	{
-		writeToDisk();
+		if (!entry.is_regular_file())
+			continue;
+
+		if (entry.path().extension() != ".e2a")
+			continue;
+
+		invalidateAsset(entry.path().string());
 	}
 }
 
-void e2::AssetDatabase::readFromDisk()
+
+e2::AssetEntry* e2::AssetDatabase::entryFromName(e2::Name name)
 {
-	e2::FileStream fileBuffer("./assets/registry.db", false);
-	bool forceSave{};
-	if (fileBuffer.valid())
+	auto finder = m_nameIndex.find(name);
+	if (finder == m_nameIndex.end())
 	{
-		read(fileBuffer);
-	}
-	else
-	{
-		forceSave = true;
-		for (e2::AssetEntry* entry : m_assets)
-		{
-			e2::destroy(entry);
-		}
-		m_assets.clear();
-	}
-
-	validate(forceSave);
-}
-
-void e2::AssetDatabase::writeToDisk()
-{
-	e2::FileStream fileBuffer("./assets/registry.db", true);
-	write(fileBuffer);
-}
-
-
-
-void e2::AssetDatabase::write(e2::IStream& destination) const
-{
-	destination << uint32_t(m_assets.size());
-	for (e2::AssetEntry *entry : m_assets)
-		destination << *entry;
-}
-
-bool e2::AssetDatabase::read(e2::IStream& source)
-{
-	uint32_t numEntries{};
-	source >> numEntries;
-	for (uint32_t i = 0; i < numEntries; i++)
-	{
-		e2::AssetEntry *newEntry = e2::create<e2::AssetEntry>();
-		source >> *newEntry;
-		m_assets.insert(newEntry);
-	}
-
-	return true;
-}
-
-
-e2::AssetEntry* e2::AssetDatabase::entryFromUUID(e2::UUID const& uuid)
-{
-	auto finder = m_uuidIndex.find(uuid);
-	if (finder == m_uuidIndex.end())
-	{
-		LogError("Failed to find asset given the uuid \"{}\"", uuid.string());
+		LogError("Failed to find asset given the name \"{}\"",name);
 		return nullptr;
 	}
 
@@ -588,13 +463,12 @@ e2::Engine* e2::AssetDatabase::engine()
 	return m_engine;
 }
 
-e2::UUID e2::AssetDatabase::invalidateAsset(std::string const& path)
+e2::Name e2::AssetDatabase::invalidateAsset(std::string const& path)
 {
 	e2::AssetEntry* existing = entryFromPath(path);
 	if(existing)
 	{
-		//LogError("Asset already exists: \"{}\"", path);
-		return existing->uuid;
+		return existing->name;
 	}
 
 	std::string clean = cleanPath(path);
@@ -602,7 +476,7 @@ e2::UUID e2::AssetDatabase::invalidateAsset(std::string const& path)
 	e2::AssetEntry *newEntry = e2::create<e2::AssetEntry>();
 
 	newEntry->path = clean;
-	newEntry->uuid = e2::UUID::generate();
+	newEntry->name = std::filesystem::path(newEntry->path).filename().string();
 
 	if (!readHeader(clean, newEntry->header))
 	{
@@ -612,16 +486,18 @@ e2::UUID e2::AssetDatabase::invalidateAsset(std::string const& path)
 
 	m_assets.insert(newEntry);
 	m_pathIndex[newEntry->path] = newEntry;
-	m_uuidIndex[newEntry->uuid] = newEntry;
+	m_nameIndex[newEntry->name] = newEntry;
 
-	return newEntry->uuid;
+	populateEditorEntries();
+
+	return newEntry->name;
 }
 
 bool e2::AssetDatabase::readHeader(std::string const& path, e2::AssetHeader& outHeader)
 {
 	std::string clean = cleanPath(path);
 
-	e2::FileStream dataBuffer(clean, false);
+	e2::FileStream dataBuffer(clean, e2::FileMode::ReadOnly);
 	if (!dataBuffer.valid())
 	{
 		return false;
@@ -641,7 +517,7 @@ std::string e2::AssetDatabase::cleanPath(std::string const& path)
 namespace
 {
 
-	void populateEntries(e2::AssetDatabase* db, e2::AssetEditorEntry* editorEntry, std::string const& fullPath)
+	void populateEntries(e2::AssetDatabase* db, std::shared_ptr<e2::AssetEditorEntry> editorEntry, std::string const& fullPath)
 	{
 		
 		for (std::filesystem::directory_entry const& directoryEntry : std::filesystem::directory_iterator{ fullPath })
@@ -649,7 +525,7 @@ namespace
 			
 			if (directoryEntry.is_directory())
 			{
-				e2::AssetEditorEntry* newEntry = e2::create<e2::AssetEditorEntry>();
+				std::shared_ptr<e2::AssetEditorEntry> newEntry = std::make_shared<e2::AssetEditorEntry>();
 				newEntry->name = std::format("{}/", directoryEntry.path().filename().string());
 				newEntry->parent = editorEntry;
 				
@@ -667,7 +543,7 @@ namespace
 					continue;
 				}
 
-				e2::AssetEditorEntry* newEntry = e2::create<e2::AssetEditorEntry>();
+				std::shared_ptr<e2::AssetEditorEntry> newEntry = std::make_shared<e2::AssetEditorEntry>();
 				newEntry->name = assetPath.filename().string();
 				newEntry->parent = editorEntry;
 				newEntry->entry = assetEntry;
@@ -680,18 +556,66 @@ namespace
 	}
 }
 
+void e2::AssetDatabase::clearEditorEntries()
+{
+
+	if (m_rootEditorEntry)
+	{
+		struct _Unit
+		{
+			std::shared_ptr<e2::AssetEditorEntry> entry{};
+		};
+
+		std::queue<_Unit> q;
+		q.push({ m_rootEditorEntry });
+
+		while (!q.empty())
+		{
+			_Unit u = q.front();
+			q.pop();
+
+			for (std::shared_ptr<e2::AssetEditorEntry> c : u.entry->children)
+			{
+				q.push({ c });
+			}
+		}
+
+		m_rootEditorEntry = nullptr;
+	}
+}
+
 void e2::AssetDatabase::populateEditorEntries()
 {
-	m_rootEditorEntry = e2::create<e2::AssetEditorEntry>();
+	clearEditorEntries();
+	m_rootEditorEntry = std::make_shared<e2::AssetEditorEntry>();
 	m_rootEditorEntry->name = "/";
 
-	::populateEntries(this, m_rootEditorEntry, "./");
+	std::shared_ptr<e2::AssetEditorEntry> engineEntry = std::make_shared<e2::AssetEditorEntry>();
+	engineEntry->name = "engine/";
+	engineEntry->parent = m_rootEditorEntry;
+	::populateEntries(this, engineEntry, "./engine/");
+	m_rootEditorEntry->children.push_back(engineEntry);
+
+	std::shared_ptr<e2::AssetEditorEntry>  assetsEntry = std::make_shared<e2::AssetEditorEntry>();
+	assetsEntry->name = "assets/";
+	assetsEntry->parent = m_rootEditorEntry;
+	::populateEntries(this, assetsEntry, "./assets/");
+	m_rootEditorEntry->children.push_back(assetsEntry);
 
 }
 
-e2::AssetEditorEntry* e2::AssetDatabase::rootEditorEntry()
+std::shared_ptr<e2::AssetEditorEntry> e2::AssetDatabase::rootEditorEntry()
 {
 	return m_rootEditorEntry;
+}
+
+void e2::AssetDatabase::dumpAssets()
+{
+	LogNotice("dumping assets..:");
+	for (e2::AssetEntry* entry : m_assets)
+	{
+		LogNotice("{}: {}: {}", entry->name, entry->header.assetType.cstring(), entry->path);
+	}
 }
 
 e2::AssetEntry* e2::AssetDatabase::entryFromPath(std::string const& path)
@@ -713,7 +637,7 @@ e2::AssetEntry::AssetEntry()
 
 void e2::AssetEntry::write(e2::IStream& destination) const
 {
-	destination << uuid;
+	destination << name;
 	destination << path;
 	destination << timestamp;
 	destination << header;
@@ -721,7 +645,7 @@ void e2::AssetEntry::write(e2::IStream& destination) const
 
 bool e2::AssetEntry::read(e2::IStream& source)
 {
-	source >> uuid;
+	source >> name;
 	source >> path;
 	source >> timestamp;
 	source >> header;
@@ -739,8 +663,8 @@ void e2::AssetHeader::write(e2::IStream& destination) const
 	destination << uint8_t(dependencies.size());
 	for (e2::DependencySlot const& depSlot : dependencies)
 	{
-		destination << depSlot.name;
-		destination << depSlot.uuid;
+		destination << depSlot.dependencyName;
+		destination << depSlot.assetName;
 	}
 }
 
@@ -787,8 +711,8 @@ bool e2::AssetHeader::read(e2::IStream& source)
 	for (uint8_t i = 0; i < numDeps; i++)
 	{
 		e2::DependencySlot depSlot;
-		source >> depSlot.name;
-		source >> depSlot.uuid;
+		source >> depSlot.dependencyName;
+		source >> depSlot.assetName;
 		dependencies.push(depSlot);
 	}
 
@@ -810,9 +734,9 @@ void e2::ALJStateInternal::clear()
 
 std::string e2::AssetEditorEntry::fullPath()
 {
-	if (parent)
+	if (auto p = parent.lock())
 	{
-		return std::format("{}{}", parent->fullPath(), name);
+		return std::format("{}{}", p->fullPath(), name);
 	}
 
 	return name;

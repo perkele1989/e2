@@ -42,11 +42,12 @@ bool e2::SoundImporter::analyze()
 bool e2::SoundImporter::writeAssets()
 {
 	std::filesystem::path inputPath = std::filesystem::path(m_config.input);
+	std::string ext = std::filesystem::path(inputPath).extension().string();
 	std::filesystem::path outFilename = std::filesystem::path(inputPath).replace_extension(".e2a").filename();
 	std::string outFile = (fs::path(m_config.outputDirectory) / outFilename).string();
-	e2::Buffer soundData;
+	e2::FileStream soundData(m_config.input, e2::FileMode::ReadOnly);
 
-	if (!soundData.readFromFile(m_config.input))
+	if (!soundData.valid())
 	{
 		LogError("Failed to load sound.");
 		return false;
@@ -58,19 +59,26 @@ bool e2::SoundImporter::writeAssets()
 	assetHeader.assetType = "e2::Sound";
 
 
-	e2::Buffer assetData;
+	e2::HeapStream assetData;
 
-
+	if (ext == ".mp3" || ext == ".ogg")
+	{
+		assetData << bool(true);
+	}
+	else
+	{
+		assetData << bool(false);
+	}
 	assetData << uint64_t(soundData.size());
 	assetData << soundData;
 
-
+	assetData.seek(0);
 	assetHeader.size = assetData.size();
 
-	e2::Buffer fileBuffer(true, 1024 + assetData.size());
+	e2::FileStream fileBuffer(outFile, e2::FileMode::ReadWrite | e2::FileMode::Truncate, true);
 	fileBuffer << assetHeader;
-	fileBuffer.write(assetData.begin(), assetData.size());
-	if (fileBuffer.writeToFile(outFile))
+	fileBuffer << assetData;
+	if (fileBuffer.valid())
 	{
 		assetManager()->database().invalidateAsset(outFile);
 		return true;

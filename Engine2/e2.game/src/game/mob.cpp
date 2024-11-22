@@ -175,7 +175,7 @@ void e2::MobSpecification::initializeSpecifications(e2::GameContext* ctx)
 			//	chaiscript::ChaiScript* script = ctx->game()->scriptEngine();
 			//	try
 			//	{
-			//		newSpec.scriptInterface = script->eval_file<EntityScriptInterface>(entity.at("script").template get<std::string>());
+			//		newSpec.scriptInterface = script->eval_file<TurnbasedScriptInterface>(entity.at("script").template get<std::string>());
 
 			//	}
 			//	catch (chaiscript::exception::eval_error& e)
@@ -298,7 +298,7 @@ void e2::Mob::initialize()
 
 		meshProxy = e2::create<e2::MeshProxy>(gameSession(), proxyConf);
 		meshProxy->modelMatrix = glm::translate(glm::mat4(1.0), meshPosition + glm::vec3(e2::worldUp()) * specification->meshHeightOffset);
-		meshProxy->modelMatrix = meshProxy->modelMatrix * glm::toMat4(meshRotation) * glm::scale(glm::mat4(1.0f), specification->meshScale * e2::globalMeshScale);
+		meshProxy->modelMatrix = meshProxy->modelMatrix * glm::toMat4(meshRotation) * glm::scale(glm::mat4(1.0f), specification->meshScale);
 
 		meshProxy->modelMatrixDirty = true;
 	}
@@ -324,7 +324,7 @@ void e2::Mob::initialize()
 
 }
 
-void e2::Mob::onHit(e2::GameEntity* instigator, float damage)
+void e2::Mob::onHit(e2::TurnbasedEntity* instigator, float damage)
 {
 	if (health <= 0.0f)
 		return;
@@ -359,7 +359,7 @@ void e2::Mob::updateAnimation(double seconds)
 	if (meshProxy)
 	{
 		meshProxy->modelMatrix = glm::translate(glm::mat4(1.0), meshPosition + glm::vec3(e2::worldUp()) * specification->meshHeightOffset);
-		meshProxy->modelMatrix = meshProxy->modelMatrix * glm::toMat4(meshRotation) * glm::scale(glm::mat4(1.0f), specification->meshScale * e2::globalMeshScale);
+		meshProxy->modelMatrix = meshProxy->modelMatrix * glm::toMat4(meshRotation) * glm::scale(glm::mat4(1.0f), specification->meshScale);
 		meshProxy->modelMatrixDirty = true;
 	}
 }

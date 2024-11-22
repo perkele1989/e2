@@ -11,6 +11,7 @@
 #include <e2/renderer/shadermodels/terrain.hpp>
 #include <e2/renderer/shadermodels/fog.hpp> 
 
+#include <e2/assets/sound.hpp>
 #include "game/gamecontext.hpp"
 #include "game/shared.hpp"
 
@@ -24,16 +25,71 @@ namespace e2
 
 	inline float treeScale = 0.623f;
 	inline float treeSpread = 1.0f;
-	inline int32_t treeNum1 = 4;
-	inline int32_t treeNum2 = 7;
-	inline int32_t treeNum3 = 15;
+	inline int32_t treeNum1 = 9;
+	inline int32_t treeNum2 = 14;
+	inline int32_t treeNum3 = 23;
 
 	class GameUnit;
 
-	struct MeshTreeLods
+	//struct MeshTreeLods
+	//{
+	//	e2::MeshPtr lods[3];
+	//};
+
+	struct TileData;
+
+
+
+	constexpr float maxTreeFallTime = 4.0f;
+	struct UnpackedTreeState
 	{
-		e2::MeshPtr lods[3];
+		
+
+		uint32_t meshIndex{};
+		e2::MeshProxy* mesh{};
+		
+		glm::vec2 worldOffset;
+		glm::vec2 fallDir;
+		float rotation;
+		float scale;
+
+		float health{ 1.0f }; // if 0, this tree is harvested, will fall and die
+		float fallTime{ e2::maxTreeFallTime }; // if > 0 and health 0.0, currently falling, otherwise fallen and dying
+		float killTime{ 1.0f }; // if > 0 and falltime 0.0, currently dying, otherwise dead
+		float shake{ 0.0f };
+		
+		uint32_t totalLumber{};
+		uint32_t spawnedLumber{};
+
 	};
+
+	struct UnpackedForestState
+	{
+		e2::Hex hex;
+		std::vector<UnpackedTreeState> trees;
+	};
+
+	struct TreeState
+	{
+		uint32_t meshIndex{};
+		glm::vec2 planarOffset{};
+		float rotation{};
+		float scale{};
+
+
+		glm::vec2 localOffset(e2::TileData *tile, struct ForestState *forestState);
+
+
+	};
+
+	struct ForestState
+	{
+		e2::MeshPtr mesh;
+		std::vector<TreeState> trees;
+	};
+
+
+
 
 	enum class TileFlags : uint16_t
 	{
@@ -95,6 +151,7 @@ namespace e2
 		bool isShallowWater();
 		bool isDeepWater();
 		bool isLand();
+		bool isMountain();
 
 		bool hasGold();
 		bool hasOil();
@@ -125,7 +182,10 @@ namespace e2
 		EmpireId empireId{255}; // 255 means no empire claim this, 254 empire ids that are recycled (max 254 concurrent empires)
 
 		// optional forest proxy, if this tile is discovered it shows: forest abundance if unbuilt on forest, partly forest if built on forest, nothing if not on forest or if undiscovered (undiscovered tile meshes lives on chunk array)
+		int32_t forestIndex{-1};
 		e2::MeshProxy* forestProxy{};
+		float forestRotation{};
+
 
 		e2::MeshProxy* resourceProxy{};
 		e2::MeshPtr resourceMesh;
@@ -134,19 +194,19 @@ namespace e2
 
 	constexpr uint32_t hexChunkResolution = 6;
 
-	constexpr uint32_t maxNumExtraChunks = 256;
-	constexpr uint32_t maxNumChunkStates = 512;
+	constexpr uint32_t maxNumExtraChunks = 1024;
+	constexpr uint32_t maxNumChunkStates = 4096;
 
-	constexpr uint32_t maxNumChunkLoadTasks = 256;
-	constexpr uint32_t maxNumMeshesPerChunk = (hexChunkResolution * hexChunkResolution)*2;
+	constexpr uint32_t maxNumChunkLoadTasks = 4096;
+	constexpr uint32_t maxNumMeshesPerChunk = (hexChunkResolution * hexChunkResolution)*3;
 
 	class HexGrid;
 
-	struct ForestIndex
-	{
-		glm::ivec2 offsetCoords;
-		uint32_t meshIndex{};
-	};
+	//struct ForestIndex
+	//{
+	//	glm::ivec2 offsetCoords;
+	//	uint32_t meshIndex{};
+	//};
 
 	/** @tags(arena, arenaSize=e2::maxNumChunkLoadTasks)  */
 	class ChunkLoadTask : public e2::AsyncTask
@@ -165,8 +225,10 @@ namespace e2
 
 		e2::MeshPtr m_generatedMesh;
 
-		e2::DynamicMesh* m_dynaHex{};
-		e2::DynamicMesh* m_dynaHexHigh{};
+		/*e2::DynamicMesh* m_dynaHex{};
+		e2::DynamicMesh* m_dynaHexHigh{};*/
+		e2::FastMesh2* m_fastHex{};
+		e2::FastMesh2* m_fastHexHigh{};
 
 		e2::StackVector<e2::MeshProxy*, e2::maxNumMeshesPerChunk> forestMeshes;
 
@@ -286,6 +348,9 @@ namespace e2
 
 		HexGrid(e2::GameContext* ctx);
 		~HexGrid();
+
+		static void prescribeAssets(e2::Context* ctx, e2::ALJDescription& desc);
+		
 
 		virtual e2::Engine* engine() override;
 		virtual e2::Game* game() override;
@@ -417,7 +482,7 @@ namespace e2
 
 		/** Retrieves tile data for the given hex, if it exists. Otherwise returns null */
 		e2::TileData* getExistingTileData(glm::ivec2 const& hex);
-		e2::TileData getCalculatedTileData(glm::ivec2 const& hex);
+		e2::TileData calculateTileData(glm::ivec2 const& hex);
 		e2::TileData getTileData(glm::ivec2 const& hex);
 		/// Tiles End
 
@@ -435,20 +500,27 @@ namespace e2
 
 		e2::MeshPtr getResourceMeshForFlags(e2::TileFlags flags);
 
-		e2::MeshPtr getForestMeshForFlags(e2::TileFlags flags);
+		int32_t getForestIndexForFlags(e2::TileFlags flags);
+		ForestState* getForestState(int32_t index);
 
+		void damageTree(glm::ivec2 const& hex, uint32_t treeIndex, float dmg);
+
+		e2::UnpackedForestState* getUnpackedForestState(glm::ivec2 const& hex);
+		e2::UnpackedForestState* unpackForestState(glm::ivec2 const& hex);
+
+		e2::MeshProxy* createGrassProxy(e2::TileData* tileData, glm::ivec2 const& hex);
 		e2::MeshProxy* createResourceProxyForTile(e2::TileData* tileData, glm::ivec2 const& hex);
 		e2::MeshProxy* createForestProxyForTile(e2::TileData* tileData, glm::ivec2 const& hex);
 		static float sampleSimplex(glm::vec2 const& position);
 
-		e2::DynamicMesh& dynamicHex()
+		e2::FastMesh2& fastHex()
 		{
-			return m_dynaHex;
+			return m_fastHex;
 		}
 		
-		e2::DynamicMesh &dynamicHexHigh()
+		e2::FastMesh2& fastHexHigh()
 		{
-			return m_dynaHexHigh;
+			return m_fastHexHigh;
 		}
 
 		e2::MaterialPtr hexMaterial()
@@ -476,6 +548,11 @@ namespace e2
 
 		e2::ITexture* minimapTexture(uint8_t frameIndex);
 
+		void setFog(float newFog);
+
+
+
+		void removeWood(glm::ivec2 const& location);
 	protected:
 
 		int32_t m_numThreads{4};
@@ -489,14 +566,35 @@ namespace e2
 		std::vector<int32_t> m_tileVisibility;
 		std::unordered_map<glm::ivec2, size_t> m_tileIndex;
 
+		void updateUnpackedForests();
+
+		std::unordered_map<glm::ivec2, e2::UnpackedForestState> m_unpackedForests;
+
 		e2::MeshPtr m_resourceMeshStone;
-		e2::MeshPtr m_pineForestMeshes[3];
-		//MeshTreeLods m_pineForestMeshes[3];
+
+		e2::ForestState m_forestStates[3];
+
+		e2::MeshPtr m_treeMeshes[4];
+		e2::DynamicMesh m_dynamicTreeMeshes[4];
+		e2::MaterialPtr m_treeMaterial;
+		e2::MaterialProxy* m_treeMaterialProxy;
+
+		e2::MaterialPtr m_grassMaterial;
+		e2::DynamicMesh m_grassLeafMesh;
+		e2::MeshPtr m_grassMeshes[4];
+		e2::DynamicMesh m_dynamicGrassMeshes[4];
+
+
+		e2::SoundPtr m_treeChopSound;
+		e2::SoundPtr m_treeFallSound;
+		e2::SoundPtr m_woodDieSound;
 
 		e2::MeshPtr m_baseHex;
-		e2::DynamicMesh m_dynaHex;
+		//e2::DynamicMesh m_dynaHex;
+		e2::FastMesh2 m_fastHex;
 		e2::MeshPtr m_baseHexHigh;
-		e2::DynamicMesh m_dynaHexHigh;
+		e2::FastMesh2 m_fastHexHigh;
+		//e2::DynamicMesh m_dynaHexHigh;
 
 		e2::MaterialPtr m_terrainMaterial;
 		e2::TerrainProxy* m_terrainProxy{};

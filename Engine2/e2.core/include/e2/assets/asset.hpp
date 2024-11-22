@@ -35,6 +35,9 @@ namespace e2
 		// 
 		TextureImportRework,
 
+		//
+		AudioStream,
+
 		// New versions above this line 
 		End,
 		Latest = End - 1
@@ -43,14 +46,11 @@ namespace e2
 
 	struct E2_API DependencySlot
 	{
-		DependencySlot();
-		DependencySlot(e2::UUID uuid);
-
 		/** Internal asset-specific name of this dependency, for example "albedoMap" or "runAnimation" */
-		e2::Name name;
+		e2::Name dependencyName;
 
-		/** The asset UUID for this dependency */
-		e2::UUID uuid;
+		/** The asset name for this dependency */
+		e2::Name assetName;
 	};
 
 	/** */
@@ -61,7 +61,7 @@ namespace e2
 		Asset() = default;
 		virtual ~Asset();
 
-		virtual void postConstruct(e2::Context *ctx, e2::UUID const& inUuid);
+		virtual void postConstruct(e2::Context *ctx, e2::Name const& inUuid);
 
 		virtual Engine* engine() override;
 
@@ -69,13 +69,9 @@ namespace e2
 		virtual bool read(e2::IStream& source) override;
 		virtual bool finalize();
 
-		e2::UUID findDependencyByName(e2::Name name);
+		e2::Name findDependencyByName(e2::Name name);
 
-		// dependencies, these are guaranteed to be fully loaded in when this asset begins loading 
-		// optionally named
-
-		std::string debugName;
-		e2::UUID uuid;
+		e2::Name name;
 		e2::AssetVersion version;
 
 		e2::StackVector<DependencySlot, e2::maxNumAssetDependencies> dependencies;

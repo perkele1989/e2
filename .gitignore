@@ -625,11 +625,14 @@ repository/
 Engine2/vcx/
 Engine2/deploy/
 Engine2/assets/
+Engine2/assets.old/
+Engine2/engine.old/
 Engine2/*/bin/
 Engine2/*/lib/
 Engine2/*/reflection/
 Engine2/sourcecontent
 Engine2/sourcecontent/*
 Engine2/sourcecontent/**/*
+Engine2/engine/
 Engine2/design/**/*
 !templates/project.vcxproj.user

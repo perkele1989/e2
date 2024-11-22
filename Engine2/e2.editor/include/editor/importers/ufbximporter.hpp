@@ -30,7 +30,7 @@ namespace e2
 
 	struct UfbxImportAttribute
 	{
-		e2::Buffer vertexData;
+		e2::HeapStream vertexData;
 	};
 
 
@@ -52,7 +52,7 @@ namespace e2
 		std::vector<uint32_t> newIndices;
 
 		std::string materialName;
-		e2::UUID existingMaterialUUID;
+		//e2::Name existingMaterialName;
 
 		// this includes tangents
 		bool hasNormals{};
@@ -71,12 +71,12 @@ namespace e2
 
 		struct IntermediateData
 		{
-			e2::UUID materialUuid{};
+			e2::Name materialName{};
 			uint32_t vertexCount{};
 			uint32_t indexCount{};
 
 			e2::VertexAttributeFlags attributeFlags { e2::VertexAttributeFlags::None };
-			e2::Buffer indexData;
+			e2::HeapStream indexData;
 			std::vector<UfbxImportAttribute> attributes;
 		} intermediate;
 
@@ -181,7 +181,7 @@ namespace e2
 		bool writeAssets();
 	protected:
 
-		e2::UUID createMaterial(std::string const& outName);
+		e2::Name createMaterial(std::string const& outName);
 
 		void startAnalyzing();
 		void startProcessing();

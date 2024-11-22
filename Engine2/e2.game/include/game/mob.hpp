@@ -88,7 +88,7 @@ namespace e2
 
 
 	/**
-	 * A mob, i.e. unit in a wave
+	 * A wave entity (A mob, i.e. unit in a wave)
 	 * @tags(dynamic, arena, arenaSize=1024)
 	 */
 	class Mob : public e2::Object, public e2::GameContext
@@ -106,7 +106,7 @@ namespace e2
 		void postConstruct(e2::GameContext* ctx, e2::MobSpecification* spec, e2::Wave* wave);
 		virtual void initialize();
 
-		virtual void onHit(e2::GameEntity* instigator, float damage);
+		virtual void onHit(e2::TurnbasedEntity* instigator, float damage);
 
 		virtual void updateAnimation(double seconds);
 

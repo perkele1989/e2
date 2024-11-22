@@ -1,0 +1,122 @@
+
+{
+    "id": "player",
+    "specification": "e2::PlayerSpecification",
+    "entityType": "e2::PlayerEntity",
+    "moveSpeed": 1.4,
+
+    "collision": {
+        "radius": 0.05
+    },
+    "boatMesh":{
+        "meshScale": [0.3, 0.3, 0.3],
+        "mesh": "SM_Boat.e2a"
+    },
+    "mesh": {
+
+        "meshScale": [0.3, 0.3, 0.3],
+        "mesh": "SM_Dummy.e2a",
+        "skeleton": "SK_Dummy.e2a",
+        "dependencies": ["S_Axe_Swing.e2a"],
+        "poses": [
+            {
+                "name": "idle",
+                "asset": "A_Dummy_Idle.e2a",
+                "blendTime": 0.35 
+            },
+            {
+                "name": "boat",
+                "asset": "A_Dummy_Boat.e2a",
+                "blendTime": 0.35 
+            },
+            {
+                "name": "run",
+                "asset": "A_Dummy_Run.e2a",
+                "blendTime": 0.15,
+                "triggers":[
+                    {
+                        "id": "step1",
+                        "time": 0.0
+                    },
+                    {
+                        "id": "step2",
+                        "time": 0.33777775676 
+                    }
+                ]
+            }
+        ],
+        "actions": [
+            {
+                "name": "chop",
+                "asset": "A_Dummy_Chop.e2a",
+                "blendInTime": 0.1,
+                "blendOutTime": 0.4,
+                "speed": 2.0,
+                "triggers":[
+                    {
+                        "id": "hit",
+                        "time": 0.9333333
+                    }
+                ]
+                
+            },
+            {
+                "name": "sword",
+                "asset": "A_Dummy_Sword.e2a",
+                "blendInTime": 0.1,
+                "blendOutTime": 0.4,
+                "speed": 2.0,
+                "triggers":[
+                    {
+                        "id": "hit",
+                        "time": 0.4333333
+                    }
+                ]
+                
+            }
+        ]
+    },
+
+    "footstepGrass":{
+        "assets": [
+            "S_Footstep_Grass_001.e2a",
+            "S_Footstep_Grass_002.e2a",
+            "S_Footstep_Grass_003.e2a",
+            "S_Footstep_Grass_004.e2a",
+            "S_Footstep_Grass_005.e2a",
+            "S_Footstep_Grass_006.e2a",
+            "S_Footstep_Grass_007.e2a",
+            "S_Footstep_Grass_008.e2a",
+            "S_Footstep_Grass_009.e2a"
+        ]
+    },
+    "footstepDesert":{
+        "assets": [
+            "S_Footstep_Sand_001.e2a",
+            "S_Footstep_Sand_002.e2a",
+            "S_Footstep_Sand_003.e2a",
+            "S_Footstep_Sand_004.e2a",
+            "S_Footstep_Sand_005.e2a",
+            "S_Footstep_Sand_006.e2a",
+            "S_Footstep_Sand_007.e2a",
+            "S_Footstep_Sand_008.e2a",
+            "S_Footstep_Sand_009.e2a",
+            "S_Footstep_Sand_010.e2a"
+        ]
+    },
+    "footstepSnow":{
+        "assets": [
+            "S_Footstep_Snow_001.e2a",
+            "S_Footstep_Snow_002.e2a",
+            "S_Footstep_Snow_003.e2a",
+            "S_Footstep_Snow_005.e2a",
+            "S_Footstep_Snow_006.e2a",
+            "S_Footstep_Snow_008.e2a"
+        ]
+    }
+
+
+
+
+
+}

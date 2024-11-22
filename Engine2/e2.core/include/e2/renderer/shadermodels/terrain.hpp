@@ -125,8 +125,10 @@ namespace e2
 
 		e2::Pair<e2::IDataBuffer*> m_proxyUniformBuffers;
 	};
+
+
+	EnumFlagsDeclaration(e2::TerrainFlags);
 }
 
-EnumFlagsDeclaration(e2::TerrainFlags)
 
 #include "terrain.generated.hpp"

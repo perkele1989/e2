@@ -79,9 +79,8 @@ void e2::WaterModel::postConstruct(e2::Context* ctx)
 	m_proxyUniformBuffers[0] = renderContext()->createDataBuffer(bufferCreateInfo);
 	m_proxyUniformBuffers[1] = renderContext()->createDataBuffer(bufferCreateInfo);
 
-	
-	//std::string cubemapName = "assets/hdri/courtyard_irr.e2a";
-	std::string cubemapName = "assets/hdri/sunset_rad.e2a";
+
+	e2::Name cubemapName = "T_Sunset_Radiance.e2a";
 
 	e2::ALJDescription aljDesc;
 	assetManager()->prescribeALJ(aljDesc, cubemapName);

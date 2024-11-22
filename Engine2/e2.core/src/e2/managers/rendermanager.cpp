@@ -350,11 +350,11 @@ void e2::RenderManager::initialize()
 
 	bool aljSuccess = true;
 	e2::ALJDescription alj;
-	aljSuccess &= assetManager()->prescribeALJ(alj, "engine/F_DefaultFont_Sans.e2a");
-	aljSuccess &= assetManager()->prescribeALJ(alj, "engine/F_DefaultFont_Serif.e2a");
-	aljSuccess &= assetManager()->prescribeALJ(alj, "engine/F_DefaultFont_Monospace.e2a");
-	aljSuccess &= assetManager()->prescribeALJ(alj, "engine/T_DefaultTexture.e2a");
-	aljSuccess &= assetManager()->prescribeALJ(alj, "engine/ibl_brdf_lut_linear.e2a");
+	aljSuccess &= assetManager()->prescribeALJ(alj, "F_DefaultFont_Sans.e2a");
+	aljSuccess &= assetManager()->prescribeALJ(alj, "F_DefaultFont_Serif.e2a");
+	aljSuccess &= assetManager()->prescribeALJ(alj, "F_DefaultFont_Monospace.e2a");
+	aljSuccess &= assetManager()->prescribeALJ(alj, "T_DefaultTexture.e2a");
+	aljSuccess &= assetManager()->prescribeALJ(alj, "T_IntegratedBRDF.e2a");
 	aljSuccess &= assetManager()->queueWaitALJ(alj);
 	if (!aljSuccess)
 	{
@@ -362,11 +362,11 @@ void e2::RenderManager::initialize()
 		return;
 	}
 
-	m_defaultFont[size_t(e2::FontFace::Sans)] = assetManager()->get("engine/F_DefaultFont_Sans.e2a").cast<e2::Font>();
-	m_defaultFont[size_t(e2::FontFace::Serif)] = assetManager()->get("engine/F_DefaultFont_Serif.e2a").cast<e2::Font>();
-	m_defaultFont[size_t(e2::FontFace::Monospace)] = assetManager()->get("engine/F_DefaultFont_Monospace.e2a").cast<e2::Font>();
-	m_defaultTexture = assetManager()->get("engine/T_DefaultTexture.e2a").cast<e2::Texture2D>();
-	m_integratedBrdf = assetManager()->get("engine/ibl_brdf_lut_linear.e2a").cast<e2::Texture2D>();
+	m_defaultFont[size_t(e2::FontFace::Sans)] = assetManager()->get("F_DefaultFont_Sans.e2a").cast<e2::Font>();
+	m_defaultFont[size_t(e2::FontFace::Serif)] = assetManager()->get("F_DefaultFont_Serif.e2a").cast<e2::Font>();
+	m_defaultFont[size_t(e2::FontFace::Monospace)] = assetManager()->get("F_DefaultFont_Monospace.e2a").cast<e2::Font>();
+	m_defaultTexture = assetManager()->get("T_DefaultTexture.e2a").cast<e2::Texture2D>();
+	m_integratedBrdf = assetManager()->get("T_IntegratedBRDF.e2a").cast<e2::Texture2D>();
 	/*
 	e2::Moment start = e2::timeNow();
 	std::u32string foo = U"ABCDEFGHIJKLMNOPQRSTUVWXYZÅÄÖabcdefghijklmnopqrstuvwxyzåäö0123456789!?_-.,;:*'^\"§½<>@#£¤$%€&/{([)]=}´`µ";
@@ -380,7 +380,7 @@ void e2::RenderManager::initialize()
 	LogNotice("Seeding the default font took {}ms", start.durationSince().milliseconds());*/
 
 	m_defaultMaterial = e2::create<e2::Material>();
-	m_defaultMaterial->postConstruct(this, e2::UUID());
+	m_defaultMaterial->postConstruct(this, e2::Name("null"));
 	m_defaultMaterial->overrideModel(getShaderModel("e2::LightweightModel"));
 	
 	std::string srcData;
@@ -446,6 +446,9 @@ void e2::RenderManager::shutdown()
 	m_defaultFont[0] = nullptr;
 	m_defaultFont[1] = nullptr;
 	m_defaultFont[2] = nullptr;
+
+	for (e2::CustomModel* customModel : m_customModels)
+		e2::destroy(customModel);
 
 	for(e2::ShaderModel* model : m_shaderModels)
 		e2::destroy(model);

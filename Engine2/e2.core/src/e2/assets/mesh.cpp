@@ -66,7 +66,7 @@ bool e2::Mesh::read(e2::IStream& source)
 	for (uint32_t i = 0; i < submeshCount; i++)
 	{
 		// fetch material directly from deps array using submesh index
-		e2::MaterialPtr material = assetManager()->get(dependencies[i].uuid).cast<e2::Material>();
+		e2::MaterialPtr material = assetManager()->get(dependencies[i].assetName).cast<e2::Material>();
 		m_materials.push(material);
 
 		e2::SubmeshSpecification newSpecification;
@@ -388,7 +388,7 @@ glm::mat4 const& e2::Skeleton::inverseTransform()
 
 e2::AnimationBinding* e2::Skeleton::getOrCreateBinding(e2::Ptr<Animation> anim)
 {
-	auto finder = m_animationBindings.find(anim->uuid);
+	auto finder = m_animationBindings.find(anim->name);
 	if (finder == m_animationBindings.end())
 	{
 		e2::AnimationBinding* newBinding = e2::create<e2::AnimationBinding>();
@@ -411,7 +411,7 @@ e2::AnimationBinding* e2::Skeleton::getOrCreateBinding(e2::Ptr<Animation> anim)
 			newBinding->scaleTracks[boneId] = anim->trackByName(trackName_sca, e2::AnimationType::Vec3);
 		}
 
-		m_animationBindings[anim->uuid] = newBinding;
+		m_animationBindings[anim->name] = newBinding;
 		return newBinding;
 	}
 

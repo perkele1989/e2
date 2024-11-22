@@ -33,6 +33,8 @@ void main()
 
 	vec3 visibility = textureLod(sampler2D(visibilityMask, clampSampler), screenUv, 0).xyz;
 
+	
+
 	outColor.rgb = fogOfWar(outColor.rgb,fragPos.xyz, visibility, renderer.time.x, depth, fogHeight);
 
 	//outColor.rgb = vec3(pow(fogHeight,3.0));

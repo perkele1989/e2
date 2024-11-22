@@ -2,6 +2,8 @@
 #include "game/empire.hpp"
 #include "game/game.hpp"
 
+#include "game/entities/turnbasedentity.hpp"
+
 e2::GameEmpire::GameEmpire(e2::GameContext* ctx, EmpireId _id)
 	: m_game(ctx->game())
 	, id(_id)
@@ -50,7 +52,7 @@ e2::EmpireAI::~EmpireAI()
 
 void e2::EmpireAI::grugBrainWakeUp()
 {
-	for (e2::GameEntity* ent : empire->entities)
+	for (e2::TurnbasedEntity* ent : empire->entities)
 	{
 		if (ent->grugRelevant())
 		{

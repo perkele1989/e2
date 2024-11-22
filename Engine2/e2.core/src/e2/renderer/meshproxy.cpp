@@ -50,13 +50,10 @@ e2::MeshProxy::MeshProxy(e2::Session* inSession, e2::MeshProxyConfiguration cons
 		lods.push(newLod);
 	}
 
-
-
 	modelMatrix = glm::mat4(1.0f);
 	
 	invalidatePipeline();
 	enable();
-
 }
 
 e2::MeshProxy::~MeshProxy()
@@ -91,7 +88,6 @@ void e2::MeshProxy::disable()
 void e2::MeshProxy::invalidatePipeline()
 {
 	bool wasEnabled = enabled();
-
 
 	if (wasEnabled)
 		disable();

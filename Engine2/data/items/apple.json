@@ -1,0 +1,17 @@
+{
+    "id": "apple",
+    "displayName": "Apple",
+    "dropMesh": {
+        "meshScale": [1.0, 1.0, 1.0],
+        "mesh": "SM_Apple.e2a"
+    },
+    "usable": true,
+    "useHandler": "e2::EdibleHandler",
+    "useHandlerData": {
+        "healthModifier": 10.0,
+        "meshAction": "eat"
+    },
+    "stackable": true,
+    "stackSize": 30,
+    "iconSprite": "ItemIconApple"
+}

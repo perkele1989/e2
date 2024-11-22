@@ -7,7 +7,8 @@
 
 namespace e2 
 {
-	class GameEntity;
+	class Entity;
+	class TurnbasedEntity;
 
     constexpr uint64_t maxNumEmpires = 256;
     using EmpireId = uint64_t;
@@ -69,7 +70,7 @@ namespace e2
 	{
 		TurnPreparing,
 		Turn,
-		TurnEnding,
+		TurnEnding
 	};
 
 	enum class TurnState : uint8_t
@@ -82,6 +83,7 @@ namespace e2
 		WavePreparing,
 		Wave,
 		WaveEnding,
+		Realtime
 	};
 
 	enum class EntityLayerIndex : uint8_t
@@ -96,7 +98,7 @@ namespace e2
 
 	struct EntityLayer
 	{
-		std::unordered_map<glm::ivec2, e2::GameEntity*> entityIndex;
+		std::unordered_map<glm::ivec2, e2::TurnbasedEntity*> entityIndex;
 	};
 
 
@@ -129,6 +131,28 @@ namespace e2
 		glm::vec3 velocity;
 	};
 
+	struct SweepResult
+	{
+		bool hit{};
+		float moveDistance{};
+		glm::vec2 hitNormal{};
+		glm::vec2 hitLocation{};
+		glm::vec2 stopLocation{};
+
+		glm::vec2 obstacleLocation{};
+		float obstacleRadius{};
+	};
+
+	struct OverlapResult
+	{
+		bool overlaps{};
+		glm::vec2 overlapDirection{};
+		float overlapDepth{};
+	};
+
+	SweepResult circleSweepTest(glm::vec2 const& startLocation, glm::vec2 const& endLocation, float sweepRadius, glm::vec2 const& obstacleLocation, float obstacleRadius);
+
+	OverlapResult circleOverlapTest(glm::vec2 const& location1, float radius1, glm::vec2 const& location2, float radius2);
 
 	static const e2::UIColor gameAccent{ 0xf59b14FF };
 	static const e2::UIColor gameAccentHalf{ 0xf59b147F };
@@ -137,4 +161,33 @@ namespace e2
 	static const e2::UIColor gamePanelLight{ 0x425168FF };
 	static const e2::UIColor gamePanelLightHalf{ 0x4251687F };
 
+
+	enum class CollisionType : uint8_t
+	{
+		All = 0b0000'1111,
+
+		Water = 0b0000'0001,
+		Mountain = 0b0000'0010,
+		Tree = 0b0000'0100,
+		Component = 0b0000'1000,
+		Land = 0b0001'0000
+	};
+
+
+	EnumFlagsDeclaration(CollisionType);
+
+
+	class CollisionComponent;
+
+	struct Collision
+	{
+		CollisionType type{ CollisionType::Water };
+
+		glm::vec2 position;
+		glm::ivec2 hex;
+		float radius{ 0.0f };
+
+		e2::CollisionComponent* component{};
+		int32_t treeIndex{ -1 };
+	};
 }

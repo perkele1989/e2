@@ -1,0 +1,11 @@
+{
+    "id": "bow",
+    "dropMesh": {
+        "meshScale": [1.0, 1.0, 1.0],
+        "mesh": "SM_Bow.e2a"
+    },
+    "wieldable": true,
+    "wieldHandler": "e2::BowHandler",
+    "stackable": false,
+    "iconSprite": "ItemIconBow"
+}

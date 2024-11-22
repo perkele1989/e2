@@ -54,7 +54,14 @@ out vec4 fragmentColor;
 
 void main()
 {
-	vec4 animatedVertexPosition = vec4(vertexPosition.xyz, 1.0);
+
+	vec4 meshVertex = vec4(vertexPosition.xyz, 1.0);
+#if defined(Vertex_TexCoords23)
+	vec4 meshRoot = vec4(vertexUv23.x, 0.0, vertexUv23.y, 1.0);
+#else 
+	vec4 meshRoot = vec4(0.0, 0.0, 0.0, 1.0);
+#endif
+	vec4 worldRoot = mesh.modelMatrix * meshRoot;
 
 #if !defined(Renderer_Shadow)
 	vec4 animatedVertexNormal = vec4(vertexNormal.xyz, 0.0);
@@ -62,42 +69,22 @@ void main()
 	float tangentSign = vertexTangent.w;
 #endif
 
-#if defined(Renderer_Skin) && defined(Vertex_Bones)
-
-	mat4 animationTransform = skin.skinMatrices[vertexIds.x] * vertexWeights.x; 
-	animationTransform += skin.skinMatrices[vertexIds.y] * vertexWeights.y; 
-	animationTransform += skin.skinMatrices[vertexIds.z] * vertexWeights.z; 
-	animationTransform += skin.skinMatrices[vertexIds.w] * vertexWeights.w; 
-
-	animatedVertexPosition =  animationTransform * animatedVertexPosition;
-
-#if !defined(Renderer_Shadow)
-	animatedVertexNormal = animationTransform * animatedVertexNormal;
-	animatedVertexTangent = animationTransform *animatedVertexTangent;
-#endif
-
-	animatedVertexPosition.xyz /= animatedVertexPosition.w;
-	animatedVertexPosition.w = 1.0;
-#endif 
-
-
-	vec4 modelPos = mesh.modelMatrix * animatedVertexPosition;
+	vec4 worldVertex = mesh.modelMatrix * meshVertex;
 
 #if !defined(Renderer_Shadow)
 
-	vec4 mmp = mesh.modelMatrix * vec4(0.0, 0.0, 0.0, 1.0);
-	float ss = sampleSimplex(mmp.xz * 0.5) * 0.5 + 0.5;
+	float ss = sampleSimplex(worldRoot.xz * 0.5) * 0.5 + 0.5;
 
-	modelPos.x += cos(renderer.time.x*1.3 + ss*20.0) * mix(0.065 * ss * 0.75, 0.0, smoothstep(-0.7, 0.0, modelPos.y));
-	modelPos.z += sin(renderer.time.x*0.7 + ss*40.0) * mix(0.073 * ss * 0.75, 0.0, smoothstep(-0.7, 0.0, modelPos.y));
+	worldVertex.x += cos(renderer.time.x*1.3 + ss*20.0) * mix(0.065 * ss * 0.75, 0.0, smoothstep(-0.7, 0.0, worldVertex.y));
+	worldVertex.z += sin(renderer.time.x*0.7 + ss*40.0) * mix(0.073 * ss * 0.75, 0.0, smoothstep(-0.7, 0.0, worldVertex.y));
 
-	gl_Position = renderer.projectionMatrix * renderer.viewMatrix * modelPos;
+	gl_Position = renderer.projectionMatrix * renderer.viewMatrix * worldVertex;
 #else 
-	gl_Position = shadowViewProjection * mesh.modelMatrix * animatedVertexPosition;
+	gl_Position = shadowViewProjection * mesh.modelMatrix * meshVertex;
 #endif
 
 #if !defined(Renderer_Shadow)
-	fragmentPosition = modelPos;
+	fragmentPosition = worldVertex;
 #if defined(Vertex_Normals)
 
 	fragmentNormal = normalize(mesh.modelMatrix * normalize(animatedVertexNormal)).xyz;

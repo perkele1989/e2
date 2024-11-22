@@ -54,7 +54,7 @@ void main()
 	float forestCoeff = fragmentColor.r;
 	forestCoeff = mix(forestCoeff, 0.0, waterKill);
 	forestCoeff = pow(forestCoeff, 1.0/0.5);
-	forestCoeff =smoothstep(0.0, 0.5, forestCoeff);
+	//forestCoeff =smoothstep(0.0, 0.5, forestCoeff);
 	//outColor.rgb = vec3(forestCoeff);
 	//return;
 	
@@ -75,7 +75,13 @@ void main()
 	float greenCoeff = max(fragmentColor.g + fragmentColor.r, 0.0);	
 	greenCoeff = mix(greenCoeff, 0.0, waterKill);
 
-	float desertCoeff = 1.0 - max(fragmentColor.g + (fragmentColor.b), 0.0);
+
+
+	float grassCoeff = sampleSimplex((fragmentPosition.xz + vec2(32.16, 64.32)) * 0.335);
+	grassCoeff = pow(smoothstep(0.4, 1.0, grassCoeff), 4.2);
+	greenCoeff = mix(greenCoeff, greenCoeff*0.2, grassCoeff);
+
+	float desertCoeff = clamp(1.0 - max(fragmentColor.g + (fragmentColor.b), 0.0), 0.0, 1.0);
 
 	tundraCoeff *= 1.0 - desertCoeff;
 
@@ -83,15 +89,15 @@ void main()
 	//vec3 albedoForest = mix(albedoGreen, albedoSand, 0.25)*0.345;
 	vec3 albedoForest = albedoGreen;
 	//albedoForest = mix(albedoForest, albedoSand, 0.1);
-	albedoForest = pow(shiftHue(albedoForest, 0.114), vec3(1.1));
+	albedoForest = pow(shiftHue(albedoForest, 0.214), vec3(1.5));
 	
     float waterLineCoeff = smoothstep(-0.1, 0.0, -fragmentPosition.y);
     float waterLineCoeff2 = pow(smoothstep(-0.1, 0.0, -fragmentPosition.y), 0.2);
 	//albedoSand = heightlerp(pow(albedoSand, vec3(1.6)), 0.5, pow(albedoSand, vec3(1.4)), smallSimplexS, waterLineCoeff);
 	albedoSand = pow(albedoSand, vec3(1.4));
 
-	float mountainCoeff = 1.0 - smoothstep(-0.1, 0.0, fragmentPosition.y);
-
+	float mountainCoeff = smoothstep(0.0, mix(-0.35, -0.1,  1.0 - desertCoeff), fragmentPosition.y);
+	//mountainCoeff = mix(mountainCoeff, 1.0 - smoothstep(-0.35, -0.0, fragmentPosition.y),desertCoeff);
 
 	vec3 albedoMountains = pow(texture(sampler2D(mountainAlbedo, repeatSampler), texUv * texScaleMountains).rgb, vec3( mix(2.0, 1.0, 1.0-smoothstep(-1.0, 0.0, fragmentPosition.y))));
 	
@@ -150,8 +156,9 @@ void main()
 
 	float metalness = 0.0;//(1.0 - waterLineCoeff) * 0.1;
 
-	float clouds = getCloudShadows(fragmentPosition.xyz);
-	clouds = mix(clouds, 1.0, 1.0 - waterLineCoeff);
+	float clouds = getCloudShadows(fragmentPosition.xyz) * 0.75 + 0.25;
+	//clouds = mix(clouds, 1.0, 1.0 - waterLineCoeff);
+	//clouds *= clouds;
 
 	//outColor.rgb = albedo;
 	//return;

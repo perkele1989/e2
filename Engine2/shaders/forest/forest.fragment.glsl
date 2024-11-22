@@ -54,11 +54,20 @@ void main()
 #endif 
 
 	float ss = sampleSimplex(fragmentPosition.xz*1.0);
-	albedo.rgb = shiftHue(albedo.rgb, mix(-1.25, 0.25, ss) * 0.75);
-	albedo = mix(vec3(dot(vec3(1.0/3.0), albedo)), albedo, 0.885);
-	albedo = pow(albedo, vec3(mix(1.2, 1.4, smoothstep(-0.7, 0.0, fragmentPosition.y))));
 
-    //albedo = vec3(ss);
+    // vec3 grassAlbedo = vec3(0.231, 0.471, 0.02)*0.3;
+	// grassAlbedo.rgb *= 0.5 + 0.5* (1.0 - smoothstep(-0.15, 0.0, fragmentPosition.y));
+	// grassAlbedo = mix(vec3(dot(vec3(1.0/3.0), grassAlbedo)), grassAlbedo, 0.955);
+	// grassAlbedo.rgb = shiftHue(grassAlbedo.rgb, ss*-0.12);
+
+
+	albedo.rgb *= 0.55;
+	albedo.rgb = shiftHue(albedo.rgb, mix(-0.45, -0.2, 1.0-ss));
+	albedo = mix(vec3(dot(vec3(1.0/3.0), albedo)), albedo, 0.925);
+	//albedo = pow(albedo, vec3(mix(1.0, 1.13, smoothstep(-0.7, 0.0, fragmentPosition.y))));
+	albedo.rgb *= 0.5 + 0.5* (1.0 - smoothstep(-0.15, 0.0, fragmentPosition.y));
+
+	// albedo = mix(albedo, grassAlbedo, 0.22);
 
 	vec3 emissive = pow(material.emissive.rgb, vec3(1.0)) * material.emissive.a;
 
@@ -101,7 +110,7 @@ roughness = 1.0;
 	outColor.rgb += getSunColor(fragmentPosition.xyz, worldNormal, albedo, roughness, metalness, viewVector) * getCloudShadows(fragmentPosition.xyz);
 
 
-	//outColor.rgb += albedo * getRimColor(worldNormal, viewVector, renderer.sun2.xyz * renderer.sun2.w * 8.0) ;
+	// outColor.rgb += albedo * getRimColor(worldNormal, viewVector, renderer.sun2.xyz * renderer.sun2.w * 4.0) ;
 
 
 	outColor.rgb += emissive;

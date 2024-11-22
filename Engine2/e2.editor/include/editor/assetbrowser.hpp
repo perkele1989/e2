@@ -4,7 +4,9 @@
 #include <e2/export.hpp>
 #include <editor/editorcontext.hpp>
 
+#include <e2/utils.hpp>
 #include <string>
+#include <vector>
 
 namespace e2
 {
@@ -28,8 +30,7 @@ namespace e2
 
 	protected:
 		e2::Editor* m_editor{};
-
-		e2::AssetEditorEntry* m_path{};
+		std::vector<e2::Name> m_path;
 	};
 
 }

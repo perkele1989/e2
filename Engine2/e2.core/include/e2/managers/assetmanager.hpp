@@ -64,7 +64,7 @@ namespace e2
 		virtual void write(e2::IStream& destination) const override;
 		virtual bool read(e2::IStream& source) override;
 
-		e2::UUID uuid;
+		e2::Name name; // same as filename, unique id
 		uint64_t timestamp{};
 		std::string path;
 		e2::AssetHeader header;
@@ -80,9 +80,9 @@ namespace e2
 			return name.ends_with("/");
 		}
 
-		AssetEditorEntry* parent{ };
+		std::weak_ptr<e2::AssetEditorEntry> parent{ };
 		std::string name; // folders end with / 
-		std::list<AssetEditorEntry*> children;
+		std::list<std::shared_ptr<e2::AssetEditorEntry>> children;
 
 		/** The entry for this one, if it's an asset and not a folder*/
 		AssetEntry* entry{};
@@ -90,33 +90,31 @@ namespace e2
 
 
 	/** Represents the asset database. Keeps track of all assets in a project and its metadata. It does NOT keep track of loaded assets nor loads them.*/
-	class E2_API AssetDatabase : public e2::Context, public e2::Data
+	class E2_API AssetDatabase : public e2::Context
 	{
 	public:
 		AssetDatabase(e2::Context* ctx);
 		virtual ~AssetDatabase();
 
+		void repopulate();
+
 		void clear();
 
-		void readFromDisk();
-		void writeToDisk();
-
-		void validate(bool forceSave);
-
-		virtual void write(e2::IStream& destination) const override;
-		virtual bool read(e2::IStream& source) override;
-
 		AssetEntry *entryFromPath(std::string const &path);
-		AssetEntry* entryFromUUID(e2::UUID const &uuid);
+		AssetEntry* entryFromName(e2::Name id);
 
 		virtual Engine* engine() override;
-		e2::UUID invalidateAsset(std::string const& path);
+		e2::Name invalidateAsset(std::string const& path);
 
 		static bool readHeader(std::string const& path, e2::AssetHeader& outHeader);
 		static std::string cleanPath(std::string const& path);
 
+		void clearEditorEntries();
 		void populateEditorEntries();
-		e2::AssetEditorEntry* rootEditorEntry();
+		std::shared_ptr<e2::AssetEditorEntry> rootEditorEntry();
+
+
+		void dumpAssets();
 
 	protected:
 
@@ -124,17 +122,17 @@ namespace e2
 		std::unordered_set<e2::AssetEntry*> m_assets;
 
 		std::unordered_map<std::string, e2::AssetEntry*> m_pathIndex;
-		std::unordered_map<e2::UUID, e2::AssetEntry*> m_uuidIndex;
+		std::unordered_map<e2::Name, e2::AssetEntry*> m_nameIndex;
 
 		/** nullptr in game builds */
-		e2::AssetEditorEntry* m_rootEditorEntry{};
+		std::shared_ptr<e2::AssetEditorEntry> m_rootEditorEntry{};
 	};
 
 	/** Asset-Load-Job description */
 	struct E2_API ALJDescription
 	{
-		/** Load these uuids (no need to include deps, they are figured out and loaded automatically) */
-		std::unordered_set<e2::UUID> uuids;
+		/** Load these names (no need to include deps, they are figured out and loaded automatically) */
+		std::unordered_set<e2::Name> names;
 	};
 
 	/** Asset-Load-Job ticket */
@@ -165,7 +163,7 @@ namespace e2
 
 		ALJState publicState;
 		std::mutex publicStateMutex;
-		std::vector<std::unordered_set<e2::UUID>> groups;
+		std::vector<std::unordered_set<e2::Name>> groups;
 		uint32_t activeGroupIndex{};
 
 		bool failure{};
@@ -191,7 +189,7 @@ namespace e2
 		virtual ~AssetManager();
 
 		/** Prescribe the given asset to the given ALJ (asset load job) description. Returns true if successful, will not touch description if failed. */
-		bool prescribeALJ(e2::ALJDescription& target, std::string const& assetPath);
+		bool prescribeALJ(e2::ALJDescription& target, e2::Name name);
 
 		/** Given a asset load job description, queues the job and returns a ticket. Will generate a dependency tree to maximize asynchronicity. Don't forget to return the ticket back when done! */
 		e2::ALJTicket queueALJ(e2::ALJDescription const& description);
@@ -220,8 +218,7 @@ namespace e2
 		}
 
 		/** retrieves a loaded asset, or nullptr with an error if it doesnt exist */
-		e2::AssetPtr get(e2::UUID const& uuid);
-		e2::AssetPtr get(std::string const& assetPath);
+		e2::AssetPtr get(e2::Name name);
 
 	protected:
 
@@ -233,7 +230,7 @@ namespace e2
 		AssetDatabase m_database;
 
 		/** Loaded assets, indexed by uuid */
-		std::unordered_map<e2::UUID, e2::AssetPtr> m_uuidIndex;
+		std::unordered_map<e2::Name, e2::AssetPtr> m_nameIndex;
 
 		std::queue<e2::ALJQueueEntry> m_aljQueue;
 		std::mutex m_aljMutex;

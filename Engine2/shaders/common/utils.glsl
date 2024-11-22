@@ -5,17 +5,11 @@
 const vec2 invAtan = vec2(0.1591, 0.3183);
 vec2 equirectangularUv(vec3 direction)
 {
-    //direction = normalize(direction);
     vec2 uv = vec2(atan(direction.z, direction.x), asin(-direction.y));
     uv *= invAtan;
     uv += 0.5;
 
     uv.y = 1.0 - uv.y;
-
-
-    //uv = clamp(uv, vec2(0.01), vec2(0.99));
-
-
     return uv;
 }
 
@@ -87,21 +81,6 @@ float sampleSimplex(vec2 position)
 	return simplex(position) * 0.5 + 0.5;
 }
 
-
-
-// vec3 shiftHue(vec3 col, float shift)
-// {
-//     vec3 P = vec3(0.55735)*dot(vec3(0.55735), col);
-    
-//     vec3 U = col-P;
-    
-//     vec3 V = cross(vec3(0.55735),U);    
-
-//     col = U*cos(shift*6.2832) + V*sin(shift*6.2832) + P;
-    
-//     return col;
-// }
-
 vec3 shiftHue(vec3 color, float hue) {
     const vec3 k = vec3(0.57735, 0.57735, 0.57735);
     float cosAngle = cos(hue);
@@ -113,21 +92,6 @@ float sampleBaseHeight(vec2 position)
 {
     float baseHeight = sampleSimplex((position + vec2(32.16, 64.32)) * 0.0135);
     return baseHeight;
-/*
-	float h1p = 0.42;
-	float scale1 = 0.058;
-	float h1 = pow(sampleSimplex(position, scale1), h1p);
-
-	float semiStart = 0.31;
-	float semiSize = 0.47;
-	float h2p = 0.013;
-	float h2 = smoothstep(semiStart, semiStart + semiSize, sampleSimplex(position, h2p));
-
-	float semiStart2 = 0.65; 
-	float semiSize2 = 0.1; 
-	float h3p = (0.75 * 20) / 5000;
-	float h3 = 1.0 - smoothstep(semiStart2, semiStart2 + semiSize2, sampleSimplex(position, h3p));
-	return h1 * h2 * h3;*/
 }
 
 
@@ -229,7 +193,6 @@ vec3 cookTorranceSpecular(vec3 lightDirection, vec3 viewDirection, vec3 surfaceN
   //Fresnel term
   vec3 F = (F0 + (1.0 - F0)) * pow(1.0 - VdotH, 5.0);
 
-  //Multiply terms and done
   return  (F * G * D / max(4.0  * VdotN, 0.0001));
 }
 

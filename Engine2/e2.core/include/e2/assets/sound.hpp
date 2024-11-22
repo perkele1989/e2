@@ -31,6 +31,8 @@ namespace e2
 		uint64_t m_fmodDataSize{};
 		uint8_t* m_fmodData{};
 		FMOD::Sound* m_fmodSound;
+
+		bool m_fmodStream{};
 		
 	};
 

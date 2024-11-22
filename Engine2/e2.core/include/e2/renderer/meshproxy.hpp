@@ -39,6 +39,8 @@ namespace e2
 
 		virtual void bind(e2::ICommandBuffer* buffer, uint8_t frameIndex, bool shadows) {};
 
+		virtual void unbind(e2::ICommandBuffer* buffer, uint8_t frameIndex, bool shadows) {};
+
 		virtual void invalidate(uint8_t frameIndex) {};
 		e2::Session* session{};
 
@@ -155,7 +157,7 @@ namespace e2
 
 		e2::SkinProxy* skinProxy{};
 
-		glm::mat4 modelMatrix{};
+		glm::mat4 modelMatrix{glm::identity<glm::mat4>()};
 		e2::Pair<bool> modelMatrixDirty{ true };
 		e2::StackVector<MeshProxyLOD, e2::maxNumLods> lods;
 

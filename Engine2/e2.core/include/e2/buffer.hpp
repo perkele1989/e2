@@ -302,10 +302,22 @@ namespace e2
 	/**
 	 * Filestream
 	 */
+
+	enum class FileMode : uint8_t
+	{
+		WriteMask = 0b0000'0001,
+		ReadOnly = 0b0000'0000, //read only
+		ReadWrite = 0b0000'0001, // read and write (will create if missing)
+
+		OpenMask = 0b0000'0010,
+		Append = 0b0000'0000, // Append to file
+		Truncate = 0b0000'0010, // Truncate file 
+	};
+
 	class E2_API FileStream : public e2::IStream
 	{
 	public:
-		FileStream(std::string const& path, bool create, bool transcode = true);
+		FileStream(std::string const& path, e2::FileMode mode, bool transcode = true);
 		~FileStream();
 		virtual bool growable() override;
 		virtual uint64_t size() const override;
@@ -327,5 +339,26 @@ namespace e2
 		bool m_valid;
 	};
 
+
+	constexpr e2::FileMode operator|(e2::FileMode lhs, e2::FileMode rhs)
+	{
+		return static_cast<e2::FileMode>(static_cast<std::underlying_type<e2::FileMode>::type>(lhs) | static_cast<std::underlying_type<e2::FileMode>::type>(rhs));
+	}
+
+	constexpr e2::FileMode& operator|=(e2::FileMode& lhs, e2::FileMode const& rhs)
+	{
+		lhs = lhs | rhs;
+		return lhs;
+	}
+
+	constexpr e2::FileMode operator&(e2::FileMode lhs, e2::FileMode rhs)
+	{
+		return static_cast<e2::FileMode>(static_cast<std::underlying_type<e2::FileMode>::type>(lhs) & static_cast<std::underlying_type<e2::FileMode>::type>(rhs));
+	}
+
+	constexpr e2::FileMode operator^(e2::FileMode lhs, e2::FileMode rhs)
+	{
+		return static_cast<e2::FileMode>(static_cast<std::underlying_type<e2::FileMode>::type>(lhs) ^ static_cast<std::underlying_type<e2::FileMode>::type>(rhs));
+	}
 
 }

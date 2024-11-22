@@ -44,18 +44,21 @@ bool e2::FontImporter::writeAssets()
 	
 	bool compatStyles[size_t(e2::FontStyle::Count)] = { true, false, false, false};
 
-	e2::Buffer regularData;
-	e2::Buffer boldData;
-	e2::Buffer italicData;
-	e2::Buffer boldItalicData;
+	e2::HeapStream regularData;
+	e2::HeapStream boldData;
+	e2::HeapStream italicData;
+	e2::HeapStream boldItalicData;
 
 	if (m_config.inputRegular.size() != 0)
 	{
-		if (!regularData.readFromFile(m_config.inputRegular))
+		e2::FileStream regularFile(m_config.inputRegular, e2::FileMode::ReadOnly);
+
+		if (!regularFile.valid())
 		{
 			LogError("Failed to load regular font.");
 			return false;
 		}
+		regularData << regularFile;
 	}
 	else
 	{
@@ -67,33 +70,42 @@ bool e2::FontImporter::writeAssets()
 	{
 		compatStyles[size_t(FontStyle::Bold)] = true;
 
-		if (!boldData.readFromFile(m_config.inputBold))
+		e2::FileStream boldFile(m_config.inputBold, e2::FileMode::ReadOnly);
+
+		if (!boldFile.valid())
 		{
 			LogError("Failed to load bold font.");
 			return false;
 		}
+		boldData << boldFile;
 	}
 
 	if (m_config.inputItalic.size() != 0)
 	{
 		compatStyles[size_t(FontStyle::Italic)] = true;
 
-		if (!italicData.readFromFile(m_config.inputItalic))
+		e2::FileStream italicFile(m_config.inputItalic, e2::FileMode::ReadOnly);
+
+		if (!italicFile.valid())
 		{
 			LogError("Failed to load italic font.");
 			return false;
 		}
+		italicData << italicFile;
 	}
 
 	if (m_config.inputBoldItalic.size() != 0)
 	{
 		compatStyles[size_t(FontStyle::BoldItalic)] = true;
 
-		if (!boldItalicData.readFromFile(m_config.inputBoldItalic))
+		e2::FileStream boldItalicFile(m_config.inputBoldItalic, e2::FileMode::ReadOnly);
+
+		if (!boldItalicFile.valid())
 		{
-			LogError("Failed to load bolditalic font.");
+			LogError("Failed to load bold-italic font.");
 			return false;
 		}
+		boldItalicData << boldItalicFile;
 	}
 
 	e2::AssetHeader fontHeader;
@@ -101,7 +113,7 @@ bool e2::FontImporter::writeAssets()
 	fontHeader.assetType = "e2::Font";
 
 	
-	e2::Buffer fontData;
+	e2::HeapStream fontData;
 
 	for (uint8_t i = 0; i < size_t(e2::FontStyle::Count); i++)
 	{
@@ -130,12 +142,13 @@ bool e2::FontImporter::writeAssets()
 		fontData << boldItalicData;
 	}
 
+	fontData.seek(0);
 	fontHeader.size = fontData.size();
 
-	e2::Buffer fileBuffer(true, 1024 + fontData.size());
+	e2::FileStream fileBuffer(m_config.outputFilepath, e2::FileMode::ReadWrite | e2::FileMode::Truncate, true);
 	fileBuffer << fontHeader;
-	fileBuffer.write(fontData.begin(), fontData.size());
-	if (fileBuffer.writeToFile(m_config.outputFilepath))
+	fileBuffer << fontData;
+	if (fileBuffer.valid())
 	{
 		assetManager()->database().invalidateAsset(m_config.outputFilepath);
 		return true;

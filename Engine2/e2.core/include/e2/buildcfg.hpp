@@ -188,7 +188,7 @@ namespace e2
 
 	constexpr uint32_t maxVkPipelines = 8192;
 
-	constexpr uint32_t maxVkDataBuffers = 4096;
+	constexpr uint32_t maxVkDataBuffers = 16384;
 
 	constexpr uint32_t maxVkDescriptorSetLayouts = 256;
 

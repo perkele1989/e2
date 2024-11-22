@@ -1,62 +1,140 @@
 
 #include "game/hex.hpp"
+#include "e2/e2.hpp"
 #include "e2/game/gamesession.hpp"
 #include "e2/managers/asyncmanager.hpp"
 #include "e2/managers/uimanager.hpp"
-
+#include "e2/managers/audiomanager.hpp"
 #include "e2/transform.hpp"
-
+#include "game/entities/turnbasedentity.hpp"
 #include "game/game.hpp"
 
 #include <glm/gtc/noise.hpp>
 
+#include <glm/gtx/easing.hpp>
+
+
+glm::vec2 e2::TreeState::localOffset(e2::TileData *tile, ForestState* forestState)
+{
+
+	glm::mat4 forestRotation = glm::rotate(glm::identity<glm::mat4>(), tile->forestRotation, e2::worldUpf());
+
+	glm::mat4 treeTranslation = glm::translate(glm::identity<glm::mat4>(), glm::vec3(planarOffset.x, 0.0f, planarOffset.y));
+	
+
+	glm::mat4 treeTransform = forestRotation * treeTranslation;
+
+	glm::vec4 localOffset = treeTransform * glm::vec4(0.0, 0.0f, 0.0, 1.0f);
+	return glm::vec2(localOffset.x, localOffset.z);
+}
+
+
+namespace
+{
+	void grassShader(e2::Vertex* vertex, void* shaderFuncData)
+	{
+		glm::vec2* offset = reinterpret_cast<glm::vec2*>(shaderFuncData);
+		vertex->uv01.x = offset->x;
+		vertex->uv01.y = offset->y;
+	}
+
+	void treeShader(e2::Vertex* vertex, void* shaderFuncData)
+	{
+		glm::vec2* offset = reinterpret_cast<glm::vec2*>(shaderFuncData);
+		vertex->uv23.x = offset->x;
+		vertex->uv23.y = offset->y;
+	}
+}
+
 void e2::HexGrid::rebuildForestMeshes()
 {
 
-	auto am = game()->assetManager();
-	e2::MeshPtr treeMesh0 = am->get("assets/environment/SM_PineTreeNew0.e2a")->cast<e2::Mesh>();
-	e2::MeshPtr treeMesh1 = am->get("assets/environment/SM_PineTreeNew1.e2a")->cast<e2::Mesh>();
-	e2::MeshPtr treeMesh2 = am->get("assets/environment/SM_PineTreeNew2.e2a")->cast<e2::Mesh>();
-	e2::MeshPtr treeMesh3 = am->get("assets/environment/SM_PineTreeNew3.e2a")->cast<e2::Mesh>();
-	e2::MaterialPtr forestMaterial = am->get("assets/environment/M_PineTreeNew.e2a")->cast<e2::Material>();
-
-	e2::DynamicMesh dynTree0 = e2::DynamicMesh(treeMesh0, 0);
-	e2::DynamicMesh dynTree1 = e2::DynamicMesh(treeMesh1, 0);
-	e2::DynamicMesh dynTree2 = e2::DynamicMesh(treeMesh2, 0);
-	e2::DynamicMesh dynTree3 = e2::DynamicMesh(treeMesh3, 0);
-	e2::DynamicMesh* dynTrees[4] = { &dynTree0, &dynTree1, &dynTree2, &dynTree3 };
+	constexpr float minDist = 0.15f;
 
 	uint32_t forestNumTrees[3] = { e2::treeNum1, e2::treeNum2, e2::treeNum3 };
 
 	for (uint32_t f = 0; f < 3; f++)
 	{
+		uint32_t numTrees = forestNumTrees[f];
+		ForestState& forestState = m_forestStates[f];
+
+		forestState.trees.clear();
+		
 		e2::DynamicMesh combinedMesh;
 
-		float treeRotation2 = e2::randomFloat(0.0f, 359.9999f);
-		for (uint32_t i = 0; i < forestNumTrees[f]; i++)
+		for (uint32_t i = 0; i < numTrees; i++)
 		{
-			uint32_t treeIndex = (uint32_t)e2::randomInt(0, 3);
+			e2::TreeState treeState;
+			treeState.meshIndex = (uint32_t)e2::randomInt(0, 3);
+			float closestDist;
+			do
+			{
+				closestDist = 1000000.0f;
+				treeState.planarOffset = e2::randomInUnitCircle() * e2::treeSpread;
+				for (e2::TreeState& t : forestState.trees)
+				{
+					float dist = glm::distance(treeState.planarOffset, t.planarOffset);
+					if (dist < closestDist)
+						closestDist = dist;
 
-			float treeScale = e2::randomFloat(0.9f, 1.1f) * e2::treeScale;
-			float treeRotation = e2::randomFloat(0.0f, 359.9999f);
-			glm::vec2 treePosition = e2::randomInUnitCircle() * e2::treeSpread;
+					if (closestDist < minDist)
+						break;
+				}
 
-			glm::mat4 treeTransform = glm::identity<glm::mat4>();
-
-			treeTransform = glm::scale(treeTransform, glm::vec3(treeScale));
-			treeTransform = glm::rotate(treeTransform, glm::radians(treeRotation), e2::worldUpf());
-			treeTransform = glm::translate(treeTransform, glm::vec3(treePosition.x, 0.0f, treePosition.y));
-			treeTransform = glm::rotate(treeTransform, glm::radians(treeRotation2), e2::worldUpf());
-
-			treeTransform = treeTransform * glm::rotate(glm::identity<glm::mat4>(), glm::radians(90.0f), e2::worldRightf());
+			} while (closestDist < minDist);
 
 
-			combinedMesh.addMesh(dynTrees[treeIndex], treeTransform);
+
+
+			treeState.rotation = glm::radians(e2::randomFloat(0.0f, 359.9999f));
+			treeState.scale = e2::randomFloat(0.9f, 1.1f) * e2::treeScale;
+			forestState.trees.push_back(treeState);
+
+			glm::mat4 treeTranslation = glm::translate(glm::identity<glm::mat4>(), glm::vec3(treeState.planarOffset.x, 0.0f, treeState.planarOffset.y));
+			glm::mat4 treeScale = glm::scale(glm::identity<glm::mat4>(), glm::vec3(treeState.scale));
+			glm::mat4 treeRotation = glm::rotate(glm::identity<glm::mat4>(), treeState.rotation, e2::worldUpf());
+
+			glm::mat4 treeRotationFix = glm::rotate(glm::identity<glm::mat4>(), glm::radians(90.0f), e2::worldRightf());
+
+			glm::mat4 treeTransform = treeTranslation * treeRotation * treeRotationFix * treeScale;
+
+			glm::vec4 offset4 =  treeTransform* glm::vec4(0.0, 0.0, 0.0, 1.0f);
+			glm::vec2 offset{ offset4.x, offset4.z };
+
+			combinedMesh.addMeshWithShaderFunction(&m_dynamicTreeMeshes[treeState.meshIndex], treeTransform, ::treeShader, &offset);
+			//combinedMesh.addMesh(&m_dynamicTreeMeshes[treeState.meshIndex], treeTransform);
 		}
 
-		m_pineForestMeshes[f] = combinedMesh.bake(forestMaterial, VertexAttributeFlags::All);
+		forestState.mesh = combinedMesh.bake(m_treeMaterial, VertexAttributeFlags::All);
 	}
+
+	
+
+
 }
+
+
+void e2::HexGrid::prescribeAssets(e2::Context* ctx, e2::ALJDescription& desc)
+{
+	e2::AssetManager* am = ctx->assetManager();
+	am->prescribeALJ(desc, "S_Wood_Chop.e2a");
+	am->prescribeALJ(desc, "S_Wood_Fall.e2a");
+	am->prescribeALJ(desc, "S_Wood_Spawn.e2a");
+	am->prescribeALJ(desc, "M_Tree.e2a");
+	am->prescribeALJ(desc, "SM_Tree0.e2a");
+	am->prescribeALJ(desc, "SM_Tree1.e2a");
+	am->prescribeALJ(desc, "SM_Tree2.e2a");
+	am->prescribeALJ(desc, "SM_Tree3.e2a");
+	am->prescribeALJ(desc, "SM_Stone.e2a");
+	am->prescribeALJ(desc, "T_Minimap_Water.e2a");
+	am->prescribeALJ(desc, "T_Minimap_Forest.e2a");
+	am->prescribeALJ(desc, "T_Minimap_Mountains.e2a");
+	am->prescribeALJ(desc, "SM_Hex.e2a");
+	am->prescribeALJ(desc, "SM_HexHigh.e2a");
+	am->prescribeALJ(desc, "S_Wood_Die.e2a");
+	am->prescribeALJ(desc, "M_Grass.e2a");
+}
+
 
 e2::HexGrid::HexGrid(e2::GameContext* gameCtx)
 	: m_game(gameCtx->game())
@@ -86,29 +164,63 @@ e2::HexGrid::HexGrid(e2::GameContext* gameCtx)
 
 	auto am = game()->assetManager();
 
-	/*m_treeMesh[0] = am->get("assets/environment/trees/SM_PineForest001.e2a")->cast<e2::Mesh>();
-	m_treeMesh[1] = am->get("assets/environment/trees/SM_PineForest002.e2a")->cast<e2::Mesh>();
-	m_treeMesh[2] = am->get("assets/environment/trees/SM_PineForest003.e2a")->cast<e2::Mesh>();*/
+	m_treeChopSound = am->get("S_Wood_Chop.e2a")->cast<e2::Sound>();
+	m_treeFallSound = am->get("S_Wood_Fall.e2a")->cast<e2::Sound>();
+	m_woodDieSound = am->get("S_Wood_Die.e2a")->cast<e2::Sound>();
+		
+
+	m_treeMeshes[0] = am->get("SM_Tree0.e2a")->cast<e2::Mesh>();
+	m_treeMeshes[1] = am->get("SM_Tree1.e2a")->cast<e2::Mesh>();
+	m_treeMeshes[2] = am->get("SM_Tree2.e2a")->cast<e2::Mesh>();
+	m_treeMeshes[3] = am->get("SM_Tree3.e2a")->cast<e2::Mesh>();
+	m_treeMaterial = am->get("M_Tree.e2a")->cast<e2::Material>();
+	m_treeMaterialProxy = gameSession()->getOrCreateDefaultMaterialProxy(m_treeMaterial);
+
+	m_grassMaterial = am->get("M_Grass.e2a")->cast<e2::Material>();
+
+	e2::MeshProxyConfiguration meshCfg = {
+		.lods = {
+			{
+				.maxDistance = 0.0f,
+				.mesh = m_treeMeshes[0],
+				.materials = { m_treeMaterialProxy }
+			}
+		}
+	};
+	// preload this to avoid hitch when you unpack forest tiles
+	auto tmp = e2::create<e2::MeshProxy>(gameSession(), meshCfg);
+	e2::destroy(tmp);
+
+
+
+	//for (uint32_t i = 0; i < 4; i++)
+	//{
+	//	e2::DynamicMesh src(m_treeMeshes[i], 0);
+	//	glm::vec2 offset{};
+	//	m_dynamicTreeMeshes[i].addMeshWithShaderFunction(&src, glm::identity<glm::mat4>(), ::treeShader, &offset);
+	//}
+
+	m_dynamicTreeMeshes[0] = e2::DynamicMesh(m_treeMeshes[0], 0);
+	m_dynamicTreeMeshes[1] = e2::DynamicMesh(m_treeMeshes[1], 0);
+	m_dynamicTreeMeshes[2] = e2::DynamicMesh(m_treeMeshes[2], 0);
+	m_dynamicTreeMeshes[3] = e2::DynamicMesh(m_treeMeshes[3], 0);
 
 
 
 
+	m_resourceMeshStone = am->get("SM_Stone.e2a").cast<e2::Mesh>();
 
+	m_waterTexture = am->get("T_Minimap_Water.e2a")->cast<e2::Texture2D>();
+	m_forestTexture = am->get("T_Minimap_Forest.e2a")->cast<e2::Texture2D>();
+	m_mountainTexture = am->get("T_Minimap_Mountains.e2a")->cast<e2::Texture2D>();
 
+	m_baseHex = am->get("SM_Hex.e2a")->cast<e2::Mesh>();
+	m_fastHex.initializeFrom(m_baseHex, 0);
+	//m_dynaHex = e2::DynamicMesh(m_baseHex, 0, VertexAttributeFlags::Color);
 
-
-
-	m_resourceMeshStone = am->get("assets/environment/resources/SM_ResourceMesh_Stone_LOD0.e2a").cast<e2::Mesh>();
-
-	m_waterTexture = am->get("assets/ui/minimap_water.e2a")->cast<e2::Texture2D>();
-	m_forestTexture = am->get("assets/ui/minimap_forest.e2a")->cast<e2::Texture2D>();
-	m_mountainTexture = am->get("assets/ui/minimap_mountain.e2a")->cast<e2::Texture2D>();
-
-	m_baseHex = am->get("assets/SM_HexBase.e2a")->cast<e2::Mesh>();
-	m_dynaHex = e2::DynamicMesh(m_baseHex, 0, VertexAttributeFlags::Color);
-
-	m_baseHexHigh = am->get("assets/SM_HexBaseHigh.e2a")->cast<e2::Mesh>();
-	m_dynaHexHigh = e2::DynamicMesh(m_baseHexHigh, 0, VertexAttributeFlags::Color);
+ 	m_baseHexHigh = am->get("SM_HexHigh.e2a")->cast<e2::Mesh>();
+	m_fastHexHigh.initializeFrom(m_baseHexHigh, 0);
+	//m_dynaHexHigh = e2::DynamicMesh(m_baseHexHigh, 0, VertexAttributeFlags::Color);
 
 
 	glm::vec2 waterOrigin = e2::Hex(glm::ivec2(0)).planarCoords();
@@ -222,6 +334,90 @@ e2::HexGrid::HexGrid(e2::GameContext* gameCtx)
 	m_terrainMaterial->overrideModel(rm->getShaderModel("e2::TerrainModel"));
 	m_terrainProxy = session->getOrCreateDefaultMaterialProxy(m_terrainMaterial)->unsafeCast<e2::TerrainProxy>();
 
+
+
+
+
+	m_grassLeafMesh = e2::DynamicMesh();
+	e2::Vertex protovert;
+	protovert.normal = -e2::worldForwardf();
+	constexpr float leafHeight = 0.185f;
+	constexpr float leafWidthBase = 0.025f;
+	constexpr int32_t leafSegments = 3;
+	for (int32_t i = 0; i < leafSegments; i++)
+	{
+		float heightCoeff = float(i) / float(leafSegments - 1);
+		float height = heightCoeff * -leafHeight;
+		float halfWidth = glm::sineEaseOut(1.0f - heightCoeff) * (leafWidthBase * 0.5f);
+
+		float nextHeightCoeff = float(i + 1) / float(leafSegments - 1);
+		float nextHeight = nextHeightCoeff * -leafHeight;
+
+		if (i < leafSegments - 1)
+		{
+			float nextHalfWidth = glm::sineEaseOut(1.0f - nextHeightCoeff) * (leafWidthBase * 0.5f);
+			e2::Vertex vert0 = protovert, vert1 = protovert, vert2 = protovert, vert3 = protovert;
+			vert3.position.x = -halfWidth;
+			vert3.position.y = height;
+
+			vert2.position.x = +halfWidth;
+			vert2.position.y = height;
+
+			vert0.position.x = -nextHalfWidth;
+			vert0.position.y = nextHeight;
+
+			vert1.position.x = +nextHalfWidth;
+			vert1.position.y = nextHeight;
+
+			m_grassLeafMesh.addTriangle(vert3, vert0, vert2);
+			m_grassLeafMesh.addTriangle(vert0, vert1, vert2);
+		}
+		else
+		{
+			e2::Vertex vert0 = protovert, vert2 = protovert, vert3 = protovert;
+			vert3.position.x = -halfWidth;
+			vert3.position.y = height;
+
+			vert2.position.x = +halfWidth;
+			vert2.position.y = height;
+
+			vert0.position.x = 0.0f;
+			vert0.position.y = nextHeight;
+
+			m_grassLeafMesh.addTriangle(vert3, vert0, vert2);
+		}
+	}
+
+	m_grassLeafMesh.calculateFaceNormals();
+	m_grassLeafMesh.calculateVertexNormals();
+
+
+
+	constexpr int32_t numLeafs = 2048;
+	for (int32_t i = 0; i < 4; i++)
+	{
+		m_dynamicGrassMeshes[i] = e2::DynamicMesh();
+		e2::DynamicMesh* curr = &m_dynamicGrassMeshes[i];
+
+		for (int32_t g = 0; g < numLeafs; g++)
+		{
+			glm::mat4 transform = glm::identity<glm::mat4>();
+			glm::vec2 offset = e2::randomInUnitCircle();
+			glm::vec3 pos{ offset.x, 0.0f, offset.y };
+
+			transform = glm::translate(transform, pos);
+			transform = glm::rotate(transform, glm::radians(e2::randomFloat(0.0f, 359.99f)), e2::worldUpf());
+			transform = glm::scale(transform, glm::vec3(e2::randomFloat(0.87f, 1.12f)));
+
+			curr->addMeshWithShaderFunction(&m_grassLeafMesh, transform, ::grassShader, &offset);
+		}
+
+		m_grassMeshes[i] = curr->bake(m_grassMaterial, e2::VertexAttributeFlags::Normal | e2::VertexAttributeFlags::TexCoords01);
+	}
+
+
+
+
 	initializeFogOfWar();
 
 	rebuildForestMeshes();
@@ -232,6 +428,7 @@ e2::HexGrid::~HexGrid()
 	clearAllChunks();
 	destroyFogOfWar();
 }
+
 
 e2::Engine* e2::HexGrid::engine()
 {
@@ -366,6 +563,38 @@ glm::vec3 e2::HexGrid::chunkOffsetFromIndex(glm::ivec2 const& index)
 	return e2::Hex(index * glm::ivec2(e2::hexChunkResolution)).localCoords();
 }
 
+
+
+constexpr uint32_t squirrelNoise5(int32_t x, uint32_t seed)
+{
+	constexpr uint32_t SQ5_BIT_NOISE1 = 0xd2a80a3f;	// 11010010101010000000101000111111
+	constexpr uint32_t SQ5_BIT_NOISE2 = 0xa884f197;	// 10101000100001001111000110010111
+	constexpr uint32_t SQ5_BIT_NOISE3 = 0x6C736F4B; // 01101100011100110110111101001011
+	constexpr uint32_t SQ5_BIT_NOISE4 = 0xB79F3ABB;	// 10110111100111110011101010111011
+	constexpr uint32_t SQ5_BIT_NOISE5 = 0x1b56c4f5;	// 00011011010101101100010011110101
+
+	uint32_t mangledBits = (uint32_t)x;
+	mangledBits *= SQ5_BIT_NOISE1;
+	mangledBits += seed;
+	mangledBits ^= (mangledBits >> 9);
+	mangledBits += SQ5_BIT_NOISE2;
+	mangledBits ^= (mangledBits >> 11);
+	mangledBits *= SQ5_BIT_NOISE3;
+	mangledBits ^= (mangledBits >> 13);
+	mangledBits += SQ5_BIT_NOISE4;
+	mangledBits ^= (mangledBits >> 15);
+	mangledBits *= SQ5_BIT_NOISE5;
+	mangledBits ^= (mangledBits >> 17);
+	return mangledBits;
+}
+
+constexpr uint32_t sqNoise2(int32_t x, int32_t y, uint32_t seed)
+{
+	constexpr int PRIME_NUMBER = 198491317; // Large prime number with non-boring bits
+	return squirrelNoise5(x + (PRIME_NUMBER * y), seed);
+}
+
+
 namespace
 {
 	struct HexShaderData
@@ -373,38 +602,48 @@ namespace
 		e2::HexGrid* grid{};
 		e2::Hex hex;
 		glm::vec2 chunkOffset;
-		e2::TileData tileData;
+		glm::ivec2 cacheOffset;
 
-		e2::TileData getTileData(glm::ivec2 const& offsetCoords)
+		e2::TileData tileCache[64];
+
+		e2::TileData& getTileData(glm::ivec2 const& offsetCoords)
 		{
-			if (offsetCoords == hex.offsetCoords())
-				return tileData;
+			glm::ivec2 cacheAlignedCoords = offsetCoords - cacheOffset + 1;
 
-			auto finder = tileCache.find(offsetCoords);
-			if (finder == tileCache.end())
-			{
-				e2::TileData newTileData = grid->getCalculatedTileData(offsetCoords);
-				tileCache[offsetCoords] = newTileData;
-				return newTileData;
-			}
+			int32_t index = cacheAlignedCoords.y * ((int32_t)e2::hexChunkResolution + 2) + cacheAlignedCoords.x;
 
-			return finder->second;
-
+			return tileCache[index];
 		}
-		std::unordered_map<glm::ivec2, e2::TileData> tileCache;
+
+		//e2::TileData& getTileDataOld(glm::ivec2 const& offsetCoords)
+		//{
+		//	if (offsetCoords == hex.offsetCoords())
+		//		return tileData;
+
+		//	auto finder = tileCacheOld.find(offsetCoords);
+		//	if (finder == tileCacheOld.end())
+		//	{
+		//		e2::TileData newTileData = grid->calculateTileData(offsetCoords);
+		//		return tileCacheOld[offsetCoords] = newTileData;
+		//	}
+
+		//	return finder->second;
+
+		//}
+		//std::unordered_map<glm::ivec2, e2::TileData> tileCacheOld;
 
 	};
 
 
-	float ridge(float v, float offset)
+	inline float ridge(float v, float offset)
 	{
 		v = offset - glm::abs(v);
 		return v < 0.5f ? 4.0f * v * v * v : (v - 1.0f) * (2.0f * v - 2.0f) * (2.0f * v - 2.0f) + 1.0f;
 	}
 
-	float ridgedMF(glm::vec2 const& position)
+	inline float ridgedMF(glm::vec2 const& position)
 	{
-		struct {
+		static const struct {
 			uint32_t octaves{ 6 }; // 2
 			float frequency{ 2.0f }; // 0.3
 			float lacunarity{ 2.0f }; // 2.0
@@ -419,6 +658,7 @@ namespace
 		for (uint32_t i = 0; i < cfg.octaves; i++)
 		{
 			float h = glm::simplex(position * freq);
+			//float h = 0.5f;
 			float n = ridge(h, cfg.ridgeOffset);
 			sum += n * amp * prev;
 			prev = n;
@@ -429,14 +669,14 @@ namespace
 		return sum;
 	}
 
-	float sampleHeight(glm::vec2 const& worldPosition, ::HexShaderData* shaderData)
+	inline float sampleHeight(glm::vec2 const& worldPosition, ::HexShaderData* shaderData)
 	{
 		float outHeight = 0.0f;
 
 		e2::Hex& hex = shaderData->hex;
 		glm::vec2 hexCenter = hex.planarCoords();
 
-		e2::TileData &tile = shaderData->tileData;
+		e2::TileData &tile = shaderData->getTileData(hex.offsetCoords());
 
 
 		bool currIsMountain = (tile.flags & e2::TileFlags::FeatureMountains) != e2::TileFlags::FeatureNone;
@@ -464,11 +704,11 @@ namespace
 					nextNi = 0;
 
 				e2::Hex &neighbourHex = neighbours[ni];
-				e2::TileData neighbourTile = shaderData->getTileData(neighbourHex.offsetCoords());
+				e2::TileData& neighbourTile = shaderData->getTileData(neighbourHex.offsetCoords());
 				glm::vec2 neighbourWorldPosition = neighbourHex.planarCoords();
 
 				e2::Hex& nextHex = neighbours[nextNi];
-				e2::TileData nextTile = shaderData->getTileData(nextHex.offsetCoords());
+				e2::TileData& nextTile = shaderData->getTileData(nextHex.offsetCoords());
 				glm::vec2 nextWorldPosition = nextHex.planarCoords();
 
 				bool neighbourIsMountain = (neighbourTile.flags & e2::TileFlags::FeatureMountains) != e2::TileFlags::FeatureNone;
@@ -496,7 +736,8 @@ namespace
 			if (currIsMountain)
 			{
 				coeffMountains = glm::clamp(coeffMountains, 0.0f, 1.0f);
-				outHeight -= ridgedMF(worldPosition * e2::mtnFreqScale) * coeffMountains * e2::mtnScale;
+				//outHeight -= coeffMountains;
+				outHeight -= ridgedMF(worldPosition * 0.1f/** e2::mtnFreqScale*/) * coeffMountains * 0.9f;// e2::mtnScale;
 			}
 
 			coeffWater = glm::clamp(coeffWater, 0.0f, 1.0f);
@@ -515,7 +756,7 @@ namespace
 
 	}
 
-	glm::vec3 sampleNormal(glm::vec2 const& worldPosition, ::HexShaderData* shaderData)
+	inline glm::vec3 sampleNormal(glm::vec2 const& worldPosition, ::HexShaderData* shaderData)
 	{
 
 		float eps = 0.1f;
@@ -532,7 +773,7 @@ namespace
 	}
 
 	// r = desert, g = grassland, b = tundra, a = forest
-	glm::vec4 sampleBiomeAtVertex(glm::vec2 const& worldPosition, ::HexShaderData* shaderData)
+	inline glm::vec4 sampleBiomeAtVertex(glm::vec2 const& worldPosition, ::HexShaderData* shaderData)
 	{
 		auto tileFlagsToValues = [](e2::TileFlags tileFlags)  -> glm::vec4 {
 			glm::vec4 returner;
@@ -550,7 +791,7 @@ namespace
 		glm::vec2 hexCenter = hex.planarCoords();
 		float hexDistance = glm::distance(worldPosition, hexCenter);
 		float hexWeight = 1.0f - glm::smoothstep(0.0f, hexDistBlendLen, hexDistance);
-		e2::TileData& hexTile = shaderData->tileData;// @todo only need biome info here! @perf
+		e2::TileData& hexTile = shaderData->getTileData(hex.offsetCoords());// @todo only need biome info here! @perf
 
 		glm::vec4 finalValues = tileFlagsToValues(hexTile.flags) * hexWeight;
 
@@ -572,35 +813,69 @@ namespace
 	}
 
 
-	void hexShader(e2::Vertex* vertex, void* shaderData)
-	{
-		::HexShaderData* data = reinterpret_cast<::HexShaderData*>(shaderData);
+	//void hexShader(e2::Vertex* vertex, void* shaderData)
+	//{
+	//	::HexShaderData* data = reinterpret_cast<::HexShaderData*>(shaderData);
 
-		e2::TileData curr = data->tileData;
+	//	e2::TileData curr = data->tileData;
+
+	//	glm::vec2 localVertexPosition = glm::vec2(vertex->position.x, vertex->position.z);
+	//	glm::vec2 worldVertexPosition = data->chunkOffset + localVertexPosition;
+
+	//	vertex->uv01 = { worldVertexPosition, 0.0f, 0.0f };
+	//	vertex->position.y = sampleHeight(worldVertexPosition, data);
+	//	vertex->normal = sampleNormal(worldVertexPosition, data);
+
+	//	//vertex->tangent = glm::rotate(glm::quat(1.0f, 0.0f, 0.0f, 0.0f), glm::radians(90.0f), glm::vec3(0.0f, 0.0f, -1.0f)) * vertex->normal;
+	//	
+	//	glm::vec4 biomeValues = sampleBiomeAtVertex(worldVertexPosition, data);
+
+	//	// save hex grid thingy
+	//	vertex->color.a = vertex->color.r;
+
+	//	// forest 
+	//	vertex->color.r = biomeValues.a;
+
+	//	// tundra
+	//	vertex->color.g = biomeValues.g;
+
+	//	vertex->color.b = biomeValues.b;
+
+	//	
+	//}
+
+
+	//void hexShaderFast(glm::vec4* pos, glm::vec4* nrm, glm::vec4* col, void* shaderFuncData)
+	//{
+	//	::HexShaderData* data = reinterpret_cast<::HexShaderData*>(shaderFuncData);
+
+	//	e2::TileData curr = data->tileData;
+
+	//	glm::vec2 localVertexPosition = glm::vec2(pos->x, pos->z);
+	//	glm::vec2 worldVertexPosition = data->chunkOffset + localVertexPosition;
+
+	//	pos->y = sampleHeight(worldVertexPosition, data);
+	//	*nrm = { sampleNormal(worldVertexPosition, data), 0.0f};
+
+	//	glm::vec4 biomeValues = sampleBiomeAtVertex(worldVertexPosition, data);
+
+	//	*col = { biomeValues.a,biomeValues.g, biomeValues.b, 0.0f};
+	//}
+
+	void hexShaderFast2(e2::FastVertex2 *vertex, void* shaderFuncData)
+	{
+		::HexShaderData* data = reinterpret_cast<::HexShaderData*>(shaderFuncData);
 
 		glm::vec2 localVertexPosition = glm::vec2(vertex->position.x, vertex->position.z);
 		glm::vec2 worldVertexPosition = data->chunkOffset + localVertexPosition;
 
-		vertex->uv01 = { worldVertexPosition, 0.0f, 0.0f };
 		vertex->position.y = sampleHeight(worldVertexPosition, data);
-		vertex->normal = sampleNormal(worldVertexPosition, data);
+		vertex->normal = { sampleNormal(worldVertexPosition, data), 0.0f };
 
-		//vertex->tangent = glm::rotate(glm::quat(1.0f, 0.0f, 0.0f, 0.0f), glm::radians(90.0f), glm::vec3(0.0f, 0.0f, -1.0f)) * vertex->normal;
-		
 		glm::vec4 biomeValues = sampleBiomeAtVertex(worldVertexPosition, data);
 
-		// save hex grid thingy
-		vertex->color.a = vertex->color.r;
+		vertex->color = { biomeValues.a,biomeValues.g, biomeValues.b, 0.0f };
 
-		// forest 
-		vertex->color.r = biomeValues.a;
-
-		// tundra
-		vertex->color.g = biomeValues.g;
-
-		vertex->color.b = biomeValues.b;
-
-		
 	}
 }
 
@@ -872,6 +1147,9 @@ void e2::HexGrid::updateStreaming(glm::vec2 const& streamCenter, e2::Viewpoints2
 		}
 	}
 
+	if(game()->isRealtime())
+		updateUnpackedForests();
+
 	debugDraw();
 
 }
@@ -964,10 +1242,9 @@ float e2::HexGrid::calculateBaseHeight(glm::vec2 const& planarCoords)
 
 void e2::HexGrid::calculateResources(glm::vec2 const& planarCoords, e2::TileFlags& outFlags)
 {
-	if((outFlags & e2::TileFlags::WaterMask) != e2::TileFlags::WaterNone)
-	{
+	
+	if ((outFlags & e2::TileFlags::FeatureMask) != e2::TileFlags::FeatureNone)
 		return;
-	}
 
 	float abundanceCoeff = sampleSimplex((planarCoords + glm::vec2(41.44f, 73.28f)) * 2.0f);
 	if (abundanceCoeff > 0.97)
@@ -980,15 +1257,30 @@ void e2::HexGrid::calculateResources(glm::vec2 const& planarCoords, e2::TileFlag
 		outFlags |= TileFlags::Abundance1;
 
 	float resourceBase = sampleSimplex((planarCoords + glm::vec2(11.44f, 53.28f)) * 8.0f);
+
+	if ((outFlags & e2::TileFlags::WaterMask) == e2::TileFlags::WaterDeep)
+	{
+		if (resourceBase > 0.865)
+			outFlags |= TileFlags::ResourceStone;
+		return;
+	}
+	if ((outFlags & e2::TileFlags::WaterMask) == e2::TileFlags::WaterShallow)
+	{
+		if (resourceBase > 0.92)
+			outFlags |= TileFlags::ResourceStone;
+		return;
+	}
+
 	if (abundanceCoeff > 0.5f)
 	{
-		if (resourceBase > 0.97)
+		/*if (resourceBase > 0.97)
 			outFlags |= TileFlags::ResourceUranium;
 		else if (resourceBase > 0.85)
 			outFlags |= TileFlags::ResourceGold;
 		else if (resourceBase > 0.7)
-			outFlags |= TileFlags::ResourceOre;
-		else if (resourceBase > 0.5)
+			outFlags |= TileFlags::ResourceOre;*/
+		// else if
+		if (resourceBase > 0.85)
 			outFlags |= TileFlags::ResourceStone;
 	}
 }
@@ -1030,7 +1322,7 @@ void e2::HexGrid::calculateFeaturesAndWater(glm::vec2 const& planarCoords, float
 
 e2::MeshPtr e2::HexGrid::getResourceMeshForFlags(e2::TileFlags flags)
 {
-	return nullptr;
+	//return nullptr;
 	switch (flags & e2::TileFlags::ResourceMask)
 	{
 		case e2::TileFlags::ResourceStone:
@@ -1046,7 +1338,7 @@ e2::MeshPtr e2::HexGrid::getResourceMeshForFlags(e2::TileFlags flags)
 	}
 }
 
-e2::MeshPtr e2::HexGrid::getForestMeshForFlags(e2::TileFlags flags)
+int32_t e2::HexGrid::getForestIndexForFlags(e2::TileFlags flags)
 {
 
 	if ((flags & e2::TileFlags::FeatureForest) != e2::TileFlags::FeatureNone)
@@ -1055,19 +1347,284 @@ e2::MeshPtr e2::HexGrid::getForestMeshForFlags(e2::TileFlags flags)
 		switch ((flags & e2::TileFlags::WoodAbundanceMask))
 		{
 		case TileFlags::WoodAbundance1:
-			return m_pineForestMeshes[0];
+			return 0;
 			break;
 		case TileFlags::WoodAbundance2:
-			return m_pineForestMeshes[1];
+			return 1;
 			break;
 		default:
 		case TileFlags::WoodAbundance3:
 		case TileFlags::WoodAbundance4:
-			return m_pineForestMeshes[2];
+			return 2;
 			break;
 		}
 	}
-	return nullptr;
+	return -1;
+}
+
+e2::ForestState* e2::HexGrid::getForestState(int32_t index)
+{
+	if(index < 0 || index > 2)
+		return nullptr;
+
+	return &m_forestStates[index];
+
+}
+
+void e2::HexGrid::damageTree(glm::ivec2 const& hex, uint32_t treeIndex, float dmg)
+{
+	e2::UnpackedForestState *state = unpackForestState(hex);
+	if (!state)
+		return;
+
+	if(treeIndex >= state->trees.size())
+		return;
+
+	state->trees[treeIndex].health -= dmg;
+	state->trees[treeIndex].shake = 0.4f;
+
+	glm::vec2 to = state->trees[treeIndex].worldOffset;
+	glm::vec3 two{to.x, -0.25f ,to.y};
+	game()->spawnHitLabel(two, std::format("{}", uint32_t(dmg*100.0f)));
+
+	if (state->trees[treeIndex].health <= 0.0f)
+	{
+		audioManager()->playOneShot(m_woodDieSound, 1.2f, 0.25f, e2::Hex(hex).localCoords());
+		audioManager()->playOneShot(m_treeFallSound, 1.0f, 1.0f, e2::Hex(hex).localCoords());
+	}
+	
+}
+
+e2::UnpackedForestState* e2::HexGrid::getUnpackedForestState(glm::ivec2 const& hex)
+{
+	auto finder = m_unpackedForests.find(hex);
+	if (finder == m_unpackedForests.end())
+		return nullptr;
+
+	return &finder->second;
+}
+
+e2::UnpackedForestState* e2::HexGrid::unpackForestState(glm::ivec2 const& hex)
+{
+	// return if already unpacked
+	e2::UnpackedForestState* unpacked = getUnpackedForestState(hex);
+	if (unpacked)
+		return unpacked;
+
+	// return null if not forested, or if not discovered
+	e2::TileData* tile = getExistingTileData(hex);
+	if (!tile || !tile->isForested() || tile->forestIndex < 0)
+		return nullptr;
+
+	e2::ForestState* originalForest = getForestState(tile->forestIndex);
+	e2::UnpackedForestState newForest;
+	newForest.hex = hex;
+	newForest.trees.reserve(originalForest->trees.size());
+
+	uint32_t i = 0;
+	for (e2::TreeState& originalTree : originalForest->trees)
+	{
+		e2::MeshProxyConfiguration treeCfg;
+		e2::MeshLodConfiguration lodCfg;
+		lodCfg.mesh = m_treeMeshes[originalTree.meshIndex];
+		lodCfg.materials.push(m_treeMaterialProxy);
+		treeCfg.lods.push(lodCfg);
+
+		e2::UnpackedTreeState newTree;
+		newTree.meshIndex = originalTree.meshIndex;
+		newTree.totalLumber = (uint32_t)(e2::randomFloat(3.5f * originalTree.scale, 4.5 * originalTree.scale)/ e2::treeScale);
+		newTree.mesh = e2::create<e2::MeshProxy>(gameSession(), treeCfg);
+
+		glm::vec3 fallDirection = glm::rotate(glm::identity<glm::quat>(), glm::radians(e2::randomFloat(-45.0f, 45.0f)), e2::worldUpf()) * -e2::worldRightf();
+		newTree.fallDir = glm::vec2(fallDirection.x, fallDirection.z);
+		newTree.rotation = originalTree.rotation + tile->forestRotation;
+		newTree.scale = originalTree.scale;
+
+		glm::vec2 treeOffset = e2::Hex(hex).planarCoords() + originalTree.localOffset(tile, originalForest);
+
+		newTree.worldOffset = treeOffset;
+
+		glm::mat4 treeTranslation = glm::translate(glm::identity<glm::mat4>(), glm::vec3(treeOffset.x, 0.0f, treeOffset.y));
+		glm::mat4 treeScale = glm::scale(glm::identity<glm::mat4>(), glm::vec3(newTree.scale));
+		glm::mat4 treeRotation = glm::rotate(glm::identity<glm::mat4>(), newTree.rotation, e2::worldUpf());
+
+		glm::mat4 treeRotationFix = glm::rotate(glm::identity<glm::mat4>(), glm::radians(90.0f), e2::worldRightf());
+
+		newTree.mesh->modelMatrix = treeTranslation * treeRotation * treeRotationFix * treeScale;
+		newTree.mesh->modelMatrixDirty = { true };
+		newForest.trees.push_back(newTree);
+
+
+		/*
+			glm::mat4 treeTranslation = glm::translate(glm::identity<glm::mat4>(), glm::vec3(treeState.planarOffset.x, 0.0f, treeState.planarOffset.y));
+			glm::mat4 treeScale = glm::scale(glm::identity<glm::mat4>(), glm::vec3(treeState.scale));
+			glm::mat4 treeRotation = glm::rotate(glm::identity<glm::mat4>(), treeState.rotation, e2::worldUpf());
+
+			glm::mat4 treeRotationFix = glm::rotate(glm::identity<glm::mat4>(), glm::radians(90.0f), e2::worldRightf());
+
+			glm::mat4 treeTransform = treeTranslation * treeRotation * treeRotationFix * treeScale;
+		
+		
+		*/
+
+	}
+
+	removeWood(hex);
+
+	m_unpackedForests[hex] = newForest;
+
+	return getUnpackedForestState(hex);
+
+}
+
+
+void e2::HexGrid::updateUnpackedForests()
+{
+	static std::vector<glm::ivec2> removeList;
+
+	removeList.clear();
+	for (auto& pair : m_unpackedForests)
+	{
+		uint32_t deadTrees = 0;
+		for (auto& t : pair.second.trees)
+		{
+			if (t.health <= 0.0f)
+			{
+				if (t.fallTime <= 0.0f)
+				{
+					if (t.killTime > 0.0f)
+					{
+
+						glm::vec3 fallRot = glm::vec3(t.fallDir.y, 0.0f, -t.fallDir.x);
+
+						t.killTime -= game()->timeDelta();
+
+						if (t.killTime < 0.4f && t.mesh)
+						{
+							e2::destroy(t.mesh);
+							t.mesh = nullptr;
+						}
+
+						if (t.killTime < 0.3f)
+						{
+							
+							if (t.spawnedLumber < t.totalLumber)
+							{
+								float nextTimeRef = (1.0f - (((float)t.spawnedLumber + 1.0f) / (float)t.totalLumber)) * 0.3f;
+								if (t.killTime < nextTimeRef)
+								{
+									e2::ItemEntity* newLumber = game()->spawnEntity("lumber", glm::vec3(t.worldOffset.x, 0.0f, t.worldOffset.y) + fallRot * (t.spawnedLumber * 0.2f))->cast<e2::ItemEntity>();
+									newLumber->setLifetime(4.0);
+									newLumber->playSound("S_Wood_Spawn.e2a", 1.0f, 1.0f);
+									t.spawnedLumber++;
+								}
+							}
+						}
+					}
+					else
+					{
+						deadTrees++;
+					}
+				}
+				else
+				{
+					t.fallTime -= game()->timeDelta();
+										
+					glm::mat4 treeTranslation = glm::translate(glm::identity<glm::mat4>(), glm::vec3(t.worldOffset.x, 0.0f, t.worldOffset.y));
+					glm::mat4 treeScale = glm::scale(glm::identity<glm::mat4>(), glm::vec3(t.scale));
+					glm::mat4 treeRotation = glm::rotate(glm::identity<glm::mat4>(), t.rotation, e2::worldUpf());
+
+					glm::mat4 treeRotationFix = glm::rotate(glm::identity<glm::mat4>(), glm::radians(90.0f), e2::worldRightf());
+
+
+					glm::mat4 shakeRotation = glm::identity<glm::mat4>();
+					if (t.shake >= 0.0f)
+					{
+						float shakeDelta = glm::clamp(t.shake / 0.4f, 0.0f, 1.0f);
+						glm::vec2 shakeDirection = e2::randomOnUnitCircle();
+						shakeRotation = glm::rotate(glm::identity<glm::mat4>(), glm::radians(3.0f * shakeDelta), glm::vec3(shakeDirection.x, 0.0f, shakeDirection.y));
+						t.shake -= game()->timeDelta();
+					}
+
+					float fallAlpha = (e2::maxTreeFallTime - glm::clamp(t.fallTime, 0.0f, e2::maxTreeFallTime)) / e2::maxTreeFallTime;
+					float fallDelta = glm::circularEaseIn(glm::clamp(fallAlpha, 0.0f, 1.0f));
+					glm::mat4 fallRotation = glm::rotate(glm::identity<glm::mat4>(), glm::radians(90.0f * fallDelta), glm::vec3(t.fallDir.x, 0.0f, t.fallDir.y));
+
+					t.mesh->modelMatrix = treeTranslation * fallRotation * shakeRotation * treeRotation * treeRotationFix * treeScale;
+					t.mesh->modelMatrixDirty = true;
+
+					if (t.fallTime <= 0.0f)
+					{
+						game()->addScreenShake(0.2f);
+					}
+				}
+			}
+			else
+			{
+				if (t.shake > 0.0f)
+				{
+					glm::mat4 treeTranslation = glm::translate(glm::identity<glm::mat4>(), glm::vec3(t.worldOffset.x, 0.0f, t.worldOffset.y));
+					glm::mat4 treeScale = glm::scale(glm::identity<glm::mat4>(), glm::vec3(t.scale));
+					glm::mat4 treeRotation = glm::rotate(glm::identity<glm::mat4>(), t.rotation, e2::worldUpf());
+
+					glm::mat4 treeRotationFix = glm::rotate(glm::identity<glm::mat4>(), glm::radians(90.0f), e2::worldRightf());
+
+					float shakeDelta = glm::clamp(t.shake / 0.4f, 0.0f, 1.0f);
+					glm::vec2 shakeDirection = e2::randomOnUnitCircle();
+					glm::mat4 shakeRotation = glm::rotate(glm::identity<glm::mat4>(), glm::radians(3.0f * shakeDelta), glm::vec3(shakeDirection.x, 0.0f, shakeDirection.y));
+
+					t.mesh->modelMatrix = treeTranslation * shakeRotation * treeRotation * treeRotationFix * treeScale;
+					t.mesh->modelMatrixDirty = true;
+
+					t.shake -= game()->timeDelta();
+					if (t.shake <= 0.0f)
+					{
+						glm::mat4 treeTranslation = glm::translate(glm::identity<glm::mat4>(), glm::vec3(t.worldOffset.x, 0.0f, t.worldOffset.y));
+						glm::mat4 treeScale = glm::scale(glm::identity<glm::mat4>(), glm::vec3(t.scale));
+						glm::mat4 treeRotation = glm::rotate(glm::identity<glm::mat4>(), t.rotation, e2::worldUpf());
+
+						glm::mat4 treeRotationFix = glm::rotate(glm::identity<glm::mat4>(), glm::radians(90.0f), e2::worldRightf());
+
+						t.mesh->modelMatrix = treeTranslation * treeRotation * treeRotationFix * treeScale;
+						t.mesh->modelMatrixDirty = true;
+					}
+				}
+			}
+		}
+
+		if (deadTrees >= pair.second.trees.size())
+		{
+			removeList.push_back(pair.first);
+		}
+	}
+
+	for (auto h : removeList)
+	{
+		m_unpackedForests.erase(h);
+	}
+}
+
+e2::MeshProxy* e2::HexGrid::createGrassProxy(e2::TileData* tileData, glm::ivec2 const& hex)
+{
+	if (!tileData)
+		return nullptr;
+
+	e2::MeshProxyConfiguration meshConf;
+	e2::MeshLodConfiguration lodConf;
+	lodConf.mesh = m_grassMeshes[(hex.x * hex.x - (hex.y * 4)) % 4];
+	meshConf.lods.push(lodConf);
+
+	e2::MeshProxy* newMeshProxy = e2::create<e2::MeshProxy>(gameSession(), meshConf);
+
+	glm::vec3 meshOffset = e2::Hex(hex).localCoords();
+
+	glm::mat4 transform = glm::mat4(1.0f);
+	transform = glm::translate(transform, meshOffset);
+
+	newMeshProxy->modelMatrix = transform;
+	newMeshProxy->modelMatrixDirty = { true };
+
+	return newMeshProxy;
 }
 
 e2::MeshProxy* e2::HexGrid::createResourceProxyForTile(e2::TileData* tileData, glm::ivec2 const& hex)
@@ -1078,23 +1635,45 @@ e2::MeshProxy* e2::HexGrid::createResourceProxyForTile(e2::TileData* tileData, g
 	if (!tileData->resourceMesh)
 		return nullptr;
 
-
 	e2::MeshProxyConfiguration meshConf;
 	e2::MeshLodConfiguration lodConf;
 	lodConf.mesh = tileData->resourceMesh;
 	meshConf.lods.push(lodConf);
+
+	e2::MeshProxy* newMeshProxy = e2::create<e2::MeshProxy>(gameSession(), meshConf);
+
+	if ((tileData->flags & e2::TileFlags::WaterMask) != e2::TileFlags::WaterNone)
+	{
+
+
+		glm::vec3 meshOffset = e2::Hex(hex).localCoords() + e2::worldUpf() * -1.0f;
+
+		glm::mat4 transform = glm::mat4(1.0f);
+		transform = glm::translate(transform, meshOffset);
+		transform = glm::rotate(transform, glm::radians(e2::randomFloat(0.0f, 359.f)), glm::vec3(e2::worldUp()));
+		transform = glm::scale(transform, glm::vec3(e2::randomFloat(1.4f, 2.2f)));
+		newMeshProxy->modelMatrix = transform;
+		newMeshProxy->modelMatrixDirty = { true };
+
+		return newMeshProxy;
+	}
+
+
+
 	
 	glm::vec3 meshOffset = e2::Hex(hex).localCoords();
 
-	e2::MeshProxy* newMeshProxy = e2::create<e2::MeshProxy>(gameSession(), meshConf);
-	newMeshProxy->modelMatrix = glm::translate(glm::mat4(1.0f), meshOffset);
-	newMeshProxy->modelMatrix = glm::rotate(newMeshProxy->modelMatrix, glm::radians(e2::randomFloat(0.0f, 359.f)), glm::vec3(e2::worldUp()));
+	glm::mat4 transform = glm::mat4(1.0f);
+	transform = glm::translate(transform, meshOffset);
+	transform = glm::rotate(transform, glm::radians(hex.x * 20.0f), glm::vec3(e2::worldUp()));
+	transform = glm::scale(transform, glm::vec3(0.675f));
+	newMeshProxy->modelMatrix = transform;
 	newMeshProxy->modelMatrixDirty = { true };
 
 	return newMeshProxy;
 }
 
-e2::TileData e2::HexGrid::getCalculatedTileData(glm::ivec2 const& hex)
+e2::TileData e2::HexGrid::calculateTileData(glm::ivec2 const& hex)
 {
 	TileData newTileData;
 
@@ -1103,13 +1682,14 @@ e2::TileData e2::HexGrid::getCalculatedTileData(glm::ivec2 const& hex)
 	calculateBiome(planarCoords, newTileData.flags);
 	calculateFeaturesAndWater(planarCoords, baseHeight, newTileData.flags);
 	calculateResources(planarCoords, newTileData.flags);
+	newTileData.forestIndex = getForestIndexForFlags(newTileData.flags);
+	newTileData.forestRotation = glm::radians(hex.x * hex.y * 1.12f);
+	newTileData.resourceMesh = getResourceMeshForFlags(newTileData.flags);
 
-	newTileData.resourceMesh = nullptr;// getResourceMeshForFlags(newTileData.flags);
-
-	e2::GameEntity* existingStructure = game()->entityAtHex(EntityLayerIndex::Structure, hex);
+	e2::TurnbasedEntity* existingStructure = game()->entityAtHex(EntityLayerIndex::Structure, hex);
 	if (existingStructure)
 	{
-		newTileData.empireId = existingStructure->empireId;
+		newTileData.empireId = existingStructure->getEmpireId();
 	}
 
 	return newTileData;
@@ -1121,7 +1701,7 @@ e2::TileData e2::HexGrid::getTileData(glm::ivec2 const& hex)
 	if (src)
 		return *src;
 
-	return getCalculatedTileData(hex);
+	return calculateTileData(hex);
 }
 
 e2::MeshProxy* e2::HexGrid::createForestProxyForTile(e2::TileData* tileData, glm::ivec2 const& hex)
@@ -1129,20 +1709,22 @@ e2::MeshProxy* e2::HexGrid::createForestProxyForTile(e2::TileData* tileData, glm
 	if (!tileData)
 		return nullptr;
 
-	e2::MeshPtr forestMesh = getForestMeshForFlags(tileData->flags);
-	if (!forestMesh)
+	if (!tileData->isForested() || tileData->forestIndex < 0)
 		return nullptr;
+		
+	e2::MeshProxyConfiguration proxyConfig{
+		.lods = {
+			{
+				.maxDistance = 0.0f,
+				.mesh = m_forestStates[tileData->forestIndex].mesh,
+				.materials = {m_treeMaterialProxy}
+			}
+		}
+	};
 
-	e2::MeshProxyConfiguration treeConf;
-	e2::MeshLodConfiguration lod;
-	lod.maxDistance = 0.0f;
-	lod.mesh = forestMesh;
-	treeConf.lods.push(lod);
-	glm::vec3 meshOffset = e2::Hex(hex).localCoords();
-
-	e2::MeshProxy* newMeshProxy = e2::create<e2::MeshProxy>(gameSession(), treeConf);
-	newMeshProxy->modelMatrix = glm::translate(glm::mat4(1.0f), meshOffset);
-	newMeshProxy->modelMatrix = glm::rotate(newMeshProxy->modelMatrix, glm::radians(hex.x * hex.y * 1.12f), glm::vec3(e2::worldUp()));
+	e2::MeshProxy* newMeshProxy = e2::create<e2::MeshProxy>(gameSession(), proxyConfig);
+	newMeshProxy->modelMatrix = glm::translate(glm::mat4(1.0f), e2::Hex(hex).localCoords());
+	newMeshProxy->modelMatrix = glm::rotate(newMeshProxy->modelMatrix, tileData->forestRotation, glm::vec3(e2::worldUp()));
 	newMeshProxy->modelMatrixDirty = { true };
 
 	return newMeshProxy;
@@ -1157,7 +1739,7 @@ size_t e2::HexGrid::discover(glm::ivec2 const& hex)
 		LogError("DISCOVERING ALREADY DISCOVERED TILE, EXPECT BREAKAGE");
 	}
 #endif
-	m_tiles.push_back(getCalculatedTileData(hex));
+	m_tiles.push_back(calculateTileData(hex));
 	m_tileVisibility.push_back(0);
 	m_tileIndex[hex] = m_tiles.size() - 1;
 
@@ -2039,14 +2621,14 @@ void e2::HexGrid::renderFogOfWar()
 	e2::GameEmpire* localEmpire = game()->localEmpire();
 	if (localEmpire)
 	{
-		for (e2::GameEntity* entity: localEmpire->entities)
+		for (e2::TurnbasedEntity* entity: localEmpire->entities)
 		{
-			glm::vec2 planarUnitPosition = entity->meshPlanarCoords();
+			glm::vec2 planarUnitPosition = entity->planarCoords();
 
 			glm::vec2 unitPosNormalized = (planarUnitPosition - worldOffset) / worldSize;
 			glm::vec2 unitPosPixels = unitPosNormalized * glm::vec2(m_minimapSize);
 
-			if (entity->specification->layerIndex == EntityLayerIndex::Structure)
+			if (entity->turnbasedSpecification()->layerIndex == EntityLayerIndex::Structure)
 				unitConstants.quadSize = { 6.0f, 6.0f };
 			else 
 				unitConstants.quadSize = { 3.0f, 3.0f };
@@ -2332,6 +2914,34 @@ e2::ITexture* e2::HexGrid::minimapTexture(uint8_t frameIndex)
 	return m_frameData[frameIndex].minimapTexture;
 }
 
+void e2::HexGrid::setFog(float newFog)
+{
+	m_fogProxy->uniformData.set(FogData{ {newFog, 0.0f, 0.0f, 0.0f} });
+}
+
+void e2::HexGrid::removeWood(glm::ivec2 const& location)
+{
+	e2::TileData* tileData = getExistingTileData(location);
+	if (!tileData)
+		return;
+
+	bool hasForest = (tileData->flags & e2::TileFlags::FeatureForest) != TileFlags::FeatureNone;
+	if (!hasForest)
+		return;
+
+	tileData->flags = e2::TileFlags(uint16_t(tileData->flags) & (~uint16_t(e2::TileFlags::FeatureForest)));
+
+	if (tileData->forestProxy)
+		e2::destroy(tileData->forestProxy);
+
+	tileData->forestProxy = nullptr;
+
+	glm::ivec2 chunkIndex = chunkIndexFromPlanarCoords(Hex(location).planarCoords());
+	e2::ChunkState *chunkState = getOrCreateChunk(chunkIndex);
+	refreshChunkMeshes(chunkState);
+}
+
+
 
 void e2::HexGrid::debugDraw()
 {
@@ -2451,14 +3061,16 @@ e2::ChunkLoadTask::~ChunkLoadTask()
 
 bool e2::ChunkLoadTask::prepare()
 {
-	m_dynaHex = &m_grid->dynamicHex();
-	m_dynaHexHigh = &m_grid->dynamicHexHigh();
+	m_fastHex = &m_grid->fastHex();
+	m_fastHexHigh = &m_grid->fastHexHigh();
 
 	return true;
 }
 
 bool e2::ChunkLoadTask::execute()
 {
+	//E2_TIME_SCOPE("WorldGen");
+
 	e2::Moment begin = e2::timeNow();
 
 	constexpr uint32_t HexGridChunkResolutionSquared = e2::hexChunkResolution * e2::hexChunkResolution;
@@ -2466,46 +3078,112 @@ bool e2::ChunkLoadTask::execute()
 
 	glm::vec3 chunkOffset = e2::HexGrid::chunkOffsetFromIndex(m_chunkIndex);
 
-	e2::DynamicMesh* newChunkMesh = e2::create<e2::DynamicMesh>();
+	//e2::DynamicMesh* newChunkMesh = e2::create<e2::DynamicMesh>();
+	
 	
 	HexShaderData shaderData;
 	shaderData.chunkOffset = { chunkOffset.x, chunkOffset.z };
-
+	shaderData.grid = m_grid;
+	shaderData.cacheOffset = m_chunkIndex * glm::ivec2(e2::hexChunkResolution);
 	
-
-	for (int32_t y = 0; y < e2::hexChunkResolution; y++)
+	struct _GenTileData
 	{
-		for (int32_t x = 0; x < e2::hexChunkResolution; x++)
+		e2::Hex worldHex;
+		//e2::Hex localHex;
+		glm::vec3 localOffset;
+		//glm::ivec2 localOffsetCoords;
+		//glm::ivec2 worldOffsetCoords;
+		e2::FastMesh2* mesh;
+	};
+
+	thread_local e2::StackVector<_GenTileData, HexGridChunkResolutionSquared> _fastMeshes;
+	_fastMeshes.resize(HexGridChunkResolutionSquared);
+
+	uint32_t vertexCapacity = 0;
+	uint32_t indexCapacity = 0;
+
+	{
+		//E2_TIME_SCOPE("WorldGen.Prepare");
+		int32_t i = 0;
+		for (int32_t y = -1; y < (int32_t)e2::hexChunkResolution+1; y++)
 		{
-			glm::vec3 tileOffset = e2::Hex(glm::ivec2(x, y)).localCoords();
-			glm::mat4 transform = glm::translate(glm::identity<glm::mat4>(), tileOffset);
-
-			shaderData.grid = m_grid;
-			shaderData.hex = e2::Hex(m_chunkIndex * glm::ivec2(e2::hexChunkResolution) + glm::ivec2(x, y));
-			shaderData.tileData = m_grid->getCalculatedTileData(shaderData.hex.offsetCoords());
-
-			if ((shaderData.tileData.flags & e2::TileFlags::FeatureMountains) != e2::TileFlags::FeatureNone)
+			for (int32_t x = -1; x < (int32_t)e2::hexChunkResolution+1; x++)
 			{
-				newChunkMesh->addMeshWithShaderFunction(m_dynaHexHigh, transform, ::hexShader, &shaderData);
-			}
-			else
-			{
-				newChunkMesh->addMeshWithShaderFunction(m_dynaHex, transform, ::hexShader, &shaderData);
-			}
+				glm::ivec2 localOffsetCoords(x, y);
+				e2::Hex localHex(localOffsetCoords);
+				glm::ivec2 worldOffsetCoords = shaderData.cacheOffset + localOffsetCoords;
 
-			if ((shaderData.tileData.flags & e2::TileFlags::WaterMask) != e2::TileFlags::WaterNone)
-			{
-				m_hasWaterTile = true;
-			}
+				e2::TileData newTile = shaderData.grid->calculateTileData(worldOffsetCoords);
+				shaderData.tileCache[i++] = newTile;
 
+				if (y < 0 || x < 0 || x >= (int32_t)e2::hexChunkResolution || y >= (int32_t)e2::hexChunkResolution)
+					continue;
+
+				_GenTileData newData;
+				newData.localOffset = localHex.localCoords();
+				newData.worldHex = e2::Hex(worldOffsetCoords);
+
+				if ((newTile.flags & e2::TileFlags::WaterMask) != e2::TileFlags::WaterNone)
+					m_hasWaterTile = true;
+
+				bool isMountain = ((newTile.flags & e2::TileFlags::FeatureMountains) != e2::TileFlags::FeatureNone);
+				newData.mesh = isMountain ? m_fastHexHigh : m_fastHex;
+				//newData.mesh = m_fastHex;
+
+				vertexCapacity += newData.mesh->numVertices;
+				indexCapacity += newData.mesh->numIndices;
+
+				_fastMeshes[y * e2::hexChunkResolution + x] = newData;
+			}
 		}
 	}
-	//newChunkMesh->mergeDuplicateVertices();
-	//newChunkMesh->calculateFaceNormals();
-	//newChunkMesh->calculateVertexNormals();
-	newChunkMesh->calculateVertexTangents();
-	m_generatedMesh = newChunkMesh->bake(m_grid->hexMaterial(), e2::VertexAttributeFlags(uint8_t(e2::VertexAttributeFlags::Normal) | uint8_t(e2::VertexAttributeFlags::Color)));
-	e2::destroy(newChunkMesh);
+
+	e2::FastMesh2 newFastMesh(vertexCapacity, indexCapacity, true);
+
+	{
+		//E2_TIME_SCOPE("WorldGen.AddMesh");
+		for (_GenTileData& genTile : _fastMeshes)
+		{
+			shaderData.hex = genTile.worldHex;
+			newFastMesh.addMesh(*genTile.mesh, { genTile.localOffset, 1.0f }, ::hexShaderFast2, &shaderData);
+		}
+	}
+
+	{
+		//E2_TIME_SCOPE("WorldGen.CalcVertexTangents");
+		newFastMesh.calculateVertexTangents();
+	}
+
+	{
+		//E2_TIME_SCOPE("WorldGen.Bake");
+		m_generatedMesh = newFastMesh.bake(m_grid->hexMaterial());
+	}
+
+	//for (int32_t y = 0; y < e2::hexChunkResolution; y++)
+	//{
+	//	for (int32_t x = 0; x < e2::hexChunkResolution; x++)
+	//	{
+	//		glm::vec3 tileOffset = e2::Hex(glm::ivec2(x, y)).localCoords();
+	//		glm::mat4 transform = glm::translate(glm::identity<glm::mat4>(), tileOffset);
+	//		shaderData.hex = e2::Hex(m_chunkIndex * glm::ivec2(e2::hexChunkResolution) + glm::ivec2(x, y));
+	//		shaderData.tileData = shaderData.getTileData(shaderData.hex.offsetCoords());
+	//		if ((shaderData.tileData.flags & e2::TileFlags::FeatureMountains) != e2::TileFlags::FeatureNone)
+	//		{
+	//			newChunkMesh->addMeshWithShaderFunction(m_dynaHexHigh, transform, ::hexShader, &shaderData);
+	//		}
+	//		else
+	//		{
+	//			newChunkMesh->addMeshWithShaderFunction(m_dynaHex, transform, ::hexShader, &shaderData);
+	//		}
+	//		if ((shaderData.tileData.flags & e2::TileFlags::WaterMask) != e2::TileFlags::WaterNone)
+	//		{
+	//			m_hasWaterTile = true;
+	//		}
+	//	}
+	//}
+	//newChunkMesh->calculateVertexTangents();
+	//m_generatedMesh = newChunkMesh->bake(m_grid->hexMaterial(), e2::VertexAttributeFlags(uint8_t(e2::VertexAttributeFlags::Normal) | uint8_t(e2::VertexAttributeFlags::Color)));
+	//e2::destroy(newChunkMesh);
 
 
 	m_ms = (float)begin.durationSince().milliseconds();
@@ -2589,40 +3267,37 @@ void e2::HexGrid::popOutChunk(e2::ChunkState* state)
 	{
 		e2::destroy(state->proxy);
 		state->proxy = nullptr;
+	}
+	for (e2::MeshProxy* mesh : state->extraMeshes)
+	{
+		e2::destroy(mesh);
+	}
+	state->extraMeshes.resize(0);
 
-		for (e2::MeshProxy* mesh : state->extraMeshes)
+	for (int32_t y = 0; y < e2::hexChunkResolution; y++)
+	{
+		for (int32_t x = 0; x < e2::hexChunkResolution; x++)
 		{
-			e2::destroy(mesh);
-		}
-		state->extraMeshes.resize(0);
+			glm::vec3 tileOffset = e2::Hex(glm::ivec2(x, y)).localCoords();
+			glm::mat4 transform = glm::translate(glm::identity<glm::mat4>(), tileOffset);
 
-		for (int32_t y = 0; y < e2::hexChunkResolution; y++)
-		{
-			for (int32_t x = 0; x < e2::hexChunkResolution; x++)
+			e2::Hex tileHex = e2::Hex(state->chunkIndex * glm::ivec2(e2::hexChunkResolution) + glm::ivec2(x, y));
+
+			e2::TileData* realTileData = getExistingTileData(tileHex.offsetCoords());
+			if (realTileData)
 			{
-				glm::vec3 tileOffset = e2::Hex(glm::ivec2(x, y)).localCoords();
-				glm::mat4 transform = glm::translate(glm::identity<glm::mat4>(), tileOffset);
+				if (realTileData->forestProxy)
+					e2::destroy(realTileData->forestProxy);
 
-				e2::Hex tileHex = e2::Hex(state->chunkIndex * glm::ivec2(e2::hexChunkResolution) + glm::ivec2(x, y));
+				realTileData->forestProxy = nullptr;
 
-				// get real data if we have it, otherwise calculate 
-				e2::TileData* realTileData = getExistingTileData(tileHex.offsetCoords());
-				if (realTileData)
-				{
-					if (realTileData->forestProxy)
-						e2::destroy(realTileData->forestProxy);
+				if (realTileData->resourceProxy)
+					e2::destroy(realTileData->resourceProxy);
 
-					realTileData->forestProxy = nullptr;
-
-					if (realTileData->resourceProxy)
-						e2::destroy(realTileData->resourceProxy);
-
-					realTileData->resourceProxy = nullptr;
-				}
+				realTileData->resourceProxy = nullptr;
 			}
 		}
 	}
-
 }
 
 void e2::HexGrid::refreshChunkMeshes(e2::ChunkState* state)
@@ -2656,10 +3331,13 @@ void e2::HexGrid::refreshChunkMeshes(e2::ChunkState* state)
 					e2::destroy(realTileData->resourceProxy);
 
 				realTileData->resourceProxy = createResourceProxyForTile(realTileData, tileHex);
+
+				if(realTileData->getBiome() == e2::TileFlags::BiomeGrassland && realTileData->isLand() && !realTileData->isMountain())
+					state->extraMeshes.push(createGrassProxy(realTileData, tileHex));
 			}
 			else
 			{
-				e2::TileData tileData = getCalculatedTileData(tileHex);
+				e2::TileData tileData = calculateTileData(tileHex);
 
 				e2::MeshProxy* newForestProxy = createForestProxyForTile(&tileData, tileHex);
 				if (newForestProxy)
@@ -2668,6 +3346,9 @@ void e2::HexGrid::refreshChunkMeshes(e2::ChunkState* state)
 				e2::MeshProxy* newResourceProxy = createResourceProxyForTile(&tileData, tileHex);
 				if (newResourceProxy)
 					state->extraMeshes.push(newResourceProxy);
+
+				if (tileData.getBiome() == e2::TileFlags::BiomeGrassland && tileData.isLand() && !tileData.isMountain())
+					state->extraMeshes.push(createGrassProxy(&tileData, tileHex));
 			}
 		}
 	}
@@ -2706,6 +3387,8 @@ void e2::HexGrid::endStreamingChunk(glm::ivec2 const& chunkIndex, e2::MeshPtr ne
 		return;
 	}
 	
+	LogNotice("Streamed chunk in {} ms", timeMs);
+
 	// Update highest load time 
 	if (timeMs > m_highLoadTime)
 		m_highLoadTime = timeMs;
@@ -2771,6 +3454,11 @@ bool e2::TileData::isDeepWater()
 bool e2::TileData::isLand()
 {
 	return getWater() == e2::TileFlags::WaterNone;
+}
+
+bool e2::TileData::isMountain()
+{
+	return uint16_t(flags & e2::TileFlags::FeatureMountains);
 }
 
 bool e2::TileData::hasGold()
@@ -2871,3 +3559,4 @@ float e2::TileData::getWoodAbundanceAsFloat()
 
 	return 0.0f;
 }
+

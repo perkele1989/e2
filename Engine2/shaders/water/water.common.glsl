@@ -20,35 +20,77 @@ float sampleHeight(vec2 position)
     return pow(voronoi2d(position*0.8), 2.0);
 }
 
-float sampleWaterHeight(vec2 position, float time)
+
+float generateWaveHeight(
+    vec2 position,
+    float time,
+    float scale1,
+    float scale2,
+    float scale3,
+    float variance,
+    float varianceSpeed,
+    float speed,
+    vec2 dir)
 {
-    float variance1 = 0.2;
-    float varianceOffset1 = 1.0 - variance1;
-    float varianceSpeed1 = 1.0;
-    float waveCoeff1 = (sin(time * varianceSpeed1) * 0.5 + 0.5) * variance1 + varianceOffset1;
+    float varianceOffset = 1.0 - variance;
+    float waveCoeff = (sin(time * varianceSpeed) * 0.5 + 0.5) * variance + varianceOffset;
 
-    float variance2 = 0.5;
-    float varianceOffset2 = 1.0 - variance2;
-    float varianceSpeed2 = 0.5;
-    float waveCoeff2 = (sin(time * varianceSpeed2) * 0.5 + 0.5) * variance2 + varianceOffset2;
-
-    float speed1 = 0.2;
-    vec2 dir1 = normalize(vec2(0.2, 0.4));
-    vec2 pos1 = position + (dir1 * speed1 * time);
-    float height1 = sampleHeight(pos1 * 1.6) * waveCoeff1;
-
-    float speed2 = 0.3;
-    vec2 dir2 = normalize(vec2(-0.22, -0.3));
-    vec2 pos2 = position + (dir2 * speed2 * time);
-    float height2 = sampleHeight(pos2 + vec2(1.0, 1.0) * height1 * 0.3) *  waveCoeff2;
-
-    float weight1 = 0.3;
-    float weight2 = (1.0 - weight1);
-
-    return (height1 * weight1 + height2 * weight2);
+    dir = normalize(dir);
+    vec2 pos = position + (dir * speed * time);
+    return sampleHeight(pos*scale3 + scale1 * scale2) * waveCoeff;
 }
 
-const float heightScale = 0.25;
+float sampleWaterHeight(vec2 position, float time)
+{
+    // float height1 = generateWaveHeight(position, time,
+    //  0.0, 1.6, 1.0,
+    //  0.2, 1.0,
+    //  0.2, vec2(0.2, 0.4));
+
+    // float height2 = generateWaveHeight(position, time,
+    // height1*0.314, 1.0, 1.0,
+    // 0.5, 0.5,
+    // 0.3, vec2(-0.22, -0.3));
+
+    // float height3 = generateWaveHeight(position, time,
+    // height1*0.3, 1.0, 3.0,
+    // 0.5, 0.5,
+    // 0.1, vec2(0.22, 0.4));
+
+
+/// play area
+    float heightSmallOffset = generateWaveHeight(position, time,
+     0.0, 1.6, 3.5,
+     0.2, 1.0,
+     0.1, vec2(0.2, 0.4));
+
+    float heightSmall = generateWaveHeight(position, time,
+    heightSmallOffset*0.314, 1.0, 2.5,
+    0.5, 0.5,
+    0.15, vec2(-0.22, -0.3));
+
+
+
+
+    float heightBigOffset = generateWaveHeight(position, time,
+     0.0, 1.6, 1.5,
+     0.2, 1.0,
+     0.2, vec2(0.2, 0.4));
+
+    float heightBig = generateWaveHeight(position, time,
+    heightBigOffset*0.314, 1.0, 1.0,
+    0.5, 0.5,
+    0.3, vec2(-0.22, -0.3));
+
+
+    return heightSmall * 0.2 + heightBig * 0.8;
+
+    // vec3 weights = normalize(vec3(0.2, 0.8, 0.143));
+    // return (height1 * weights.x + height2 * weights.y + height3 * weights.z);
+
+}
+
+const float heightScale = 0.15;
 
 vec3 sampleWaterNormal(vec2 position, float time)
 {

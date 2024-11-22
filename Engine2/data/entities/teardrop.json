@@ -1,0 +1,67 @@
+
+{
+    "id": "teardrop",
+    "specification": "e2::TeardropSpecification",
+    "entityType": "e2::TeardropEntity",
+    "movement": {
+        "ignoreTypes": ["e2::ItemEntity"]
+    },
+    "collision": {
+        "radius": 0.1
+    },
+    "mesh": {
+
+        "meshScale": [0.6, 0.6, 0.6],
+        "mesh": "SM_Teardrop.e2a",
+        "skeleton": "SK_Teardrop.e2a",
+        "poses": [
+            {
+                "name": "idle",
+                "asset": "A_Teardrop_Idle.e2a",
+                "blendTime": 0.35 
+            },
+            {
+                "name": "air",
+                "asset": "A_Teardrop_Air.e2a",
+                "blendTime": 0.15
+            }
+        ],
+        "actions": [
+            {
+                "name": "jump",
+                "asset": "A_Teardrop_Jump.e2a",
+                "blendInTime": 0.1,
+                "blendOutTime": 0.2,
+                "triggers":[
+                    {
+                        "id": "jump",
+                        "time": 0.5833333
+                    },
+                    {
+                        "id": "jump_sound",
+                        "time": 0.2833333
+                    }
+                ]
+            },
+            {
+                "name": "land",
+                "asset": "A_Teardrop_Land.e2a",
+                "blendInTime": 0.1,
+                "blendOutTime": 0.4
+            },
+            {
+                "name": "die",
+                "asset": "A_Teardrop_Dying.e2a",
+                "blendInTime": 0.05,
+                "blendOutTime": 0.05
+            },
+            {
+                "name": "hit",
+                "asset": "A_Teardrop_Hit.e2a",
+                "blendInTime": 0.1,
+                "blendOutTime": 0.2
+            }
+        ]
+    }
+
+}
