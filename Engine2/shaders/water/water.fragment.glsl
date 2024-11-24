@@ -190,7 +190,6 @@ void main()
 	float hcf = pow(smoothstep(0.475, 0.5, hd), 0.25);
 	outColor.rgb = mix(outColor.rgb, outColor.rgb *1.75, hcf * float(gridParams.x));
 
-
 	outColor.a = 1.0;
 
 

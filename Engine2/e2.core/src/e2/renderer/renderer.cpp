@@ -449,7 +449,7 @@ void e2::Renderer::recordShadows(double deltaTime, e2::ICommandBuffer* buff)
 
 	e2::ShadowPushConstantData shadowPushConstantData;
 	shadowPushConstantData.shadowViewProjection = m_rendererData.shadowProjection * m_rendererData.shadowView;
-
+	shadowPushConstantData.shadowTime = m_rendererData.time;
 
 	buff->useAsDepthAttachment(m_shadowBuffer.depthTexture);
 	buff->beginRender(m_shadowBuffer.renderTarget);
@@ -634,6 +634,7 @@ void e2::Renderer::recordRenderLayers(double deltaTime, e2::ICommandBuffer* buff
 			pushConstantData.normalMatrix = glm::transpose(glm::inverse(meshProxy->modelMatrix));
 			pushConstantData.resolution = m_resolution;
 			pushConstantData.gridParams = { m_drawGrid ? 1 : 0, 0 };
+			pushConstantData.player = m_playerPosition; // @todo gotta move this shit out
 			buff->pushConstants(pipelineLayout, 0, sizeof(e2::PushConstantData), reinterpret_cast<uint8_t*>(&pushConstantData));
 
 			// Bind vertex states
@@ -983,6 +984,11 @@ void e2::Renderer::setOutlineTextures(e2::ITexture* textures[2])
 void e2::Renderer::setDrawGrid(bool newDrawGrid)
 {
 	m_drawGrid = newDrawGrid;
+}
+
+void e2::Renderer::setPlayerPosition(glm::vec2 const& pos)
+{
+	m_playerPosition = pos;
 }
 
 void e2::Renderer::swapRenderBuffers()

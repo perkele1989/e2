@@ -72,15 +72,22 @@ void main()
 	vec4 worldVertex = mesh.modelMatrix * meshVertex;
 
 #if !defined(Renderer_Shadow)
+	vec4 time = renderer.time;
+#else 
+	vec4 time = shadowTime;
+#endif
+
 
 	float ss = sampleSimplex(worldRoot.xz * 0.5) * 0.5 + 0.5;
 
-	worldVertex.x += cos(renderer.time.x*1.3 + ss*20.0) * mix(0.065 * ss * 0.75, 0.0, smoothstep(-0.7, 0.0, worldVertex.y));
-	worldVertex.z += sin(renderer.time.x*0.7 + ss*40.0) * mix(0.073 * ss * 0.75, 0.0, smoothstep(-0.7, 0.0, worldVertex.y));
+	worldVertex.x += cos(time.x*1.3 + ss*20.0) * mix(0.065 * ss * 0.75, 0.0, smoothstep(-0.7, 0.0, worldVertex.y));
+	worldVertex.z += sin(time.x*0.7 + ss*40.0) * mix(0.073 * ss * 0.75, 0.0, smoothstep(-0.7, 0.0, worldVertex.y));
 
+
+#if !defined(Renderer_Shadow)
 	gl_Position = renderer.projectionMatrix * renderer.viewMatrix * worldVertex;
 #else 
-	gl_Position = shadowViewProjection * mesh.modelMatrix * meshVertex;
+	gl_Position = shadowViewProjection * worldVertex;
 #endif
 
 #if !defined(Renderer_Shadow)

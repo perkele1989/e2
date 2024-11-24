@@ -73,7 +73,7 @@ void main()
 	float m_a = mountain.a;
 	mountain.a = 1.0;
 
-	float h = sampleBaseHeight(position * 1.05);
+	float h = sampleBaseHeight(position );
 	//h = h3;
 	float m = 0.0;
 	float g = 0.0;

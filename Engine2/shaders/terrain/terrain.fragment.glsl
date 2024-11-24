@@ -77,9 +77,15 @@ void main()
 
 
 
-	float grassCoeff = sampleSimplex((fragmentPosition.xz + vec2(32.16, 64.32)) * 0.335);
-	grassCoeff = pow(smoothstep(0.4, 1.0, grassCoeff), 4.2);
-	greenCoeff = mix(greenCoeff, greenCoeff*0.2, grassCoeff);
+	float grassCoeff = sampleSimplex((fragmentPosition.xz + vec2(32.16, 64.32)) * 0.135);
+	grassCoeff = pow(smoothstep(0.0, 0.5, grassCoeff), 1.2);
+	grassCoeff = 1.0 - grassCoeff;
+
+	// outColor.rgb = vec3(grassCoeff);
+	// return;
+
+	greenCoeff = mix(greenCoeff, greenCoeff*0.1, grassCoeff);
+
 
 	float desertCoeff = clamp(1.0 - max(fragmentColor.g + (fragmentColor.b), 0.0), 0.0, 1.0);
 
@@ -94,6 +100,7 @@ void main()
     float waterLineCoeff = smoothstep(-0.1, 0.0, -fragmentPosition.y);
     float waterLineCoeff2 = pow(smoothstep(-0.1, 0.0, -fragmentPosition.y), 0.2);
 	//albedoSand = heightlerp(pow(albedoSand, vec3(1.6)), 0.5, pow(albedoSand, vec3(1.4)), smallSimplexS, waterLineCoeff);
+	//albedoSand = pow(albedoSand, mix(vec3(1.4), vec3(2.0), grassCoeff));
 	albedoSand = pow(albedoSand, vec3(1.4));
 
 	float mountainCoeff = smoothstep(0.0, mix(-0.35, -0.1,  1.0 - desertCoeff), fragmentPosition.y);
@@ -152,7 +159,7 @@ void main()
 	vec3 viewVector = getViewVector(fragmentPosition.xyz);
 
 	float roughness = mix(0.8, 0.3, 1.0 - waterLineCoeff);
-	//roughness = 0.1;
+	//roughness = 0.0;
 
 	float metalness = 0.0;//(1.0 - waterLineCoeff) * 0.1;
 

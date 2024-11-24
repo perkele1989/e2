@@ -71,7 +71,10 @@ namespace e2
 		virtual void unbind(e2::ICommandBuffer* buffer, uint8_t frameIndex, bool shadows) override;
 		virtual void invalidate(uint8_t frameIndex) override;
 
+		void setTexture(e2::Name name, e2::ITexture* texture);
+		void setFrameTexture(e2::Name name, uint8_t frameIndex, e2::ITexture* texture);
 
+		void setParameter(e2::Name name, glm::vec4 const& value);
 
 		e2::CustomModel* model{};
 
@@ -79,7 +82,7 @@ namespace e2
 		e2::Pair<e2::IDescriptorSet*> sets{ nullptr };
 
 		e2::StackVector<e2::DirtyParameter<glm::vec4>, e2::maxNumCustomParameters> parameters;
-		e2::StackVector<e2::DirtyParameter<e2::Texture2DPtr>, e2::maxNumCustomTextures> textures;
+		e2::StackVector<e2::DirtyPair<e2::ITexture*>, e2::maxNumCustomTextures> textures;
 
 	};
 
@@ -156,6 +159,7 @@ namespace e2
 
 
 		e2::StackVector<e2::Name, e2::maxNumCustomTextures> m_textureSlots;
+		/*e2::StackVector<e2::Texture2DPtr, e2::maxNumCustomTextures> m_defaultTextures;*/
 		e2::StackVector<e2::Name, e2::maxNumCustomParameters> m_parameterSlots;
 		e2::StackVector<glm::vec4, e2::maxNumCustomParameters> m_parameterDefaults;
 		e2::Pair<e2::IDataBuffer*> m_proxyUniformBuffers;

@@ -1,0 +1,29 @@
+
+{
+    "id": "house",
+    "specification": "e2::TurnbasedSpecification",
+    "entityType": "e2::TurnbasedEntity",
+
+    "displayName": "House",
+    "layerIndex": "structure",
+    "sightRange": 3,
+    "buildTurns": 4,
+    "upkeep": {
+        "gold": 0.0
+    },
+    "cost": {
+        "gold": 0.0
+    },
+
+
+    "collision": {
+        "radius": 0.05
+    },
+
+    "mesh": {
+
+        "meshScale": [1.0, 1.0, 1.0],
+        "mesh": "SM_House.e2a"
+    }
+
+}

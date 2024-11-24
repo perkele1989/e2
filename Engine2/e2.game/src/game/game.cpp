@@ -1149,7 +1149,10 @@ void e2::Game::update(double seconds)
 	renderer->whitepoint(glm::vec3(m_whitepoint));
 	renderer->exposure(m_exposure);
 
-	
+	if (m_playerState.entity)
+	{
+		renderer->setPlayerPosition(m_playerState.entity->planarCoords());
+	}
 
 	if (m_globalState == GlobalState::Boot)
 	{
@@ -1247,7 +1250,7 @@ void e2::Game::updateInGameMenu(double seconds)
 	//m_hexGrid->assertChunksWithinRangeVisible(m_viewOrigin, m_viewPoints, m_viewVelocity);
 	m_hexGrid->updateStreaming(m_viewOrigin, m_viewPoints, m_viewVelocity);
 	m_hexGrid->updateWorldBounds();
-	m_hexGrid->renderFogOfWar();
+	m_hexGrid->renderFogOfWar(); // actually renders minimap, cutmask for grass etc too!
 	e2::ITexture* outlineTextures[2] = { m_hexGrid->outlineTexture(0), m_hexGrid->outlineTexture(1) };
 	m_session->renderer()->setOutlineTextures(outlineTextures);
 
@@ -2065,6 +2068,7 @@ void e2::Game::updateRealtime()
 	if (m_playerState.entity)
 	{
 		m_targetViewOrigin = m_playerState.entity->planarCoords();
+		m_hexGrid->updateCutMask(m_playerState.entity->planarCoords());
 	}
 }
 
@@ -2097,14 +2101,12 @@ void e2::Game::updateTurnLocal()
 		{
 			// ugly line of code, no I wont fix it 
 			bool onLand = m_cursorTile ? m_cursorTile->getWater() == TileFlags::WaterNone : m_hexGrid->calculateTileData(m_cursorHex).getWater() == TileFlags::WaterNone;
-			bool unitSlotTaken = entityAtHex(e2::EntityLayerIndex::Unit, m_cursorHex) != nullptr;
+			bool unitSlotTaken = entityAtHex(e2::EntityLayerIndex::Structure, m_cursorHex) != nullptr;
 
 			if (!unitSlotTaken)
 			{
 				if (onLand)
-					spawnTurnbasedEntity("hive", m_cursorHex, m_nomadEmpireId);
-				else
-					spawnTurnbasedEntity("cb90", m_cursorHex, m_nomadEmpireId);
+					spawnTurnbasedEntity("house", m_cursorHex, m_localEmpireId);
 			}
 			return;
 		}
@@ -3649,9 +3651,9 @@ void e2::Game::updateMainCamera(double seconds)
 
 e2::RenderView e2::Game::calculateRenderView(glm::vec2 const &viewOrigin)
 {
-	float viewFov = glm::mix(45.0f, 35.0f, m_viewZoom);
+	float viewFov = glm::mix(25.0f, 35.0f, m_viewZoom);
 	float viewAngle =  glm::mix(40.0f, 55.0f, m_viewZoom);
-	float viewDistance = glm::mix(6.25f, 60.0f, m_viewZoom);
+	float viewDistance = glm::mix(10.0f, 60.0f, m_viewZoom);
 
 	glm::quat orientation = glm::rotate(glm::quat(1.0f, 0.0f, 0.0f, 0.0f), glm::radians(viewAngle), { 1.0f, 0.0f, 0.0f });
 

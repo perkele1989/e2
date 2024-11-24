@@ -7,7 +7,7 @@
     "supportsShadows": false,
     "textures": [
         {
-            "name": "albedoMap"
+            "name": "cutMask"
         }
     ],
     "parameters": [
@@ -22,6 +22,10 @@
         {
             "name": "rmxx",
             "defaultValue": [1.0, 0.0, 0.0, 0.0]
+        },
+        {
+            "name": "areaParams",
+            "defaultValue": [0.0, 0.0, 0.0, 0.0]
         }
     ]
 }

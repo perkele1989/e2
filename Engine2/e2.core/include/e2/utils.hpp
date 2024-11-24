@@ -115,6 +115,42 @@ namespace e2
 		e2::Pair<bool> m_dirty {true};
 	};
 
+
+
+	/**
+	 * Utility for manually doublebuffered parameters (perfect for source data for descriptor sets, where you need explicit control over frames)
+	 */
+	template<typename DataType>
+	class DirtyPair
+	{
+	public:
+
+		void set(DataType const& newData, uint8_t frameIndex)
+		{
+			m_data[frameIndex] = newData;
+			m_dirty[frameIndex] = true;
+		}
+
+		bool invalidate(uint8_t frameIndex)
+		{
+			bool dirty = m_dirty[frameIndex];
+			if (dirty)
+				m_dirty[frameIndex] = false;
+
+			return dirty;
+		}
+
+		DataType const& data(uint8_t frameIndex)
+		{
+			return m_data[frameIndex];
+		}
+
+	protected:
+		e2::Pair<DataType> m_data{};
+		e2::Pair<bool> m_dirty{ true };
+	};
+
+
 	struct E2_API UUID : public e2::Data
 	{
 		static UUID generate();
@@ -336,6 +372,16 @@ namespace e2
 		protected:
 			pointer m_ptr{};
 		};
+
+		uint64_t capacity()
+		{
+			return Capacity;
+		}
+
+		bool full()
+		{
+			return Capacity <= size();
+		}
 
 		StackVector()
 		{

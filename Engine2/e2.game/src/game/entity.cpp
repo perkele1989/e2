@@ -538,6 +538,8 @@ void e2::SwordHandler::onTrigger(e2::PlayerEntity* player, e2::Name actionName, 
 			}
 		}
 
+		player->game()->hexGrid()->grassCutMask().cut({ planarPosition + playerToMouse * 0.2f , 0.3f });
+
 	}
 }
 

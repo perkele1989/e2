@@ -52,6 +52,7 @@ void e2::LightweightModel::postConstruct(e2::Context* ctx)
 		{ e2::DescriptorBindingType::Texture, 1}, // normalTexture
 		{ e2::DescriptorBindingType::Texture, 1}, // roughnessTexture
 		{ e2::DescriptorBindingType::Texture, 1}, // metalnessTexture
+		{ e2::DescriptorBindingType::Texture, 1}, // emissiveTexture
 	};
 	m_descriptorSetLayout = renderContext()->createDescriptorSetLayout(setLayoutCreateInfo);
 
@@ -115,6 +116,11 @@ e2::MaterialProxy* e2::LightweightModel::createMaterialProxy(e2::Session* sessio
 	if(metalnessAsset)
 		newProxy->metalnessTexture.set(metalnessAsset->handle());
 
+	auto emissiveAsset = material->getTexture("emissive", nullptr);
+	if (emissiveAsset)
+		newProxy->emissiveTexture.set(emissiveAsset->handle());
+
+
 	for (uint8_t i = 0; i < 2; i++)
 	{
 		newProxy->sets[i] = m_descriptorPool->createDescriptorSet(m_descriptorSetLayout);
@@ -131,6 +137,9 @@ e2::MaterialProxy* e2::LightweightModel::createMaterialProxy(e2::Session* sessio
 
 		if (newProxy->metalnessTexture.data())
 			newProxy->sets[i]->writeTexture(4, newProxy->metalnessTexture.data());
+
+		if (newProxy->emissiveTexture.data())
+			newProxy->sets[i]->writeTexture(5, newProxy->emissiveTexture.data());
 	}
 
 	e2::LightweightData newData;
@@ -205,6 +214,9 @@ e2::IPipeline* e2::LightweightModel::getOrCreatePipeline(e2::MeshProxy* proxy, u
 	if (lwProxy->metalnessTexture.data())
 		materialFlags |= uint16_t(e2::LightweightFlags::MetalnessTexture);
 
+	if (lwProxy->emissiveTexture.data())
+		materialFlags |= uint16_t(e2::LightweightFlags::EmissiveTexture);
+
 	if (lwProxy->alphaClip)
 		materialFlags |= uint16_t(e2::LightweightFlags::AlphaClip);
 
@@ -248,6 +260,9 @@ e2::IPipeline* e2::LightweightModel::getOrCreatePipeline(e2::MeshProxy* proxy, u
 
 	if ((lwFlags & e2::LightweightFlags::MetalnessTexture) == e2::LightweightFlags::MetalnessTexture)
 		shaderInfo.defines.push({ "Material_MetalnessTexture", "1" });
+
+	if ((lwFlags & e2::LightweightFlags::EmissiveTexture) == e2::LightweightFlags::EmissiveTexture)
+		shaderInfo.defines.push({ "Material_EmissiveTexture", "1" });
 
 	if ((lwFlags & e2::LightweightFlags::NormalTexture) == e2::LightweightFlags::NormalTexture)
 		shaderInfo.defines.push({ "Material_NormalTexture", "1" });
@@ -386,5 +401,11 @@ void e2::LightweightProxy::invalidate(uint8_t frameIndex)
 		e2::ITexture* tex = metalnessTexture.data();
 		if (tex)
 			sets[frameIndex]->writeTexture(4, tex);
+	}
+	if (emissiveTexture.invalidate(frameIndex))
+	{
+		e2::ITexture* tex = emissiveTexture.data();
+		if (tex)
+			sets[frameIndex]->writeTexture(5, tex);
 	}
 }

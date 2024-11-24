@@ -15,6 +15,7 @@ layout(push_constant) uniform ConstantData
     mat4 normalMatrix;
     uvec2 resolution;
 	uvec2 gridParams;
+	vec2 playerPosition;
 };
 
 // Begin Set0: Renderer
@@ -56,6 +57,7 @@ layout(set = RendererSetIndex, binding = 12) uniform sampler shadowSampler;
 layout(push_constant) uniform ShadowConstantData
 {
     mat4 shadowViewProjection;
+	vec4 shadowTime;
 };
 // End Set0
 #endif
@@ -151,7 +153,7 @@ float calculateSunShadow(vec4 fragPosWS)
 	}
 	returner /= float(SHADOWSAMPLES);
 	
-	return returner;
+	return returner;// * 0.5 + 0.5;
 }
 
 float getSunDelta(vec3 fragPos, vec3 fragNormal)
@@ -218,6 +220,17 @@ float getCloudShadows(vec3 fragPosition)
 	float shadowCoeff = pow(shadowSimplex, 0.72);
 	shadowCoeff = smoothstep(0.4, 0.7, shadowCoeff) * 0.5 + 0.5;
 	return shadowCoeff;
+    //return 0.25 + shadowCoeff*0.75;
+}
+
+float getGrassCloudShadows(vec3 fragPosition)
+{
+	float shadowSimplex = (simplex((fragPosition.xz) - vec2(0.4, 0.6) * renderer.time.x * 0.241 ) * 0.5 + 0.5);
+	shadowSimplex = smoothstep(0.1,0.8, shadowSimplex);
+	return 0.5 + (1.0 - shadowSimplex)*0.5;
+	//float shadowCoeff = pow(shadowSimplex, 0.72);
+	//shadowCoeff = smoothstep(0.4, 0.7, shadowCoeff) * 0.5 + 0.5;
+	//return shadowCoeff;
     //return 0.25 + shadowCoeff*0.75;
 }
 #endif

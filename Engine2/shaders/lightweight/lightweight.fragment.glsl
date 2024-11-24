@@ -52,10 +52,8 @@ void main()
 #endif 
 	vec3 albedo = albedoTexel.rgb *  material.albedo.rgb;
 #else
-	vec3 albedo = pow(material.albedo.rgb, vec3(1.0));
+	vec3 albedo = material.albedo.rgb;
 #endif 
-
-	vec3 emissive = pow(material.emissive.rgb, vec3(1.0)) * material.emissive.a;
 
 #if defined(Vertex_Color)
 	//albedo.rgb *= pow(fragmentColor.rgb, vec3(2.2));
@@ -68,10 +66,21 @@ void main()
 	float roughness = material.rmxx.x;
 #endif 
 
+
+
 #if defined(Material_MetalnessTexture)
 	float metalness = texture(sampler2D(metalnessTexture, repeatSampler), uv).r;
 #else
 	float metalness = material.rmxx.y;
+#endif 
+
+
+#if defined(Material_EmissiveTexture)
+	albedo = mix(albedo, albedo * 0.5, 1.0 - metalness);
+	roughness = pow(roughness, 1.0/2.2);
+	vec3 emissive = texture(sampler2D(emissiveTexture, repeatSampler), uv).rgb * material.emissive.a;
+#else
+	vec3 emissive = pow(material.emissive.rgb, vec3(1.0)) * material.emissive.a;
 #endif 
 
 #if defined(Vertex_Normals)

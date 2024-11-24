@@ -34,11 +34,12 @@ namespace e2
 		RoughnessTexture = 1 << 8,
 		MetalnessTexture = 1 << 9,
 		NormalTexture = 1 << 10,
+		EmissiveTexture = 1 << 11,
 
-		AlphaClip = 1 << 11,
-		DoubleSided = 1 << 12,
+		AlphaClip = 1 << 12,
+		DoubleSided = 1 << 13,
 
-		Count = 1 << 13
+		Count = 1 << 14
 
 	};
 
@@ -91,6 +92,7 @@ namespace e2
 		e2::DirtyParameter<e2::ITexture*> normalTexture;
 		e2::DirtyParameter<e2::ITexture*> roughnessTexture;
 		e2::DirtyParameter<e2::ITexture*> metalnessTexture;
+		e2::DirtyParameter<e2::ITexture*> emissiveTexture;
 
 	};
 

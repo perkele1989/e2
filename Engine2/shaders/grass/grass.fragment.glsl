@@ -58,9 +58,8 @@ void main()
 
     albedo.rgb = vec3(0.231, 0.471, 0.02)*0.3;
 	albedo.rgb *= 0.5 + 0.5* (1.0 - smoothstep(-0.15, 0.0, fragmentPosition.y));
-	albedo = mix(vec3(dot(vec3(1.0/3.0), albedo)), albedo, 0.955);
-
-	albedo.rgb = shiftHue(albedo.rgb, ss*-0.12);
+	//albedo = mix(vec3(dot(vec3(1.0/3.0), albedo)), albedo, 0.955);
+	albedo.rgb = shiftHue(albedo.rgb, 0.042);
 	
 
 	vec3 emissive = pow(material.emissive.rgb, vec3(1.0)) * material.emissive.a;
@@ -76,7 +75,7 @@ void main()
 	float roughness = material.rmxx.x;
 #endif 
 
-    roughness = 0.25;
+    roughness = 0.1;
 
 #if defined(HasCustomTexture_metalnessMap)
 	float metalness = texture(sampler2D(customTexture_metalnessMap, repeatSampler), uv).r;
@@ -91,16 +90,27 @@ void main()
 	vec3 worldNormal = normalize(fragmentNormal);
 	vec3 viewVector= getViewVector(fragmentPosition.xyz);
 
-	outColor.rgb = vec3(0.0, 0.0, 0.0);
-	outColor.rgb += getIblColor(fragmentPosition.xyz, albedo, worldNormal, roughness, metalness, viewVector)*0.5;
-	outColor.rgb += getIblColor(fragmentPosition.xyz, albedo, -worldNormal, roughness, metalness, viewVector)*0.5;
-	outColor.rgb += getSunColor(fragmentPosition.xyz, worldNormal, albedo, roughness, metalness, viewVector) * getCloudShadows(fragmentPosition.xyz) * 0.5;
-	outColor.rgb += getSunColor(fragmentPosition.xyz, -worldNormal, albedo, roughness, metalness, viewVector) * getCloudShadows(fragmentPosition.xyz) * 0.5;
+	float cloudShadows =  getGrassCloudShadows(fragmentPosition.xyz);
 
+	outColor.rgb = vec3(0.0, 0.0, 0.0);
+
+	outColor.rgb += getIblColor(fragmentPosition.xyz, albedo, worldNormal, roughness, metalness, viewVector) * 0.5;
+	outColor.rgb += getIblColor(fragmentPosition.xyz, albedo, -worldNormal, roughness, metalness, viewVector) * 0.5;
+	outColor.rgb += getSunColor(fragmentPosition.xyz, worldNormal, albedo, roughness, metalness, viewVector) * cloudShadows * 0.5;
+	outColor.rgb += getSunColor(fragmentPosition.xyz, -worldNormal, albedo, roughness, metalness, viewVector) * cloudShadows * 0.5;
+
+
+	// outColor.rgb = vec3(cloudShadows);
+	// return;
 	// outColor.rgb = worldNormal * 0.5 + 0.5;
 	// return;
 	//outColor.rgb += albedo * getRimColor(worldNormal, viewVector, renderer.sun2.xyz * renderer.sun2.w * 8.0) ;
 
+
+
+	// float ss2 = sampleSimplex(fragmentPosition.xz * 10.5);
+	// outColor.rgb = vec3(ss2);
+	// return;
 
 	outColor.rgb += emissive;
 #else 

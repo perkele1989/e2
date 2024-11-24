@@ -36,6 +36,7 @@ namespace e2
 	struct E2_API ShadowPushConstantData
 	{
 		glm::mat4 shadowViewProjection;
+		glm::vec4 shadowTime;
 	};
 
 	struct E2_API PushConstantData
@@ -43,6 +44,7 @@ namespace e2
 		glm::mat4 normalMatrix;
 		glm::uvec2 resolution;
 		glm::uvec2 gridParams;
+		glm::vec2 player;
 	};
 
 	struct E2_API RendererData
@@ -256,10 +258,13 @@ layout(set = RendererSetIndex, binding = 0) uniform RendererData
 
 		void setDrawGrid(bool newDrawGrid);
 
+		void setPlayerPosition(glm::vec2 const& pos);
+
 	protected:
 		e2::Session* m_session{};
 
 		bool m_drawGrid{};
+		glm::vec2 m_playerPosition;
 
 		e2::RenderView m_view{};
 		e2::Viewpoints2D m_viewPoints{};

@@ -271,7 +271,8 @@ e2::MaterialProxy* e2::CustomModel::createMaterialProxy(e2::Session* session, e2
 		for (uint32_t i = 0; i < m_textureSlots.size(); i++)
 		{
 			newProxy->textures.push({});
-			newProxy->textures[newProxy->textures.size() - 1].set(defaultTexture);
+			newProxy->textures[newProxy->textures.size() - 1].set(defaultTexture->handle(), 0);
+			newProxy->textures[newProxy->textures.size() - 1].set(defaultTexture->handle(), 1);
 			newProxy->sets[0]->writeTexture(i + (requiresUniformBuffer ? 1 : 0), defaultTexture->handle());
 			newProxy->sets[1]->writeTexture(i + (requiresUniformBuffer ? 1 : 0), defaultTexture->handle());
 		}
@@ -283,7 +284,8 @@ e2::MaterialProxy* e2::CustomModel::createMaterialProxy(e2::Session* session, e2
 			if (slotId == -1)
 				continue;
 
-			newProxy->textures[slotId].set(texture);
+			newProxy->textures[slotId].set(texture->handle(), 0);
+			newProxy->textures[slotId].set(texture->handle(), 1);
 			newProxy->sets[0]->writeTexture(slotId + (requiresUniformBuffer ? 1 : 0), texture->handle());
 			newProxy->sets[1]->writeTexture(slotId + (requiresUniformBuffer ? 1 : 0), texture->handle());
 		}
@@ -394,10 +396,7 @@ e2::IPipeline* e2::CustomModel::getOrCreatePipeline(e2::MeshProxy* proxy, uint8_
 	for (uint32_t i = 0; i < m_textureSlots.size(); i++)
 	{
 		e2::Name textureName = m_textureSlots[i];
-		if (lwProxy->textures[i].data() != nullptr)
-		{
-			shaderInfo.defines.push({ std::format("HasCustomTexture_{}", textureName), "1" });
-		}
+		shaderInfo.defines.push({ std::format("HasCustomTexture_{}", textureName), "1" });
 	}
 
 	shaderInfo.stage = ShaderStage::Vertex;
@@ -589,9 +588,46 @@ void e2::CustomProxy::invalidate(uint8_t frameIndex)
 	{
 		if (textures[i].invalidate(frameIndex))
 		{
-			e2::Texture2DPtr texture = textures[i].data();
+			e2::ITexture *texture = textures[i].data(frameIndex);
 			if (texture)
-				sets[frameIndex]->writeTexture(i + (requiresUniformBuffer ? 1 : 0), texture->handle());
+				sets[frameIndex]->writeTexture(i + (requiresUniformBuffer ? 1 : 0), texture);
 		}
 	}
+}
+
+void e2::CustomProxy::setTexture(e2::Name name, e2::ITexture* texture)
+{
+	int32_t slotIndex = model->getTextureSlot(name);
+	if (slotIndex < 0)
+	{
+		LogWarning("No such texture slot in custom model: {}", name);
+		return;
+	}
+
+	textures[slotIndex].set(texture, 0);
+	textures[slotIndex].set(texture, 1);
+}
+
+
+void e2::CustomProxy::setFrameTexture(e2::Name name, uint8_t frameIndex, e2::ITexture* texture)
+{
+	int32_t slotIndex = model->getTextureSlot(name);
+	if (slotIndex < 0)
+	{
+		LogWarning("No such texture slot in custom model: {}", name);
+		return;
+	}
+
+	textures[slotIndex].set(texture, frameIndex);
+}
+
+void e2::CustomProxy::setParameter(e2::Name name, glm::vec4 const& value)
+{
+	int32_t slotIndex = model->getParameterSlot(name);
+	if (slotIndex < 0)
+	{
+		LogWarning("No such parameter slot in custom model: {}", name);
+		return;
+	}
+	parameters[slotIndex].set(value);
 }

@@ -47,8 +47,8 @@ void main()
 
 #if defined(Vertex_Color) 
 	fragmentColor = vertexColor;
-	//float tundraCoeff = fragmentColor.b;
-	//worldPosition.y -= tundraCoeff * 0.05f;
+	// float tundraCoeff = fragmentColor.b;
+	// worldPosition.y -= tundraCoeff * 0.05f;
 #endif
 
 

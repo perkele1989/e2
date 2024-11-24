@@ -138,6 +138,7 @@ void e2::HexGrid::prescribeAssets(e2::Context* ctx, e2::ALJDescription& desc)
 
 e2::HexGrid::HexGrid(e2::GameContext* gameCtx)
 	: m_game(gameCtx->game())
+	, m_cutMask(gameCtx, 1280, 10.0f)
 {
 	constexpr size_t prewarmSize = 16'384;
 	m_tiles.reserve(prewarmSize);
@@ -176,7 +177,7 @@ e2::HexGrid::HexGrid(e2::GameContext* gameCtx)
 	m_treeMaterial = am->get("M_Tree.e2a")->cast<e2::Material>();
 	m_treeMaterialProxy = gameSession()->getOrCreateDefaultMaterialProxy(m_treeMaterial);
 
-	m_grassMaterial = am->get("M_Grass.e2a")->cast<e2::Material>();
+	//m_grassMaterial = am->get("M_Grass.e2a")->cast<e2::Material>();
 
 	e2::MeshProxyConfiguration meshCfg = {
 		.lods = {
@@ -336,13 +337,20 @@ e2::HexGrid::HexGrid(e2::GameContext* gameCtx)
 
 
 
+	m_grassMaterial = e2::MaterialPtr::create();
+	m_grassMaterial->postConstruct(game(), {});
+	m_grassMaterial->overrideModel(rm->getShaderModel("grass"));
+	m_grassProxy = session->getOrCreateDefaultMaterialProxy(m_grassMaterial)->unsafeCast<e2::CustomProxy>();
+	m_grassProxy->setFrameTexture("cutMask", 0, m_cutMask.getTexture(0));
+	m_grassProxy->setFrameTexture("cutMask", 1, m_cutMask.getTexture(0));
+	m_grassProxy->setParameter("areaParams", { (float)m_cutMask.getResolution(), m_cutMask.getAreaSize(), m_cutMask.getCenter() });
 
 
 	m_grassLeafMesh = e2::DynamicMesh();
 	e2::Vertex protovert;
 	protovert.normal = -e2::worldForwardf();
 	constexpr float leafHeight = 0.185f;
-	constexpr float leafWidthBase = 0.025f;
+	constexpr float leafWidthBase = 0.045f; // 0.025f
 	constexpr int32_t leafSegments = 3;
 	for (int32_t i = 0; i < leafSegments; i++)
 	{
@@ -427,6 +435,8 @@ e2::HexGrid::~HexGrid()
 {
 	clearAllChunks();
 	destroyFogOfWar();
+
+	m_grassProxy->setTexture("cutMask", nullptr);
 }
 
 
@@ -1200,9 +1210,46 @@ void e2::HexGrid::nukeChunk(e2::ChunkState* chunk)
 }
 
 
+namespace
+{
+
+	glm::vec3 my_permute(glm::vec3 x)
+	{
+		return glm::mod(((x * 34.0f) + 1.0f) * x, 289.0f);
+	}
+
+	float my_simplex(glm::vec2 v) {
+		const glm::vec4 C = glm::vec4(0.211324865405187f, 0.366025403784439f, -0.577350269189626f, 0.024390243902439f);
+		glm::vec2 i = floor(v + glm::dot(v, glm::vec2{C.y, C.y}));
+		glm::vec2 x0 = v - i + glm::dot(i, glm::vec2{C.x, C.x});
+		glm::vec2 i1;
+		i1 = (x0.x > x0.y) ? glm::vec2(1.0f, 0.0f) : glm::vec2(0.0f, 1.0f);
+		glm::vec4 x12 = glm::vec4{ x0.x,  x0.y, x0.x, x0.y } + glm::vec4{C.x, C.x, C.z, C.z};
+		x12.x -= i1.x;
+		x12.y -= i1.y;
+		i = glm::mod(i, 289.0f);
+		glm::vec3 p = my_permute(my_permute(i.y + glm::vec3(0.0f, i1.y, 1.0f))
+			+ i.x + glm::vec3(0.0f, i1.x, 1.0f));
+		glm::vec3 m = glm::max(0.5f - glm::vec3(dot(x0, x0), glm::dot(glm::vec2{ x12.x, x12.y}, glm::vec2{ x12.x, x12.y }),
+			glm::dot(glm::vec2{ x12.z, x12.w } , glm::vec2{ x12.z, x12.w })), 0.0f);
+		m = m * m;
+		m = m * m;
+		glm::vec3 x = 2.0f * glm::fract(p * glm::vec3(C.w, C.w, C.w)) - 1.0f;
+		glm::vec3 h = glm::abs(x) - 0.5f;
+		glm::vec3 ox = floor(x + 0.5f);
+		glm::vec3 a0 = x - ox;
+		m *= 1.79284291400159f - 0.85373472095314f * (a0 * a0 + h * h);
+		glm::vec3 g;
+		g.x = a0.x * x0.x + h.x * x0.y;
+		g.y = a0.y * x12.x + h.y * x12.y;
+		g.z = a0.z * x12.z + h.z * x12.w;
+		return 130.0f * glm::dot(m, g);
+	}
+}
+
 float e2::HexGrid::sampleSimplex(glm::vec2 const& position)
 {
-	return glm::simplex(position) * 0.5f + 0.5f;
+	return ::my_simplex(position) * 0.5f + 0.5f;
 }
 
 void e2::HexGrid::calculateBiome(glm::vec2 const& planarCoords, e2::TileFlags& outFlags)
@@ -1292,16 +1339,22 @@ void e2::HexGrid::calculateFeaturesAndWater(glm::vec2 const& planarCoords, float
 
 		if (baseHeight > 0.6f)
 		{
-			float forestCoeff = sampleSimplex((planarCoords + glm::vec2(32.14f, 29.28f)) * 7.5f);
 
-			if (forestCoeff > 0.6f && (baseHeight <= 0.90f) && ((outFlags & TileFlags::BiomeMask) != TileFlags::BiomeDesert))
+			float forestCoeff = sampleSimplex((planarCoords + glm::vec2(32.16f, 64.32f)) * 0.135f);
+			forestCoeff = glm::pow(glm::smoothstep(0.5f, 1.0f, forestCoeff), 1.0);
+			//forestCoeff = 1.0 - forestCoeff;
+
+			//float forestCoeff = sampleSimplex((planarCoords + glm::vec2(32.16f, 64.32f)) * 0.135f);
+			//forestCoeff = glm::pow(glm::smoothstep(0.0f, 0.5f, forestCoeff), 1.2f);
+
+			if (forestCoeff > 0.05f && (baseHeight <= 0.90f) && ((outFlags & TileFlags::BiomeMask) != TileFlags::BiomeDesert))
 				outFlags |= TileFlags::FeatureForest;
 
-			if (forestCoeff > 0.950f)
+			if (forestCoeff > 0.95f)
 				outFlags |= TileFlags::WoodAbundance4;
-			else if (forestCoeff > 0.90f)
+			else if (forestCoeff > 0.750f)
 				outFlags |= TileFlags::WoodAbundance3;
-			else if (forestCoeff > 0.80f)
+			else if (forestCoeff > 0.5f)
 				outFlags |= TileFlags::WoodAbundance2;
 			else
 				outFlags |= TileFlags::WoodAbundance1;
@@ -1478,6 +1531,12 @@ e2::UnpackedForestState* e2::HexGrid::unpackForestState(glm::ivec2 const& hex)
 }
 
 
+void e2::HexGrid::updateCutMask(glm::vec2 const& newCenter)
+{
+	m_cutMask.setCenter(newCenter);
+	m_grassProxy->setParameter("areaParams", { (float)m_cutMask.getResolution(), m_cutMask.getAreaSize(), m_cutMask.getCenter() });
+}
+
 void e2::HexGrid::updateUnpackedForests()
 {
 	static std::vector<glm::ivec2> removeList;
@@ -1542,7 +1601,7 @@ void e2::HexGrid::updateUnpackedForests()
 					{
 						float shakeDelta = glm::clamp(t.shake / 0.4f, 0.0f, 1.0f);
 						glm::vec2 shakeDirection = e2::randomOnUnitCircle();
-						shakeRotation = glm::rotate(glm::identity<glm::mat4>(), glm::radians(3.0f * shakeDelta), glm::vec3(shakeDirection.x, 0.0f, shakeDirection.y));
+						shakeRotation = glm::rotate(glm::identity<glm::mat4>(), glm::radians(4.0f * shakeDelta), glm::vec3(shakeDirection.x, 0.0f, shakeDirection.y));
 						t.shake -= game()->timeDelta();
 					}
 
@@ -1571,7 +1630,7 @@ void e2::HexGrid::updateUnpackedForests()
 
 					float shakeDelta = glm::clamp(t.shake / 0.4f, 0.0f, 1.0f);
 					glm::vec2 shakeDirection = e2::randomOnUnitCircle();
-					glm::mat4 shakeRotation = glm::rotate(glm::identity<glm::mat4>(), glm::radians(3.0f * shakeDelta), glm::vec3(shakeDirection.x, 0.0f, shakeDirection.y));
+					glm::mat4 shakeRotation = glm::rotate(glm::identity<glm::mat4>(), glm::radians(4.0f * shakeDelta), glm::vec3(shakeDirection.x, 0.0f, shakeDirection.y));
 
 					t.mesh->modelMatrix = treeTranslation * shakeRotation * treeRotation * treeRotationFix * treeScale;
 					t.mesh->modelMatrixDirty = true;
@@ -1677,7 +1736,7 @@ e2::TileData e2::HexGrid::calculateTileData(glm::ivec2 const& hex)
 {
 	TileData newTileData;
 
-	glm::vec2 planarCoords = e2::Hex(hex).planarCoords() * 1.05f;
+	glm::vec2 planarCoords = e2::Hex(hex).planarCoords();// *1.05f;
 	float baseHeight = calculateBaseHeight(planarCoords);
 	calculateBiome(planarCoords, newTileData.flags);
 	calculateFeaturesAndWater(planarCoords, baseHeight, newTileData.flags);
@@ -2673,6 +2732,8 @@ void e2::HexGrid::renderFogOfWar()
 	buff->useAsDefault(frameData.minimapTexture);
 
 
+	// hotwire this comma nd buffer to record our cutmask, because we are sneaky like that 
+	m_cutMask.recordFrame(buff, frameIndex);
 
 
 	buff->endRecord();
@@ -3560,3 +3621,227 @@ float e2::TileData::getWoodAbundanceAsFloat()
 	return 0.0f;
 }
 
+
+
+
+e2::GrassCutMask::GrassCutMask(e2::GameContext* ctx, uint32_t resolution, float areaSize)
+	: m_game(ctx->game())
+	, m_resolution(resolution)
+	, m_areaSize(areaSize)
+{
+	e2::TextureCreateInfo cutMaskInfo{};
+	cutMaskInfo.resolution.x = resolution;
+	cutMaskInfo.resolution.y = resolution;
+	m_textures[0] = renderContext()->createTexture(cutMaskInfo);
+	m_textures[1] = renderContext()->createTexture(cutMaskInfo);
+
+	e2::RenderTargetCreateInfo cutTargetInfo{};
+	cutTargetInfo.areaExtent = { resolution, resolution };
+
+	cutTargetInfo.colorAttachments.push({ m_textures[0], e2::ClearMethod::ColorFloat, e2::LoadOperation::Clear, e2::StoreOperation::Store, glm::vec4(1.0f, 1.0f, 1.0f, 1.0f) });
+	m_targets[0] = renderContext()->createRenderTarget(cutTargetInfo);
+
+	cutTargetInfo.colorAttachments.clear();
+	cutTargetInfo.colorAttachments.push({ m_textures[1], e2::ClearMethod::ColorFloat, e2::LoadOperation::Clear, e2::StoreOperation::Store, glm::vec4(1.0f, 1.0f, 1.0f, 1.0f) });
+	m_targets[1] = renderContext()->createRenderTarget(cutTargetInfo);
+
+	e2::DescriptorSetLayoutCreateInfo setLayoutInfo{};
+	setLayoutInfo.bindings.push({
+		e2::DescriptorBindingType::Sampler,
+		1,
+		false,
+		true
+	});
+	setLayoutInfo.bindings.push({
+		e2::DescriptorBindingType::Texture,
+		1,
+		false,
+		true
+	});
+
+	m_shiftSetLayout = renderContext()->createDescriptorSetLayout(setLayoutInfo);
+
+	e2::DescriptorPoolCreateInfo poolInfo{};
+	poolInfo.allowUpdateAfterBind = true;
+	poolInfo.maxSets = 2 * e2::maxNumSessions;
+	poolInfo.numTextures = 2 * e2::maxNumSessions;
+	poolInfo.numSamplers = 2 * e2::maxNumSessions;
+	m_shiftPool = renderContext()->mainThreadContext()->createDescriptorPool(poolInfo);
+
+	m_shiftSets[0] = m_shiftPool->createDescriptorSet(m_shiftSetLayout);
+	m_shiftSets[0]->writeSampler(0, renderManager()->clampSampler());
+	m_shiftSets[0]->writeTexture(1, m_textures[1]);
+
+	m_shiftSets[1] = m_shiftPool->createDescriptorSet(m_shiftSetLayout);
+	m_shiftSets[1]->writeSampler(0, renderManager()->clampSampler());
+	m_shiftSets[1]->writeTexture(1, m_textures[0]);
+
+	e2::PipelineLayoutCreateInfo shiftLayoutInfo{};
+	shiftLayoutInfo.pushConstantSize = sizeof(e2::GrassCutMaskShiftConstants);
+	shiftLayoutInfo.sets.push(m_shiftSetLayout);
+	m_shiftPipelineLayout = renderContext()->createPipelineLayout(shiftLayoutInfo);
+
+	std::string shaderSource;
+	e2::ShaderCreateInfo shaderInfo{};
+
+	shaderSource.clear();
+	if (!e2::readFileWithIncludes("./shaders/grasscutmask/shift.vertex.glsl", shaderSource))
+	{
+		LogError("grasscutmask shader issue");
+	}
+	shaderInfo.stage = ShaderStage::Vertex;
+	shaderInfo.source = shaderSource.c_str();
+	m_shiftVertexShader = renderContext()->createShader(shaderInfo);
+
+	shaderSource.clear();
+	if (!e2::readFileWithIncludes("./shaders/grasscutmask/shift.fragment.glsl", shaderSource))
+	{
+		LogError("grasscutmask shader issue");
+	}
+	shaderInfo.stage = ShaderStage::Fragment;
+	shaderInfo.source = shaderSource.c_str();
+	m_shiftFragmentShader = renderContext()->createShader(shaderInfo);
+
+	e2::PipelineCreateInfo pipelineInfo;
+	pipelineInfo.alphaBlending = false;
+	pipelineInfo.colorFormats.push(e2::TextureFormat::RGBA8);
+	pipelineInfo.layout = m_shiftPipelineLayout;
+	pipelineInfo.shaders.push(m_shiftVertexShader);
+	pipelineInfo.shaders.push(m_shiftFragmentShader);
+	m_shiftPipeline = renderContext()->createPipeline(pipelineInfo);
+	pipelineInfo.shaders.clear();
+	pipelineInfo.colorFormats.clear();
+
+	// ADD pipeline
+	shaderSource.clear();
+	if (!e2::readFileWithIncludes("./shaders/grasscutmask/add.vertex.glsl", shaderSource))
+	{
+		LogError("grasscutmask shader issue");
+	}
+	shaderInfo.stage = ShaderStage::Vertex;
+	shaderInfo.source = shaderSource.c_str();
+	m_addVertexShader = renderContext()->createShader(shaderInfo);
+
+	shaderSource.clear();
+	if (!e2::readFileWithIncludes("./shaders/grasscutmask/add.fragment.glsl", shaderSource))
+	{
+		LogError("grasscutmask shader issue");
+	}
+	shaderInfo.stage = ShaderStage::Fragment;
+	shaderInfo.source = shaderSource.c_str();
+	m_addFragmentShader = renderContext()->createShader(shaderInfo);
+
+
+
+	e2::PipelineLayoutCreateInfo addLayoutInfo{};
+	addLayoutInfo.pushConstantSize = sizeof(e2::GrassCutMaskAddConstants);
+	m_addPipelineLayout = renderContext()->createPipelineLayout(addLayoutInfo);
+
+
+	pipelineInfo.alphaBlending = true;
+	pipelineInfo.colorFormats.push(e2::TextureFormat::RGBA8);
+	pipelineInfo.layout = m_addPipelineLayout;
+	pipelineInfo.shaders.push(m_addVertexShader);
+	pipelineInfo.shaders.push(m_addFragmentShader);
+	m_addPipeline = renderContext()->createPipeline(pipelineInfo);
+	pipelineInfo.shaders.clear();
+	pipelineInfo.colorFormats.clear();
+}
+
+e2::GrassCutMask::~GrassCutMask()
+{
+	e2::discard(m_addPipeline);
+	e2::discard(m_addFragmentShader);
+	e2::discard(m_addVertexShader);
+	e2::discard(m_addPipelineLayout);
+	e2::discard(m_shiftPipeline);
+	e2::discard(m_shiftFragmentShader);
+	e2::discard(m_shiftVertexShader);
+	e2::discard(m_shiftSets[0]);
+	e2::discard(m_shiftSets[1]);
+	e2::discard(m_shiftPipelineLayout);
+	e2::discard(m_shiftPool);
+	e2::discard(m_shiftSetLayout);
+	e2::discard(m_textures[0]);
+	e2::discard(m_textures[1]);
+	e2::discard(m_targets[0]);
+	e2::discard(m_targets[1]);
+}
+
+void e2::GrassCutMask::recordFrame(e2::ICommandBuffer* buffer, uint8_t frameIndex)
+{
+	buffer->useAsAttachment(m_textures[frameIndex]);
+	buffer->beginRender(m_targets[frameIndex]);
+
+	{
+		GrassCutMaskShiftConstants shiftConstants;
+		shiftConstants.resolution = glm::vec2((float)m_resolution);
+		shiftConstants.areaSize = glm::vec2(m_areaSize);
+		shiftConstants.moveOffset = m_center - m_lastCenter;
+		
+		buffer->bindPipeline(m_shiftPipeline);
+		buffer->bindDescriptorSet(m_shiftPipelineLayout, 0, m_shiftSets[frameIndex]);
+		buffer->bindVertexLayout(uiManager()->quadVertexLayout);
+		buffer->bindIndexBuffer(uiManager()->quadIndexBuffer);
+		buffer->bindVertexBuffer(0, uiManager()->quadVertexBuffer);
+		buffer->pushConstants(m_shiftPipelineLayout, 0, sizeof(e2::GrassCutMaskShiftConstants), reinterpret_cast<uint8_t*>(&shiftConstants));
+		buffer->draw(6, 1);
+	}
+
+	{
+		GrassCutMaskAddConstants addConstants;
+		
+		for (e2::GrassCut const& cut : m_cuts)
+		{
+			addConstants.resolution = glm::vec2((float)m_resolution);
+			addConstants.areaSize = glm::vec2(m_areaSize);
+			addConstants.center = m_center;
+			addConstants.position = cut.position;
+			addConstants.radius = cut.radius;
+
+			buffer->bindPipeline(m_addPipeline);
+			buffer->bindVertexLayout(uiManager()->quadVertexLayout);
+			buffer->bindIndexBuffer(uiManager()->quadIndexBuffer);
+			buffer->bindVertexBuffer(0, uiManager()->quadVertexBuffer);
+			buffer->pushConstants(m_addPipelineLayout, 0, sizeof(e2::GrassCutMaskAddConstants), reinterpret_cast<uint8_t*>(&addConstants));
+			buffer->draw(6, 1);
+		}
+
+		m_cuts.clear();
+	}
+
+	buffer->endRender();
+	buffer->useAsDefault(m_textures[frameIndex]);
+
+	m_lastCenter = m_center;
+}
+
+e2::Engine* e2::GrassCutMask::engine()
+{
+	return m_game->engine();
+}
+
+e2::Game* e2::GrassCutMask::game()
+{
+	return m_game;
+}
+
+void e2::GrassCutMask::setCenter(glm::vec2 const& worldPlanarCoords)
+{
+	m_center = worldPlanarCoords;
+}
+
+void e2::GrassCutMask::cut(GrassCut const& cut)
+{
+	if (m_cuts.full())
+	{
+		return;
+	}
+
+	m_cuts.push(cut);
+}
+
+e2::ITexture* e2::GrassCutMask::getTexture(uint8_t frameIndex)
+{
+	return m_textures[frameIndex];
+}

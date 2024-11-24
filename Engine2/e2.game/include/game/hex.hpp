@@ -9,6 +9,7 @@
 #include <e2/dmesh/dmesh.hpp>
 #include <e2/renderer/shadermodels/water.hpp>
 #include <e2/renderer/shadermodels/terrain.hpp>
+#include <e2/renderer/shadermodels/custom.hpp>
 #include <e2/renderer/shadermodels/fog.hpp> 
 
 #include <e2/assets/sound.hpp>
@@ -334,6 +335,94 @@ namespace e2
 	constexpr float waterLine = 0.025f;
 
 
+	struct GrassCutMaskShiftConstants
+	{
+		glm::vec2 resolution;
+		glm::vec2 areaSize;
+		glm::vec2 moveOffset;
+
+	};
+
+
+	struct GrassCutMaskAddConstants
+	{
+		glm::vec2 resolution;
+		glm::vec2 areaSize;
+		glm::vec2 center;
+		glm::vec2 position;
+		float radius;
+	};
+
+	struct GrassCut
+	{
+		glm::vec2 position;
+		float radius;
+	};
+
+	constexpr uint64_t maxNumCuts = 16;
+
+	class GrassCutMask : public e2::GameContext, public e2::Context
+	{
+	public:
+		GrassCutMask(e2::GameContext* ctx, uint32_t resolution, float areaSize);
+		virtual ~GrassCutMask();
+
+		void recordFrame(e2::ICommandBuffer *buffer, uint8_t frameIndex);
+
+		virtual e2::Engine* engine() override;
+		virtual e2::Game* game() override;
+
+		void setCenter(glm::vec2 const& worldPlanarCoords);
+
+		void cut(GrassCut const& cut);
+
+		e2::ITexture* getTexture(uint8_t frameIndex);
+
+		inline float getAreaSize()
+		{
+			return m_areaSize;
+		}
+
+		inline uint32_t getResolution()
+		{
+			return m_resolution;
+		}
+
+		inline glm::vec2 const& getCenter()
+		{
+			return m_center;
+		}
+
+	protected:
+
+		e2::Game* m_game{};
+
+		float m_areaSize;
+		uint32_t m_resolution;
+
+		glm::vec2 m_lastCenter;
+		glm::vec2 m_center;
+
+		e2::ITexture* m_textures[2];
+		e2::IRenderTarget* m_targets[2];
+
+		// shift stuff (for moving the view)
+		e2::IDescriptorPool* m_shiftPool{};
+		e2::IDescriptorSetLayout* m_shiftSetLayout{};
+		e2::IDescriptorSet* m_shiftSets[2];
+		e2::IShader* m_shiftVertexShader{};
+		e2::IShader* m_shiftFragmentShader{};
+		e2::IPipelineLayout* m_shiftPipelineLayout{};
+		e2::IPipeline* m_shiftPipeline{};
+
+		// add stuff (for adding cuts)
+		e2::IShader* m_addVertexShader{};
+		e2::IShader* m_addFragmentShader{};
+		e2::IPipelineLayout* m_addPipelineLayout{};
+		e2::IPipeline* m_addPipeline{};
+		
+		e2::StackVector<GrassCut, e2::maxNumCuts> m_cuts;
+	};
 
 
 	/** 
@@ -560,6 +649,17 @@ namespace e2
 
 		e2::Game* m_game{};
 
+		GrassCutMask m_cutMask;
+
+	public:
+		inline GrassCutMask& grassCutMask()
+		{
+			return m_cutMask;
+		}
+
+		void updateCutMask(glm::vec2 const& newCenter);
+	protected:
+
 		//
 		// list of discovered tiles 
 		std::vector<TileData> m_tiles;
@@ -580,6 +680,12 @@ namespace e2
 		e2::MaterialProxy* m_treeMaterialProxy;
 
 		e2::MaterialPtr m_grassMaterial;
+		e2::CustomProxy* m_grassProxy{};
+
+
+
+
+
 		e2::DynamicMesh m_grassLeafMesh;
 		e2::MeshPtr m_grassMeshes[4];
 		e2::DynamicMesh m_dynamicGrassMeshes[4];

@@ -62,7 +62,7 @@ void main()
 
 
 	albedo.rgb *= 0.55;
-	albedo.rgb = shiftHue(albedo.rgb, mix(-0.45, -0.2, 1.0-ss));
+	albedo.rgb = shiftHue(albedo.rgb, mix(-0.45, -0.2, 1.0-ss)*1.5);
 	albedo = mix(vec3(dot(vec3(1.0/3.0), albedo)), albedo, 0.925);
 	//albedo = pow(albedo, vec3(mix(1.0, 1.13, smoothstep(-0.7, 0.0, fragmentPosition.y))));
 	albedo.rgb *= 0.5 + 0.5* (1.0 - smoothstep(-0.15, 0.0, fragmentPosition.y));
@@ -82,7 +82,7 @@ void main()
 	float roughness = material.rmxx.x;
 #endif 
 
-roughness = 1.0;
+roughness = 0.75;
 
 #if defined(HasCustomTexture_metalnessMap)
 	float metalness = texture(sampler2D(customTexture_metalnessMap, repeatSampler), uv).r;
@@ -107,6 +107,7 @@ roughness = 1.0;
 
 	outColor.rgb = vec3(0.0, 0.0, 0.0);
 	outColor.rgb += getIblColor(fragmentPosition.xyz, albedo, worldNormal, roughness, metalness, viewVector);
+	//outColor.rgb += getIblColor(fragmentPosition.xyz, albedo, -worldNormal, roughness, metalness, viewVector)*0.15;
 	outColor.rgb += getSunColor(fragmentPosition.xyz, worldNormal, albedo, roughness, metalness, viewVector) * getCloudShadows(fragmentPosition.xyz);
 
 

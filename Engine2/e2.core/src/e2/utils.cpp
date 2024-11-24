@@ -228,8 +228,10 @@ glm::vec3 e2::randomVec3(glm::vec3 min, glm::vec3 max)
 
 glm::vec2 e2::randomOnUnitCircle()
 {
-	glm::vec2 fwd{ 1.0f, 0.0f};
-	return glm::rotate(fwd, glm::radians(e2::randomFloat(0.0f, 359.9999f)));
+	//glm::vec2 fwd{ 1.0f, 0.0f};
+	//return glm::rotate(fwd, glm::radians(e2::randomFloat(0.0f, 359.9999f)));
+	float theta = e2::randomFloat(0.0f, 1.0f) * 2.0f * glm::pi<float>();
+	return { glm::cos(theta), glm::sin(theta) };
 }
 
 glm::vec2 e2::randomInUnitCircle()

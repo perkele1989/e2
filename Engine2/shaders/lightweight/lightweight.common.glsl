@@ -14,6 +14,7 @@ layout(set = MaterialSetIndex, binding = 1) uniform texture2D albedoTexture;
 layout(set = MaterialSetIndex, binding = 2) uniform texture2D normalTexture;
 layout(set = MaterialSetIndex, binding = 3) uniform texture2D roughnessTexture;
 layout(set = MaterialSetIndex, binding = 4) uniform texture2D metalnessTexture;
+layout(set = MaterialSetIndex, binding = 5) uniform texture2D emissiveTexture;
 #endif
 
 //layout(set = 2, binding = 12) uniform texture2D visibilityMask;

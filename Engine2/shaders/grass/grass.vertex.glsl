@@ -63,13 +63,38 @@ void main()
 #if !defined(Renderer_Shadow)
 	rootPosition = worldRoot;
 #endif
-	// float baseHeight = sampleSimplex((planarCoords + glm::vec2(32.16f, 64.32f)) * 0.0135f);
-	float grassCoeff = sampleSimplex((worldRoot.xz + vec2(32.16, 64.32)) * 0.335);
-	grassCoeff = pow(smoothstep(0.45, 0.76, grassCoeff), 4.2);
-	grassCoeff = 1.0 - grassCoeff;
-	grassCoeff *= 0.85 + sampleSimplex((worldRoot.xz) * 0.8) * 0.15;
 
+	vec2 areaResolution = material.areaParams.xx;
+	vec2 areaSize = material.areaParams.yy;
+	vec2 areaCenter = material.areaParams.zw;
+	vec2 areaTopLeft = areaCenter - (areaSize * 0.5);
+	vec2 areaUv = (worldRoot.xz - areaTopLeft) / areaSize; 
+
+	float areaHeight = 1.0;
+	if(areaUv.x >= 0.0 && areaUv.x <= 1.0 && areaUv.y >= 0.0 && areaUv.y <= 1.0)
+	{
+		areaHeight = texture(sampler2D(customTexture_cutMask, clampSampler), areaUv).r;
+	}
+	
+	//areaHeight = 0.3 + areaHeight * 0.7;
+
+	
+
+
+	// float grassCoeff = sampleSimplex((worldRoot.xz + vec2(32.16, 64.32)) * 0.335);
+	// grassCoeff = pow(smoothstep(0.45, 0.76, grassCoeff), 4.2);
+	// grassCoeff = 1.0 - grassCoeff;
+
+	float grassCoeff = sampleSimplex((worldRoot.xz + vec2(32.16, 64.32)) * 0.135);
+	grassCoeff = pow(smoothstep(0.35, 0.40, grassCoeff), 4.2);
+
+	meshVertex.x = mix(meshRoot.x, meshVertex.x, 0.85);
+	meshVertex.y = mix(meshRoot.y, meshVertex.y, 0.85);
 	meshVertex.xyz = mix(meshRoot.xyz, meshVertex.xyz, grassCoeff);
+
+
+	meshVertex.xyz = mix(meshRoot.xyz, meshVertex.xyz, areaHeight *0.5 + 0.5);
+	meshVertex.y *= areaHeight*0.5 + 0.5;
 
 #if !defined(Renderer_Shadow)
 	vec4 animatedVertexNormal = vec4(vertexNormal.xyz, 0.0);
@@ -81,18 +106,36 @@ void main()
 	
 
 #if !defined(Renderer_Shadow)
-    
+	vec4 time = renderer.time;
+#else 
+	vec4 time = shadowTime;
+#endif
+
 	float ss = sampleSimplex(worldRoot.xz * 0.5) * 0.5 + 0.5;
 
-	worldVertex.x += cos(renderer.time.x*1.3 + ss*20.0) * mix(0.065 * ss * 0.45, 0.0, smoothstep(-0.185, 0.0, worldVertex.y));
-	worldVertex.z += sin(renderer.time.x*0.7 + ss*40.0) * mix(0.073 * ss * 0.45, 0.0, smoothstep(-0.185, 0.0, worldVertex.y));
+	float heightCoeff = smoothstep(-0.185, 0.0, worldVertex.y);
+
+	worldVertex.x += cos(time.x*1.3 + ss*20.0) * mix(0.065 * ss * 0.45, 0.0, heightCoeff);
+	worldVertex.z += sin(time.x*0.7 + ss*40.0) * mix(0.073 * ss * 0.45, 0.0, heightCoeff);
+
+#if !defined(Renderer_Shadow)
+	vec2 ltp = playerPosition - worldRoot.xz;
+	float ltpDistance = length(ltp);
+	ltp = normalize(ltp);
+
+	float ss2 = sampleSimplex(worldRoot.xz * 10.5) * 0.75 + 0.25;
+
+	float heightCoeff2 = smoothstep(0.05, 0.1, -worldVertex.y);
+	float ltpCoeff = mix(0.0, 0.0755, 1.0 - clamp(ltpDistance*3.0, 0.0, 1.0));
+	worldVertex.xz += -ltp * ltpCoeff * heightCoeff2 * ss2;
+
+	float ltpCoeff2 = 1.0 - clamp(ltpDistance*8.0, 0.0, 1.0);
+	worldVertex.y = mix(worldVertex.y, worldVertex.y*0.5, ltpCoeff2 * heightCoeff2);
 
 	gl_Position = renderer.projectionMatrix * renderer.viewMatrix * worldVertex;
 
-
-	
 #else 
-	gl_Position = shadowViewProjection * mesh.modelMatrix * meshVertex;
+	gl_Position = shadowViewProjection * worldVertex;
 #endif
 
 #if !defined(Renderer_Shadow)
