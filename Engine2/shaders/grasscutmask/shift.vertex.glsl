@@ -8,6 +8,7 @@ layout(push_constant) uniform ConstantData
     vec2 resolution;
     vec2 areaSize;
     vec2 moveOffset;
+    float timeDelta;
 };
 
 layout(set = 0, binding = 0) uniform sampler areaSampler;

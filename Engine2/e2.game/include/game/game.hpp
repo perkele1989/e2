@@ -13,6 +13,9 @@
 #include "game/mob.hpp"
 #include "game/empire.hpp"
 #include "game/shared.hpp"
+#include "game/playerstate.hpp"
+#include "game/script.hpp"
+#include "game/radionmanager.hpp"
 
 #include <chaiscript/chaiscript.hpp>
 
@@ -128,33 +131,7 @@ namespace e2
 	class TurnbasedEntity;
 	class PlayerEntity;
 
-	struct InventorySlot
-	{
-		e2::ItemSpecification* item{};
-		uint32_t count;
-	};
 
-
-	struct PlayerState
-	{
-
-		PlayerState(e2::Game* g);
-
-		bool give(e2::Name itemIdentifier);
-		void drop(uint32_t slotIndex, uint32_t num);
-		void setActiveSlot(uint8_t newSlot);
-
-		void update(double seconds);
-
-		void renderInventory(double seconds);
-
-		e2::Game* game{};
-		e2::PlayerEntity* entity{};
-
-		uint32_t activeSlot{}; // 0-7
-		std::array<InventorySlot, 32> inventory; // 8x4, first row is ready to use 
-		
-	};
 
 	class Game : public e2::Application, public e2::GameContext
 	{
@@ -310,6 +287,9 @@ namespace e2
 		// which empire has current turn
 		//EmpireId m_empireTurn{};
 
+		e2::ScriptGraph* m_currentGraph{};
+		e2::ScriptExecutionContext* m_scriptExecutionContext{};
+
 		TurnState m_turnState{ TurnState::Unlocked };
 		TurnState m_moveTurnStateFallback{ TurnState::Unlocked };
 
@@ -444,7 +424,8 @@ namespace e2
 		void endTargeting();
 		void updateTarget();
 
-		e2::Entity* spawnEntity(e2::Name entityId, glm::vec3 const& worldPosition);
+		e2::Entity* spawnEntity(e2::Name entityId, glm::vec3 const& worldPosition, glm::quat const& worldRotation = glm::identity<glm::quat>());
+		e2::Entity* spawnCustomEntity(e2::Name specificationId, e2::Name entityType, glm::vec3 const& worldPosition, glm::quat const& worldRotation = glm::identity<glm::quat>());
 		void destroyEntity(e2::Entity* entity);
 		void queueDestroyEntity(e2::Entity* entity);
 
@@ -590,7 +571,16 @@ namespace e2
 
 		std::unordered_map<e2::Name, e2::ItemSpecification*> m_itemSpecifications;
 
+		void initializeScriptGraphs();
+
+
+		std::unordered_map<e2::Name, e2::ScriptGraph*> m_scriptGraphs;
+
 	public:
+
+		bool scriptRunning();
+
+		void runScriptGraph(e2::Name id);
 
 		e2::ItemSpecification* getItemSpecification(e2::Name name);
 		e2::EntitySpecification* getEntitySpecification(e2::Name name);
@@ -602,6 +592,13 @@ namespace e2
 
 	protected:
 		std::unordered_map<glm::ivec2, std::unordered_set<e2::CollisionComponent*>> m_collisionComponents;
+
+
+		e2::RadionManager m_radionManager;
+
+	public:
+		e2::RadionManager* radionManager();
+
 
 	};
 	

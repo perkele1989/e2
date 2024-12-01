@@ -189,6 +189,8 @@ namespace e2
 
 	E2_API float radiansBetween(glm::vec3 const& a, glm::vec3 const & b);;
 
+	E2_API float radiansBetween(glm::vec2 const& a, glm::vec2 const& b);;
+
 	E2_API size_t hash(e2::UUID const& id);
 
 	template <class T>
@@ -199,7 +201,8 @@ namespace e2
 	}
 
 	E2_API bool nearlyEqual(float x, float y, float tresh);
-	E2_API bool intersect(glm::vec2 p, glm::vec2 boxOffset, glm::vec2 boxSize);
+	E2_API bool intersect(glm::vec2 const& p, glm::vec2 const& boxOffset, glm::vec2 const& boxSize);
+	E2_API bool boxIntersect(glm::vec2 const& centerA, float radiusA, glm::vec2 const& centerB, float radiusB);
 
 	E2_API bool randomBool();
 	E2_API int64_t randomInt(int64_t min, int64_t max);

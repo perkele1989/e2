@@ -96,6 +96,15 @@ namespace e2
 		Triangle
 	};
 
+	enum class ComponentMask : uint8_t
+	{
+		R = 0b0000'0001,
+		G = 0b0000'0010,
+		B = 0b0000'0100,
+		A = 0b0000'1000,
+		RGBA = 0b0000'1111,
+	};
+
 	struct E2_API PipelineCreateInfo
 	{
 		IPipelineLayout* layout{};
@@ -105,6 +114,7 @@ namespace e2
 		PrimitiveTopology topology{ PrimitiveTopology::Triangle };
 
 		e2::StackVector<e2::TextureFormat, e2::maxNumRenderAttachments> colorFormats;
+		e2::StackVector<e2::ComponentMask, e2::maxNumRenderAttachments> componentMasks;
 		e2::TextureFormat depthFormat { e2::TextureFormat::Undefined }; // target is null if unused
 		e2::TextureFormat stencilFormat { e2::TextureFormat::Undefined }; // target is null if unused
 
@@ -118,6 +128,8 @@ namespace e2
 		IPipeline(e2::IRenderContext* renderContext, PipelineCreateInfo const& createInfo);
 		virtual ~IPipeline();
 	};
+
+	EnumFlagsDeclaration(e2::ComponentMask);
 }
 
 #include "pipeline.generated.hpp"

@@ -187,6 +187,7 @@ void main()
 
 	// debug norm
 	//outColor.rgb = clamp(vec3(finalNormal.x, finalNormal.z, -finalNormal.y) * 0.5 + 0.5, vec3(0.0), vec3(1.0));
+	//return;
 
 	vec4 h = getHex(fragmentPosition.xz);
 	float hd = hex(h.xy);

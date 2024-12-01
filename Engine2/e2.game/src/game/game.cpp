@@ -5,6 +5,7 @@
 
 #include "game/entities/turnbasedentity.hpp"
 #include "game/entities/player.hpp"
+#include "game/entities/itementity.hpp"
 
 #include "e2/e2.hpp"
 #include "e2/managers/rendermanager.hpp"
@@ -46,6 +47,7 @@ namespace
 
 e2::Game::Game(e2::Context* ctx)
 	: e2::Application(ctx)
+	, m_radionManager(this)
 	, m_playerState(this)
 {
 	m_empires.resize(e2::maxNumEmpires);
@@ -286,7 +288,7 @@ void e2::Game::setupGame()
 	e2::SoundPtr menuMusic= assetManager()->get("M_Menu.e2a").cast<e2::Sound>();
 	audioManager()->playMusic(menuMusic, 0.8f, true, &m_menuMusic);
 
-	m_startViewOrigin = glm::vec2(1313.72f, -24.57f);
+	m_startViewOrigin = glm::vec2(-1662.75f, 650.27f);
 	m_viewOrigin = m_startViewOrigin;
 	m_targetViewOrigin = m_viewOrigin;
 	m_viewZoom = 0.3f;
@@ -1106,6 +1108,8 @@ void e2::Game::initialize()
 	am->prescribeALJ(alj, "M_Menu.e2a");
 	am->prescribeALJ(alj, "M_Ambient_Ocean.e2a");
 
+	initializeScriptGraphs();
+
 	m_bootTicket = am->queueALJ(alj);
 	
 	m_session->window()->showCursor(false);
@@ -1130,6 +1134,11 @@ void e2::Game::shutdown()
 	m_uiIconsSheet2 = nullptr;
 	m_uiUnitsSheet = nullptr;
 
+	for (auto& [id, graph] : m_scriptGraphs)
+	{
+		e2::destroy(graph);
+	}
+	m_scriptGraphs.clear();
 }
 
 void e2::Game::update(double seconds)
@@ -1468,11 +1477,30 @@ void e2::Game::updateGame(double seconds)
 	// ticking session renders renderer too, and blits it to the UI, so we need to do it precisely here (after rendering fog of war and before rendering UI)
 	m_session->tick(seconds);
 
-	//ui->drawTexturedQuad({}, resolution, 0xFFFFFFFF, m_hexGrid->outlineTexture(renderManager()->frameIndex()));
+
+	if (m_currentGraph)
+	{
+		m_scriptExecutionContext->update(seconds);
+		if (m_scriptExecutionContext->isDone())
+		{
+			e2::destroy(m_scriptExecutionContext);
+			m_scriptExecutionContext = nullptr;
+			m_currentGraph = nullptr;
+		}
+	}
+
+
+	//e2::ITexture *tex = hexGrid()->grassCutMask().getTexture(renderManager()->frameIndex());
+
+	//ui->drawTexturedQuad({ 48.0, 48.0 }, {256, 256}, 0xFFFFFFFF, tex);
 
 	if(!kb.state(Key::C))
 		drawUI();
 
+	if (kb.pressed(Key::L))
+	{
+		runScriptGraph("test");
+	}
 }
 
 void e2::Game::updateMenu(double seconds)
@@ -1705,6 +1733,24 @@ void e2::Game::updateMenu(double seconds)
 		m_playerState.entity = player->cast<e2::PlayerEntity>();
 		m_playerState.give("ironhatchet");
 		m_playerState.give("ironsword");
+		m_playerState.give("radion_ionizer");
+		m_radionManager.discoverEntity("radion_powersource");
+		m_radionManager.discoverEntity("radion_wirepost");
+		m_radionManager.discoverEntity("radion_capacitor");
+		m_radionManager.discoverEntity("radion_switch");
+		m_radionManager.discoverEntity("radion_crystal");
+		m_radionManager.discoverEntity("radion_gateAND");
+		m_radionManager.discoverEntity("radion_gateNAND");
+		m_radionManager.discoverEntity("radion_gateNOR");
+		m_radionManager.discoverEntity("radion_gateNOT");
+		m_radionManager.discoverEntity("radion_gateOR");
+		m_radionManager.discoverEntity("radion_gateXNOR");
+		m_radionManager.discoverEntity("radion_gateXOR");
+
+		for (uint32_t i = 0; i < 100; i++)
+		{
+			m_playerState.give("radion_cube");
+		}
 
 		//spawnCity(m_localEmpireId, m_startLocation);
 
@@ -2047,7 +2093,7 @@ void e2::Game::updateRealtime()
 	auto& leftMouse = mouse.buttons[uint8_t(e2::MouseButton::Left)];
 	auto& rightMouse = mouse.buttons[uint8_t(e2::MouseButton::Right)];
 
-	if (kb.pressed(e2::Key::Tab))
+	if (kb.pressed(e2::Key::Tab) && !scriptRunning())
 	{
 		m_targetViewZoom = 1.0f;
 		m_turnState = e2::TurnState::Unlocked;
@@ -2059,21 +2105,30 @@ void e2::Game::updateRealtime()
 	std::unordered_set<e2::Entity*> ents = m_realtimeEntities;
 	for (e2::Entity* entity : ents)
 	{
-		entity->update(game()->timeDelta());
+		entity->update(m_timeDelta);
 	}
 
-
-	m_playerState.update(game()->timeDelta());
+	m_playerState.update(m_timeDelta);
 
 	if (m_playerState.entity)
 	{
 		m_targetViewOrigin = m_playerState.entity->planarCoords();
 		m_hexGrid->updateCutMask(m_playerState.entity->planarCoords());
 	}
+
+	if (!scriptRunning())
+	{
+		m_radionManager.update(m_timeDelta);
+	}
 }
 
 void e2::Game::updateTurnLocal()
 {
+	if (scriptRunning())
+	{
+		return;
+	}
+
 	constexpr float moveSpeed = 10.0f;
 	constexpr float viewSpeed = .3f;
 
@@ -2086,6 +2141,7 @@ void e2::Game::updateTurnLocal()
 	auto& leftMouse = mouse.buttons[uint8_t(e2::MouseButton::Left)];
 	auto& rightMouse = mouse.buttons[uint8_t(e2::MouseButton::Right)];
 
+	
 	if (kb.pressed(e2::Key::Tab) && m_turnState == e2::TurnState::Unlocked)
 	{
 		m_targetViewZoom = 0.0f;
@@ -2115,15 +2171,17 @@ void e2::Game::updateTurnLocal()
 		{
 			// ugly line of code, no I wont fix it 
 			bool onLand = m_cursorTile ? m_cursorTile->getWater() == TileFlags::WaterNone : m_hexGrid->calculateTileData(m_cursorHex).getWater() == TileFlags::WaterNone;
-			bool unitSlotTaken = entityAtHex(e2::EntityLayerIndex::Unit, m_cursorHex) != nullptr;
-
-			if (!unitSlotTaken)
+			
+			if (m_playerState.entity)
 			{
-				if (onLand)
-					spawnTurnbasedEntity("nimble", m_cursorHex, m_localEmpireId);
-				else
-					spawnTurnbasedEntity("cb90", m_cursorHex, m_nomadEmpireId);
+				e2::Transform* playerTransform = m_playerState.entity->getTransform();
+				glm::vec3 oldPosition = playerTransform->getTranslation(e2::TransformSpace::World);
+				glm::vec3 newPosition{ m_cursorPlane.x, oldPosition.y, m_cursorPlane.y };
+
+				playerTransform->setTranslation(newPosition, e2::TransformSpace::World);
+				m_playerState.entity->getMesh()->applyTransform();
 			}
+
 			return;
 		}
 
@@ -2414,6 +2472,11 @@ void e2::Game::updateTarget()
 	auto& mouse = ui->mouseState();
 	auto& leftMouse = mouse.buttons[uint16_t(e2::MouseButton::Left)];
 
+	if (scriptRunning())
+	{
+		return;
+	}
+
 	if (!m_selectedEntity)
 		return;
 
@@ -2485,7 +2548,7 @@ e2::TurnbasedEntity* e2::Game::spawnTurnbasedEntity(e2::Name entityId, glm::ivec
 	return turnbasedEntity;
 }
 
-e2::Entity* e2::Game::spawnEntity(e2::Name entityId, glm::vec3 const& worldPosition)
+e2::Entity* e2::Game::spawnEntity(e2::Name entityId, glm::vec3 const& worldPosition, glm::quat const& worldRotation)
 {
 	auto finder = m_entitySpecifications.find(entityId);
 	if (finder == m_entitySpecifications.end())
@@ -2512,7 +2575,54 @@ e2::Entity* e2::Game::spawnEntity(e2::Name entityId, glm::vec3 const& worldPosit
 	}
 
 	// post construct since we created it dynamically
-	asEntity->postConstruct(this, spec, worldPosition);
+	asEntity->postConstruct(this, spec, worldPosition, worldRotation);
+
+	// insert into global entity set 
+	m_entities.insert(asEntity);
+
+	e2::TurnbasedSpecification* turnbasedSpecification = dynamic_cast<e2::TurnbasedSpecification*>(spec);
+	if (!turnbasedSpecification)
+	{
+		m_realtimeEntities.insert(asEntity);
+	}
+
+	return asEntity;
+}
+
+e2::Entity* e2::Game::spawnCustomEntity(e2::Name specificationId, e2::Name entityTypeName, glm::vec3 const& worldPosition, glm::quat const& worldRotation)
+{
+	auto finder = m_entitySpecifications.find(specificationId);
+	if (finder == m_entitySpecifications.end())
+	{
+		LogError("no entity with id {}, returning null", specificationId.cstring());
+		return nullptr;
+	}
+	e2::EntitySpecification* spec = finder->second;
+
+	e2::Type* entityType = e2::Type::fromName(entityTypeName);
+	if (!entityType)
+	{
+		LogError("invalid entity typename");
+		return nullptr;
+	}
+
+	e2::Object* newEntity = entityType->create();
+	if (!newEntity)
+	{
+		LogError("failed to create instance of type {} for entity with id {}", entityType->fqn.cstring(), specificationId.cstring());
+		return nullptr;
+	}
+
+	e2::Entity* asEntity = newEntity->cast<e2::Entity>();
+	if (!asEntity)
+	{
+		e2::destroy(newEntity);
+		LogError("entity specification couldnt spawn entity instance, make sure entity type inherits e2::Entity and isnt pure virtual/abstract");
+		return nullptr;
+	}
+
+	// post construct since we created it dynamically
+	asEntity->postConstruct(this, spec, worldPosition, worldRotation);
 
 	// insert into global entity set 
 	m_entities.insert(asEntity);
@@ -3957,6 +4067,59 @@ e2::ItemSpecification* e2::Game::getItemSpecification(e2::Name name)
 	return finder->second;
 }
 
+void e2::Game::initializeScriptGraphs()
+{
+
+	for (const std::filesystem::directory_entry& entry : std::filesystem::recursive_directory_iterator("data/scripts/"))
+	{
+		if (!entry.is_regular_file())
+			continue;
+		if (entry.path().extension() != ".json")
+			continue;
+
+		e2::ScriptGraph* newGraph = e2::create<e2::ScriptGraph>(this, entry.path().string());
+		if (newGraph->valid())
+		{
+			LogError("Loaded script graph {} from {}", newGraph->id(), entry.path().string());
+			m_scriptGraphs[newGraph->id()] = newGraph;
+		}
+		else
+		{
+			LogError("Invalid script graph: {}", entry.path().string());
+			e2::destroy(newGraph);
+		}
+	}
+}
+
+void e2::Game::runScriptGraph(e2::Name id)
+{
+	if (m_currentGraph)
+	{
+		LogError("Can't run script graph, one is already running!");
+		return;
+	}
+
+	auto finder = m_scriptGraphs.find(id);
+	if (finder == m_scriptGraphs.end())
+	{
+		LogError("No such graph: {}", id);
+		return;
+	}
+
+	m_currentGraph = finder->second;
+	m_scriptExecutionContext = e2::create<e2::ScriptExecutionContext>(m_currentGraph);
+}
+
+bool e2::Game::scriptRunning()
+{
+	return m_currentGraph != nullptr;
+}
+
+e2::RadionManager* e2::Game::radionManager()
+{
+	return &m_radionManager;
+}
+
 e2::EntitySpecification* e2::Game::getEntitySpecification(e2::Name name)
 {
 	auto finder = m_entitySpecifications.find(name);
@@ -4704,244 +4867,4 @@ e2::HitLabel::HitLabel(glm::vec3 const& worldOffset, std::string const& inText) 
 	active = true;
 	timeCreated = e2::timeNow();
 	velocity = glm::vec3{ 50.0f, -200.0f, 50.0f } * 0.02f;
-}
-
-e2::PlayerState::PlayerState(e2::Game* g)
-	: game(g)
-{
-}
-
-bool e2::PlayerState::give(e2::Name itemIdentifier)
-{
-	e2::ItemSpecification* item = game->getItemSpecification(itemIdentifier);
-	if (!item)
-		return false;
-
-	if (item->stackable)
-	{
-		for (uint32_t i = 0; i < inventory.size(); i++)
-		{
-			e2::InventorySlot& slot = inventory[i];
-			if (slot.item == item && slot.count < item->stackSize)
-			{
-
-				if (i == activeSlot && slot.item->wieldable && slot.item->wieldHandler && slot.count == 0 && entity)
-				{
-					slot.item->wieldHandler->setActive(entity);
-				}
-
-				slot.count++;
-
-				entity->playSound("S_Item_Pickup.e2a", 1.0, 1.0);
-
-				return true;
-			}
-		}
-	}
-	for (uint32_t i = 0; i < inventory.size(); i++)
-	{
-		e2::InventorySlot& slot = inventory[i];
-		if (slot.item == nullptr || slot.count == 0)
-		{
-			slot.item = item;
-			slot.count = 1;
-
-			if (i == activeSlot && slot.item->wieldable && slot.item->wieldHandler && entity)
-			{
-				slot.item->wieldHandler->setActive(entity);
-			}
-
-			entity->playSound("S_Item_Pickup.e2a", 1.0, 1.0);
-
-			return true;
-		}
-	}
-
-	return false;
-}
-
-void e2::PlayerState::drop(uint32_t slotIndex, uint32_t num)
-{
-	e2::InventorySlot& slot = inventory[slotIndex];
-	if (!slot.item || slot.count == 0)
-		return;
-
-	num = glm::clamp(num, (uint32_t)1, slot.count);
-	slot.count -= num;
-	
-	if (slotIndex == activeSlot && slot.item->wieldable && slot.item->wieldHandler && slot.count == 0 && entity)
-	{
-		slot.item->wieldHandler->setInactive(entity);
-	}
-
-	if (entity && num > 0)
-	{
-		for(uint32_t i = 0; i < num; i++)
-			game->spawnEntity(slot.item->id, entity->getTransform()->getTranslation(e2::TransformSpace::World));
-
-		entity->playSound("S_Item_Drop.e2a", 1.0, 1.0);
-	}
-
-	if (slot.count == 0)
-	{
-		slot.item = nullptr;
-	}
-}
-
-void e2::PlayerState::setActiveSlot(uint8_t newSlotIndex)
-{
-	e2::InventorySlot& slot = inventory[activeSlot];
-	if (slot.item)
-	{
-		if (slot.item->wieldable && slot.item->wieldHandler)
-		{
-			slot.item->wieldHandler->setInactive(entity);
-		}
-	}
-
-	activeSlot = newSlotIndex;
-	e2::InventorySlot& newSlot = inventory[activeSlot];
-	if (newSlot.item)
-	{
-		if (newSlot.item->wieldable && newSlot.item->wieldHandler)
-		{
-			newSlot.item->wieldHandler->setActive(entity);
-		}
-	}
-
-
-}
-
-void e2::PlayerState::update(double seconds)
-{
-	e2::GameSession* session = game->gameSession();
-	e2::UIContext* ui = session->uiContext();
-	e2::UIKeyboardState &kb = ui->keyboardState();
-
-	if (entity)
-	{
-		if (!entity->getMesh()->isAnyActionPlaying())
-		{
-			if (kb.pressed(e2::Key::Num1))
-			{
-				setActiveSlot(0);
-			}
-			if (kb.pressed(e2::Key::Num2))
-			{
-				setActiveSlot(1);
-			}
-			if (kb.pressed(e2::Key::Num3))
-			{
-				setActiveSlot(2);
-			}
-			if (kb.pressed(e2::Key::Num4))
-			{
-				setActiveSlot(3);
-			}
-			if (kb.pressed(e2::Key::Num5))
-			{
-				setActiveSlot(4);
-			}
-			if (kb.pressed(e2::Key::Num6))
-			{
-				setActiveSlot(5);
-			}
-			if (kb.pressed(e2::Key::Num7))
-			{
-				setActiveSlot(6);
-			}
-			if (kb.pressed(e2::Key::Num8))
-			{
-				setActiveSlot(7);
-			}
-
-			if (kb.pressed(e2::Key::G))
-			{
-				drop(activeSlot, 1);
-			}
-			if (kb.pressed(e2::Key::Q))
-			{
-				give("ironhatchet");
-			}
-			if (kb.pressed(e2::Key::E))
-			{
-				give("arrow");
-			}
-		}
-
-
-		glm::vec2 inputVector{};
-		if (kb.state(e2::Key::A))
-		{
-			inputVector.x -= 1.0f;
-		}
-		if (kb.state(e2::Key::D))
-		{
-			inputVector.x += 1.0f;
-		}
-		if (kb.state(e2::Key::W))
-		{
-			inputVector.y -= 1.0f;
-		}
-		if (kb.state(e2::Key::S))
-		{
-			inputVector.y += 1.0f;
-		}
-
-		entity->setInputVector(inputVector);
-	}
-
-	if (!entity->isCaptain())
-	{
-		e2::InventorySlot& slot = inventory[activeSlot];
-		if (slot.item)
-		{
-			if (slot.item->wieldable && slot.item->wieldHandler)
-			{
-				slot.item->wieldHandler->onUpdate(entity, seconds);
-			}
-		}
-	}
-
-}
-
-void e2::PlayerState::renderInventory(double seconds)
-{
-	e2::GameSession* session = entity->gameSession();
-	e2::UIContext* ui = session->uiContext();
-
-	e2::IWindow* wnd =  session->window();
-	e2::Renderer* renderer = session->renderer();
-
-	glm::vec2 res = wnd->size();
-	glm::vec2 iconSize { 48.0f, 48.0f };
-	float iconPadding{ 8.0f };
-	glm::vec2 cursor{res.x / 2.0f -  (iconSize.x * 4.f) - (iconPadding*4.5f), res.y - iconSize.y - iconPadding};
-
-	for (uint32_t i = 0; i < 8; i++)
-	{
-		ui->drawGamePanel(cursor, iconSize, i == activeSlot, inventory[i].item ?  1.0f : 0.25f);
-
-
-		if (inventory[i].item)
-		{
-			float textWidth = ui->calculateTextWidth(e2::FontFace::Sans, 9, inventory[i].item->displayName);
-			ui->drawRasterText(e2::FontFace::Sans, 9, e2::UIColor(0xFFFFFFFF), cursor + glm::vec2(iconSize.x/2.0f -textWidth / 2.0f, iconSize.y/2.0f), inventory[i].item->displayName);
-
-			if (inventory[i].count > 1)
-			{
-				float numWidth = ui->calculateTextWidth(e2::FontFace::Sans, 9, std::format("{}", inventory[i].count));
-				ui->drawRasterText(e2::FontFace::Sans, 9, e2::UIColor(0xFFFFFFFF), cursor + glm::vec2(iconSize.x / 2.0f - textWidth / 2.0f, iconSize.y / 2.0f + 14.0f), std::format("{}", inventory[i].count));
-			}
-		}
-		else
-		{
-			float textWidth = ui->calculateTextWidth(e2::FontFace::Sans, 9, "empty");
-			ui->drawRasterText(e2::FontFace::Sans, 9, e2::UIColor(0xFFFFFFFF), cursor + glm::vec2(iconSize.x / 2.0f - textWidth / 2.0f, iconSize.y / 2.0f), "empty");
-		}
-
-		cursor.x += iconSize.x + iconPadding;
-
-	}
-
 }

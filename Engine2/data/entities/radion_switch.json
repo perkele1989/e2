@@ -1,0 +1,27 @@
+
+{
+    "id": "radion_switch",
+    "specification": "e2::RadionEntitySpecification",
+    "entityType": "e2::RadionSwitch",
+    "radionCost": 10,
+    "pins": [
+        {
+            "name": "Input",
+            "offset": [-0.25, -0.25, 0.0]
+        },
+        {
+            "name": "Output",
+            "offset": [0.25, -0.25, 0.0]
+        }
+    ],
+
+    "collision": {
+        "radius": 0.1
+    },
+    "mesh": {
+
+        "meshScale": [0.3, 0.3, 0.3],
+        "mesh": "SM_Bomb.e2a"
+    }
+
+}

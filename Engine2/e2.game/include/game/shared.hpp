@@ -118,7 +118,7 @@ namespace e2
 
 	constexpr uint64_t numSaveSlots = 8;
 
-	constexpr uint64_t maxNumHitLabels = 16;
+	constexpr uint64_t maxNumHitLabels = 128; 
 	struct HitLabel
 	{
 		HitLabel() = default;

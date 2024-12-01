@@ -104,6 +104,9 @@ e2::MaterialProxy* e2::WaterModel::createMaterialProxy(e2::Session* session, e2:
 	newData.albedo = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
 	newProxy->uniformData.set(newData);
 
+
+	newProxy->reflectionHdr.set(m_cubemap->handle());
+
 	return newProxy;
 }
 

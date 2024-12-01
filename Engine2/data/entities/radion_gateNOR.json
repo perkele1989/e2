@@ -1,0 +1,35 @@
+
+{
+    "id": "radion_gateNOR",
+    "specification": "e2::RadionEntitySpecification",
+    "entityType": "e2::RadionGateNOR",
+    "radionCost": 15,
+    "pins": [
+        {
+            "name": "InputA",
+            "offset": [-0.25, -0.25, -0.25]
+        },
+        {
+            "name": "Power",
+            "offset": [-0.25, -0.25, 0.0]
+        },
+        {
+            "name": "InputB",
+            "offset": [-0.25, -0.25, 0.25]
+        },
+        {
+            "name": "Output",
+            "offset": [0.25, -0.25, 0.0]
+        }
+    ],
+
+    "collision": {
+        "radius": 0.1
+    },
+    "mesh": {
+
+        "meshScale": [0.3, 0.3, 0.3],
+        "mesh": "SM_Bomb.e2a"
+    }
+
+}

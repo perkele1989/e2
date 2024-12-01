@@ -26,138 +26,6 @@ namespace e2
 
 	class PlayerEntity;
 
-	class WieldHandler : public e2::Object
-	{
-		ObjectDeclaration();
-	public:
-		WieldHandler() = default;
-		virtual ~WieldHandler();
-
-		virtual void populate(e2::GameContext* ctx, nlohmann::json& obj, std::unordered_set<e2::Name>&deps) = 0;
-		virtual void finalize(e2::GameContext* ctx) = 0;
-
-		virtual void setActive(e2::PlayerEntity* player) = 0;
-		virtual void setInactive(e2::PlayerEntity* player) = 0;
-
-		virtual void onUpdate(e2::PlayerEntity* player, double seconds) = 0;
-		virtual void onTrigger(e2::PlayerEntity* player, e2::Name actionName, e2::Name triggerName) = 0;
-		
-		e2::ItemSpecification* item{};
-	}; 
-
-	/** @tags(dynamic) */
-	class HatchetHandler : public e2::WieldHandler
-	{
-		ObjectDeclaration();
-	public:
-
-		HatchetHandler() = default;
-		virtual ~HatchetHandler(); 
-
-		virtual void populate(e2::GameContext* ctx, nlohmann::json& obj, std::unordered_set<e2::Name>& deps) override;
-		virtual void finalize(e2::GameContext* ctx) override;
-
-		virtual void setActive(e2::PlayerEntity* player) override;
-		virtual void setInactive(e2::PlayerEntity* player) override;
-
-		virtual void onUpdate(e2::PlayerEntity* player, double seconds) override;
-		virtual void onTrigger(e2::PlayerEntity* player, e2::Name actionName, e2::Name triggerName) override;
-
-	protected:
-		
-		
-		bool m_actionBusy{};
-
-		e2::StaticMeshSpecification m_meshSpecification;
-		e2::RandomAudioSpecification m_axeSwingSpecification;
-		e2::RandomAudioSpecification m_woodChopSpecification;
-
-		e2::StaticMeshComponent* m_mesh{};
-		e2::RandomAudioComponent* m_axeSwing{};
-		e2::RandomAudioComponent* m_woodChop{};
-	};
-
-
-
-	/** @tags(dynamic) */
-	class SwordHandler : public e2::WieldHandler
-	{
-		ObjectDeclaration();
-	public:
-
-		SwordHandler() = default;
-		virtual ~SwordHandler();
-
-		virtual void populate(e2::GameContext* ctx, nlohmann::json& obj, std::unordered_set<e2::Name>& deps) override;
-		virtual void finalize(e2::GameContext* ctx) override;
-
-		virtual void setActive(e2::PlayerEntity* player) override;
-		virtual void setInactive(e2::PlayerEntity* player) override;
-
-		virtual void onUpdate(e2::PlayerEntity* player, double seconds) override;
-		virtual void onTrigger(e2::PlayerEntity* player, e2::Name actionName, e2::Name triggerName) override;
-
-	protected:
-
-
-		bool m_actionBusy{};
-
-		e2::StaticMeshSpecification m_meshSpecification;
-		e2::RandomAudioSpecification m_swordSwingSpecification;
-
-		e2::StaticMeshComponent* m_mesh{};
-		e2::RandomAudioComponent* m_swordSwing{};
-	};
-
-
-	class UseHandler : public e2::Object
-	{
-		ObjectDeclaration();
-	public:
-		UseHandler()=default;
-
-		virtual void populate(e2::GameContext* ctx, nlohmann::json& obj) = 0;
-		virtual void finalize(e2::GameContext* ctx) = 0;
-
-		virtual void onUse(e2::PlayerEntity* player) = 0;
-
-		e2::ItemSpecification* item{};
-	protected:
-		
-	};
-
-	class EquipHandler : public e2::Object
-	{
-		ObjectDeclaration();
-	public:
-		EquipHandler()=default;
-		virtual ~EquipHandler();
-
-		virtual void populate(e2::GameContext* ctx, nlohmann::json& obj) = 0;
-		virtual void finalize(e2::GameContext* ctx) = 0;
-
-
-		e2::ItemSpecification* item{};
-	protected:
-		
-	};
-
-	/** @tags(dynamic) */
-	class ShieldHandler : public e2::EquipHandler
-	{
-		ObjectDeclaration();
-	public:
-		ShieldHandler() = default;
-		virtual ~ShieldHandler();
-
-		virtual void populate(e2::GameContext* ctx, nlohmann::json& obj) override;
-		virtual void finalize(e2::GameContext* ctx) override;
-
-		float knockback{ 0.0f };
-		float stun{ 0.0f };
-	};
-
-
 
 	class EntitySpecification : public e2::Object
 	{
@@ -191,7 +59,7 @@ namespace e2
 		Entity();
 		virtual ~Entity();
 
-		virtual void postConstruct(e2::GameContext* ctx, e2::EntitySpecification* spec, glm::vec3 const& worldPosition);
+		virtual void postConstruct(e2::GameContext* ctx, e2::EntitySpecification* spec, glm::vec3 const& worldPosition, glm::quat const& worldRotation);
 
 		virtual void writeForSave(e2::IStream& toBuffer);
 		virtual void readForSave(e2::IStream& fromBuffer);
@@ -201,6 +69,10 @@ namespace e2
 		virtual void updateAnimation(double seconds) {};
 
 		virtual void update(double seconds) {};
+
+		virtual bool interactable() { return false; }
+
+		virtual void onInteract(e2::Entity* interactor) {}
 
 		virtual void onHitEntity(e2::Entity* otherEntity) {};
 
@@ -254,6 +126,8 @@ namespace e2
 		e2::Transform* m_transform{};
 	};
 
+
+
 	enum class EquipSlot : uint8_t
 	{
 		Shield = 0,
@@ -262,83 +136,6 @@ namespace e2
 	};
 
 	class StaticMeshComponent;
-
-	class ItemSpecification : public e2::EntitySpecification
-	{
-		ObjectDeclaration();
-	public:
-		ItemSpecification();
-		virtual ~ItemSpecification();
-
-		virtual void populate(e2::GameContext* ctx, nlohmann::json& obj) override;
-		virtual void finalize() override;
-
-		bool stackable{};
-		uint32_t stackSize{ 1 };
-
-		bool wieldable{};
-		e2::Type* wieldHandlerType{};
-		e2::WieldHandler* wieldHandler{}; // owning instance
-
-		bool usable{};
-		e2::Type* useHandlerType{};
-		e2::UseHandler* useHandler{}; // owning instance
-
-		bool equippable{};
-		e2::EquipSlot equipSlot{ e2::EquipSlot::Shield };
-		e2::Type* equipHandlerType{};
-		e2::EquipHandler* equipHandler{};
-		
-
-		e2::Name iconSprite;
-
-		StaticMeshSpecification equipMesh;
-		StaticMeshSpecification dropMesh;
-		CollisionSpecification collision;
-		MovementSpecification movement;
-
-	};
-
-
-	/** @tags(dynamic) */
-	class ItemEntity : public e2::Entity
-	{
-		ObjectDeclaration();
-	public:
-		ItemEntity();
-		virtual ~ItemEntity();
-
-		virtual void postConstruct(e2::GameContext* ctx, e2::EntitySpecification* spec, glm::vec3 const& worldPosition) override;
-
-		virtual void writeForSave(e2::IStream& toBuffer) override;
-		virtual void readForSave(e2::IStream& fromBuffer) override;
-
-		virtual void updateAnimation(double seconds) override;
-
-		virtual void update(double seconds) override;
-
-		virtual void updateVisibility() override;
-
-		inline double getLifetime() {
-			return m_time;
-		}
-
-		inline void setLifetime(double newTime)
-		{
-			m_time = newTime;
-		}
-
-	protected:
-		e2::ItemSpecification* m_itemSpecification{};
-		e2::StaticMeshComponent* m_mesh{};
-		e2::CollisionComponent* m_collision{};
-		e2::MovementComponent* m_movement{};
-
-		double m_time{};
-		float m_rotation{};
-
-		std::vector<e2::Collision> m_collisionCache;
-	};
 
 
 

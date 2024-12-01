@@ -737,9 +737,9 @@ e2::TurnbasedEntity::~TurnbasedEntity()
 }
 
 
-void e2::TurnbasedEntity::postConstruct(e2::GameContext* ctx, e2::EntitySpecification* spec, glm::vec3 const& worldPosition)
+void e2::TurnbasedEntity::postConstruct(e2::GameContext* ctx, e2::EntitySpecification* spec, glm::vec3 const& worldPosition, glm::quat const& worldRotation)
 {
-	e2::Entity::postConstruct(ctx, spec, worldPosition);
+	e2::Entity::postConstruct(ctx, spec, worldPosition, worldRotation);
 	m_turnbasedSpecification = m_specification->cast<e2::TurnbasedSpecification>();
 
 	m_movePointsLeft = m_turnbasedSpecification->movePoints;

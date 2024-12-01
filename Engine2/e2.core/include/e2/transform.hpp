@@ -52,6 +52,8 @@ namespace e2
 
 		void lookAt(glm::vec3 const& target, e2::TransformSpace space);
 
+		glm::vec3 getForward(e2::TransformSpace space);
+
 	protected:
 		Transform* m_transformParent{};
 

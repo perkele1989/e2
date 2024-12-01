@@ -92,7 +92,7 @@ namespace e2
 	constexpr uint32_t maxNumAssetDependencies = 16;
 
 	/** The maximum number of concurrently loaded (or generated!) mesh assets we support. */
-	constexpr uint32_t maxNumMeshAssets = 2048;
+	constexpr uint32_t maxNumMeshAssets = 8192;
 
 
 	/** The maximum number of concurrently loaded skeleton assets we support. */

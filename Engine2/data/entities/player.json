@@ -4,7 +4,9 @@
     "specification": "e2::PlayerSpecification",
     "entityType": "e2::PlayerEntity",
     "moveSpeed": 1.4,
-
+    "movement": {
+        "ignoreTypes": ["e2::ItemEntity", "e2::TeardropEntity", "e2::BombEntity"]
+    },
     "collision": {
         "radius": 0.05
     },

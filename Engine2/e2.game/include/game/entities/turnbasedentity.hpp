@@ -322,7 +322,7 @@ namespace e2
 		TurnbasedEntity();
 		virtual ~TurnbasedEntity();
 
-		virtual void postConstruct(e2::GameContext* ctx, e2::EntitySpecification* spec, glm::vec3 const& worldPosition) override;
+		virtual void postConstruct(e2::GameContext* ctx, e2::EntitySpecification* spec, glm::vec3 const& worldPosition, glm::quat const& worldRotation) override;
 		void setupTurnbased(glm::ivec2 const& tile, EmpireId empire);
 
 		virtual void writeForSave(e2::IStream& toBuffer) override;

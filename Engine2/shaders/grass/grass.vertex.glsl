@@ -71,27 +71,24 @@ void main()
 	vec2 areaUv = (worldRoot.xz - areaTopLeft) / areaSize; 
 
 	float areaHeight = 1.0;
+	vec2 areaOffset = vec2(15.0, 15.0);
+	float areaOffsetLength = 15.0;
 	if(areaUv.x >= 0.0 && areaUv.x <= 1.0 && areaUv.y >= 0.0 && areaUv.y <= 1.0)
 	{
-		areaHeight = texture(sampler2D(customTexture_cutMask, clampSampler), areaUv).r;
+		vec4 areaMap = texture(sampler2D(customTexture_cutMask, clampSampler), areaUv).rgba;
+		areaHeight = areaMap.r;
+		areaOffset = areaMap.gb;
+		areaOffsetLength = length(areaOffset);
 	}
 	
-	//areaHeight = 0.3 + areaHeight * 0.7;
-
-	
-
-
-	// float grassCoeff = sampleSimplex((worldRoot.xz + vec2(32.16, 64.32)) * 0.335);
-	// grassCoeff = pow(smoothstep(0.45, 0.76, grassCoeff), 4.2);
-	// grassCoeff = 1.0 - grassCoeff;
-
 	float grassCoeff = sampleSimplex((worldRoot.xz + vec2(32.16, 64.32)) * 0.135);
 	grassCoeff = pow(smoothstep(0.35, 0.40, grassCoeff), 4.2);
 
-	meshVertex.x = mix(meshRoot.x, meshVertex.x, 0.85);
-	meshVertex.y = mix(meshRoot.y, meshVertex.y, 0.85);
-	meshVertex.xyz = mix(meshRoot.xyz, meshVertex.xyz, grassCoeff);
+	float randomCoeff = sampleSimplex((worldRoot.xz + vec2(32.16, 64.32)) * 1.135);
 
+	meshVertex.x = mix(meshRoot.x, meshVertex.x, 0.85);
+	meshVertex.y = mix(meshRoot.y, meshVertex.y, 0.85 + 0.15 * randomCoeff);
+	meshVertex.xyz = mix(meshRoot.xyz, meshVertex.xyz, grassCoeff);
 
 	meshVertex.xyz = mix(meshRoot.xyz, meshVertex.xyz, areaHeight *0.5 + 0.5);
 	meshVertex.y *= areaHeight*0.5 + 0.5;
@@ -122,6 +119,9 @@ void main()
 	vec2 ltp = playerPosition - worldRoot.xz;
 	float ltpDistance = length(ltp);
 	ltp = normalize(ltp);
+
+	ltp = normalize(-areaOffset);
+	ltpDistance = areaOffsetLength;
 
 	float ss2 = sampleSimplex(worldRoot.xz * 10.5) * 0.75 + 0.25;
 

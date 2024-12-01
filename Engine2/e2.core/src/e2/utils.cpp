@@ -148,6 +148,20 @@ float e2::radiansBetween(glm::vec3 const& a, glm::vec3 const& b)
 	return glm::orientedAngle(nb, na);
 }
 
+float e2::radiansBetween(glm::vec2 const& a, glm::vec2 const& b)
+{
+	if (a == b)
+		return 0.0f;
+
+	glm::vec2 a2 = { a.x, a.y };
+	glm::vec2 b2 = { b.x, b.y };
+	glm::vec2 na = glm::normalize(a2 - b2);
+
+	glm::vec2 nb = glm::normalize(glm::vec2(0.0f, -1.0f));
+
+	return glm::orientedAngle(nb, na);
+}
+
 size_t e2::hash(UUID const& id)
 {
 	return std::hash<uuids::uuid>{}(uuids::uuid(id.data));
@@ -158,10 +172,23 @@ bool e2::nearlyEqual(float x, float y, float tresh)
 	return glm::abs(y - x) <= tresh;
 }
 
-bool e2::intersect(glm::vec2 p, glm::vec2 boxOffset, glm::vec2 boxSize)
+bool e2::intersect(glm::vec2 const& p, glm::vec2 const& boxOffset, glm::vec2 const& boxSize)
 {
 	return p.x >= boxOffset.x && p.x <= boxOffset.x + boxSize.x
 		&& p.y >= boxOffset.y && p.y <= boxOffset.y + boxSize.y;
+}
+
+bool e2::boxIntersect(glm::vec2 const& centerA, float radiusA, glm::vec2 const& centerB, float radiusB)
+{
+	float distX = abs(centerA.x - centerB.x);
+	float distY = abs(centerA.y - centerB.y);
+
+	if (distX <= (radiusA + radiusB) && distY <= (radiusA + radiusB))
+	{
+		return true;
+	}
+
+	return false;
 }
 
 namespace

@@ -8,6 +8,7 @@
 #include "e2/transform.hpp"
 #include "game/entities/turnbasedentity.hpp"
 #include "game/game.hpp"
+#include "game/entities/itementity.hpp"
 
 #include <glm/gtc/noise.hpp>
 
@@ -1547,14 +1548,15 @@ void e2::HexGrid::updateUnpackedForests()
 		uint32_t deadTrees = 0;
 		for (auto& t : pair.second.trees)
 		{
+
+			glm::vec3 fallRot = glm::vec3(t.fallDir.y, 0.0f, -t.fallDir.x);
+
 			if (t.health <= 0.0f)
 			{
 				if (t.fallTime <= 0.0f)
 				{
 					if (t.killTime > 0.0f)
 					{
-
-						glm::vec3 fallRot = glm::vec3(t.fallDir.y, 0.0f, -t.fallDir.x);
 
 						t.killTime -= game()->timeDelta();
 
@@ -1612,9 +1614,11 @@ void e2::HexGrid::updateUnpackedForests()
 					t.mesh->modelMatrix = treeTranslation * fallRotation * shakeRotation * treeRotation * treeRotationFix * treeScale;
 					t.mesh->modelMatrixDirty = true;
 
+					m_cutMask.push({ t.worldOffset + glm::vec2{ fallRot.x, fallRot.z } * (0.5f * fallDelta), 0.1f + 0.25f * fallDelta });
+
 					if (t.fallTime <= 0.0f)
 					{
-						game()->addScreenShake(0.2f);
+						game()->addScreenShake(0.05f);
 					}
 				}
 			}
@@ -1670,7 +1674,14 @@ e2::MeshProxy* e2::HexGrid::createGrassProxy(e2::TileData* tileData, glm::ivec2 
 
 	e2::MeshProxyConfiguration meshConf;
 	e2::MeshLodConfiguration lodConf;
-	lodConf.mesh = m_grassMeshes[(hex.x * hex.x - (hex.y * 4)) % 4];
+	int32_t meshIndex = glm::abs(hex.x * hex.x - (hex.y * 4)) % 4;
+	if (meshIndex > 3)
+	{
+		LogError("Grass mesh index was out of bounds");
+		meshIndex = 3;
+	}
+		
+	lodConf.mesh = m_grassMeshes[meshIndex];
 	meshConf.lods.push(lodConf);
 
 	e2::MeshProxy* newMeshProxy = e2::create<e2::MeshProxy>(gameSession(), meshConf);
@@ -3630,6 +3641,7 @@ e2::GrassCutMask::GrassCutMask(e2::GameContext* ctx, uint32_t resolution, float 
 	, m_areaSize(areaSize)
 {
 	e2::TextureCreateInfo cutMaskInfo{};
+	cutMaskInfo.format = e2::TextureFormat::RGBA16;
 	cutMaskInfo.resolution.x = resolution;
 	cutMaskInfo.resolution.y = resolution;
 	m_textures[0] = renderContext()->createTexture(cutMaskInfo);
@@ -3638,11 +3650,11 @@ e2::GrassCutMask::GrassCutMask(e2::GameContext* ctx, uint32_t resolution, float 
 	e2::RenderTargetCreateInfo cutTargetInfo{};
 	cutTargetInfo.areaExtent = { resolution, resolution };
 
-	cutTargetInfo.colorAttachments.push({ m_textures[0], e2::ClearMethod::ColorFloat, e2::LoadOperation::Clear, e2::StoreOperation::Store, glm::vec4(1.0f, 1.0f, 1.0f, 1.0f) });
+	cutTargetInfo.colorAttachments.push({ m_textures[0], e2::ClearMethod::ColorFloat, e2::LoadOperation::Clear, e2::StoreOperation::Store, glm::vec4(1.0f, 15.0f, 15.0f, 1.0f) });
 	m_targets[0] = renderContext()->createRenderTarget(cutTargetInfo);
 
 	cutTargetInfo.colorAttachments.clear();
-	cutTargetInfo.colorAttachments.push({ m_textures[1], e2::ClearMethod::ColorFloat, e2::LoadOperation::Clear, e2::StoreOperation::Store, glm::vec4(1.0f, 1.0f, 1.0f, 1.0f) });
+	cutTargetInfo.colorAttachments.push({ m_textures[1], e2::ClearMethod::ColorFloat, e2::LoadOperation::Clear, e2::StoreOperation::Store, glm::vec4(1.0f, 15.0f, 15.0f, 1.0f) });
 	m_targets[1] = renderContext()->createRenderTarget(cutTargetInfo);
 
 	e2::DescriptorSetLayoutCreateInfo setLayoutInfo{};
@@ -3651,13 +3663,13 @@ e2::GrassCutMask::GrassCutMask(e2::GameContext* ctx, uint32_t resolution, float 
 		1,
 		false,
 		true
-	});
+		});
 	setLayoutInfo.bindings.push({
 		e2::DescriptorBindingType::Texture,
 		1,
 		false,
 		true
-	});
+		});
 
 	m_shiftSetLayout = renderContext()->createDescriptorSetLayout(setLayoutInfo);
 
@@ -3704,52 +3716,108 @@ e2::GrassCutMask::GrassCutMask(e2::GameContext* ctx, uint32_t resolution, float 
 
 	e2::PipelineCreateInfo pipelineInfo;
 	pipelineInfo.alphaBlending = false;
-	pipelineInfo.colorFormats.push(e2::TextureFormat::RGBA8);
+	pipelineInfo.colorFormats.push(e2::TextureFormat::RGBA16);
+	pipelineInfo.componentMasks.push(e2::ComponentMask::R | e2::ComponentMask::G | e2::ComponentMask::B);
 	pipelineInfo.layout = m_shiftPipelineLayout;
 	pipelineInfo.shaders.push(m_shiftVertexShader);
 	pipelineInfo.shaders.push(m_shiftFragmentShader);
 	m_shiftPipeline = renderContext()->createPipeline(pipelineInfo);
 	pipelineInfo.shaders.clear();
 	pipelineInfo.colorFormats.clear();
+	pipelineInfo.componentMasks.clear();
 
 	// ADD pipeline
-	shaderSource.clear();
-	if (!e2::readFileWithIncludes("./shaders/grasscutmask/add.vertex.glsl", shaderSource))
 	{
-		LogError("grasscutmask shader issue");
-	}
-	shaderInfo.stage = ShaderStage::Vertex;
-	shaderInfo.source = shaderSource.c_str();
-	m_addVertexShader = renderContext()->createShader(shaderInfo);
+		shaderSource.clear();
+		if (!e2::readFileWithIncludes("./shaders/grasscutmask/add.vertex.glsl", shaderSource))
+		{
+			LogError("grasscutmask shader issue");
+		}
+		shaderInfo.stage = ShaderStage::Vertex;
+		shaderInfo.source = shaderSource.c_str();
+		m_addVertexShader = renderContext()->createShader(shaderInfo);
 
-	shaderSource.clear();
-	if (!e2::readFileWithIncludes("./shaders/grasscutmask/add.fragment.glsl", shaderSource))
+		shaderSource.clear();
+		if (!e2::readFileWithIncludes("./shaders/grasscutmask/add.fragment.glsl", shaderSource))
+		{
+			LogError("grasscutmask shader issue");
+		}
+		shaderInfo.stage = ShaderStage::Fragment;
+		shaderInfo.source = shaderSource.c_str();
+		m_addFragmentShader = renderContext()->createShader(shaderInfo);
+
+
+
+		e2::PipelineLayoutCreateInfo addLayoutInfo{};
+		addLayoutInfo.pushConstantSize = sizeof(e2::GrassCutMaskAddConstants);
+		m_addPipelineLayout = renderContext()->createPipelineLayout(addLayoutInfo);
+
+
+		pipelineInfo.alphaBlending = true;
+		pipelineInfo.colorFormats.push(e2::TextureFormat::RGBA16);
+		pipelineInfo.componentMasks.push(e2::ComponentMask::R);
+		pipelineInfo.layout = m_addPipelineLayout;
+		pipelineInfo.shaders.push(m_addVertexShader);
+		pipelineInfo.shaders.push(m_addFragmentShader);
+		m_addPipeline = renderContext()->createPipeline(pipelineInfo);
+		pipelineInfo.shaders.clear();
+		pipelineInfo.colorFormats.clear();
+		pipelineInfo.componentMasks.clear();
+	}
+
+
+
+
+
+
+	// PUSH pipeline
 	{
-		LogError("grasscutmask shader issue");
+		shaderSource.clear();
+		if (!e2::readFileWithIncludes("./shaders/grasscutmask/push.vertex.glsl", shaderSource))
+		{
+			LogError("grasscutmask shader issue");
+		}
+		shaderInfo.stage = ShaderStage::Vertex;
+		shaderInfo.source = shaderSource.c_str();
+		m_pushVertexShader = renderContext()->createShader(shaderInfo);
+
+		shaderSource.clear();
+		if (!e2::readFileWithIncludes("./shaders/grasscutmask/push.fragment.glsl", shaderSource))
+		{
+			LogError("grasscutmask shader issue");
+		}
+		shaderInfo.stage = ShaderStage::Fragment;
+		shaderInfo.source = shaderSource.c_str();
+		m_pushFragmentShader = renderContext()->createShader(shaderInfo);
+
+
+
+		e2::PipelineLayoutCreateInfo pushLayoutInfo{};
+		pushLayoutInfo.pushConstantSize = sizeof(e2::GrassCutMaskPushConstants);
+		m_pushPipelineLayout = renderContext()->createPipelineLayout(pushLayoutInfo);
+
+
+		pipelineInfo.alphaBlending = true;
+		pipelineInfo.colorFormats.push(e2::TextureFormat::RGBA16);
+		pipelineInfo.componentMasks.push(e2::ComponentMask::G | e2::ComponentMask::B);
+		pipelineInfo.layout = m_pushPipelineLayout;
+		pipelineInfo.shaders.push(m_pushVertexShader);
+		pipelineInfo.shaders.push(m_pushFragmentShader);
+		m_pushPipeline = renderContext()->createPipeline(pipelineInfo);
+		pipelineInfo.shaders.clear();
+		pipelineInfo.colorFormats.clear();
+		pipelineInfo.componentMasks.clear();
 	}
-	shaderInfo.stage = ShaderStage::Fragment;
-	shaderInfo.source = shaderSource.c_str();
-	m_addFragmentShader = renderContext()->createShader(shaderInfo);
 
 
-
-	e2::PipelineLayoutCreateInfo addLayoutInfo{};
-	addLayoutInfo.pushConstantSize = sizeof(e2::GrassCutMaskAddConstants);
-	m_addPipelineLayout = renderContext()->createPipelineLayout(addLayoutInfo);
-
-
-	pipelineInfo.alphaBlending = true;
-	pipelineInfo.colorFormats.push(e2::TextureFormat::RGBA8);
-	pipelineInfo.layout = m_addPipelineLayout;
-	pipelineInfo.shaders.push(m_addVertexShader);
-	pipelineInfo.shaders.push(m_addFragmentShader);
-	m_addPipeline = renderContext()->createPipeline(pipelineInfo);
-	pipelineInfo.shaders.clear();
-	pipelineInfo.colorFormats.clear();
 }
 
 e2::GrassCutMask::~GrassCutMask()
 {
+	e2::discard(m_pushPipeline);
+	e2::discard(m_pushPipelineLayout);
+	e2::discard(m_pushFragmentShader);
+	e2::discard(m_pushVertexShader);
 	e2::discard(m_addPipeline);
 	e2::discard(m_addFragmentShader);
 	e2::discard(m_addVertexShader);
@@ -3778,6 +3846,7 @@ void e2::GrassCutMask::recordFrame(e2::ICommandBuffer* buffer, uint8_t frameInde
 		shiftConstants.resolution = glm::vec2((float)m_resolution);
 		shiftConstants.areaSize = glm::vec2(m_areaSize);
 		shiftConstants.moveOffset = m_center - m_lastCenter;
+		shiftConstants.timeDelta = game()->timeDelta();
 		
 		buffer->bindPipeline(m_shiftPipeline);
 		buffer->bindDescriptorSet(m_shiftPipelineLayout, 0, m_shiftSets[frameIndex]);
@@ -3795,7 +3864,7 @@ void e2::GrassCutMask::recordFrame(e2::ICommandBuffer* buffer, uint8_t frameInde
 		{
 			addConstants.resolution = glm::vec2((float)m_resolution);
 			addConstants.areaSize = glm::vec2(m_areaSize);
-			addConstants.center = m_center;
+			addConstants.areaCenter = m_center;
 			addConstants.position = cut.position;
 			addConstants.radius = cut.radius;
 
@@ -3808,6 +3877,28 @@ void e2::GrassCutMask::recordFrame(e2::ICommandBuffer* buffer, uint8_t frameInde
 		}
 
 		m_cuts.clear();
+	}
+
+	{
+		GrassCutMaskPushConstants pushConstants;
+
+		for (e2::GrassPush const& push : m_pushes)
+		{
+			pushConstants.resolution = glm::vec2((float)m_resolution);
+			pushConstants.areaSize = glm::vec2(m_areaSize);
+			pushConstants.areaCenter = m_center;
+			pushConstants.position = push.position;
+			pushConstants.radius = push.radius;
+
+			buffer->bindPipeline(m_pushPipeline);
+			buffer->bindVertexLayout(uiManager()->quadVertexLayout);
+			buffer->bindIndexBuffer(uiManager()->quadIndexBuffer);
+			buffer->bindVertexBuffer(0, uiManager()->quadVertexBuffer);
+			buffer->pushConstants(m_pushPipelineLayout, 0, sizeof(e2::GrassCutMaskPushConstants), reinterpret_cast<uint8_t*>(&pushConstants));
+			buffer->draw(6, 1);
+		}
+
+		m_pushes.clear();
 	}
 
 	buffer->endRender();
@@ -3838,7 +3929,29 @@ void e2::GrassCutMask::cut(GrassCut const& cut)
 		return;
 	}
 
+
+	if (!e2::boxIntersect(cut.position, cut.radius, m_center, m_areaSize / 2.0f))
+	{
+		return;
+	}
+
+
 	m_cuts.push(cut);
+}
+
+void e2::GrassCutMask::push(GrassPush const& push)
+{
+	if (m_pushes.full())
+	{
+		return;
+	}
+
+	if (!e2::boxIntersect(push.position, push.radius, m_center, m_areaSize / 2.0f))
+	{
+		return;
+	}
+
+	m_pushes.push(push);
 }
 
 e2::ITexture* e2::GrassCutMask::getTexture(uint8_t frameIndex)

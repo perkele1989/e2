@@ -2,6 +2,7 @@
 #include "game/entities/player.hpp"
 
 #include "game/game.hpp"
+#include "game/entities/itementity.hpp"
 
 #include <e2/game/gamesession.hpp>
 #include <e2/e2.hpp>
@@ -89,9 +90,9 @@ e2::PlayerEntity::~PlayerEntity()
 
 }
 
-void e2::PlayerEntity::postConstruct(e2::GameContext* ctx, e2::EntitySpecification* spec, glm::vec3 const& worldPosition)
+void e2::PlayerEntity::postConstruct(e2::GameContext* ctx, e2::EntitySpecification* spec, glm::vec3 const& worldPosition, glm::quat const& worldRotation)
 {
-	e2::Entity::postConstruct(ctx, spec, worldPosition);
+	e2::Entity::postConstruct(ctx, spec, worldPosition, worldRotation);
 	m_playerSpecification = m_specification->cast<e2::PlayerSpecification>();
 
 	m_mesh = e2::create<e2::SkeletalMeshComponent>(&m_playerSpecification->mesh, this);
@@ -222,6 +223,7 @@ void e2::PlayerEntity::update(double seconds)
 	game()->populateCollisions(hex().offsetCoords(), m_captain ? e2::CollisionType::Land |  e2::CollisionType::Component : e2::CollisionType::Mountain | e2::CollisionType::Tree | e2::CollisionType::Water | e2::CollisionType::Component, m_collisionCache);
 
 
+
 	/*e2::TileData tile = game()->hexGrid()->getTileData(hex().offsetCoords());
 	if (tile.isShallowWater() || tile.isDeepWater())
 	{
@@ -232,7 +234,7 @@ void e2::PlayerEntity::update(double seconds)
 
 	}*/
 
-	m_aiming = mouse.buttonState(e2::MouseButton::Right);
+	m_aiming = !game()->scriptRunning() && mouse.buttonState(e2::MouseButton::Right);
 
 	if (m_captain)
 	{
@@ -271,6 +273,49 @@ void e2::PlayerEntity::update(double seconds)
 	m_mesh->applyTransform();
 	m_boatMesh->applyTransform();
 
+
+	std::set<e2::Entity*, e2::RadialCompare> interactables; // @todo fix alloc
+
+	e2::Transform* playerTransform = getTransform();
+	glm::vec3 playerFwd = playerTransform->getForward(e2::TransformSpace::World);
+	glm::vec3 playerPosition = playerTransform->getTranslation(e2::TransformSpace::World);
+	glm::vec2 playerCoords{ playerPosition.x, playerPosition.z };
+	glm::vec2 playerFwdPlanar = glm::normalize(glm::vec2{ playerFwd.x, playerFwd.z });
+	for (e2::Collision& collision : m_collisionCache)
+	{
+		if (collision.type == e2::CollisionType::Component && collision.component)
+		{
+			e2::Entity* otherEntity = collision.component->entity();
+			e2::ItemEntity* item = otherEntity->cast<e2::ItemEntity>();
+			e2::ItemSpecification* itemSpec = otherEntity->getSpecificationAs<e2::ItemSpecification>();
+			if (item && itemSpec)
+			{
+				if (item->getLifetime() > 4.0 && glm::distance(planarCoords(), item->planarCoords()) < 0.3f && game()->playerState().give(itemSpec->id))
+					game()->queueDestroyEntity(item);
+			}
+			else
+			{
+				if (otherEntity->interactable() && !otherEntity->pendingDestroy)
+				{
+
+					glm::vec2 playerToEntity = otherEntity->planarCoords() - planarCoords();
+					glm::vec2 playerToEntityDir = glm::normalize(playerToEntity);
+					float playerToEntityDist = glm::length(playerToEntity);
+
+					if (glm::dot(playerToEntityDir, playerFwdPlanar) > glm::cos(glm::radians(45.0f)) && playerToEntityDist <= 0.5f)
+					{
+						interactables.insert(otherEntity);
+					}
+				}
+			}
+		}
+	}
+	m_interactable = interactables.empty() ? nullptr : *interactables.begin();
+
+	if (!game()->scriptRunning() && m_interactable && ui->keyboardState().pressed(e2::Key::E))
+	{
+		m_interactable->onInteract(this);
+	}
 }
 
 void e2::PlayerEntity::updateLand(double seconds)
@@ -280,10 +325,10 @@ void e2::PlayerEntity::updateLand(double seconds)
 
 	game()->setZoom(0.0f);
 
-	if (mouse.buttonPressed(e2::MouseButton::Left) && !m_aiming)
-	{
-		game()->spawnEntity("teardrop", getTransform()->getTranslation(e2::TransformSpace::World));
-	}
+	//if (mouse.buttonPressed(e2::MouseButton::Left) && !m_aiming)
+	//{
+	//	game()->spawnEntity("teardrop", getTransform()->getTranslation(e2::TransformSpace::World));
+	//}
 
 	glm::vec2 cursor = game()->cursorPlane();
 
@@ -298,7 +343,7 @@ void e2::PlayerEntity::updateLand(double seconds)
 	{
 		m_inputVector = glm::normalize(m_inputVector);
 
-		m_movement->move(m_collision->radius(), m_inputVector, float(seconds) * moveSpeed, e2::CollisionType::Mountain | e2::CollisionType::Tree | e2::CollisionType::Water, m_collisionCache);
+		m_movement->move(m_collision->radius(), m_inputVector, float(seconds) * moveSpeed, e2::CollisionType::Mountain | e2::CollisionType::Tree | e2::CollisionType::Water | e2::CollisionType::Component, m_collisionCache);
 	}
 
 	planarPosition = planarCoords();
@@ -492,13 +537,7 @@ void e2::PlayerEntity::onTrigger(e2::Name action, e2::Name trigger)
 
 void e2::PlayerEntity::onHitEntity(e2::Entity* otherEntity)
 {
-	e2::ItemEntity* item = otherEntity->cast<e2::ItemEntity>();
-	e2::ItemSpecification* itemSpec = otherEntity->getSpecificationAs<e2::ItemSpecification>();
-	if (item && itemSpec)
-	{
-		if(item->getLifetime() > 4.0 && game()->playerState().give(itemSpec->id))
-			game()->queueDestroyEntity(otherEntity);
-	}
+
 }
 
 void e2::PlayerEntity::updateVisibility()
@@ -506,268 +545,25 @@ void e2::PlayerEntity::updateVisibility()
 	m_mesh->updateVisibility();
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-e2::TeardropSpecification::TeardropSpecification()
-	: e2::EntitySpecification()
+bool e2::RadialCompare::operator()(e2::Entity* a, e2::Entity* b) const
 {
-	entityType = e2::Type::fromName("e2::TeardropEntity");
-}
+	e2::Game* game = a->game();
+	e2::PlayerEntity* player = game->playerEntity();
 
-e2::TeardropSpecification::~TeardropSpecification()
-{
-}
-
-void e2::TeardropSpecification::populate(e2::GameContext* ctx, nlohmann::json& obj)
-{
-	e2::EntitySpecification::populate(ctx, obj);
-
-	assets.insert("S_Teardrop_Jump.e2a");
-	assets.insert("S_Teardrop_Land.e2a");
-	assets.insert("S_Teardrop_Hit.e2a");
-	assets.insert("S_Teardrop_Die.e2a");
-
-	if (obj.contains("mesh"))
-		mesh.populate(obj.at("mesh"), assets);
-
-	if (obj.contains("collision"))
-		collision.populate(obj.at("collision"), assets);
-
-	if (obj.contains("movement"))
-		movement.populate(obj.at("movement"), assets);
-}
-
-void e2::TeardropSpecification::finalize()
-{
-	mesh.finalize(game);
-	collision.finalize(game);
-
-}
-
-e2::TeardropEntity::TeardropEntity()
-	: e2::Entity()
-{
-	m_targetRotation = glm::angleAxis(0.0f, e2::worldUpf());
-}
-
-e2::TeardropEntity::~TeardropEntity()
-{
-	if (m_mesh)
-		e2::destroy(m_mesh);
-
-	if (m_collision)
-		e2::destroy(m_collision);
-
-	if (m_movement)
-		e2::destroy(m_movement);
-
-}
-
-void e2::TeardropEntity::postConstruct(e2::GameContext* ctx, e2::EntitySpecification* spec, glm::vec3 const& worldPosition)
-{
-	e2::Entity::postConstruct(ctx, spec, worldPosition);
-	m_teardropSpecification = m_specification->cast<e2::TeardropSpecification>();
-
-	m_mesh = e2::create<e2::SkeletalMeshComponent>(&m_teardropSpecification->mesh, this);
-	m_mesh->setTriggerListener(this);
-
-
-	m_collision = e2::create<e2::CollisionComponent>(&m_teardropSpecification->collision, this);
-	m_movement = e2::create<e2::MovementComponent>(&m_teardropSpecification->movement, this);
-}
-
-void e2::TeardropEntity::writeForSave(e2::IStream& toBuffer)
-{
-}
-
-void e2::TeardropEntity::readForSave(e2::IStream& fromBuffer)
-{
-}
-
-void e2::TeardropEntity::updateAnimation(double seconds)
-{
-	glm::quat currentRotation = m_transform->getRotation(e2::TransformSpace::World);
-	currentRotation = glm::slerp(currentRotation, m_targetRotation, glm::clamp(float(seconds) * 10.0f, 0.01f, 1.0f));
-	m_transform->setRotation(currentRotation, e2::TransformSpace::World);
-
-	m_mesh->updateAnimation(seconds);
-}
-
-void e2::TeardropEntity::update(double seconds)
-{
-	m_collisionCache.clear();
-	game()->populateCollisions(hex().offsetCoords(), e2::CollisionType::All, m_collisionCache);
-
-	e2::PlayerEntity* player = game()->playerEntity();
-	glm::vec2 playerCoords = player->planarCoords();
-	glm::vec2 thisCoords = planarCoords();
-
-	constexpr float jumpInterval = 3.0f;
-	constexpr float jumpTime = 0.5f;
-	constexpr float rotateTime = 2.3f;
-	constexpr float jumpHeight = 0.3f;
-
-	if (m_mesh->isActionPlaying("die") || m_health <= 0.0f)
-	{
-
-	}
-	else if (m_mesh->isActionPlaying("hit"))
-	{
-		m_movement->move(m_collision->radius(), m_hitDirection, float(seconds) * 1.0f, e2::CollisionType::All, m_collisionCache);
-		float angle = e2::radiansBetween(glm::vec3(thisCoords.x, 0.0f, thisCoords.y) - glm::vec3(m_hitDirection.x, 0.0f, m_hitDirection.y), glm::vec3(thisCoords.x, 0.0f, thisCoords.y));
-		m_targetRotation = glm::angleAxis(angle, glm::vec3(e2::worldUp()));
-		m_jumping = false;
-		m_timeSinceJump = 0.0f;
-	}
-	else if (m_jumping)
-	{
-		m_mesh->setPose("air");
-
-		m_jumpFactor += float(seconds);
-
-		float jumpCoefficient = glm::clamp(m_jumpFactor / jumpTime, 0.0f, 1.0f);
-		float heightCoefficient = glm::sin(jumpCoefficient * glm::pi<float>());
-
-
-		m_mesh->setHeightOffset(heightCoefficient * -jumpHeight);
-
-		glm::vec3 fwd = m_targetRotation * e2::worldForwardf();
-		
-		m_movement->move(m_collision->radius(), glm::normalize(glm::vec2{fwd.x, fwd.z}), float(seconds) * 1.0f, e2::CollisionType::All, m_collisionCache);
-
-		if (m_jumpFactor >= jumpTime)
-		{
-			m_jumping = false;
-			m_timeSinceJump = 0.0f;
-
-			m_mesh->setPose("idle");
-			m_mesh->playAction("land");
-			playSound("S_Teardrop_Land.e2a", 1.0f, 1.0f);
-			
-		}
-	}
-	else
-	{
-		m_movement->resolve(m_collision->radius(), e2::CollisionType::All, m_collisionCache);
-
-		m_mesh->setHeightOffset(0.0f);
-		if (!m_mesh->isActionPlaying("jump"))
-		{
-			m_mesh->setPose("idle");
-			float oldTimeSinceJump = m_timeSinceJump;
-			m_timeSinceJump += float(seconds);
-
-			if (oldTimeSinceJump < rotateTime && m_timeSinceJump >= rotateTime)
-			{
-				m_targetRotation = glm::angleAxis(glm::radians(e2::randomFloat(0.0f, 360.0f)), e2::worldUpf());
-			}
-
-			if (m_timeSinceJump > jumpInterval)
-			{
-				m_mesh->playAction("jump");
-			}
-		}
-	}
+	if (!player)
+		return false;
 
 	
-	m_collision->invalidate();
-	m_mesh->applyTransform();
-	
+	e2::Transform* playerTransform = player->getTransform();
+	glm::vec3 playerFwd = playerTransform->getForward(e2::TransformSpace::World);
+	glm::vec3 playerPosition = playerTransform->getTranslation(e2::TransformSpace::World);
+	glm::vec2 playerCoords{ playerPosition.x, playerPosition.z };
+	glm::vec2 playerFwdPlanar = glm::normalize(glm::vec2{playerFwd.x, playerFwd.z});
 
+	glm::vec2 dirA = glm::normalize(a->planarCoords() - playerCoords);
+	glm::vec2 dirB = glm::normalize(b->planarCoords() - playerCoords);
 
-}
-
-void e2::TeardropEntity::onTrigger(e2::Name action, e2::Name trigger)
-{
-	static const e2::Name triggerJump{ "jump" };
-	if (trigger == triggerJump)
-	{
-		m_jumping = true;
-		m_jumpFactor = 0.0f;
-	}
-
-	static const e2::Name triggerJumpSound{ "jump_sound"};
-	if (trigger == triggerJumpSound)
-	{
-		playSound("S_Teardrop_Jump.e2a", 1.0f, 1.0f);
-	}
-}
-
-void e2::TeardropEntity::updateVisibility()
-{
-	m_mesh->updateVisibility();
-}
-
-void e2::TeardropEntity::onMeleeDamage(e2::Entity* instigator, float dmg)
-{
-	if (m_health <= 0.0f)
-		return;
-
-	glm::vec2 pos = planarCoords();
-
-	if (m_jumping)
-	{
-		game()->spawnHitLabel({ pos.x, -0.25f, pos.y }, "Miss!");
-		return;
-	}
-
-	
-	glm::vec2 instPos = instigator->planarCoords();
-	m_hitDirection = glm::normalize(pos - instPos);
-
-	game()->spawnHitLabel({ pos.x, -0.25f, pos.y }, std::format("{}", (uint32_t)dmg));
-	m_health -= dmg;
-	if (m_health <= 0.0f)
-	{
-		playSound("S_Teardrop_Die.e2a", 1.0, 0.5);
-		m_mesh->playAction("die");
-		game()->queueDestroyEntity(this);
-	}
-	else
-	{
-		playSound("S_Teardrop_Hit.e2a", 1.0, 1.0);
-		m_mesh->playAction("hit");
-	}
-}
-
-bool e2::TeardropEntity::canBeDestroyed()
-{
-	return !m_mesh->isActionPlaying("die");
+	float radiansA = e2::radiansBetween(dirA, playerFwdPlanar);
+	float radiansB = e2::radiansBetween(dirB, playerFwdPlanar);
+	return radiansA < radiansB;
 }

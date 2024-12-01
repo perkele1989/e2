@@ -1,0 +1,245 @@
+
+#pragma once 
+
+#include <e2/utils.hpp>
+#include "game/entity.hpp"
+
+namespace e2
+{
+	constexpr uint64_t maxNumRadionPins = 4;
+	struct RadionPin
+	{
+		e2::Name name;
+		glm::vec3 offset;
+	};
+
+	class RadionEntity;
+
+	struct RadionConnection
+	{
+		e2::RadionEntity* otherEntity{};
+		e2::Name otherPin;
+	};
+
+	/** @tags(dynamic) */
+	class RadionEntitySpecification : public e2::EntitySpecification
+	{
+		ObjectDeclaration();
+	public:
+		RadionEntitySpecification();
+		virtual ~RadionEntitySpecification();
+
+		virtual void populate(e2::GameContext* ctx, nlohmann::json& obj) override;
+		virtual void finalize() override;
+
+		int32_t pinIndexFromName(e2::Name name);
+
+		e2::StackVector<e2::RadionPin, maxNumRadionPins> pins;
+		e2::StaticMeshSpecification mesh;
+		e2::CollisionSpecification collision;
+
+		uint32_t radionCost{ 4 };
+	};
+
+	/** @tags(dynamic) */
+	class RadionEntity : public e2::Entity
+	{
+		ObjectDeclaration();
+	public:
+		RadionEntity()=default;
+		virtual ~RadionEntity();
+
+		virtual void radionTick();
+
+		virtual void postConstruct(e2::GameContext* ctx, e2::EntitySpecification* spec, glm::vec3 const& worldPosition, glm::quat const& worldRotation) override;
+
+		virtual void update(double seconds) override;
+		virtual void updateAnimation(double seconds) override;
+
+		virtual void updateVisibility() override;
+
+		void connectPin(e2::Name pinName, e2::RadionEntity* entity, e2::Name otherPinName);
+		void disconnectPin(e2::Name pinName);
+
+		float getInputRadiance(e2::Name pinName);
+		float getOutputRadiance(e2::Name pinName);
+		void setOutputRadiance(e2::Name pinName, float newRadiance);
+
+		e2::StackVector<RadionConnection, e2::maxNumRadionPins> connections;
+		e2::StackVector<float, e2::maxNumRadionPins> outputRadiance;
+		e2::RadionEntitySpecification* radionSpecification{};
+
+	protected:
+		e2::CollisionComponent* m_collision{};
+		e2::StaticMeshComponent* m_mesh{};
+	};
+
+
+
+	/** @tags(dynamic) */
+	class RadionPreviewEntity : public e2::Entity
+	{
+		ObjectDeclaration();
+	public:
+		RadionPreviewEntity() = default;
+		virtual ~RadionPreviewEntity();
+
+		virtual void postConstruct(e2::GameContext* ctx, e2::EntitySpecification* spec, glm::vec3 const& worldPosition, glm::quat const& worldRotation) override;
+
+		e2::RadionEntitySpecification* radionSpecification{};
+		e2::StaticMeshComponent* mesh{};
+	};
+
+
+
+
+
+
+	constexpr float radionDecay = 0.985f;
+	constexpr float radionPowerTreshold = 4.2f;
+	constexpr float radionSignalTreshold = 2.5f;
+	constexpr float radionHighRadiance = 5.0f;
+	constexpr float radionLowRadiance = 0.0f;
+
+
+	/** @tags(dynamic) */
+	class RadionPowerSource : public e2::RadionEntity
+	{
+		ObjectDeclaration();
+	public:
+		RadionPowerSource() = default;
+		virtual ~RadionPowerSource() = default;
+
+		virtual void radionTick() override;
+	};
+
+	/** @tags(dynamic) */
+	class RadionWirePost : public e2::RadionEntity
+	{
+		ObjectDeclaration();
+	public:
+		RadionWirePost() = default;
+		virtual ~RadionWirePost() = default;
+
+		virtual void radionTick() override;
+	};
+
+	/** @tags(dynamic) basically a repeater (charges to 5V by adding input, once 5V sets output to 5V, otherwise sets output to 0V*/
+	class RadionCapacitor : public e2::RadionEntity
+	{
+		ObjectDeclaration();
+	public:
+		RadionCapacitor() = default;
+		virtual ~RadionCapacitor() = default;
+
+		virtual void radionTick() override;
+
+		float charge{};
+	};
+
+	/** @tags(dynamic) sets output to input if state is true, otherwise sets output to 0V */
+	class RadionSwitch : public e2::RadionEntity
+	{
+		ObjectDeclaration();
+	public:
+		RadionSwitch() = default;
+		virtual ~RadionSwitch() = default;
+
+		virtual void radionTick() override;
+
+		bool state{ true };
+	};
+
+	/** @tags(dynamic) alternates output between input V and 0V every tick */
+	class RadionCrystal : public e2::RadionEntity
+	{
+		ObjectDeclaration();
+	public:
+		RadionCrystal() = default;
+		virtual ~RadionCrystal()=default;
+
+		virtual void radionTick() override;
+
+		bool state{ false };
+	};
+
+	/** @tags(dynamic) */
+	class RadionGateNOT : public e2::RadionEntity
+	{
+		ObjectDeclaration();
+	public:
+		RadionGateNOT() = default;
+		virtual ~RadionGateNOT() = default;
+
+		virtual void radionTick() override;
+	};
+
+	/** @tags(dynamic) */
+	class RadionGateAND : public e2::RadionEntity
+	{
+		ObjectDeclaration();
+	public:
+		RadionGateAND() = default;
+		virtual ~RadionGateAND() = default;
+
+		virtual void radionTick() override;
+	};
+
+	/** @tags(dynamic) */
+	class RadionGateOR : public e2::RadionEntity
+	{
+		ObjectDeclaration();
+	public:
+		RadionGateOR() = default;
+		virtual ~RadionGateOR() = default;
+
+		virtual void radionTick() override;
+	};
+
+
+	/** @tags(dynamic) */
+	class RadionGateXOR : public e2::RadionEntity
+	{
+		ObjectDeclaration();
+	public:
+		RadionGateXOR() = default;
+		virtual ~RadionGateXOR() = default;
+
+		virtual void radionTick() override;
+	};
+
+	/** @tags(dynamic) */
+	class RadionGateNAND : public e2::RadionEntity
+	{
+		ObjectDeclaration();
+	public:
+		RadionGateNAND() = default;
+		virtual ~RadionGateNAND() = default;
+
+		virtual void radionTick() override;
+	};
+
+	/** @tags(dynamic) */
+	class RadionGateNOR : public e2::RadionEntity
+	{
+		ObjectDeclaration();
+	public:
+		RadionGateNOR() = default;
+		virtual ~RadionGateNOR() = default;
+
+		virtual void radionTick() override;
+	};
+
+	/** @tags(dynamic) */
+	class RadionGateXNOR : public e2::RadionEntity
+	{
+		ObjectDeclaration();
+	public:
+		RadionGateXNOR() = default;
+		virtual ~RadionGateXNOR() = default;
+
+		virtual void radionTick() override;
+	};
+}
+
+#include "radionentity.generated.hpp"

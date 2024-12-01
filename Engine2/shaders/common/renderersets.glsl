@@ -227,7 +227,7 @@ float getGrassCloudShadows(vec3 fragPosition)
 {
 	float shadowSimplex = (simplex((fragPosition.xz) - vec2(0.4, 0.6) * renderer.time.x * 0.241 ) * 0.5 + 0.5);
 	shadowSimplex = smoothstep(0.1,0.8, shadowSimplex);
-	return 0.5 + (1.0 - shadowSimplex)*0.5;
+	return 0.5 + (1.0 - shadowSimplex)*0.75;
 	//float shadowCoeff = pow(shadowSimplex, 0.72);
 	//shadowCoeff = smoothstep(0.4, 0.7, shadowCoeff) * 0.5 + 0.5;
 	//return shadowCoeff;

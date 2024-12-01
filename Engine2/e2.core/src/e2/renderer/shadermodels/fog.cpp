@@ -104,6 +104,7 @@ e2::MaterialProxy* e2::FogModel::createMaterialProxy(e2::Session* session, e2::M
 	e2::FogData newData;
 	newData.albedo = glm::vec4(0.0f, 1.0f, 1.0f, 1.0f);
 	newProxy->uniformData.set(newData);
+	newProxy->irradianceHdr.set(m_cubemap->handle());
 
 	return newProxy;
 }

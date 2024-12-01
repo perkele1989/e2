@@ -143,6 +143,9 @@ e2::IPipeline_Vk::IPipeline_Vk(IRenderContext* context, e2::PipelineCreateInfo c
 	VkPipelineColorBlendStateCreateInfo cbInfo{ VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO };
 	e2::StackVector<VkPipelineColorBlendAttachmentState, e2::maxNumRenderAttachments> vkAttachments;
 	vkAttachments.resize(createInfo.colorFormats.size());
+
+	bool hasComponentMasks = createInfo.componentMasks.size() == createInfo.colorFormats.size();
+
 	for (uint32_t i = 0; i < createInfo.colorFormats.size();i++)
 	{
 		
@@ -166,9 +169,16 @@ e2::IPipeline_Vk::IPipeline_Vk(IRenderContext* context, e2::PipelineCreateInfo c
 		}
 
 		vkAttachments[i].colorBlendOp = VK_BLEND_OP_ADD;
-
 		vkAttachments[i].alphaBlendOp = VK_BLEND_OP_ADD;
-		vkAttachments[i].colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+
+		if (hasComponentMasks)
+		{
+			vkAttachments[i].colorWriteMask = (VkColorComponentFlags)createInfo.componentMasks[i];
+		}
+		else
+		{
+			vkAttachments[i].colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+		}
 	}
 	cbInfo.attachmentCount = (uint32_t)vkAttachments.size();
 	cbInfo.pAttachments = vkAttachments.data();

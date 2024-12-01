@@ -8,6 +8,7 @@ namespace e2
 	class HexGrid;
 	class Game;
 	class GameSession;
+	class RadionManager;
 
 	class GameContext 
 	{
@@ -17,6 +18,7 @@ namespace e2
 
 		virtual e2::HexGrid* hexGrid();
 		virtual e2::GameSession* gameSession();
+		e2::RadionManager* radionManager();
 	};
 
 }

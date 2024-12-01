@@ -76,7 +76,7 @@ void main()
 
 
 #if defined(Material_EmissiveTexture)
-	albedo = mix(albedo, albedo * 0.5, 1.0 - metalness);
+	//albedo = mix(albedo, albedo * 0.5, 1.0 - metalness);
 	roughness = pow(roughness, 1.0/2.2);
 	vec3 emissive = texture(sampler2D(emissiveTexture, repeatSampler), uv).rgb * material.emissive.a;
 #else

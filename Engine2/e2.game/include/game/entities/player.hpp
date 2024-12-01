@@ -9,6 +9,11 @@
 
 namespace e2
 {
+	struct RadialCompare
+	{
+		bool operator() (e2::Entity* a, e2::Entity* b) const;
+	};
+
 	/** @tags(dynamic) */
 	class PlayerSpecification : public e2::EntitySpecification
 	{
@@ -42,7 +47,7 @@ namespace e2
 		PlayerEntity();
 		virtual ~PlayerEntity();
 
-		virtual void postConstruct(e2::GameContext* ctx, e2::EntitySpecification* spec, glm::vec3 const& worldPosition) override;
+		virtual void postConstruct(e2::GameContext* ctx, e2::EntitySpecification* spec, glm::vec3 const& worldPosition, glm::quat const& worldRotation) override;
 
 		virtual void writeForSave(e2::IStream& toBuffer) override;
 		virtual void readForSave(e2::IStream& fromBuffer) override;
@@ -122,87 +127,7 @@ namespace e2
 
 		e2::FogComponent m_fog;
 
-		std::vector<e2::Collision> m_collisionCache;
-	};
-
-
-
-
-
-
-
-
-
-
-
-
-	/** @tags(dynamic) */
-	class TeardropSpecification : public e2::EntitySpecification
-	{
-		ObjectDeclaration();
-	public:
-		TeardropSpecification();
-		virtual ~TeardropSpecification();
-		virtual void populate(e2::GameContext* ctx, nlohmann::json& obj) override;
-		virtual void finalize() override;
-
-		e2::SkeletalMeshSpecification mesh;
-
-		e2::CollisionSpecification collision;
-		e2::MovementSpecification movement;
-
-	};
-
-	/**
-	 * A game character, i.e. a freely movable character (not strictly tied to the hexgrid, but navigates through it freely with collisions)
-	 * @tags(dynamic, arena, arenaSize=1024)
-	 */
-	class TeardropEntity : public e2::Entity, public e2::ITriggerListener
-	{
-		ObjectDeclaration();
-	public:
-		TeardropEntity();
-		virtual ~TeardropEntity();
-
-		virtual void postConstruct(e2::GameContext* ctx, e2::EntitySpecification* spec, glm::vec3 const& worldPosition) override;
-
-		virtual void writeForSave(e2::IStream& toBuffer) override;
-		virtual void readForSave(e2::IStream& fromBuffer) override;
-
-		virtual void updateAnimation(double seconds) override;
-
-		virtual void update(double seconds) override;
-
-		virtual void onTrigger(e2::Name action, e2::Name trigger) override;
-
-		virtual void updateVisibility() override;
-
-		virtual void onMeleeDamage(e2::Entity* instigator, float dmg) override;
-
-		virtual bool canBeDestroyed() override;
-
-	protected:
-
-		e2::TeardropSpecification* m_teardropSpecification{};
-
-		float m_health{30.0f};
-
-		e2::CollisionComponent* m_collision{};
-		e2::MovementComponent* m_movement{};
-
-		e2::SkeletalMeshComponent* m_mesh{};
-		glm::quat m_targetRotation{ glm::identity<glm::quat>() };
-
-		glm::vec2 m_inputVector{};
-
-		glm::vec2 m_hitDirection{};
-
-		bool m_jumping{};
-		float m_jumpFactor{};
-		float m_timeSinceJump{};
-
-		glm::vec2 m_lastPosition{};
-
+		e2::Entity* m_interactable{};
 		std::vector<e2::Collision> m_collisionCache;
 	};
 

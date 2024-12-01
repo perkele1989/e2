@@ -677,7 +677,7 @@ void e2::Renderer::recordRenderLayers(double deltaTime, e2::ICommandBuffer* buff
 void e2::Renderer::recordDebugLines(double deltaTime, e2::ICommandBuffer* buff)
 {
 	uint8_t frameIndex = renderManager()->frameIndex();
-	e2::IDescriptorSet* modelSet = m_session->getModelSet(frameIndex);
+
 	std::map<e2::RenderLayer, std::unordered_set<MeshProxyLODEntry>> const& submeshIndex = m_session->submeshIndex();
 
 	if (m_debugLines.size() == 0)

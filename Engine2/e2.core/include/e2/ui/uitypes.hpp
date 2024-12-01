@@ -66,6 +66,11 @@ namespace e2
 
 			uint32_t hex{ 0xFF000000 };
 		};
+
+		static UIColor white()
+		{
+			return { 0xFFFFFFFF };
+		}
 	};
 
 	enum UIAccent : uint8_t

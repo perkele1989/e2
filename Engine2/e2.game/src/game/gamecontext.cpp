@@ -12,3 +12,8 @@ e2::GameSession* e2::GameContext::gameSession()
 {
 	return game()->m_session;
 }
+
+e2::RadionManager* e2::GameContext::radionManager()
+{
+	return game()->radionManager();
+}

@@ -340,6 +340,7 @@ namespace e2
 		glm::vec2 resolution;
 		glm::vec2 areaSize;
 		glm::vec2 moveOffset;
+		float timeDelta;
 
 	};
 
@@ -348,10 +349,27 @@ namespace e2
 	{
 		glm::vec2 resolution;
 		glm::vec2 areaSize;
-		glm::vec2 center;
+		glm::vec2 areaCenter;
 		glm::vec2 position;
 		float radius;
 	};
+
+
+	struct GrassCutMaskPushConstants
+	{
+		glm::vec2 resolution;
+		glm::vec2 areaSize;
+		glm::vec2 areaCenter;
+		glm::vec2 position;
+		float radius;
+	};
+
+	struct GrassPush
+	{
+		glm::vec2 position;
+		float radius;
+	};
+
 
 	struct GrassCut
 	{
@@ -360,6 +378,7 @@ namespace e2
 	};
 
 	constexpr uint64_t maxNumCuts = 16;
+	constexpr uint64_t maxNumPush = 512;
 
 	class GrassCutMask : public e2::GameContext, public e2::Context
 	{
@@ -375,6 +394,7 @@ namespace e2
 		void setCenter(glm::vec2 const& worldPlanarCoords);
 
 		void cut(GrassCut const& cut);
+		void push(GrassPush const& push);
 
 		e2::ITexture* getTexture(uint8_t frameIndex);
 
@@ -422,6 +442,15 @@ namespace e2
 		e2::IPipeline* m_addPipeline{};
 		
 		e2::StackVector<GrassCut, e2::maxNumCuts> m_cuts;
+
+		// push stuff (for adding object weights)
+		e2::IShader* m_pushVertexShader{};
+		e2::IShader* m_pushFragmentShader{};
+		e2::IPipelineLayout* m_pushPipelineLayout{};
+		e2::IPipeline* m_pushPipeline{};
+
+		e2::StackVector<GrassPush, e2::maxNumPush> m_pushes;
+		 
 	};
 
 

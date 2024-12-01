@@ -50,6 +50,13 @@ void e2::Transform::lookAt(glm::vec3 const& target, TransformSpace space)
 	setRotation(glm::quatLookAt(glm::normalize(target - getTranslation(space)), e2::worldUpf()), space);
 }
 
+glm::vec3 e2::Transform::getForward(e2::TransformSpace space)
+{
+	glm::vec3 worldFwd = e2::worldForwardf();
+	glm::vec4 fwd = getTransformMatrix(space) * glm::vec4(worldFwd.x, worldFwd.y, worldFwd.z, 0.0);
+	return glm::vec3(fwd.x, fwd.y, fwd.z);
+}
+
 glm::vec3 e2::Transform::getTranslation(TransformSpace space /*= TS_Local*/)
 {
 	if (space == e2::TransformSpace::Local || !m_transformParent)

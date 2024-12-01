@@ -32,6 +32,8 @@ void e2::CollisionComponent::invalidate()
 		m_currentIndex = newIndex;
 		m_entity->game()->registerCollisionComponent(this, m_currentIndex);
 	}
+
+	m_entity->game()->hexGrid()->grassCutMask().push({ m_entity->planarCoords(), m_radius*4.0f });
 }
 
 void e2::CollisionComponent::setRadius(float newRadius)

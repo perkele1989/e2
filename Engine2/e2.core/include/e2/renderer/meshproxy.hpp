@@ -95,7 +95,7 @@ namespace e2
 	struct E2_API MeshLodConfiguration
 	{
 		float maxDistance{ 0.0f };
-		e2::MeshPtr mesh;
+		e2::MeshPtr mesh{};
 		e2::StackVector<e2::MaterialProxy*, e2::maxNumSubmeshes> materials;
 	};
 

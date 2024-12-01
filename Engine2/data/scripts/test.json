@@ -1,0 +1,66 @@
+{
+    "id": "test",
+    "entryNode": 0,
+    "nodes": [
+        {
+            "id": 0,
+            "typeName": "e2::DialogueNode",
+            "lines": [
+                "So...",
+                "You wanna party?"
+            ],
+            "answers":[
+                "Yeah!",
+                "Hell no!"
+            ]
+        },
+        {
+            "id": 1,
+            "typeName": "e2::DialogueNode",
+            "lines": [
+                "Maan, you're boring!"
+            ]
+        },
+        {
+            "id": 2,
+            "typeName": "e2::DialogueNode",
+            "lines": [
+                "That's great!",
+                "Do you have booze?"
+            ],
+            "answers": [
+                "Yep!",
+                "Was I supposed to bring some?"
+            ]
+        },
+        {
+            "id": 3,
+            "typeName": "e2::DialogueNode",
+            "lines": [
+                "Wooo, let's party!"
+            ]
+        }
+    ],
+    "connections": [
+        {
+            "startNode": 0,
+            "startNodePin": 0,
+            "endNode": 2
+        },
+        {
+            "startNode": 0,
+            "startNodePin": 1,
+            "endNode": 1
+        },
+        {
+            "startNode": 2,
+            "startNodePin": 0,
+            "endNode": 3
+        },
+        {
+            "startNode": 2,
+            "startNodePin": 1,
+            "endNode": 1
+        }
+    ]
+}

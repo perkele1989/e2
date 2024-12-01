@@ -1,0 +1,19 @@
+
+{
+    "id": "redbomb_entity",
+    "specification": "e2::BombSpecification",
+    "isRedBomb": true,
+    "entityType": "e2::BombEntity",
+    "movement": {
+        "ignoreTypes": ["e2::ItemEntity"]
+    },
+    "collision": {
+        "radius": 0.1
+    },
+    "mesh": {
+
+        "meshScale": [0.5, 0.5, 0.5],
+        "mesh": "SM_RedBomb.e2a"
+    }
+
+}

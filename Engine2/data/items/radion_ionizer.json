@@ -1,0 +1,18 @@
+{
+    "id": "radion_ionizer",
+    "displayName": "Ionizer",
+    "dropMesh": {
+        "meshScale": [1.0, 1.0, 1.0],
+        "mesh": "SM_IronHatchet.e2a"
+    },
+    "wieldable": true,
+    "wieldHandler": "e2::IonizerHandler",
+    "wieldHandlerData":{
+        "mesh": {
+            "meshScale": [1.0, 1.0, 1.0],
+            "mesh": "SM_IronHatchet.e2a"
+        }
+    },
+    "stackable": false,
+    "iconSprite": "ItemIconIonizer"
+}

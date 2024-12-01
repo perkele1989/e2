@@ -1,0 +1,16 @@
+{
+    "id": "bomb",
+    "displayName": "Bomb",
+    "dropMesh": {
+        "meshScale": [1.0, 1.0, 1.0],
+        "mesh": "SM_Bomb.e2a"
+    },
+    "wieldable": true,
+    "wieldHandler": "e2::ThrowableHandler",
+    "wieldHandlerData":{
+        "entity": "bomb_entity"
+    },
+    "stackable": true,
+    "stackSize": 5,
+    "iconSprite": "ItemIconBomb"
+}
