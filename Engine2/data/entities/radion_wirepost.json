@@ -7,11 +7,13 @@
     "pins": [
         {
             "name": "Input",
-            "offset": [-0.25, -0.25, 0.0]
+            "type": "Input",
+            "offset": [0.0, -0.1, 0.1]
         },
         {
             "name": "Output",
-            "offset": [0.25, -0.25, 0.0]
+            "type": "Output",
+            "offset": [0.0, -0.1, -0.1]
         }
     ],
 
@@ -20,8 +22,8 @@
     },
     "mesh": {
 
-        "meshScale": [0.3, 0.3, 0.3],
-        "mesh": "SM_Bomb.e2a"
+        "meshScale": [2.0, 2.0, 2.0],
+        "mesh": "SM_Radion_WirePost.e2a"
     }
 
 }

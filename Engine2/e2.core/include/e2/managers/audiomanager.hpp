@@ -49,7 +49,7 @@ namespace e2
 
 		void playMusic(e2::Ptr<e2::Sound> sound, float volume = 1.0f, bool looping = true, e2::AudioChannel *channel = nullptr);
 
-		void playOneShot(e2::Ptr<e2::Sound> sound, float volume = 1.0f, float spatiality = 0.0f, glm::vec3 const& position = {});
+		void playOneShot(e2::Ptr<e2::Sound> sound, float volume = 1.0f, float spatiality = 0.0f, glm::vec3 const& position = {}, float pitch = 1.0f);
 
 		inline FMOD::System* coreSystem()
 		{

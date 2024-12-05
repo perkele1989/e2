@@ -1,9 +1,9 @@
 
 {
-    "id": "radion_capacitor",
+    "id": "radion_splitter",
     "specification": "e2::RadionEntitySpecification",
-    "entityType": "e2::RadionCapacitor",
-    "radionCost": 3,
+    "entityType": "e2::RadionSplitter",
+    "radionCost": 2,
     "pins": [
         {
             "name": "Input",
@@ -11,9 +11,14 @@
             "offset": [0.0, -0.1, 0.1]
         },
         {
-            "name": "Output",
+            "name": "OutputA",
             "type": "Output",
-            "offset": [0.0, -0.1, -0.1]
+            "offset": [0.1, -0.1, -0.1]
+        },
+        {
+            "name": "OutputB",
+            "type": "Output",
+            "offset": [-0.1, -0.1, -0.1]
         }
     ],
 
@@ -21,8 +26,9 @@
         "radius": 0.1
     },
     "mesh": {
+
         "meshScale": [2.0, 2.0, 2.0],
-        "mesh": "SM_Radion_Capacitor.e2a"
+        "mesh": "SM_Radion_Splitter.e2a"
     }
 
 }

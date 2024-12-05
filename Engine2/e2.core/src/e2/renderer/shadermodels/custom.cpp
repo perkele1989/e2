@@ -326,6 +326,9 @@ e2::IPipeline* e2::CustomModel::getOrCreatePipeline(e2::MeshProxy* proxy, uint8_
 
 
 	e2::SubmeshSpecification const& spec = proxy->lods[lodIndex].asset->specification(submeshIndex);
+	if (spec.indexBuffer == nullptr || spec.vertexCount == 0 || spec.indexCount == 0)
+		return nullptr;
+
 	e2::CustomProxy* lwProxy = static_cast<e2::CustomProxy*>(proxy->lods[lodIndex].materialProxies[submeshIndex]);
 	e2::MaterialPtr material = lwProxy->asset;
 

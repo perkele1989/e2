@@ -286,7 +286,7 @@ void e2::Game::setupGame()
 	m_hexGrid = e2::create<e2::HexGrid>(this);
 	
 	e2::SoundPtr menuMusic= assetManager()->get("M_Menu.e2a").cast<e2::Sound>();
-	audioManager()->playMusic(menuMusic, 0.8f, true, &m_menuMusic);
+	audioManager()->playMusic(menuMusic, 0.6f, true, &m_menuMusic);
 
 	m_startViewOrigin = glm::vec2(-1662.75f, 650.27f);
 	m_viewOrigin = m_startViewOrigin;
@@ -1377,7 +1377,7 @@ void e2::Game::updateGame(double seconds)
 	if (divisor > 0)
 	{
 		m_waterProximity = proximity / float(divisor);
-		m_waterChannel.setVolume(m_waterProximity * 0.5f);
+		m_waterChannel.setVolume(m_waterProximity * 0.35f);
 	}
 
 	constexpr float invisibleChunkLifetime = 3.0f;
@@ -1734,8 +1734,10 @@ void e2::Game::updateMenu(double seconds)
 		m_playerState.give("ironhatchet");
 		m_playerState.give("ironsword");
 		m_playerState.give("radion_ionizer");
+		m_playerState.give("radion_linker");
 		m_radionManager.discoverEntity("radion_powersource");
 		m_radionManager.discoverEntity("radion_wirepost");
+		m_radionManager.discoverEntity("radion_splitter");
 		m_radionManager.discoverEntity("radion_capacitor");
 		m_radionManager.discoverEntity("radion_switch");
 		m_radionManager.discoverEntity("radion_crystal");

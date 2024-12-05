@@ -182,6 +182,9 @@ e2::IPipeline* e2::TerrainModel::getOrCreatePipeline(e2::MeshProxy* proxy, uint8
 	}
 
 	e2::SubmeshSpecification const& spec = proxy->lods[lodIndex].asset->specification(submeshIndex);
+	if (spec.indexBuffer == nullptr || spec.vertexCount == 0 || spec.indexCount == 0)
+		return nullptr;
+
 	e2::TerrainProxy* lwProxy = static_cast<e2::TerrainProxy*>(proxy->lods[lodIndex].materialProxies[submeshIndex]);
 
 	uint16_t geometryFlags = (uint16_t)spec.attributeFlags;

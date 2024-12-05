@@ -3,15 +3,17 @@
     "id": "radion_crystal",
     "specification": "e2::RadionEntitySpecification",
     "entityType": "e2::RadionCrystal",
-    "radionCost": 40,
+    "radionCost": 5,
     "pins": [
         {
             "name": "Input",
-            "offset": [-0.25, -0.25, 0.0]
+            "type": "Input",
+            "offset": [0.0, -0.1, 0.1]
         },
         {
             "name": "Output",
-            "offset": [0.25, -0.25, 0.0]
+            "type": "Output",
+            "offset": [0.0, -0.1, -0.1]
         }
     ],
 

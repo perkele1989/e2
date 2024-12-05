@@ -852,6 +852,23 @@ glm::dvec2 e2::RenderView::unprojectWorldPlane(glm::dvec2 const& resolution, glm
 	return { offset.x, offset.z};
 }
 
+glm::dvec2 e2::RenderView::unprojectWorld(glm::dvec2 const& resolution, glm::dvec3 const& worldPosition) const
+{
+	glm::dmat4 projectionMatrix = calculateProjectionMatrix(resolution);
+	glm::dmat4 viewMatrix = calculateViewMatrix();
+	glm::dmat4 viewProjectionMatrix = projectionMatrix * viewMatrix;
+
+	glm::dvec4 clipPosition = viewProjectionMatrix * glm::dvec4(worldPosition, 1.0);
+
+	glm::dvec3 ndcPosition = glm::dvec3(clipPosition) / clipPosition.w;
+
+	glm::dvec2 screenPosition;
+	screenPosition.x = (ndcPosition.x * 0.5 + 0.5) * resolution.x;
+	screenPosition.y = (ndcPosition.y * 0.5 + 0.5) * resolution.y;
+
+	return screenPosition;
+}
+
 e2::Viewpoints2D const & e2::Renderer::viewpoints() const
 {
 	return m_viewPoints;

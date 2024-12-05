@@ -2,8 +2,8 @@
     "id": "radion_cube",
     "displayName": "Radion",
     "dropMesh": {
-        "meshScale": [0.3, 0.3, 0.3],
-        "mesh": "SM_Lumber.e2a"
+        "meshScale": [1.0, 1.0, 1.0],
+        "mesh": "SM_Radion_Cube.e2a"
     },
     "wieldable": false,
     "stackable": true,

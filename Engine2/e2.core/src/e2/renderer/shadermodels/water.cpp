@@ -145,6 +145,9 @@ e2::IPipeline* e2::WaterModel::getOrCreatePipeline(e2::MeshProxy* proxy, uint8_t
 	}
 
 	e2::SubmeshSpecification const& spec = proxy->lods[lodIndex].asset->specification(submeshIndex);
+	if (spec.indexBuffer == nullptr || spec.vertexCount == 0 || spec.indexCount == 0)
+		return nullptr;
+
 	e2::WaterProxy* lwProxy = static_cast<e2::WaterProxy*>(proxy->lods[lodIndex].materialProxies[submeshIndex]);
 
 	uint16_t geometryFlags = (uint16_t)spec.attributeFlags;

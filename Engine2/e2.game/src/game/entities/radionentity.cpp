@@ -1,6 +1,7 @@
 
 #include "game/entities/radionentity.hpp"
 #include "game/game.hpp"
+#include <e2/game/gamesession.hpp>
 
 e2::RadionEntitySpecification::RadionEntitySpecification()
 	: e2::EntitySpecification()
@@ -22,9 +23,17 @@ void e2::RadionEntitySpecification::populate(e2::GameContext* ctx, nlohmann::jso
 		{
 			if (!jsonPin.contains("name"))
 			{
-				LogWarning("pins contain invalid object");
+				LogWarning("pin requires name");
 				continue;
 			}
+
+			if (!jsonPin.contains("type"))
+			{
+				LogWarning("pin type (Input or Output)");
+				continue;
+			}
+
+			e2::RadionPinType pinType = jsonPin.at("type").template get<std::string>() == "Input" ? e2::RadionPinType::Input : e2::RadionPinType::Output;
 
 			e2::Name pinName = jsonPin.at("name").template get<std::string>();
 			glm::vec3 pinOffset{};
@@ -43,7 +52,7 @@ void e2::RadionEntitySpecification::populate(e2::GameContext* ctx, nlohmann::jso
 				}
 			}
 
-			pins.push({pinName, pinOffset});
+			pins.push({pinName,pinType, pinOffset});
 		}
 	}
 
@@ -82,6 +91,19 @@ int32_t e2::RadionEntitySpecification::pinIndexFromName(e2::Name name)
 
 e2::RadionEntity::~RadionEntity()
 {
+	for (e2::RadionPin& pin : radionSpecification->pins)
+	{
+		if(pin.type == e2::RadionPinType::Input)
+		{
+			disconnectInputPin(pin.name);
+		}
+		else
+		{
+			disconnectOutputPin(pin.name);
+		}
+
+	}
+
 	radionManager()->unregisterEntity(this);
 	if (m_mesh)
 		e2::destroy(m_mesh);
@@ -101,11 +123,11 @@ void e2::RadionEntity::postConstruct(e2::GameContext* ctx, e2::EntitySpecificati
 	radionSpecification = m_specification->cast<e2::RadionEntitySpecification>();
 	
 	uint64_t numPins = radionSpecification->pins.size();
-	connections.resize(numPins);
+	slots.resize(numPins);
 	outputRadiance.resize(radionSpecification->pins.size());
 	for (uint64_t i = 0; i < numPins; i++)
 	{
-		connections[i] = {};
+		slots[i] = {};
 		outputRadiance[i] = 0.0f;
 	}
 
@@ -119,6 +141,38 @@ void e2::RadionEntity::postConstruct(e2::GameContext* ctx, e2::EntitySpecificati
 void e2::RadionEntity::update(double seconds)
 {
 	m_collision->invalidate();
+
+	e2::GameSession* gameSession = game()->gameSession();
+	e2::Renderer* renderer = gameSession->renderer();
+
+	int32_t i = -1;
+	for (e2::RadionPin& pin : radionSpecification->pins)
+	{
+		i++;
+		if (pin.type != e2::RadionPinType::Output)
+			continue;
+
+		e2::RadionSlot& slot = slots[i];
+
+		for (e2::RadionConnection conn : slot.connections)
+		{
+			e2::RadionEntity* otherEntity = conn.otherEntity;
+			if (!otherEntity)
+				continue;
+			glm::vec3 aWorld = getTransform()->getTransformMatrix(e2::TransformSpace::World) * glm::vec4(pin.offset, 1.0f);
+
+			e2::RadionEntitySpecification* otherSpec = otherEntity->radionSpecification;
+			int32_t otherIndex = otherSpec->pinIndexFromName(conn.otherPin);
+
+			glm::vec3 bWorld = otherEntity->getTransform()->getTransformMatrix(e2::TransformSpace::World) * glm::vec4(otherSpec->pins[otherIndex].offset, 1.0f);
+
+			glm::vec3 color = glm::mix(glm::vec3(1.0, 0.0, 0.0), glm::vec3(0.0, 1.0, 0.0), outputRadiance[i] / e2::radionHighRadiance);
+			renderer->debugLine(color, aWorld, bWorld);
+		}
+
+
+
+	}
 }
 
 void e2::RadionEntity::updateAnimation(double seconds)
@@ -131,69 +185,168 @@ void e2::RadionEntity::updateVisibility()
 	m_mesh->updateVisibility();
 }
 
-void e2::RadionEntity::connectPin(e2::Name pinName, e2::RadionEntity* otherEntity, e2::Name otherPinName)
+void e2::RadionEntity::connectOutputPin(e2::Name outputPinName, e2::RadionEntity* inputEntity, e2::Name inputPinName)
 {
-	disconnectPin(pinName);
+	inputEntity->disconnectInputPin(inputPinName);
 
-	if (!otherEntity)
+	int32_t outputPinIndex = radionSpecification->pinIndexFromName(outputPinName);
+	e2::RadionPin& outputPin = radionSpecification->pins[outputPinIndex];
+	e2::RadionSlot& outputSlot = slots[outputPinIndex];
+
+	if (outputPin.type != e2::RadionPinType::Output)
 	{
-		LogError("otherEntity null");
+		LogError("not output pin");
 		return;
 	}
 
-	int32_t pinIndex = radionSpecification->pinIndexFromName(pinName);
-	int32_t otherPinIndex = otherEntity->radionSpecification->pinIndexFromName(otherPinName);
+	if (outputSlot.connections.full())
+	{
+		e2::RadionConnection lastOutputConnection = outputSlot.connections.back();
+		lastOutputConnection.otherEntity->disconnectInputPin(lastOutputConnection.otherPin);
+	}
 
-	if (pinIndex < 0 || otherPinIndex < 0)
+	if (outputSlot.connections.full())
+	{
+		LogError("code flow error!!!!");
+		return;
+	}
+
+	int32_t inputPinIndex = inputEntity->radionSpecification->pinIndexFromName(inputPinName);
+	e2::RadionPin& inputPin = inputEntity->radionSpecification->pins[inputPinIndex];
+	if (inputPin.type != e2::RadionPinType::Input)
+	{
+		LogError("not input pin");
+		return;
+	}
+
+	e2::RadionSlot& inputSlot = inputEntity->slots[inputPinIndex];
+	inputSlot.connections.push({this, outputPinName});
+	outputSlot.connections.push({ inputEntity, inputPinName });
+
+
+}
+
+void e2::RadionEntity::disconnectInputPin(e2::Name pinName)
+{
+	int32_t inputPinIndex = radionSpecification->pinIndexFromName(pinName);
+	if (inputPinIndex < 0)
 	{
 		LogError("no such pin");
 		return;
 	}
 
-	connections[pinIndex].otherEntity = otherEntity;
-	connections[pinIndex].otherPin = otherPinName;
+	e2::RadionPin& inputPin = radionSpecification->pins[inputPinIndex];
+	if (inputPin.type != e2::RadionPinType::Input)
+	{
+		LogError("not an input pin");
+		return;
+	}
 
-	otherEntity->connections[otherPinIndex].otherEntity = this;
-	otherEntity->connections[otherPinIndex].otherPin = pinName;
+	e2::RadionSlot& inputSlot = slots[inputPinIndex];
+	if (inputSlot.connections.empty())
+	{
+		return;
+	}
+
+	if (inputSlot.connections.size() > 1)
+	{
+		LogWarning("multiple connections on input pin, this is invalid, will disconnect all");
+	}
+
+	for (e2::RadionConnection& conn : inputSlot.connections)
+	{
+		e2::RadionEntity* outputEntity = conn.otherEntity;
+		e2::Name outputPinName = conn.otherPin;
+
+		conn.otherEntity = nullptr;
+		conn.otherPin = e2::Name();
+
+		if (outputEntity)
+		{
+			int32_t outputPinIndex = outputEntity->radionSpecification->pinIndexFromName(outputPinName);
+			if (outputPinIndex < 0)
+			{
+				LogError("no such pin (invalid connection)");
+				continue;
+			}
+
+			e2::RadionSlot &outputSlot = outputEntity->slots[outputPinIndex];
+			outputSlot.connections.removeFirstByValueFast({this, pinName});
+		}
+	}
+
+	inputSlot.connections.clear();
 
 }
 
-void e2::RadionEntity::disconnectPin(e2::Name pinName)
+void e2::RadionEntity::disconnectOutputPin(e2::Name pinName)
 {
 	int32_t pinIndex = radionSpecification->pinIndexFromName(pinName);
 	if (pinIndex < 0)
 	{
-		LogError("invalid pin name");
+		LogError("no such pin");
 		return;
 	}
 
-	e2::RadionEntity* otherEntity = connections[pinIndex].otherEntity;
-	if (!otherEntity)
+	e2::RadionPin& pin = radionSpecification->pins[pinIndex];
+	if (pin.type != e2::RadionPinType::Output)
 	{
-		LogError("broken connection! WTF");
+		LogError("not an output pin");
 		return;
 	}
 
-	int32_t otherPinIndex = otherEntity->radionSpecification->pinIndexFromName(connections[pinIndex].otherPin);
+	e2::RadionSlot& slot = slots[pinIndex];
+	if (slot.connections.empty())
+	{
+		return;
+	}
 
-	connections[pinIndex].otherEntity = nullptr;
-	connections[pinIndex].otherPin = e2::Name();
+	e2::StackVector<e2::RadionConnection, maxNumRadionConnections> connCopy = slot.connections;
 
-	otherEntity->connections[otherPinIndex].otherEntity = nullptr;
-	otherEntity->connections[otherPinIndex].otherPin = e2::Name();
+	for (e2::RadionConnection conn : connCopy)
+	{
+		if (!conn.otherEntity)
+			continue;
+		conn.otherEntity->disconnectInputPin(conn.otherPin);
+	}
 }
 
 float e2::RadionEntity::getInputRadiance(e2::Name pinName)
 {
 	int32_t pinIndex = radionSpecification->pinIndexFromName(pinName);
 	if (pinIndex < 0)
+	{
+		LogError("no such pin");
 		return 0.0f;
+	}
 
-	e2::RadionEntity* otherEntity = connections[pinIndex].otherEntity;
+	e2::RadionPin& pin = radionSpecification->pins[pinIndex];
+	if (pin.type != e2::RadionPinType::Input)
+	{
+		LogError("not input pin");
+		return 0.0f;
+	}
+
+	e2::RadionSlot& slot = slots[pinIndex];
+	if (slot.connections.empty())
+	{
+		// not connected
+		return 0.0f;
+	}
+
+	if (slot.connections.size() > 1)
+	{
+		LogError("multiple connections on input pin, invalid!!");
+		return 0.0f;
+	}
+
+	e2::RadionConnection& connection = slot.connections[0];
+
+	e2::RadionEntity* otherEntity = connection.otherEntity;
 	if (!otherEntity)
 		return 0.0f;
 
-	return otherEntity->getOutputRadiance(connections[pinIndex].otherPin);
+	return otherEntity->getOutputRadiance(connection.otherPin);
 }
 
 float e2::RadionEntity::getOutputRadiance(e2::Name pinName)
@@ -212,6 +365,23 @@ void e2::RadionEntity::setOutputRadiance(e2::Name pinName, float newRadiance)
 		return;
 
 	outputRadiance[pinIndex] = newRadiance;
+}
+
+bool e2::RadionEntity::anyOutputConnected()
+{
+	int32_t i = -1;
+	for (e2::RadionPin& pin : radionSpecification->pins)
+	{
+		i++;
+
+		if (pin.type != e2::RadionPinType::Output)
+			continue;
+		
+		if (!slots[i].connections.empty())
+			return true;
+	}
+	
+	return false;
 }
 
 
@@ -245,16 +415,18 @@ void e2::RadionSwitch::radionTick()
 	setOutputRadiance("Output", state ? inputRadiance * e2::radionDecay : e2::radionLowRadiance);
 }
 
+void e2::RadionSwitch::onInteract(e2::Entity* interactor)
+{
+	state = !state;
+}
+
 void e2::RadionCapacitor::radionTick()
 {
 	float inputRadiance = getInputRadiance("Input");
-	charge += inputRadiance;
-	charge = glm::clamp(charge, e2::radionLowRadiance, e2::radionHighRadiance);
 
-	if (charge > e2::radionPowerTreshold)
+	if (inputRadiance > e2::radionPowerTreshold)
 	{
-		setOutputRadiance("Output", charge);
-		charge *= e2::radionDecay;
+		setOutputRadiance("Output", e2::radionHighRadiance);
 	}
 	else
 	{
@@ -284,7 +456,7 @@ void e2::RadionGateNOT::radionTick()
 		return;
 	}
 
-	setOutputRadiance("Output", inputRadiance >= e2::radionSignalTreshold ? powerRadiance * e2::radionDecay : e2::radionLowRadiance);
+	setOutputRadiance("Output", inputRadiance >= e2::radionSignalTreshold ? e2::radionLowRadiance : powerRadiance * e2::radionDecay);
 }
 
 void e2::RadionGateAND::radionTick()
@@ -393,4 +565,12 @@ void e2::RadionGateXNOR::radionTick()
 		((inputRadianceA >= e2::radionSignalTreshold) == (inputRadianceB >= e2::radionSignalTreshold)) ?
 		powerRadiance * e2::radionDecay :
 		e2::radionLowRadiance);
+}
+
+void e2::RadionSplitter::radionTick()
+{
+	float inputRadiance = getInputRadiance("Input");
+	inputRadiance *= e2::radionDecay;
+	setOutputRadiance("OutputA", inputRadiance);
+	setOutputRadiance("OutputB", inputRadiance);
 }

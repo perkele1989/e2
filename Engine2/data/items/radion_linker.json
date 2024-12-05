@@ -1,0 +1,18 @@
+{
+    "id": "radion_linker",
+    "displayName": "Linker",
+    "dropMesh": {
+        "meshScale": [1.0, 1.0, 1.0],
+        "mesh": "SM_IronHatchet.e2a"
+    },
+    "wieldable": true,
+    "wieldHandler": "e2::LinkerHandler",
+    "wieldHandlerData":{
+        "mesh": {
+            "meshScale": [1.0, 1.0, 1.0],
+            "mesh": "SM_IronHatchet.e2a"
+        }
+    },
+    "stackable": false,
+    "iconSprite": "ItemIconLinker"
+}

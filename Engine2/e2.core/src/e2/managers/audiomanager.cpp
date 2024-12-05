@@ -129,7 +129,7 @@ void e2::AudioManager::playMusic(e2::Ptr<e2::Sound> sound, float volume, bool lo
 	channel->m_fmodChannel = fmodChannel;
 }
 
-void e2::AudioManager::playOneShot(e2::Ptr<e2::Sound> sound, float volume,  float spatiality, glm::vec3 const& position)
+void e2::AudioManager::playOneShot(e2::Ptr<e2::Sound> sound, float volume,  float spatiality, glm::vec3 const& position, float pitch)
 {
 	if (!sound)
 		return;
@@ -154,6 +154,7 @@ void e2::AudioManager::playOneShot(e2::Ptr<e2::Sound> sound, float volume,  floa
 	channel->set3DAttributes(&pos, &vel);
 	channel->set3DMinMaxDistance(0.25f, 15.0f);
 	channel->set3DLevel(spatiality);
+	channel->setPitch(pitch);
 	channel->setPaused(false);
 }
 

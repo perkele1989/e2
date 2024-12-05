@@ -3,11 +3,12 @@
     "id": "radion_powersource",
     "specification": "e2::RadionEntitySpecification",
     "entityType": "e2::RadionPowerSource",
-    "radionCost": 20,
+    "radionCost": 5,
     "pins": [
         {
             "name": "Output",
-            "offset": [0.0, -0.25, 0.0]
+            "type": "Output",
+            "offset": [0.0, -0.1, 0.0]
         }
     ],
 
@@ -16,8 +17,8 @@
     },
     "mesh": {
 
-        "meshScale": [0.5, 0.5, 0.5],
-        "mesh": "SM_Bomb.e2a"
+        "meshScale": [2.0, 2.0, 2.0],
+        "mesh": "SM_Radion_Powersource.e2a"
     }
 
 }

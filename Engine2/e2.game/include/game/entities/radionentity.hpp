@@ -7,10 +7,20 @@
 namespace e2
 {
 	constexpr uint64_t maxNumRadionPins = 4;
+	constexpr uint64_t maxNumRadionConnections = 4;
+
+	enum class RadionPinType : uint8_t
+	{
+		Input,
+		Output
+	};
+
 	struct RadionPin
 	{
 		e2::Name name;
+		e2::RadionPinType type;
 		glm::vec3 offset;
+		
 	};
 
 	class RadionEntity;
@@ -19,6 +29,16 @@ namespace e2
 	{
 		e2::RadionEntity* otherEntity{};
 		e2::Name otherPin;
+	};
+
+	inline bool operator== (RadionConnection const& lhs, RadionConnection const& rhs) noexcept
+	{
+		return lhs.otherEntity == rhs.otherEntity && lhs.otherPin == rhs.otherPin;
+	}
+
+	struct RadionSlot
+	{
+		e2::StackVector<e2::RadionConnection, maxNumRadionConnections> connections;
 	};
 
 	/** @tags(dynamic) */
@@ -58,14 +78,17 @@ namespace e2
 
 		virtual void updateVisibility() override;
 
-		void connectPin(e2::Name pinName, e2::RadionEntity* entity, e2::Name otherPinName);
-		void disconnectPin(e2::Name pinName);
+		void connectOutputPin(e2::Name outputPinName, e2::RadionEntity* inputEntity, e2::Name inputPinName);
+		void disconnectInputPin(e2::Name pinName);
+		void disconnectOutputPin(e2::Name pinName);
 
 		float getInputRadiance(e2::Name pinName);
 		float getOutputRadiance(e2::Name pinName);
 		void setOutputRadiance(e2::Name pinName, float newRadiance);
 
-		e2::StackVector<RadionConnection, e2::maxNumRadionPins> connections;
+		bool anyOutputConnected();
+
+		e2::StackVector<RadionSlot, e2::maxNumRadionPins> slots;
 		e2::StackVector<float, e2::maxNumRadionPins> outputRadiance;
 		e2::RadionEntitySpecification* radionSpecification{};
 
@@ -124,6 +147,17 @@ namespace e2
 		virtual void radionTick() override;
 	};
 
+	/** @tags(dynamic) */
+	class RadionSplitter : public e2::RadionEntity
+	{
+		ObjectDeclaration();
+	public:
+		RadionSplitter() = default;
+		virtual ~RadionSplitter() = default;
+
+		virtual void radionTick() override;
+	};
+
 	/** @tags(dynamic) basically a repeater (charges to 5V by adding input, once 5V sets output to 5V, otherwise sets output to 0V*/
 	class RadionCapacitor : public e2::RadionEntity
 	{
@@ -134,7 +168,6 @@ namespace e2
 
 		virtual void radionTick() override;
 
-		float charge{};
 	};
 
 	/** @tags(dynamic) sets output to input if state is true, otherwise sets output to 0V */
@@ -147,7 +180,11 @@ namespace e2
 
 		virtual void radionTick() override;
 
-		bool state{ true };
+
+		virtual bool interactable() { return true; }
+		virtual void onInteract(e2::Entity* interactor);
+
+		bool state{ false };
 	};
 
 	/** @tags(dynamic) alternates output between input V and 0V every tick */

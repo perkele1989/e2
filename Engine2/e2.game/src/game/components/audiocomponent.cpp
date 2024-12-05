@@ -18,7 +18,8 @@ e2::RandomAudioComponent::~RandomAudioComponent()
 
 void e2::RandomAudioComponent::play(float volume, float spatiality)
 {
-	m_entity->game()->audioManager()->playOneShot(m_specification->getRandom(), volume, spatiality, m_entity->getTransform()->getTranslation(e2::TransformSpace::World));
+	float pitch = e2::randomFloat(0.90f, 1.1f);
+	m_entity->game()->audioManager()->playOneShot(m_specification->getRandom(), volume, spatiality, m_entity->getTransform()->getTranslation(e2::TransformSpace::World), pitch);
 }
 
 

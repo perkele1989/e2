@@ -84,26 +84,19 @@ bool e2::Mesh::read(e2::IStream& source)
 			uint32_t bufferSize{};
 			source >> bufferSize;
 
-			e2::DataBufferCreateInfo bufferCreateInfo{};
-			bufferCreateInfo.dynamic = false;
-			bufferCreateInfo.size = bufferSize;
-			bufferCreateInfo.type = BufferType::IndexBuffer;
-			e2::IDataBuffer* newBuffer = renderContext()->createDataBuffer(bufferCreateInfo);
+			e2::IDataBuffer* newBuffer{};
+			if (bufferSize > 0)
+			{
+				e2::DataBufferCreateInfo bufferCreateInfo{};
+				bufferCreateInfo.dynamic = false;
+				bufferCreateInfo.size = bufferSize;
+				bufferCreateInfo.type = BufferType::IndexBuffer;
+				newBuffer = renderContext()->createDataBuffer(bufferCreateInfo);
 
-			uint8_t const* readCurrent = source.read(bufferSize);
-			//uint32_t* indexBuffer = reinterpret_cast<uint32_t const*>(readCurrent);
-			//for (uint32_t ti = 0; ti < (newSpecification.indexCount / 3); ti++)
-			//{
-			//	uint32_t a = indexBuffer[ti * 3 + 0];
-			//	uint32_t b = indexBuffer[ti * 3 + 1];
-			//	uint32_t c = indexBuffer[ti * 3 + 2];
+				uint8_t const* readCurrent = source.read(bufferSize);
 
-			//	if (a >= newSpecification.vertexCount || b >= newSpecification.vertexCount || c >= newSpecification.vertexCount)
-			//		LogError("corrupt data detected");
-			//}
-
-			// upload data direct from source buffer, and then use consume to skip 
-			newBuffer->upload(readCurrent, bufferSize, 0, 0);
+				newBuffer->upload(readCurrent, bufferSize, 0, 0);
+			}
 
 			newSpecification.indexBuffer = newBuffer;
 		};
@@ -112,15 +105,19 @@ bool e2::Mesh::read(e2::IStream& source)
 			uint32_t bufferSize{};
 			source >> bufferSize;
 
-			e2::DataBufferCreateInfo bufferCreateInfo{};
-			bufferCreateInfo.dynamic = false;
-			bufferCreateInfo.size = bufferSize;
-			bufferCreateInfo.type = BufferType::VertexBuffer;
-			e2::IDataBuffer* newBuffer = renderContext()->createDataBuffer(bufferCreateInfo);
+			e2::IDataBuffer* newBuffer{};
+			if (bufferSize > 0)
+			{
+				e2::DataBufferCreateInfo bufferCreateInfo{};
+				bufferCreateInfo.dynamic = false;
+				bufferCreateInfo.size = bufferSize;
+				bufferCreateInfo.type = BufferType::VertexBuffer;
+				newBuffer = renderContext()->createDataBuffer(bufferCreateInfo);
 
-			// upload data direct from source buffer, and then use consume to skip 
-			uint8_t const* readCurrent = source.read(bufferSize);
-			newBuffer->upload(readCurrent, bufferSize, 0, 0);
+				// upload data direct from source buffer, and then use consume to skip 
+				uint8_t const* readCurrent = source.read(bufferSize);
+				newBuffer->upload(readCurrent, bufferSize, 0, 0);
+			}
 
 			newSpecification.vertexAttributes.push(newBuffer);
 		};

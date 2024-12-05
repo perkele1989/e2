@@ -10,6 +10,8 @@
 #include "game/components/physicscomponent.hpp"
 #include "game/components/fogcomponent.hpp"
 
+#include "game/radionmanager.hpp"
+
 #include <nlohmann/json.hpp>
 
 namespace e2
@@ -101,6 +103,9 @@ namespace e2
 
 		int32_t m_currentEntityIndex{};
 
+
+		std::vector<e2::Collision> m_collisions;
+
 		e2::StaticMeshSpecification m_meshSpecification;
 
 		e2::StaticMeshComponent* m_mesh{};
@@ -109,6 +114,40 @@ namespace e2
 		int32_t m_previewIndex{};
 		e2::RadionPreviewEntity* m_previewEntity{};
 	};
+
+	/** @tags(dynamic) */
+	class LinkerHandler : public e2::WieldHandler
+	{
+		ObjectDeclaration();
+	public:
+
+		LinkerHandler() = default;
+		virtual ~LinkerHandler();
+
+		virtual void populate(e2::GameContext* ctx, nlohmann::json& obj, std::unordered_set<e2::Name>& deps) override;
+		virtual void finalize(e2::GameContext* ctx) override;
+
+		virtual void setActive(e2::PlayerEntity* player) override;
+		virtual void setInactive(e2::PlayerEntity* player) override;
+
+		virtual void onUpdate(e2::PlayerEntity* player, double seconds) override;
+		virtual void onRenderInventory(e2::PlayerEntity* player, double seconds) override;
+
+		virtual void onTrigger(e2::PlayerEntity* player, e2::Name actionName, e2::Name triggerName) override;
+
+	protected:
+
+		int32_t m_currentEntityIndex{};
+
+		e2::StaticMeshSpecification m_meshSpecification;
+
+		e2::StaticMeshComponent* m_mesh{};
+		std::vector<e2::RadionWorldPin> m_worldPins;
+		e2::RadionWorldPin* m_hoveredPin{};
+		e2::RadionWorldPin m_connectingPin{};
+		bool m_connecting{};
+	};
+
 
 	/** @tags(dynamic) */
 	class SwordHandler : public e2::WieldHandler
@@ -226,6 +265,8 @@ namespace e2
 		bool give(e2::Name itemIdentifier);
 		void drop(uint32_t slotIndex, uint32_t num);
 		void take(uint32_t slotIndex, uint32_t num); // opposite of give, just makes items disappear
+
+		bool takeById(e2::Name itemName, uint32_t num);
 		void setActiveSlot(uint8_t newSlot);
 
 		void update(double seconds);

@@ -141,6 +141,9 @@ e2::IPipeline* e2::FogModel::getOrCreatePipeline(e2::MeshProxy* proxy, uint8_t l
 	}
 
 	e2::SubmeshSpecification const& spec = proxy->lods[lodIndex].asset->specification(submeshIndex);
+	if (spec.indexBuffer == nullptr || spec.vertexCount == 0 || spec.indexCount == 0)
+		return nullptr;
+
 	e2::FogProxy* lwProxy = static_cast<e2::FogProxy*>(proxy->lods[lodIndex].materialProxies[submeshIndex]);
 
 	uint16_t geometryFlags = (uint16_t)spec.attributeFlags;

@@ -164,6 +164,9 @@ e2::IPipeline* e2::LightweightModel::getOrCreatePipeline(e2::MeshProxy* proxy, u
 
 
 	e2::SubmeshSpecification const& spec = proxy->lods[lodIndex].asset->specification(submeshIndex);
+	if (spec.indexBuffer == nullptr || spec.vertexCount == 0 || spec.indexCount == 0)
+		return nullptr;
+
 	e2::LightweightProxy* lwProxy = static_cast<e2::LightweightProxy*>(proxy->lods[lodIndex].materialProxies[submeshIndex]);
 	e2::MaterialPtr material = lwProxy->asset;
 

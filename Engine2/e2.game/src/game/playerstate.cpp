@@ -138,6 +138,44 @@ void e2::PlayerState::take(uint32_t slotIndex, uint32_t num)
 	}
 }
 
+bool e2::PlayerState::takeById(e2::Name itemName, uint32_t num)
+{
+	struct _slotFuck
+	{
+		uint32_t slotIndex;
+		uint32_t num;
+	};
+
+	e2::StackVector<_slotFuck, 32> slotsToFuck;
+
+	for (uint32_t slotIndex = 0; slotIndex < 32; slotIndex++)
+	{
+		if (num == 0)
+		{
+			break;
+		}
+
+		if (inventory[slotIndex].item && inventory[slotIndex].item->id == itemName)
+		{
+			uint32_t toFuck = glm::min(num, inventory[slotIndex].count);
+			slotsToFuck.push({ slotIndex, toFuck});
+			num -= toFuck;
+		}
+	}
+
+	if (num > 0)
+	{
+		return false;
+	}
+
+	for (_slotFuck& fuck : slotsToFuck)
+	{
+		take(fuck.slotIndex, fuck.num);
+	}
+
+	return true;
+}
+
 void e2::PlayerState::setActiveSlot(uint8_t newSlotIndex)
 {
 	e2::InventorySlot& slot = inventory[activeSlot];
@@ -443,6 +481,9 @@ void e2::HatchetHandler::onTrigger(e2::PlayerEntity* player, e2::Name actionName
 			}
 		}
 
+
+		player->game()->hexGrid()->grassCutMask().push({ planarPosition + playerToMouse * 0.2f , 0.5f });
+
 		if (didHitTree)
 		{
 			player->hexGrid()->damageTree(closestHex, closestTree, e2::randomFloat(0.15f, 0.27f));
@@ -564,6 +605,7 @@ void e2::SwordHandler::onTrigger(e2::PlayerEntity* player, e2::Name actionName, 
 			}
 		}
 
+		player->game()->hexGrid()->grassCutMask().push({ planarPosition + playerToMouse * 0.2f , 0.5f });
 		player->game()->hexGrid()->grassCutMask().cut({ planarPosition + playerToMouse * 0.2f , 0.3f });
 
 	}
@@ -710,6 +752,27 @@ void e2::IonizerHandler::onUpdate(e2::PlayerEntity* player, double seconds)
 	glm::vec2 cursorPlane = game->cursorPlane();
 	glm::vec3 cursorWorld{ cursorPlane.x, 0.0f, cursorPlane.y };
 
+	e2::RadionEntity* hoveredEntity{};
+	float hoveredDistance{9999.0f};
+	m_collisions.clear();
+	game->populateCollisions(game->cursorHex(), e2::CollisionType::Component, m_collisions, true);
+
+	for (e2::Collision& col : m_collisions)
+	{
+		e2::RadionEntity* currEntity = col.component->entity()->cast<e2::RadionEntity>();
+		if (!currEntity)
+			continue;
+
+		glm::vec2 currCoords = currEntity->planarCoords();
+		float currDistance = glm::distance(currCoords, cursorPlane);
+
+		if (currDistance < hoveredDistance && currDistance < currEntity->radionSpecification->collision.radius)
+		{
+			hoveredDistance = currDistance;
+			hoveredEntity = currEntity;
+		}
+	}
+
 	if (!m_holding)
 	{
 		if (glm::abs(mouse.scrollOffset) > 0.0f && numEntities > 0)
@@ -733,11 +796,25 @@ void e2::IonizerHandler::onUpdate(e2::PlayerEntity* player, double seconds)
 	{
 		if (!mouse.buttonState(e2::MouseButton::Left))
 		{
-			game->spawnEntity(
-				rm->discoveredEntity(m_currentEntityIndex),
-				m_previewEntity->getTransform()->getTranslation(e2::TransformSpace::World), 
-				m_previewEntity->getTransform()->getRotation(e2::TransformSpace::World)
-			);
+			e2::Name spawnId = rm->discoveredEntity(m_currentEntityIndex);
+			e2::RadionEntitySpecification *spec = game->getEntitySpecification(spawnId)->cast<e2::RadionEntitySpecification>();
+			if (!spec)
+			{
+				LogError("Invalid radion entity specification");
+			}
+			else
+			{
+				if (game->playerState().takeById("radion_cube", spec->radionCost))
+				{
+					game->spawnEntity( 
+						spawnId,
+						m_previewEntity->getTransform()->getTranslation(e2::TransformSpace::World),
+						m_previewEntity->getTransform()->getRotation(e2::TransformSpace::World)
+					);
+				}
+			}
+
+
 			m_holding = false;
 		}
 	}
@@ -784,6 +861,14 @@ void e2::IonizerHandler::onUpdate(e2::PlayerEntity* player, double seconds)
 		}
 	}
 
+	if (hoveredEntity && mouse.buttonPressed(e2::MouseButton::Right))
+	{
+		for (uint32_t i = 0; i < hoveredEntity->radionSpecification->radionCost; i++)
+		{
+			game->spawnEntity("radion_cube", hoveredEntity->getTransform()->getTranslation(e2::TransformSpace::World));
+		}
+		game->destroyEntity(hoveredEntity);
+	}
 
 	//if (player->aiming() && mouse.buttonPressed(e2::MouseButton::Left) && cursorTile.isLand())
 	//{
@@ -851,5 +936,131 @@ void e2::IonizerHandler::onRenderInventory(e2::PlayerEntity* player, double seco
 }
 
 void e2::IonizerHandler::onTrigger(e2::PlayerEntity* player, e2::Name actionName, e2::Name triggerName)
+{
+}
+
+e2::LinkerHandler::~LinkerHandler()
+{
+}
+
+void e2::LinkerHandler::populate(e2::GameContext* ctx, nlohmann::json& obj, std::unordered_set<e2::Name>& deps)
+{
+	if (obj.contains("mesh"))
+		m_meshSpecification.populate(obj.at("mesh"), deps);
+}
+
+void e2::LinkerHandler::finalize(e2::GameContext* ctx)
+{
+	m_meshSpecification.finalize(ctx);
+}
+
+void e2::LinkerHandler::setActive(e2::PlayerEntity* player)
+{
+	if (m_mesh)
+		e2::destroy(m_mesh);
+
+	m_mesh = nullptr;
+
+	m_mesh = e2::create<e2::StaticMeshComponent>(&m_meshSpecification, player);
+}
+
+void e2::LinkerHandler::setInactive(e2::PlayerEntity* player)
+{
+	if (m_mesh)
+		e2::destroy(m_mesh);
+
+	m_mesh = nullptr;
+}
+
+void e2::LinkerHandler::onUpdate(e2::PlayerEntity* player, double seconds)
+{
+	e2::Game* game = player->game();
+	e2::GameSession* session = game->gameSession();
+	e2::UIContext* ui = session->uiContext();
+	e2::UIKeyboardState& kb = ui->keyboardState();
+	e2::UIMouseState& mouse = ui->mouseState();
+
+	e2::TileData cursorTile = game->hexGrid()->getTileData(game->cursorHex());
+
+	e2::RadionManager* rm = game->radionManager();
+	int32_t numEntities = rm->numDiscoveredEntities();
+
+
+	e2::IWindow* wnd = session->window();
+	e2::Renderer* renderer = session->renderer();
+	glm::vec2 cursorPlane = game->cursorPlane();
+	glm::vec3 cursorWorld{ cursorPlane.x, 0.0f, cursorPlane.y };
+
+
+	m_worldPins.clear();
+	rm->populatePins(game->cursorHex(), m_connecting ? e2::RadionPinType::Input : e2::RadionPinType::Output, m_worldPins);
+
+	glm::vec2 mousePos = mouse.relativePosition;
+
+	m_hoveredPin = nullptr;
+	float hoveredDistance = 9999999.9f;
+	for (e2::RadionWorldPin& pin : m_worldPins)
+	{
+		glm::vec2 pinScreen = renderer->view().unprojectWorld(renderer->resolution(), pin.worldOffset);
+
+		float dist = glm::distance(pinScreen, mousePos);
+		if (dist < hoveredDistance && dist < 6.0f)
+		{
+			hoveredDistance = dist;
+			m_hoveredPin = &pin;
+		}
+
+
+		
+	}
+
+
+	if (m_hoveredPin && mouse.buttonPressed(e2::MouseButton::Left))
+	{
+		if (m_connecting)
+		{
+			m_connectingPin.entity->connectOutputPin(m_connectingPin.name, m_hoveredPin->entity, m_hoveredPin->name);
+		}
+		else
+		{
+			m_connectingPin = *m_hoveredPin;
+		}
+		m_connecting = !m_connecting;
+	}
+
+	if (!m_connecting && m_hoveredPin && mouse.buttonPressed(e2::MouseButton::Right))
+	{
+		m_hoveredPin->entity->disconnectOutputPin(m_hoveredPin->name);
+	}
+
+
+}
+
+void e2::LinkerHandler::onRenderInventory(e2::PlayerEntity* player, double seconds)
+{
+	e2::Game* game = player->game();
+	e2::GameSession* session = game->gameSession();
+	e2::UIContext* ui = session->uiContext();
+	e2::UIKeyboardState& kb = ui->keyboardState();
+	e2::UIMouseState& mouse = ui->mouseState();
+
+	e2::RadionManager* rm = game->radionManager();
+
+	e2::IWindow* wnd = session->window();
+	e2::Renderer* renderer = session->renderer();
+
+	glm::vec2 res = wnd->size();
+
+	for (e2::RadionWorldPin& pin : m_worldPins)
+	{
+		glm::vec2 pinScreen = renderer->view().unprojectWorld(renderer->resolution(), pin.worldOffset);
+		ui->drawRasterText(e2::FontFace::Monospace, 9, &pin == m_hoveredPin ? e2::UIColor(0x00FF00FF) :  e2::UIColor::white(), pinScreen, pin.name.string());
+
+		session->renderer()->debugSphere(&pin == m_hoveredPin ? glm::vec3(0.0, 1.0, 0.0) : (m_connecting ? glm::vec3(1.0, 0.0, 1.0) : glm::vec3(0.0, 1.0, 1.0)), pin.worldOffset, 0.05f);
+	}
+
+}
+
+void e2::LinkerHandler::onTrigger(e2::PlayerEntity* player, e2::Name actionName, e2::Name triggerName)
 {
 }
