@@ -21,6 +21,7 @@
 
 namespace e2
 {
+	// DONT EVER CHANGE THESE vvv
 	inline float mtnFreqScale = 0.1f;
 	inline float mtnScale = 0.9f;
 
@@ -29,6 +30,7 @@ namespace e2
 	inline int32_t treeNum1 = 9;
 	inline int32_t treeNum2 = 14;
 	inline int32_t treeNum3 = 23;
+	// DONT EVER CHANGE THESE ^^^
 
 	class GameUnit;
 
@@ -180,7 +182,6 @@ namespace e2
 
 		// flags control biome, resources, abundance
 		TileFlags flags{ TileFlags::None }; // 16 bits
-		EmpireId empireId{255}; // 255 means no empire claim this, 254 empire ids that are recycled (max 254 concurrent empires)
 
 		// optional forest proxy, if this tile is discovered it shows: forest abundance if unbuilt on forest, partly forest if built on forest, nothing if not on forest or if undiscovered (undiscovered tile meshes lives on chunk array)
 		int32_t forestIndex{-1};
@@ -473,7 +474,8 @@ namespace e2
 		virtual e2::Engine* engine() override;
 		virtual e2::Game* game() override;
 
-		void rebuildForestMeshes();
+		void buildForestStates();
+		void buildForestMeshes();
 
 		void saveToBuffer(e2::IStream& toBuffer);
 		void loadFromBuffer(e2::IStream& fromBuffer);
@@ -693,7 +695,7 @@ namespace e2
 		// list of discovered tiles 
 		std::vector<TileData> m_tiles;
 		std::vector<int32_t> m_tileVisibility;
-		std::unordered_map<glm::ivec2, size_t> m_tileIndex;
+		std::unordered_map<glm::ivec2, uint64_t> m_tileIndex;
 
 		void updateUnpackedForests();
 

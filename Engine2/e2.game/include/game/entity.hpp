@@ -118,6 +118,9 @@ namespace e2
 
 		bool pendingDestroy{};
 
+		uint64_t uniqueId{};
+		bool transient{};
+
 	protected:
 		e2::Game* m_game{};
 		e2::EntitySpecification* m_specification{};

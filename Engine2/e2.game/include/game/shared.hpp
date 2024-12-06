@@ -8,10 +8,10 @@
 namespace e2 
 {
 	class Entity;
-	class TurnbasedEntity;
+	//class TurnbasedEntity;
 
-    constexpr uint64_t maxNumEmpires = 256;
-    using EmpireId = uint64_t;
+    //constexpr uint64_t maxNumEmpires = 256;
+    //using EmpireId = uint64_t;
 
 	enum class EntityMoveType : uint8_t
 	{
@@ -59,47 +59,47 @@ namespace e2
 		InGameMenu
 	};
 
-	enum class CursorMode : uint8_t
-	{
-		Select,
-		UnitMove,
-		UnitAttack
-	};
+	//enum class CursorMode : uint8_t
+	//{
+	//	Select,
+	//	UnitMove,
+	//	UnitAttack
+	//};
 
-	enum class GameState : uint8_t
-	{
-		TurnPreparing,
-		Turn,
-		TurnEnding
-	};
+	//enum class GameState : uint8_t
+	//{
+	//	TurnPreparing,
+	//	Turn,
+	//	TurnEnding
+	//};
 
 	enum class TurnState : uint8_t
 	{
 		//Auto,
 		Unlocked,
-		UnitAction_Move,
-		EntityAction_Generic,
-		EntityAction_Target,
-		WavePreparing,
-		Wave,
-		WaveEnding,
+		//UnitAction_Move,
+		//EntityAction_Generic,
+		//EntityAction_Target,
+		//WavePreparing,
+		//Wave,
+		//WaveEnding,
 		Realtime
 	};
 
-	enum class EntityLayerIndex : uint8_t
-	{
-		Unit = 0,
-		Structure,
-		Air,
-		Count
-	};
+	//enum class EntityLayerIndex : uint8_t
+	//{
+	//	Unit = 0,
+	//	Structure,
+	//	Air,
+	//	Count
+	//};
 
-	EnumFlagsDeclaration(EntityLayerIndex);
+	//EnumFlagsDeclaration(EntityLayerIndex);
 
-	struct EntityLayer
-	{
-		std::unordered_map<glm::ivec2, e2::TurnbasedEntity*> entityIndex;
-	};
+	//struct EntityLayer
+	//{
+	//	std::unordered_map<glm::ivec2, e2::TurnbasedEntity*> entityIndex;
+	//};
 
 
 	struct SaveMeta

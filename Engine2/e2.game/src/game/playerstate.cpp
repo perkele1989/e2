@@ -4,7 +4,6 @@
 #include "game/entity.hpp"
 #include "game/game.hpp"
 
-#include "game/wave.hpp"
 #include "game/entities/player.hpp"
 #include "game/entities/itementity.hpp"
 #include "game/entities/throwableentity.hpp"
@@ -354,9 +353,27 @@ e2::WieldHandler::~WieldHandler()
 {
 }
 
+void e2::WieldHandler::onNuke()
+{
+}
+
+void e2::WieldHandler::onSetup()
+{
+}
+
 e2::HatchetHandler::~HatchetHandler()
 {
 
+}
+
+void e2::HatchetHandler::onNuke()
+{
+	e2::WieldHandler::onNuke();
+}
+
+void e2::HatchetHandler::onSetup()
+{
+	e2::WieldHandler::onSetup();
 }
 
 void e2::HatchetHandler::populate(e2::GameContext* ctx, nlohmann::json& obj, std::unordered_set<e2::Name>& deps)
@@ -505,6 +522,16 @@ e2::SwordHandler::~SwordHandler()
 
 }
 
+void e2::SwordHandler::onNuke()
+{
+	e2::WieldHandler::onNuke();
+}
+
+void e2::SwordHandler::onSetup()
+{
+	e2::WieldHandler::onSetup();
+}
+
 void e2::SwordHandler::populate(e2::GameContext* ctx, nlohmann::json& obj, std::unordered_set<e2::Name>& deps)
 {
 	if (obj.contains("mesh"))
@@ -645,6 +672,16 @@ e2::ThrowableHandler::~ThrowableHandler()
 {
 }
 
+void e2::ThrowableHandler::onNuke()
+{
+	e2::WieldHandler::onNuke();
+}
+
+void e2::ThrowableHandler::onSetup()
+{
+	e2::WieldHandler::onSetup();
+}
+
 void e2::ThrowableHandler::populate(e2::GameContext* ctx, nlohmann::json& obj, std::unordered_set<e2::Name>& deps)
 {
 	std::string entityName = obj.at("entity").template get<std::string>();
@@ -698,6 +735,17 @@ void e2::ThrowableHandler::onTrigger(e2::PlayerEntity* player, e2::Name actionNa
 
 e2::IonizerHandler::~IonizerHandler()
 {
+}
+
+void e2::IonizerHandler::onNuke()
+{
+	m_previewEntity = nullptr;
+	e2::WieldHandler::onNuke();
+}
+
+void e2::IonizerHandler::onSetup()
+{
+	e2::WieldHandler::onSetup();
 }
 
 void e2::IonizerHandler::populate(e2::GameContext* ctx, nlohmann::json& obj, std::unordered_set<e2::Name>& deps)
@@ -865,7 +913,9 @@ void e2::IonizerHandler::onUpdate(e2::PlayerEntity* player, double seconds)
 	{
 		for (uint32_t i = 0; i < hoveredEntity->radionSpecification->radionCost; i++)
 		{
-			game->spawnEntity("radion_cube", hoveredEntity->getTransform()->getTranslation(e2::TransformSpace::World));
+			e2::Entity *cube = game->spawnEntity("radion_cube", hoveredEntity->getTransform()->getTranslation(e2::TransformSpace::World));
+			e2::ItemEntity* cubeAsItem = cube->cast<e2::ItemEntity>();
+			cubeAsItem->setLifetime(4.0);
 		}
 		game->destroyEntity(hoveredEntity);
 	}
@@ -941,6 +991,17 @@ void e2::IonizerHandler::onTrigger(e2::PlayerEntity* player, e2::Name actionName
 
 e2::LinkerHandler::~LinkerHandler()
 {
+}
+
+void e2::LinkerHandler::onNuke()
+{
+	
+	e2::WieldHandler::onNuke();
+}
+
+void e2::LinkerHandler::onSetup()
+{
+	e2::WieldHandler::onSetup();
 }
 
 void e2::LinkerHandler::populate(e2::GameContext* ctx, nlohmann::json& obj, std::unordered_set<e2::Name>& deps)

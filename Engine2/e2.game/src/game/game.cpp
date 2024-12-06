@@ -1,9 +1,6 @@
 
 #include "game/game.hpp"
 
-#include "game/wave.hpp"
-
-#include "game/entities/turnbasedentity.hpp"
 #include "game/entities/player.hpp"
 #include "game/entities/itementity.hpp"
 
@@ -50,12 +47,7 @@ e2::Game::Game(e2::Context* ctx)
 	, m_radionManager(this)
 	, m_playerState(this)
 {
-	m_empires.resize(e2::maxNumEmpires);
-	for (uint64_t i = 0; uint64_t(i) < e2::maxNumEmpires; i++)
-	{
-		m_empires[i] = nullptr;
-	}
-
+	
 	m_hitLabels.resize(e2::maxNumHitLabels);
 	for (uint64_t i = 0; i < maxNumHitLabels; i++)
 	{
@@ -64,23 +56,6 @@ e2::Game::Game(e2::Context* ctx)
 
 	readAllSaveMetas();
 
-	std::string namesRaw;
-	if (!e2::readFile("./data/citynames.txt", namesRaw))
-	{
-		LogError("failed to read city names");
-	}
-
-	std::vector<std::string> namesStr = e2::split(namesRaw, '\n');
-	for (std::string str : namesStr)
-	{
-		str = e2::trim(str);
-		m_cityNames.push_back(str);
-	}
-
-	auto rd = std::random_device{};
-	auto rng = std::default_random_engine{ rd() };
-	std::shuffle(m_cityNames.begin(), m_cityNames.end(), rng);
-	
 }
 
 e2::Game::~Game()
@@ -109,29 +84,28 @@ void e2::Game::saveGame(uint8_t slot)
 
 	buf << m_startViewOrigin;
 	buf << m_targetViewOrigin;
-	buf << m_turn;
 
-	m_localEmpire->write(buf);
-	m_nomadEmpire->write(buf);
+	uint64_t numEntities = 0;
+	for (e2::Entity* ent : m_entities)
+	{
+		if (ent->transient)
+			continue;
+		numEntities++;
+	}
 
-	buf << uint64_t(m_entities.size());
+	buf << numEntities;
 	for (e2::Entity* entity : m_entities)
 	{
+		if (entity->transient)
+			continue;
+
 		e2::EntitySpecification* spec = entity->getSpecification();
-		e2::TurnbasedSpecification* tbSpec = spec->cast<e2::TurnbasedSpecification>();
-		e2::TurnbasedEntity* tbEntity = entity->cast<e2::TurnbasedEntity>();
 
 		// structure id
+		buf << entity->uniqueId;
 		buf << spec->id;
 
-		if (tbSpec && tbEntity)
-		{
-			buf << tbEntity->getTileIndex() << tbEntity->getEmpireId();
-		}
-		else
-		{
-			buf << entity->getTransform()->getTranslation(e2::TransformSpace::World);
-		}
+		buf << entity->getTransform()->getTranslation(e2::TransformSpace::World);
 
 
 		entity->writeForSave(buf);
@@ -185,48 +159,35 @@ void e2::Game::loadGame(uint8_t slot)
 	// header is just uint64_t discoveredTiles + int64_t timestamp
 	constexpr uint64_t headerSize = 8 ;
 
+	nukeGame();
+	setupGame();
+	m_menuMusic.stop();
+
 	e2::FileStream buf(saveSlots[slot].fileName(), e2::FileMode::ReadOnly);
 	if (!buf.valid())
 	{
-		LogError("save slot missing or corrupted"); 
+		LogError("save slot missing or corrupted");
 		return;
 	}
-
-	nukeGame();
-	setupGame();
 
 	buf.read(sizeof(int64_t));
 
 	m_hexGrid->loadFromBuffer(buf);
 
+
+	m_hexGrid->clearAllChunks();
+
 	buf >> m_startViewOrigin;
 	buf >> m_targetViewOrigin;
 	m_viewOrigin = m_targetViewOrigin;
-	buf >> m_turn;
-
-
-
-	m_localEmpireId = spawnEmpire();
-	assert(m_localEmpireId == 0 && "local empire HAS to be 0!");
-
-	m_localEmpire = m_empires[m_localEmpireId];
-	//discoverEmpire(m_localEmpireId);
-	m_localEmpire->read(buf);
-
-	m_nomadEmpireId = spawnEmpire();
-	assert(m_nomadEmpireId == 1 && "nomad empire HAS to be 1!");
-
-	m_nomadEmpire = m_empires[m_nomadEmpireId];
-	//discoverEmpire(m_nomadEmpireId);
-	m_nomadEmpire->read(buf);
-
-	m_nomadEmpire->ai = e2::create<e2::NomadAI>(this, m_nomadEmpireId);
-
 
 	uint64_t numEntities{};
 	buf >> numEntities;
 	for (uint64_t i = 0; i < numEntities; i++)
 	{
+		uint64_t uniqueId{};
+		buf >> uniqueId;
+
 		e2::Name entityId;
 		buf >> entityId;
 
@@ -237,26 +198,15 @@ void e2::Game::loadGame(uint8_t slot)
 			continue;
 		}
 		e2::EntitySpecification* spec = finder->second;
-		e2::TurnbasedSpecification* tbSpec= spec->cast<e2::TurnbasedSpecification>();
-		if (tbSpec)
-		{
-			glm::ivec2 tileIndex;
-			EmpireId empireId;
-			buf >> tileIndex >> empireId;
-			e2::TurnbasedEntity* newEntity = spawnTurnbasedEntity(entityId, tileIndex, empireId);
-			newEntity->readForSave(buf);
-		}
-		else
-		{
-			glm::vec3 worldPosition;
-			buf >> worldPosition;
-			e2::Entity* newEntity = spawnEntity(entityId, worldPosition);
-			newEntity->readForSave(buf);
+		glm::vec3 worldPosition;
+		buf >> worldPosition;
+		e2::Entity* newEntity = spawnEntity(entityId, worldPosition);
+		newEntity->uniqueId = uniqueId;
+		newEntity->readForSave(buf);
 
-			if (e2::PlayerEntity* player = newEntity->cast<e2::PlayerEntity>())
-			{
-				m_playerState.entity = player;
-			}
+		if (e2::PlayerEntity* player = newEntity->cast<e2::PlayerEntity>())
+		{
+			m_playerState.entity = player;
 		}
 
 	}
@@ -278,13 +228,16 @@ void e2::Game::loadGame(uint8_t slot)
 	//	discoverEmpire((EmpireId)empId);
 	//}
 
+	
+
 	startGame();
 }
 
 void e2::Game::setupGame()
 {
 	m_hexGrid = e2::create<e2::HexGrid>(this);
-	
+
+
 	e2::SoundPtr menuMusic= assetManager()->get("M_Menu.e2a").cast<e2::Sound>();
 	audioManager()->playMusic(menuMusic, 0.6f, true, &m_menuMusic);
 
@@ -294,31 +247,46 @@ void e2::Game::setupGame()
 	m_viewZoom = 0.3f;
 	m_targetViewZoom = m_viewZoom;
 	m_hexGrid->initializeWorldBounds(m_viewOrigin);
+	
+
+	for (auto& [name, spec] : m_entitySpecifications)
+	{
+		e2::ItemSpecification* itemSpec = spec->cast<e2::ItemSpecification>();
+		if (itemSpec)
+		{
+			if (itemSpec->wieldHandler)
+			{
+				itemSpec->wieldHandler->onSetup();
+			}
+		}
+	}
 }
 
 void e2::Game::nukeGame()
 {
 	e2::ITexture* outlineTextures[2] = {nullptr, nullptr};
 	m_session->renderer()->setOutlineTextures(outlineTextures);
-
+	m_menuMusic.stop();
 	m_waterChannel.setVolume(0.0f);
 
-	deselectEntity();
+
+	for (auto &[name, spec] : m_entitySpecifications)
+	{
+		e2::ItemSpecification* itemSpec = spec->cast<e2::ItemSpecification>();
+		if (itemSpec)
+		{
+			if (itemSpec->wieldHandler)
+			{
+				itemSpec->wieldHandler->onNuke();
+			}
+		}
+	}
 
 	m_entitiesPendingDestroy.clear();
-	m_turnbasedEntitiesPendingDestroy.clear();
-
-	auto turnbasedClone = m_turnbasedEntities;
-	for (e2::TurnbasedEntity* tbEntity : turnbasedClone)
-		destroyTurnbasedEntity(tbEntity);
-
+	
 	auto entitiesClone = m_entities;
 	for (e2::Entity* entity: entitiesClone)
 		destroyEntity(entity);
-
-	for (EmpireId i = 0; i < e2::maxNumEmpires-1; i++)
-		destroyEmpire(i);
-
 
 	m_playerState.entity = nullptr;
 
@@ -335,13 +303,9 @@ void e2::Game::nukeGame()
 
 	m_globalState = GlobalState::Menu;
 	m_inGameMenuState = InGameMenuState::Main;
-	m_state = GameState::TurnPreparing;
-	m_turn = 0;
 	//m_empireTurn = 0;
 	m_turnState = TurnState::Unlocked;
 	m_timeDelta = 0.0;
-	m_localEmpireId = 0;
-	m_localEmpire = nullptr;
 }
 
 void e2::Game::exitToMenu()
@@ -353,7 +317,7 @@ void e2::Game::exitToMenu()
 void e2::Game::finalizeBoot()
 {
 	finalizeSpecifications();
-	e2::MobSpecification::finalizeSpecifications(this);
+
 
 	auto am = assetManager();
 
@@ -383,659 +347,6 @@ void e2::Game::finalizeBoot()
 #endif
 }
 
-void e2::Game::initializeScriptEngine()
-{
-	try {
-
-
-		m_scriptModule = chaiscript::ModulePtr(e2::create<chaiscript::Module>());
-
-		/*
-
-		TileData& getTileFromIndex(size_t index);
-		size_t discover(Hex hex);
-		size_t getTileIndexFromHex(Hex hex);
-		e2::TileData* getTileData(glm::ivec2 const& hex);
-		*/
-
-		chaiscript::utility::add_class<e2::Name>(*m_scriptModule,
-			"Name",
-			{
-				chaiscript::constructor<e2::Name(std::string const&)>(),
-			},
-			{
-				{chaiscript::fun(&e2::Name::string), "string"},
-			}
-			);
-
-		chaiscript::utility::add_class<glm::ivec2>(*m_scriptModule,
-			"ivec2",
-			{
-				chaiscript::constructor<glm::ivec2(glm::ivec2 const&)>(),
-				chaiscript::constructor<glm::ivec2()>(),
-				chaiscript::constructor<glm::ivec2(int32_t, int32_t)>()
-			},
-			{
-				{chaiscript::fun(&glm::ivec2::x), "x"},
-				{chaiscript::fun(&glm::ivec2::y), "y"},
-				{chaiscript::fun( (glm::ivec2 & (glm::ivec2::*)(const glm::ivec2&)) (&glm::ivec2::operator=) ), "="},
-			}
-			);
-		
-
-		chaiscript::utility::add_class<e2::Hex>(*m_scriptModule,
-			"Hex",
-			{
-				chaiscript::constructor<e2::Hex()>(),
-				chaiscript::constructor<e2::Hex(e2::Hex const&)>(),
-				chaiscript::constructor<e2::Hex(glm::ivec2 const&)>(),
-				chaiscript::constructor<e2::Hex(glm::vec2 const&)>()
-			},
-			{
-				{chaiscript::fun(&e2::Hex::neighbours), "neighbours"},
-				{chaiscript::fun(&e2::Hex::planarCoords), "planarCoords"},
-				{chaiscript::fun(&e2::Hex::offsetCoords), "offsetCoords"},
-				{chaiscript::fun(&e2::Hex::localCoords), "localCoords"},
-				{chaiscript::fun(&e2::Hex::x), "x"},
-				{chaiscript::fun(&e2::Hex::y), "y"},
-				{chaiscript::fun(&e2::Hex::z), "z"},
-			}
-		);
-
-		m_scriptModule->add(chaiscript::fun<int32_t (*)(e2::Hex const&, e2::Hex const&)>(&e2::Hex::distance), "hexDistance" );
-
-		/*
-		e2::StackVector<Hex, 6> 
-		*/
-
-
-		chaiscript::utility::add_class<e2::StackVector<Hex, 6>>(*m_scriptModule,
-			"HexNeighbourList",
-			{ },
-			{
-				{chaiscript::fun(&e2::StackVector<Hex, 6>::size), "size"},
-				{chaiscript::fun(&e2::StackVector<Hex, 6>::at), "at"},
-			}
-		);
-
-		chaiscript::utility::add_class<glm::vec2>(*m_scriptModule,
-			"vec2",
-			{
-				chaiscript::constructor<glm::vec2()>(),
-				chaiscript::constructor<glm::vec2(float, float)>()
-			},
-			{
-				{chaiscript::fun(&glm::vec2::x), "x"},
-				{chaiscript::fun(&glm::vec2::y), "y"},
-			}
-		);
-
-		chaiscript::utility::add_class<glm::vec3>(*m_scriptModule,
-			"vec3",
-			{
-				chaiscript::constructor<glm::vec3()>(),
-				chaiscript::constructor<glm::vec3(float, float, float)>()
-			},
-			{
-				{chaiscript::fun(&glm::vec3::x), "x"},
-				{chaiscript::fun(&glm::vec3::y), "y"},
-				{chaiscript::fun(&glm::vec3::z), "z"},
-			}
-			);
-
-		chaiscript::utility::add_class<glm::vec4>(*m_scriptModule,
-			"vec4",
-			{
-				chaiscript::constructor<glm::vec4()>(),
-				chaiscript::constructor<glm::vec4(float, float, float, float)>()
-			},
-			{
-				{chaiscript::fun(&glm::vec4::x), "x"},
-				{chaiscript::fun(&glm::vec4::y), "y"},
-				{chaiscript::fun(&glm::vec4::z), "z"},
-				{chaiscript::fun(&glm::vec4::w), "w"},
-			}
-			);
-
-		chaiscript::utility::add_class<e2::GameContext>(*m_scriptModule,
-			"GameContext",
-			{ },
-		{
-			{chaiscript::fun(&GameContext::game), "game"},
-			{chaiscript::fun(&GameContext::hexGrid), "hexGrid"},
-			{chaiscript::fun(&GameContext::gameSession), "gameSession"},
-		}
-		);
-
-		chaiscript::utility::add_class<e2::UIColor>(*m_scriptModule,
-			"Color",
-			{
-				chaiscript::constructor<UIColor(glm::vec4 const&)>()
-			},
-			{
-				{chaiscript::fun(&UIColor::toVec4), "toVec4"},
-			}
-		);
-
-		chaiscript::utility::add_class<e2::TileData>(*m_scriptModule,
-			"TileData",
-			{ },
-		{
-			{chaiscript::fun(&e2::TileData::empireId), "empireId"},
-			{chaiscript::fun(&e2::TileData::getAbundanceAsFloat), "getAbundanceAsFloat"},
-			{chaiscript::fun(&e2::TileData::getWoodAbundanceAsFloat), "getWoodAbundanceAsFloat"},
-			{chaiscript::fun(&e2::TileData::isForested), "isForested"},
-			{chaiscript::fun(&e2::TileData::hasResource), "hasResource"},
-			{chaiscript::fun(&e2::TileData::isPassable), "isPassable"},
-
-			{chaiscript::fun(&e2::TileData::hasGold), "hasGold"},
-			{chaiscript::fun(&e2::TileData::hasOil), "hasOil"},
-			{chaiscript::fun(&e2::TileData::hasOre), "hasOre"},
-			{chaiscript::fun(&e2::TileData::hasStone), "hasStone"},
-			{chaiscript::fun(&e2::TileData::hasUranium), "hasUranium"},
-
-			{chaiscript::fun(&e2::TileData::isShallowWater), "isShallowWater"},
-			{chaiscript::fun(&e2::TileData::isDeepWater), "isDeepWater"},
-			{chaiscript::fun(&e2::TileData::isLand), "isLand"},
-			{chaiscript::fun(&e2::TileData::getWater), "getWater"},
-			{chaiscript::fun(&e2::TileData::getFeature), "getFeature"},
-			{chaiscript::fun(&e2::TileData::getBiome), "getBiome"},
-			{chaiscript::fun(&e2::TileData::getResource), "getResource"},
-			{chaiscript::fun(&e2::TileData::getAbundance), "getAbundance"},
-			{chaiscript::fun(&e2::TileData::getWoodAbundance), "getWoodAbundance"},
-
-		}
-		);
-
-		chaiscript::utility::add_class<e2::HexGrid>(*m_scriptModule,
-			"HexGrid",
-			{ },
-		{
-			{chaiscript::fun(&HexGrid::viewBounds), "viewBounds"},
-			{chaiscript::fun(&HexGrid::worldBounds), "worldBounds"},
-			{chaiscript::fun(&HexGrid::isVisible), "isVisible"},
-			{chaiscript::fun(&HexGrid::clearOutline), "clearOutline"},
-			{chaiscript::fun(&HexGrid::pushOutline), "pushOutline"},
-			{chaiscript::fun(&HexGrid::getTileData), "getTileData"},
-			{chaiscript::fun(&HexGrid::getExistingTileData), "getExistingTileData"},
-			{chaiscript::fun(&HexGrid::calculateTileData), "calculateTileData"},
-
-		}
-		);
-
-
-
-
-		chaiscript::utility::add_class<e2::TurnbasedSpecification>(*m_scriptModule,
-			"TurnbasedSpecification",
-			{ },
-		{
-			{chaiscript::fun(&e2::TurnbasedSpecification::attackPoints), "attackPoints"},
-			{chaiscript::fun(&e2::TurnbasedSpecification::attackStrength), "attackStrength"},
-			{chaiscript::fun(&e2::TurnbasedSpecification::buildPoints), "buildPoints"},
-			{chaiscript::fun(&e2::TurnbasedSpecification::buildTurns), "buildTurns"},
-			{chaiscript::fun(&e2::TurnbasedSpecification::defensiveModifier), "defensiveModifier"},
-			{chaiscript::fun(&e2::TurnbasedSpecification::displayName), "displayName"},
-			{chaiscript::fun(&e2::TurnbasedSpecification::id), "id"},
-			{chaiscript::fun(&e2::TurnbasedSpecification::layerIndex), "layerIndex"},
-			{chaiscript::fun(&e2::TurnbasedSpecification::maxHealth), "maxHealth"},
-			{chaiscript::fun(&e2::TurnbasedSpecification::movePoints), "movePoints"},
-			{chaiscript::fun(&e2::TurnbasedSpecification::moveSpeed), "moveSpeed"},
-			{chaiscript::fun(&e2::TurnbasedSpecification::moveType), "moveType"},
-			{chaiscript::fun(&e2::TurnbasedSpecification::retaliatoryModifier), "retaliatoryModifier"},
-			{chaiscript::fun(&e2::TurnbasedSpecification::sightRange), "sightRange"},
-			{chaiscript::fun(&e2::TurnbasedSpecification::attackRange), "attackRange"},
-		}
-		);
-
-		chaiscript::utility::add_class<e2::UnitBuildResult>(*m_scriptModule,
-			"UnitBuildResult",
-			{ },
-		{
-			{chaiscript::fun(&e2::UnitBuildResult::buildMessage), "buildMessage"},
-			{chaiscript::fun(&e2::UnitBuildResult::didSpawn), "didSpawn"},
-			{chaiscript::fun(&e2::UnitBuildResult::spawnLocation), "spawnLocation"}
-		}
-		);
-
-		chaiscript::utility::add_class<e2::UnitBuildAction>(*m_scriptModule,
-			"UnitBuildAction",
-			{ },
-		{
-			{chaiscript::fun(&e2::UnitBuildAction::buildTurnsLeft), "buildTurnsLeft"},
-			{chaiscript::fun(&e2::UnitBuildAction::totalBuilt), "totalBuilt"},
-			{chaiscript::fun(&e2::UnitBuildAction::turnLastBuilt), "turnLastBuilt"},
-			{chaiscript::fun(&e2::UnitBuildAction::tick), "tick"},
-		}
-		);
-
-		chaiscript::utility::add_class<e2::PathFindingHex>(*m_scriptModule,
-			"PathFindingHex",
-			{
-			},
-			{
-				{chaiscript::fun(&e2::PathFindingHex::index), "index"},
-				{chaiscript::fun(&e2::PathFindingHex::isBegin), "isBegin"},
-				{chaiscript::fun(&e2::PathFindingHex::hexHasTarget), "hexHasTarget"},
-				{chaiscript::fun(&e2::PathFindingHex::grugTarget), "grugTarget"},
-				{chaiscript::fun(&e2::PathFindingHex::stepsFromOrigin), "stepsFromOrigin"},
-				{chaiscript::fun(&e2::PathFindingHex::towardsOrigin), "towardsOrigin"},
-			}
-			);
-
-		chaiscript::utility::add_class<e2::PathFindingAS>(*m_scriptModule,
-			"PathFindingAS",
-			{
-				{ chaiscript::constructor<e2::PathFindingAS(e2::TurnbasedEntity*)>() },
-				{ chaiscript::constructor<e2::PathFindingAS(e2::Game*, e2::Hex const&, uint64_t, bool, e2::PassableFlags)>() },
-				
-				// e2::Game* game, e2::Hex const& start, uint64_t range, bool ignoreVisibility = false, e2::PassableFlags passableFlags = PassableFlags::Land
-			},
-			{
-				{chaiscript::fun(&e2::PathFindingAS::find), "find"},
-				{ chaiscript::fun(&e2::PathFindingAS::grugTarget), "grugTarget" },
-				{ chaiscript::fun(&e2::PathFindingAS::grugCanMove), "grugCanMove" },
-			}
-		);
-
-
-
-
-		chaiscript::utility::add_class<e2::MobSpecification>(*m_scriptModule,
-			"MobSpecification",
-			{ },
-		{
-
-			{chaiscript::fun(&e2::MobSpecification::attackStrength), "attackStrength"},
-			{chaiscript::fun(&e2::MobSpecification::defensiveStrength), "defensiveStrength"},
-			{chaiscript::fun(&e2::MobSpecification::displayName), "displayName"},
-			{chaiscript::fun(&e2::MobSpecification::id), "id"},
-			{chaiscript::fun(&e2::MobSpecification::layerIndex), "layerIndex"},
-			{chaiscript::fun(&e2::MobSpecification::maxHealth), "maxHealth"},
-			{chaiscript::fun(&e2::MobSpecification::moveSpeed), "moveSpeed"},
-			{chaiscript::fun(&e2::MobSpecification::moveType), "moveType"},
-			{chaiscript::fun(&e2::MobSpecification::passableFlags), "passableFlags"},
-			{chaiscript::fun(&e2::MobSpecification::reward), "reward"},
-		}
-		);
-
-		chaiscript::utility::add_class<e2::Mob>(*m_scriptModule,
-			"Mob",
-			{ },
-		{
-			//{chaiscript::fun(&e2::Mob::scriptEqualityPtr), "=="},
-			//{chaiscript::fun(&e2::Mob::scriptAssignPtr), "="},
-			{chaiscript::fun(&e2::Mob::health), "health"},
-			{chaiscript::fun(&e2::Mob::specification), "specification"},
-			{chaiscript::fun(&e2::Mob::meshPosition), "meshPosition"},
-		}
-		);
-
-		chaiscript::utility::add_class<e2::Game>(*m_scriptModule,
-			"Game",
-			{ },
-			{
-				{chaiscript::fun(&Game::spawnHitLabel), "spawnHitLabel"},
-				//{chaiscript::fun(&Game::discoverEmpire), "discoverEmpire"},
-				{chaiscript::fun(&Game::turn), "turn"},
-				{chaiscript::fun(&Game::timeDelta), "timeDelta"},
-				{chaiscript::fun(&Game::worldToPixels), "worldToPixels"},
-				{chaiscript::fun(&Game::pauseWorldStreaming), "pauseWorldStreaming"},
-				{chaiscript::fun(&Game::resumeWorldStreaming), "resumeWorldStreaming"},
-				{chaiscript::fun(&Game::forceStreamLocation), "forceStreamLocation"},
-				{chaiscript::fun(&Game::loadGame), "loadGame"},
-				{chaiscript::fun(&Game::saveGame), "saveGame"},
-				{chaiscript::fun(&Game::exitToMenu), "exitToMenu"},
-				{chaiscript::fun(&Game::spawnEmpire), "spawnEmpire"},
-				//{chaiscript::fun(&Game::spawnAIEmpire), "spawnAIEmpire"},
-				{chaiscript::fun(&Game::localEmpire), "localEmpire"},
-				{chaiscript::fun(&Game::nomadEmpire), "nomadEmpire"},
-				{chaiscript::fun(&Game::localEmpireId), "localEmpireId"},
-				{chaiscript::fun(&Game::nomadEmpireId), "nomadEmpireId"},
-				{chaiscript::fun(&Game::empireById), "empireById"},
-				{chaiscript::fun(&Game::destroyEmpire), "destroyEmpire"},
-				{chaiscript::fun(&Game::harvestWood), "harvestWood"},
-				{chaiscript::fun(&Game::getUiSprite), "getUiSprite"},
-				{chaiscript::fun(&Game::removeWood), "removeWood"},
-				{chaiscript::fun(&Game::view), "view"},
-				{chaiscript::fun(&Game::viewPoints), "viewPoints"},
-				{chaiscript::fun(&Game::applyDamage), "applyDamage"},
-				{chaiscript::fun(&Game::selectEntity), "selectEntity"},
-				{chaiscript::fun(&Game::deselectEntity), "deselectEntity"},
-				{chaiscript::fun(&Game::moveSelectedEntityTo), "moveSelectedEntityTo"},
-				{chaiscript::fun(&Game::beginCustomAction), "beginCustomAction"},
-				{chaiscript::fun(&Game::attemptBeginWave), "attemptBeginWave"},
-				{chaiscript::fun(&Game::addScreenShake), "addScreenShake"},
-				
-				{chaiscript::fun(&Game::endCustomAction), "endCustomAction"},
-				{chaiscript::fun(&Game::beginTargeting), "beginTargeting"},
-				{chaiscript::fun(&Game::endTargeting), "endTargeting"},
-				{chaiscript::fun(&Game::spawnEntity), "spawnEntity"},
-				{chaiscript::fun(&Game::entityAtHex), "entityAtHex"},
-				{chaiscript::fun(&Game::getSelectedEntity), "getSelectedEntity"},
-				{chaiscript::fun(&Game::getTurnState), "getTurnState"},
-				{chaiscript::fun(&Game::grugNumAttackMovePoints), "grugNumAttackMovePoints"},
-				{chaiscript::fun(&Game::grugAttackTarget), "grugAttackTarget"},
-				{chaiscript::fun(&Game::grugAttackMoveLocation), "grugAttackMoveLocation"},
-				{chaiscript::fun(&Game::grugMoveLocation), "grugMoveLocation"},
-				{chaiscript::fun(&Game::resolveLocalEntity), "resolveLocalEntity"},
-				{chaiscript::fun(&Game::getCityName), "getCityName"},
-				/*
-						int32_t grugNumAttackMovePoints();
-		e2::GameEntity* grugAttackTarget();
-		glm::ivec2 grugAttackMoveLocation();
-		glm::ivec2 grugMoveLocation();
-				*/
-			}
-		);
-
-		m_scriptModule->add(chaiscript::base_class<GameContext, Game>());
-
-		/*
-		chaiscript::utility::add_class<e2::FontFace>(*m_scriptModule,
-			"FontFace",
-			{
-				{e2::FontFace::Serif, "Serif"},
-				{e2::FontFace::Sans, "Sans"},
-				{e2::FontFace::Monospace, "Monospace"},
-			}
-		);*/
-
-		/*chaiscript::utility::add_class<e2::UITextAlign>(*m_scriptModule,
-			"UITextAlign",
-			{
-				{e2::UITextAlign::Begin, "Begin"},
-				{e2::UITextAlign::End, "End"},
-				{e2::UITextAlign::Middle, "Middle"},
-			}
-		);*/
-
-		chaiscript::utility::add_class<e2::UIContext>(*m_scriptModule,
-			"UIContext",
-			{ },
-			{
-				{chaiscript::fun(&UIContext::beginStackV), "beginStackV"},
-				{chaiscript::fun(&UIContext::endStackV), "endStackV"},
-				{chaiscript::fun(&UIContext::beginStackH), "beginStackH"},
-				{chaiscript::fun(&UIContext::endStackH), "endStackH"},
-				{chaiscript::fun(&UIContext::beginFlexH), "beginFlexH"},
-				{chaiscript::fun(&UIContext::endFlexH), "endFlexH"},
-				{chaiscript::fun(&UIContext::beginFlexV), "beginFlexV"},
-				{chaiscript::fun(&UIContext::endFlexV), "endFlexV"},
-				{chaiscript::fun(&UIContext::flexHSlider), "flexHSlider"},
-				{chaiscript::fun(&UIContext::flexVSlider), "flexVSlider"},
-				{chaiscript::fun(&UIContext::beginWrap), "beginWrap"},
-				{chaiscript::fun(&UIContext::endWrap), "endWrap"},
-				{chaiscript::fun(&UIContext::button), "button"},
-				{chaiscript::fun(&UIContext::checkbox), "checkbox"},
-				{chaiscript::fun(&UIContext::radio), "radio"},
-				{chaiscript::fun(&UIContext::inputText), "inputText"},
-				{chaiscript::fun(&UIContext::sliderInt), "sliderInt"},
-				{chaiscript::fun(&UIContext::sliderFloat), "sliderFloat"},
-				{chaiscript::fun(&UIContext::gameLabel), "gameLabel"},
-				{chaiscript::fun(&UIContext::gameGridButton), "gameGridButton"},
-				{chaiscript::fun(&UIContext::calculateSDFTextWidth), "calculateSDFTextWidth"},
-				{chaiscript::fun(&UIContext::calculateTextWidth), "calculateTextWidth"},
-				{chaiscript::fun(&UIContext::drawSDFText), "drawSDFText"},
-				{chaiscript::fun(&UIContext::drawRasterText), "drawRasterText"},
-				{chaiscript::fun(&UIContext::drawQuad), "drawQuad"},
-				{chaiscript::fun(&UIContext::drawSprite), "drawSprite"},
-				{chaiscript::fun(&UIContext::drawTexturedQuad), "drawTexturedQuad"},
-			}
-		);
-
-		chaiscript::utility::add_class<e2::MeshProxy>(*m_scriptModule,
-			"MeshProxy",
-			{ },
-			{
-				{chaiscript::fun(&MeshProxy::enable), "enable"},
-				{chaiscript::fun(&MeshProxy::disable), "disable"},
-				{chaiscript::fun(&MeshProxy::enabled), "enabled"},
-				{chaiscript::fun(&MeshProxy::setPosition), "setPosition"},
-				{chaiscript::fun(&MeshProxy::setRotation), "setRotation"},
-				{chaiscript::fun(&MeshProxy::setScale), "setScale"},
-
-			}
-			);
-
-		chaiscript::utility::add_class<e2::TurnbasedScriptInterface>(*m_scriptModule,
-			"EntityScript",
-			{
-				chaiscript::constructor<TurnbasedScriptInterface()>()
-			},
-			{
-				{chaiscript::fun(&TurnbasedScriptInterface::hasOnActionTrigger), "hasOnActionTrigger"},
-				{chaiscript::fun(&TurnbasedScriptInterface::hasUpdate), "hasUpdate"},
-				{chaiscript::fun(&TurnbasedScriptInterface::hasCreateState), "hasCreateState"},
-				{chaiscript::fun(&TurnbasedScriptInterface::hasDrawUI), "hasDrawUI"},
-				{chaiscript::fun(&TurnbasedScriptInterface::hasCollectExpenditure), "hasCollectExpenditure"},
-				{chaiscript::fun(&TurnbasedScriptInterface::hasCollectRevenue), "hasCollectRevenue"},
-				{chaiscript::fun(&TurnbasedScriptInterface::hasGrugRelevant), "hasGrugRelevant"},
-				{chaiscript::fun(&TurnbasedScriptInterface::hasGrugTick), "hasGrugTick"},
-				{chaiscript::fun(&TurnbasedScriptInterface::hasOnBeginMove), "hasOnBeginMove"},
-				{chaiscript::fun(&TurnbasedScriptInterface::hasOnEndMove), "hasOnEndMove"},
-				{chaiscript::fun(&TurnbasedScriptInterface::hasOnHit), "hasOnHit"},
-				{chaiscript::fun(&TurnbasedScriptInterface::hasOnTargetChanged), "hasOnTargetChanged"},
-				{chaiscript::fun(&TurnbasedScriptInterface::hasOnTargetClicked), "hasOnTargetClicked"},
-				{chaiscript::fun(&TurnbasedScriptInterface::hasOnTurnEnd), "hasOnTurnEnd"},
-				{chaiscript::fun(&TurnbasedScriptInterface::hasOnTurnStart), "hasOnTurnStart"},
-				{chaiscript::fun(&TurnbasedScriptInterface::hasUpdateAnimation), "hasUpdateAnimation"},
-				{chaiscript::fun(&TurnbasedScriptInterface::hasUpdateCustomAction), "hasUpdateCustomAction"},
-				{chaiscript::fun(&TurnbasedScriptInterface::hasOnWaveUpdate), "hasOnWaveUpdate"},
-				{chaiscript::fun(&TurnbasedScriptInterface::hasOnWaveStart), "hasOnWaveStart"},
-				{chaiscript::fun(&TurnbasedScriptInterface::hasOnWaveEnd), "hasOnWaveEnd"},
-				{chaiscript::fun(&TurnbasedScriptInterface::hasOnSpawned), "hasOnSpawned"},
-
-				{chaiscript::fun(&TurnbasedScriptInterface::hasOnSelected), "hasOnSelected"},
-				{chaiscript::fun(&TurnbasedScriptInterface::hasOnDeselected), "hasOnDeselected"},
-
-				{chaiscript::fun(&TurnbasedScriptInterface::invokeOnActionTrigger), "invokeOnActionTrigger"},
-				{chaiscript::fun(&TurnbasedScriptInterface::invokeUpdate), "invokeUpdate"},
-				{chaiscript::fun(&TurnbasedScriptInterface::invokeCreateState), "invokeCreateState"},
-				{chaiscript::fun(&TurnbasedScriptInterface::invokeDrawUI), "invokeDrawUI"},
-				{chaiscript::fun(&TurnbasedScriptInterface::invokeCollectExpenditure), "invokeCollectExpenditure"},
-				{chaiscript::fun(&TurnbasedScriptInterface::invokeCollectRevenue), "invokeCollectRevenue"},
-				{chaiscript::fun(&TurnbasedScriptInterface::invokeGrugRelevant), "invokeGrugRelevant"},
-				{chaiscript::fun(&TurnbasedScriptInterface::invokeGrugTick), "invokeGrugTick"},
-				{chaiscript::fun(&TurnbasedScriptInterface::invokeOnBeginMove), "invokeOnBeginMove"},
-				{chaiscript::fun(&TurnbasedScriptInterface::invokeOnEndMove), "invokeOnEndMove"},
-				{chaiscript::fun(&TurnbasedScriptInterface::invokeOnHit), "invokeOnHit"},
-				{chaiscript::fun(&TurnbasedScriptInterface::invokeOnTargetChanged), "invokeOnTargetChanged"},
-				{chaiscript::fun(&TurnbasedScriptInterface::invokeOnTargetClicked), "invokeOnTargetClicked"},
-				{chaiscript::fun(&TurnbasedScriptInterface::invokeOnTurnEnd), "invokeOnTurnEnd"},
-				{chaiscript::fun(&TurnbasedScriptInterface::invokeOnTurnStart), "invokeOnTurnStart"},
-				{chaiscript::fun(&TurnbasedScriptInterface::invokeUpdateAnimation), "invokeUpdateAnimation"},
-				{chaiscript::fun(&TurnbasedScriptInterface::invokeUpdateCustomAction), "invokeUpdateCustomAction"},
-				{chaiscript::fun(&TurnbasedScriptInterface::invokeOnWaveUpdate), "invokeOnWaveUpdate"},
-				{chaiscript::fun(&TurnbasedScriptInterface::invokeOnWaveStart), "invokeOnWaveStart"},
-				{chaiscript::fun(&TurnbasedScriptInterface::invokeOnWaveEnd), "invokeOnWaveEnd"},
-				{chaiscript::fun(&TurnbasedScriptInterface::invokeOnSpawned), "invokeOnSpawned"},
-
-				{chaiscript::fun(&TurnbasedScriptInterface::setOnSelected), "setOnSelected"},
-				{chaiscript::fun(&TurnbasedScriptInterface::setOnDeselected), "setOnDeselected"},
-
-				{chaiscript::fun(&TurnbasedScriptInterface::setOnActionTrigger), "setOnActionTrigger"},
-				{chaiscript::fun(&TurnbasedScriptInterface::setUpdate), "setUpdate"},
-				{chaiscript::fun(&TurnbasedScriptInterface::setCreateState), "setCreateState"},
-				{chaiscript::fun(&TurnbasedScriptInterface::setDrawUI), "setDrawUI"},
-				{chaiscript::fun(&TurnbasedScriptInterface::setCollectExpenditure), "setCollectExpenditure"},
-				{chaiscript::fun(&TurnbasedScriptInterface::setCollectRevenue), "setCollectRevenue"},
-				{chaiscript::fun(&TurnbasedScriptInterface::setPlayerRelevant), "setPlayerRelevant"},
-				{chaiscript::fun(&TurnbasedScriptInterface::setGrugRelevant), "setGrugRelevant"},
-				{chaiscript::fun(&TurnbasedScriptInterface::setGrugTick), "setGrugTick"},
-				{chaiscript::fun(&TurnbasedScriptInterface::setOnBeginMove), "setOnBeginMove"},
-				{chaiscript::fun(&TurnbasedScriptInterface::setOnEndMove), "setOnEndMove"},
-				{chaiscript::fun(&TurnbasedScriptInterface::setOnHit), "setOnHit"},
-				{chaiscript::fun(&TurnbasedScriptInterface::setOnTargetChanged), "setOnTargetChanged"},
-				{chaiscript::fun(&TurnbasedScriptInterface::setOnTargetClicked), "setOnTargetClicked"},
-				{chaiscript::fun(&TurnbasedScriptInterface::setOnTurnEnd), "setOnTurnEnd"},
-				{chaiscript::fun(&TurnbasedScriptInterface::setOnTurnStart), "setOnTurnStart"},
-				{chaiscript::fun(&TurnbasedScriptInterface::setUpdateAnimation), "setUpdateAnimation"},
-				{chaiscript::fun(&TurnbasedScriptInterface::setUpdateCustomAction), "setUpdateCustomAction"},
-				{chaiscript::fun(&TurnbasedScriptInterface::setOnWaveUpdate), "setOnWaveUpdate"},
-				{chaiscript::fun(&TurnbasedScriptInterface::setOnWaveStart), "setOnWaveStart"},
-				{chaiscript::fun(&TurnbasedScriptInterface::setOnWaveEnd), "setOnWaveEnd"},
-				{chaiscript::fun(&TurnbasedScriptInterface::setOnSpawned), "setOnSpawned"},
-				{chaiscript::fun(&TurnbasedScriptInterface::setOnMobSpawned), "setOnMobSpawned"},
-				{chaiscript::fun(&TurnbasedScriptInterface::setOnMobDestroyed), "setOnMobDestroyed"},
-				{chaiscript::fun(&TurnbasedScriptInterface::hasOnMobSpawned), "hasOnMobSpawned"},
-				{chaiscript::fun(&TurnbasedScriptInterface::hasOnMobDestroyed), "hasOnMobDestroyed"},
-				{chaiscript::fun(&TurnbasedScriptInterface::invokeOnMobSpawned), "invokeOnMobSpawned"},
-				{chaiscript::fun(&TurnbasedScriptInterface::invokeOnMobDestroyed), "invokeOnMobDestroyed"},
-
-				{chaiscript::fun(&TurnbasedScriptInterface::invokeOnSelected), "invokeOnSelected"},
-				{chaiscript::fun(&TurnbasedScriptInterface::invokeOnDeselected), "invokeOnDeselected"},
-			}
-		);
-
-
-
-		chaiscript::utility::add_class<e2::ScriptRef<e2::Mob>>(*m_scriptModule,
-			"MobRef",
-			{
-				chaiscript::constructor<e2::ScriptRef<e2::Mob>()>(),
-				chaiscript::constructor<e2::ScriptRef<e2::Mob>(e2::Mob*)>(),
-				chaiscript::constructor<e2::ScriptRef<e2::Mob>(e2::ScriptRef<e2::Mob> const &)>(),
-			},
-			{
-				{chaiscript::fun(&e2::ScriptRef<e2::Mob>::operator=), "="},
-				{chaiscript::fun(&e2::ScriptRef<e2::Mob>::equals), "=="},
-				{chaiscript::fun(&e2::ScriptRef<e2::Mob>::value), "value"},
-				{chaiscript::fun(&e2::ScriptRef<e2::Mob>::clear), "clear"},
-				{chaiscript::fun(&e2::ScriptRef<e2::Mob>::isNull), "isNull"},
-
-			}
-			);
-
-
-		m_scriptModule->add(chaiscript::type_conversion<e2::Name, std::string>([](const e2::Name& asName) { return asName.cstring(); }));
-		m_scriptModule->add(chaiscript::type_conversion<std::string, e2::Name>([](const std::string & asString) { return e2::Name(asString); }));
-
-
-		m_scriptModule->add(chaiscript::type_conversion<e2::Hex, glm::ivec2>([](const e2::Hex& asHex) { return asHex.offsetCoords(); }));
-		m_scriptModule->add(chaiscript::type_conversion<glm::ivec2, e2::Hex>([](const glm::ivec2& asIvec2) { return e2::Hex(asIvec2); }));
-
-
-		chaiscript::utility::add_class<e2::EntityLayerIndex>(*m_scriptModule,
-			"LayerIndex",
-			{
-				{e2::EntityLayerIndex::Unit, "LI_Unit"},
-				{e2::EntityLayerIndex::Structure, "LI_Structure"},
-				{e2::EntityLayerIndex::Air, "LI_Air"}
-			}
-		);
-
-		chaiscript::utility::add_class<e2::EntityMoveType>(*m_scriptModule,
-			"MoveType",
-			{
-				{e2::EntityMoveType::Static, "MT_Static"},
-				{e2::EntityMoveType::Linear, "MT_Linear"},
-				{e2::EntityMoveType::Smooth, "MT_Smooth"}
-			}
-		);
-
-		chaiscript::utility::add_class<e2::TileFlags>(*m_scriptModule,
-			"TileFlags",
-			{
-				{e2::TileFlags::None, "TF_None"},
-
-				{e2::TileFlags::BiomeMask, "TF_BiomeMask"},
-				{e2::TileFlags::BiomeGrassland, "TF_BiomeGrassland"},
-				{e2::TileFlags::BiomeDesert, "TF_BiomeDesert"},
-				{e2::TileFlags::BiomeTundra, "TF_BiomeTundra"},
-
-				{e2::TileFlags::FeatureMask, "TF_FeatureMask"},
-				{e2::TileFlags::FeatureNone, "TF_FeatureNone"},
-				{e2::TileFlags::FeatureMountains, "TF_FeatureMountains"},
-				{e2::TileFlags::FeatureForest, "TF_FeatureForest"},
-
-				{e2::TileFlags::WaterMask, "TF_WaterMask"},
-				{e2::TileFlags::WaterNone, "TF_WaterNone"},
-				{e2::TileFlags::WaterShallow, "TF_WaterShallow"},
-				{e2::TileFlags::WaterDeep, "TF_WaterDeep"},
-
-				{e2::TileFlags::ResourceMask, "TF_ResourceMask"},
-				{e2::TileFlags::ResourceNone, "TF_ResourceNone"},
-				{e2::TileFlags::ResourceStone, "TF_ResourceStone"},
-				{e2::TileFlags::ResourceOre, "TF_ResourceOre"},
-				{e2::TileFlags::ResourceGold, "TF_ResourceGold"},
-				{e2::TileFlags::ResourceOil, "TF_ResourceOil"},
-				{e2::TileFlags::ResourceUranium, "TF_ResourceUranium"},
-
-				{e2::TileFlags::AbundanceMask, "TF_AbundanceMask"},
-				{e2::TileFlags::Abundance1, "TF_Abundance1"},
-				{e2::TileFlags::Abundance2, "TF_Abundance2"},
-				{e2::TileFlags::Abundance3, "TF_Abundance3"},
-				{e2::TileFlags::Abundance4, "TF_Abundance4"},
-
-				{e2::TileFlags::WoodAbundanceMask, "TF_WoodAbundanceMask"},
-				{e2::TileFlags::WoodAbundance1, "TF_WoodAbundance1"},
-				{e2::TileFlags::WoodAbundance2, "TF_WoodAbundance2"},
-				{e2::TileFlags::WoodAbundance3, "TF_WoodAbundance3"},
-				{e2::TileFlags::WoodAbundance4, "TF_WoodAbundance4"},
-			}
-		);
-
-		chaiscript::utility::add_class<e2::PassableFlags>(*m_scriptModule,
-			"PassableFlags",
-			{
-				{e2::PassableFlags::None, "PF_None"},
-				{e2::PassableFlags::Land, "PF_Land"},
-				{e2::PassableFlags::WaterShallow, "PF_WaterShallow"},
-				{e2::PassableFlags::WaterDeep, "PF_WaterDeep"},
-				{e2::PassableFlags::Mountain, "PF_Mountain"},
-				{e2::PassableFlags::Air, "PF_Air"},
-			}
-		);
-
-		chaiscript::utility::add_class<e2::FontFace>(*m_scriptModule,
-			"FontFace",
-			{
-				{e2::FontFace::Sans, "FF_Sans"},
-				{e2::FontFace::Serif, "FF_Serif"},
-				{e2::FontFace::Monospace, "FF_Monospace"}
-			}
-		);
-
-
-		chaiscript::utility::add_class<e2::UITextAlign>(*m_scriptModule,
-			"UITextAlign",
-			{
-				{e2::UITextAlign::Begin, "TA_Begin"},
-				{e2::UITextAlign::End, "TA_End"},
-				{e2::UITextAlign::Middle, "TA_Middle"}
-			}
-		);
-
-		chaiscript::utility::add_class<e2::TurnState>(*m_scriptModule,
-			"TurnState",
-			{
-				{e2::TurnState::Unlocked, "TS_Unlocked"},
-				//{e2::TurnState::Auto, "TS_Auto"},
-				{e2::TurnState::UnitAction_Move, "TS_UnitAction_Move"},
-				{e2::TurnState::EntityAction_Generic, "TS_EntityAction_Generic"},
-				{e2::TurnState::EntityAction_Target, "TS_EntityAction_Target"},
-			}
-		);
-
-		m_scriptEngine = e2::create<chaiscript::ChaiScript>();
-		m_scriptEngine->add(m_scriptModule);
-
-		
-
-		m_scriptEngine->add_global(chaiscript::var(this), "game");
-	}
-	catch (std::exception& e)
-	{
-		LogError("failed to initialize chaiscript: {}", e.what());
-	}
-}
-
-void e2::Game::destroyScriptEngine()
-{
-	e2::destroy(m_scriptEngine);
-}
-
 void e2::Game::initialize()
 {
 	m_session = e2::create<e2::GameSession>(this);
@@ -1043,30 +354,11 @@ void e2::Game::initialize()
 	m_menuMusic = audioManager()->createChannel();
 	m_waterChannel = audioManager()->createChannel();
 
-	initializeScriptEngine();
-
-	try
-	{
-		m_scriptEngine->eval_file("data/library.chai");
-	}
-	catch (chaiscript::exception::eval_error& e)
-	{
-		LogError("chai: evaluation failed: {}", e.pretty_print());
-	}
-	catch (chaiscript::exception::bad_boxed_cast& e)
-	{
-		LogError("chai: casting return-type from script to native failed: {}", e.what());
-	}
-	catch (std::exception& e)
-	{
-		LogError("{}", e.what());
-	}
 
 	e2::ALJDescription alj;
 
 
 	initializeSpecifications(alj);
-	e2::MobSpecification::initializeSpecifications(this);
 
 	m_bootBegin = e2::timeNow();
 
@@ -1075,22 +367,6 @@ void e2::Game::initialize()
 	
 
 
-	for (size_t i = 0; i < e2::MobSpecification::specificationCount(); i++)
-	{
-		e2::MobSpecification* spec = e2::MobSpecification::specification(i);
-
-		am->prescribeALJ(alj, spec->meshAssetPath);
-
-		if (spec->skeletonAssetPath.size() > 0)
-			am->prescribeALJ(alj, spec->skeletonAssetPath);
-
-		if (spec->runPoseAssetPath.size() > 0)
-			am->prescribeALJ(alj, spec->runPoseAssetPath);
-
-
-		if (spec->diePoseAssetPath.size() > 0)
-			am->prescribeALJ(alj, spec->diePoseAssetPath);
-	}
 
 	e2::HexGrid::prescribeAssets(this, alj);
 
@@ -1118,9 +394,6 @@ void e2::Game::initialize()
 void e2::Game::shutdown()
 {
 	nukeGame();
-
-	e2::MobSpecification::destroySpecifications();
-	destroyScriptEngine();
 
 	e2::destroy(m_session);
 	uiManager()->unregisterGlobalSpritesheet("gameUi");
@@ -1203,20 +476,6 @@ void e2::Game::update(double seconds)
 	auto view = renderer->view();
 
 	audioManager()->setListenerTransform(glm::inverse(view.calculateViewMatrix()));
-
-	std::unordered_set<e2::TurnbasedEntity*> cpy = m_dyingEntities;
-	for (e2::TurnbasedEntity* entity : cpy)
-	{
-		if (!entity->meshComponent()->isActionPlaying("die"))
-		{
-			m_dyingEntities.erase(entity);
-			game()->queueDestroyTurnbasedEntity(entity);
-		}
-	}
-
-	for (e2::TurnbasedEntity* entity : m_turnbasedEntitiesPendingDestroy)
-		destroyTurnbasedEntity(entity);
-	m_turnbasedEntitiesPendingDestroy.clear();
 
 	std::unordered_set<e2::Entity*> ecpy = m_entitiesPendingDestroy;
 	for (e2::Entity* entity : ecpy)
@@ -1401,7 +660,6 @@ void e2::Game::updateGame(double seconds)
 
 	if (kb.keys[int16_t(e2::Key::F1)].pressed)
 	{
-		m_hexGrid->rebuildForestMeshes();
 		m_hexGrid->clearAllChunks();
 	}
 
@@ -1716,19 +974,6 @@ void e2::Game::updateMenu(double seconds)
 		glm::vec2 startCoords = e2::Hex(m_startLocation).planarCoords();
 		m_hexGrid->initializeWorldBounds(startCoords);
 
-		// spawn local empire
-		m_localEmpireId = spawnEmpire();
-		m_localEmpire = m_empires[m_localEmpireId];
-		m_localEmpire->resources.funds.gold = 100.0f;
-		//discoverEmpire(m_localEmpireId);
-
-		m_nomadEmpireId = spawnEmpire();
-		m_nomadEmpire = m_empires[m_nomadEmpireId];
-		//discoverEmpire(m_nomadEmpireId);
-		m_nomadEmpire->ai = e2::create<e2::NomadAI>(this, m_nomadEmpireId);
-
-		//spawnEntity("city", m_startLocation, m_localEmpireId);
-
 		e2::Entity *player = spawnEntity("player", e2::Hex(m_startLocation).localCoords());
 		m_playerState.entity = player->cast<e2::PlayerEntity>();
 		m_playerState.give("ironhatchet");
@@ -1749,7 +994,7 @@ void e2::Game::updateMenu(double seconds)
 		m_radionManager.discoverEntity("radion_gateXNOR");
 		m_radionManager.discoverEntity("radion_gateXOR");
 
-		for (uint32_t i = 0; i < 100; i++)
+		for (uint32_t i = 0; i < 400; i++)
 		{
 			m_playerState.give("radion_cube");
 		}
@@ -1868,9 +1113,7 @@ void e2::Game::startGame()
 	if (m_globalState != GlobalState::Menu)
 		return;
 	m_globalState = GlobalState::Game;
-
-	// kick off gameloop
-	onStartOfTurn();
+	m_turnState = TurnState::Realtime;
 }
 
 void e2::Game::addScreenShake(float intensity)
@@ -1910,87 +1153,12 @@ void e2::Game::updateCamera(double seconds)
 
 void e2::Game::updateGameState()
 {
-	if (!m_empires[0] || !m_localEmpire)
-	{
-		return;
-	}
 
-
-
-	if (m_state == GameState::TurnPreparing)
-	{
-		// do turn prepare things here , and then move on to turn when done 
-		bool notDoneYet = false;
-		if (notDoneYet)
-			return;
-
-		onTurnPreparingEnd();
-		m_state = GameState::Turn;
-		onStartOfTurn();
-	}
-	else if (m_state == GameState::Turn)
-	{
-
-		if (m_turnState == TurnState::Unlocked)
-			updateTurn();
-		//else if (m_turnState == TurnState::Auto)
-//			updateAuto();
-		else if (m_turnState == TurnState::UnitAction_Move)
-			updateUnitMove();
-		else if (m_turnState == TurnState::EntityAction_Target)
-			updateTarget();
-		else if (m_turnState == TurnState::EntityAction_Generic)
-			updateCustomAction();
-		else if (m_turnState == TurnState::WavePreparing)
-			updateWavePreparing();
-		else if (m_turnState == TurnState::WaveEnding)
-			updateWaveEnding();
-		else if (m_turnState == TurnState::Wave)
-			updateWave();
-		else if (m_turnState == TurnState::Realtime)
-			updateRealtime();
-			
-	}
-	else if (m_state == GameState::TurnEnding)
-	{
-		bool notDoneYet = false;
-		if (notDoneYet)
-			return;
-
-		onTurnEndingEnd();
-
-		// flip through to next empire to let the mhave its turn, if it doesnt exist, keep doing it until we find one or we run out
-
-		//m_empireTurn++;
-		//if (m_empireTurn >= e2::maxNumEmpires)
-		//{
-		//	m_empireTurn = 0;
-		//	m_turn++;
-		//}
-		//else
-		//{
-		//	while (m_empireTurn < e2::maxNumEmpires)
-		//	{
-		//		if (!m_empires[m_empireTurn])
-		//		{
-		//			m_empireTurn++;
-		//		}
-		//		else break;
-		//	}
-
-		//	if (m_empireTurn >= e2::maxNumEmpires)
-		//	{
-		//		m_empireTurn = 0;
-		//		m_turn++;
-		//	}
-		//}
-
-		m_turn++;
-
+	if (m_turnState == TurnState::Unlocked)
+		updateTurn();
+	else if (m_turnState == TurnState::Realtime)
+		updateRealtime();
 		
-		m_state = GameState::TurnPreparing;
-		onTurnPreparingBegin();
-	}
 }
 
 void e2::Game::updateTurn()
@@ -2000,87 +1168,6 @@ void e2::Game::updateTurn()
 		updateTurnLocal();
 	//else
 		//updateTurnAI();
-}
-
-void e2::Game::updateWavePreparing()
-{
-	for (e2::TurnbasedEntity* entity : m_waveEntities)
-	{
-		entity->onWaveUpdate(m_timeDelta);
-	}
-
-	m_waveDeforestTimer += float(m_timeDelta);
-	while (m_waveDeforestTimer > 0.2f)
-	{
-		m_waveDeforestTimer -= 0.2f;
-		if (m_waveDeforestIndex < m_wave->path.size())
-		{
-			glm::ivec2 currHex = m_wave->path[m_waveDeforestIndex].offsetCoords();
-			if(!m_hexGrid->getExistingTileData(currHex))
-				m_hexGrid->discover(currHex);
-
-			removeWood(currHex);
-			m_waveDeforestIndex++;
-		}
-	}
-
-	// on predicate do this:
-	if (m_waveDeforestIndex >= m_wave->path.size() - 1)
-	{
-		m_turnState = TurnState::Wave;
-		for (e2::TurnbasedEntity* entity : m_waveEntities)
-		{
-			entity->onWaveStart();
-		}
-	}
-}
-
-void e2::Game::updateWave()
-{
-	if (!m_wave)
-	{
-		m_turnState = TurnState::Unlocked;
-		return;
-	}
-
-	m_wave->update(m_timeDelta);
-
-	if (m_wave->completed())
-	{
-
-		for (e2::TurnbasedEntity* entity : m_waveEntities)
-		{
-			entity->onWaveEnding();
-		}
-
-		m_turnState = TurnState::WaveEnding; 
-
-		return;
-	}
-
-	for (e2::TurnbasedEntity*entity : m_waveEntities)
-	{
-		entity->onWaveUpdate(m_timeDelta);
-	}
-}
-
-
-void e2::Game::updateWaveEnding()
-{
-	for (e2::TurnbasedEntity* entity : m_waveEntities)
-	{
-		entity->onWaveUpdate(m_timeDelta);
-	}
-
-	// @todo on predicate  do this :
-	for (e2::TurnbasedEntity* entity : m_waveEntities)
-	{
-		entity->onWaveEnd();
-	}
-
-	e2::destroy(m_wave);
-	m_wave = nullptr;
-	m_turnState = TurnState::Unlocked;
 }
 
 void e2::Game::updateRealtime()
@@ -2104,7 +1191,7 @@ void e2::Game::updateRealtime()
 	}
 
 
-	std::unordered_set<e2::Entity*> ents = m_realtimeEntities;
+	std::unordered_set<e2::Entity*> ents = m_entities;
 	for (e2::Entity* entity : ents)
 	{
 		entity->update(m_timeDelta);
@@ -2155,20 +1242,6 @@ void e2::Game::updateTurnLocal()
 	// turn logic here
 	if (!m_uiHovered && leftMouse.clicked && leftMouse.dragDistance <= 2.0f)
 	{
-		if (kb.state(e2::Key::LeftAlt))
-		{
-			// ugly line of code, no I wont fix it 
-			bool onLand = m_cursorTile ? m_cursorTile->getWater() == TileFlags::WaterNone : m_hexGrid->calculateTileData(m_cursorHex).getWater() == TileFlags::WaterNone;
-			bool unitSlotTaken = entityAtHex(e2::EntityLayerIndex::Structure, m_cursorHex) != nullptr;
-
-			if (!unitSlotTaken)
-			{
-				if (onLand)
-					spawnTurnbasedEntity("house", m_cursorHex, m_localEmpireId);
-			}
-			return;
-		}
-
 		if (kb.state(e2::Key::LeftControl))
 		{
 			// ugly line of code, no I wont fix it 
@@ -2187,367 +1260,9 @@ void e2::Game::updateTurnLocal()
 			return;
 		}
 
-		if (kb.state(e2::Key::LeftShift))
-		{
-			// ugly line of code, no I wont fix it 
-			bool onLand = m_cursorTile ? m_cursorTile->getWater() == TileFlags::WaterNone : m_hexGrid->calculateTileData(m_cursorHex).getWater() == TileFlags::WaterNone;
-			bool unitSlotTaken = entityAtHex(e2::EntityLayerIndex::Unit, m_cursorHex) != nullptr;
-
-			if (!unitSlotTaken)
-			{
-				if (onLand)
-					spawnTurnbasedEntity("dummy", m_cursorHex, m_localEmpireId);
-				else
-					spawnTurnbasedEntity("cb90", m_cursorHex, m_localEmpireId);
-			}
-			return;
-		}
-		e2::TurnbasedEntity* unitAtHex = entityAtHex(e2::EntityLayerIndex::Unit, m_cursorHex);
-		if (unitAtHex && unitAtHex->getEmpireId() != m_localEmpireId)
-			unitAtHex = nullptr;
-		bool unitSelected = m_selectedEntity && unitAtHex == m_selectedEntity;
-
-		e2::TurnbasedEntity* structureAtHex = entityAtHex(e2::EntityLayerIndex::Structure, m_cursorHex);
-		if (structureAtHex && structureAtHex->getEmpireId() != m_localEmpireId)
-			structureAtHex = nullptr;
-		bool structureSelected = m_selectedEntity && structureAtHex == m_selectedEntity;
-
-		e2::TurnbasedEntity* airUnitAtHex = entityAtHex(e2::EntityLayerIndex::Air, m_cursorHex);
-		if (airUnitAtHex && airUnitAtHex->getEmpireId() != m_localEmpireId )
-			airUnitAtHex = nullptr;
-		bool airUnitSelected = m_selectedEntity && airUnitAtHex == m_selectedEntity;
-
-		if (unitAtHex && !unitSelected)
-			selectEntity(unitAtHex);
-		else if (structureAtHex && !structureSelected)
-			selectEntity(structureAtHex);
-		else if (!unitAtHex && !structureAtHex && !airUnitAtHex)
-			deselectEntity();
-	}
-
-	if (!m_uiHovered && rightMouse.clicked && rightMouse.dragDistance <= 2.0f)
-	{
-		moveSelectedEntityTo(m_cursorHex);
 	}
 
 
-}
-
-//void e2::Game::updateTurnAI()
-//{
-//	e2::GameEmpire* empire = m_empires[m_empireTurn];
-//	if (empire->ai)
-//		empire->ai->grugBrainTick(game()->timeDelta());
-//}
-
-
-void e2::Game::endTurn()
-{
-	if (m_state != GameState::Turn || m_turnState != TurnState::Unlocked)
-		return;
-
-	onEndOfTurn();
-	m_state = GameState::TurnEnding;
-	onTurnEndingBegin();
-}
-
-void e2::Game::onTurnPreparingBegin()
-{
-
-}
-
-void e2::Game::onTurnPreparingEnd()
-{
-
-}
-
-void e2::Game::onStartOfTurn()
-{
-	// ignore visibility for AI since we dont want to see what theyre up to 
-	//if (m_empireTurn == m_localEmpireId)
-	//{
-	//	while (m_undiscoveredEmpires.size() < 3)
-	//		spawnAIEmpire();
-
-	//}
-
-	//m_empires[m_empireTurn]->resources.onNewTurn();
-	m_empires[m_localEmpireId]->resources.onNewTurn();
-
-	for (e2::TurnbasedEntity* entity : m_empires[m_localEmpireId]->entities)
-	{
-		entity->onTurnStart();
-	}
-
-
-	//if (m_empireTurn == m_localEmpireId)
-	//{
-		m_localTurnEntities.clear();
-		for (e2::TurnbasedEntity* entity : m_localEmpire->entities)
-		{
-			entity->updateGrugVariables();
-
-			if (entity->playerRelevant())
-			{
-				m_localTurnEntities.insert(entity);
-			}
-		}
-		
-		if (m_localTurnEntities.size() > 0)
-			nextLocalEntity();
-	//}
-	//else if (m_empires[m_empireTurn]->ai)
-	//{
-	//	m_empires[m_empireTurn]->ai->grugBrainWakeUp();
-	//}
-}
-
-void e2::Game::onEndOfTurn()
-{
-	for (e2::TurnbasedEntity* entity : m_empires[m_localEmpireId]->entities)
-	{
-		entity->onTurnEnd();
-	}
-
-	if (m_empires[m_localEmpireId]->ai)
-		m_empires[m_localEmpireId]->ai->grugBrainGoSleep();
-
-}
-
-void e2::Game::onTurnEndingBegin()
-{
-
-}
-
-void e2::Game::onTurnEndingEnd()
-{
-	deselectEntity();
-}
-
-void e2::Game::updateUnitMove()
-{
-	e2::TurnbasedSpecification* spec = m_selectedEntity->turnbasedSpecification();
-	if (spec->moveType == EntityMoveType::Linear)
-	{
-		m_unitMoveDelta += float(m_timeDelta) * spec->moveSpeed * (m_ffwMove ? 100.0f : 1.0f);
-
-		while (m_unitMoveDelta > 1.0f)
-		{
-			m_unitMoveDelta -= 1.0;
-			m_unitMoveIndex++;
-
-			if (m_unitMoveIndex >= m_unitMovePath.size() - 1)
-			{
-				e2::Hex prevHex = m_unitMovePath[m_unitMovePath.size() - 2];
-				e2::Hex finalHex = m_unitMovePath[m_unitMovePath.size() - 1];
-
-				m_entityLayers[size_t(spec->layerIndex)].entityIndex.erase(m_selectedEntity->getTileIndex());
-				m_selectedEntity->setTileIndex(finalHex.offsetCoords()); // @todo make this better
-				m_entityLayers[size_t(spec->layerIndex)].entityIndex[m_selectedEntity->getTileIndex()] = m_selectedEntity;
-
-
-				float angle = e2::radiansBetween(finalHex.localCoords(), prevHex.localCoords());
-				m_selectedEntity->setMeshTransform(finalHex.localCoords(), angle);
-
-				resolveSelectedEntity();
-
-				m_selectedEntity->onEndMove();
-
-				m_turnState = m_moveTurnStateFallback;
-
-				resolveLocalEntity();
-
-				return;
-			}
-		}
-
-		e2::Hex currHex = m_unitMovePath[m_unitMoveIndex];
-		e2::Hex nextHex = m_unitMovePath[m_unitMoveIndex + 1];
-
-		glm::vec3 currHexPos = currHex.localCoords();
-		glm::vec3 nextHexPos = nextHex.localCoords();
-
-		glm::vec3 newPos = glm::mix(currHexPos, nextHexPos, m_unitMoveDelta);
-		float angle = radiansBetween(nextHexPos, currHexPos);
-		m_selectedEntity->setMeshTransform(newPos, angle);
-	}
-	else if (spec->moveType == e2::EntityMoveType::Smooth)
-	{
-
-		m_unitMoveDelta += float(m_timeDelta) * spec->moveSpeed * (m_ffwMove ? 100.0f : 1.0f);
-
-		while (m_unitMoveDelta > 1.0f)
-		{
-			m_unitMoveDelta -= 1.0;
-			m_unitMoveIndex++;
-
-			if (m_unitMoveIndex >= m_unitMovePath.size() - 1)
-			{
-				e2::Hex prevHex = m_unitMovePath[m_unitMovePath.size() - 2];
-				e2::Hex finalHex = m_unitMovePath[m_unitMovePath.size() - 1];
-				// we are done
-
-				m_entityLayers[size_t(spec->layerIndex)].entityIndex.erase(m_selectedEntity->getTileIndex());
-				m_selectedEntity->setTileIndex(finalHex.offsetCoords());
-				m_entityLayers[size_t(spec->layerIndex)].entityIndex[m_selectedEntity->getTileIndex()] = m_selectedEntity;
-
-				float angle = e2::radiansBetween(finalHex.localCoords(), prevHex.localCoords());
-				m_selectedEntity->setMeshTransform(finalHex.localCoords(), angle);
-				
-				resolveSelectedEntity();
-				m_selectedEntity->onEndMove();
-
-				m_turnState = m_moveTurnStateFallback;
-
-				resolveLocalEntity();
-
-				return;
-			}
-		}
-
-
-		e2::Hex currHex = m_unitMovePath[m_unitMoveIndex];
-		e2::Hex nextHex = m_unitMovePath[m_unitMoveIndex + 1];
-
-		glm::vec3 currHexPos = currHex.localCoords();
-		glm::vec3 nextHexPos = nextHex.localCoords();
-
-
-		glm::vec3 prevHexPos = m_unitMoveIndex > 0 ? m_unitMovePath[m_unitMoveIndex - 1].localCoords() : currHexPos - (nextHexPos - currHexPos);
-
-		glm::vec3 nextNextHexPos = m_unitMoveIndex + 2 < m_unitMovePath.size() ? m_unitMovePath[m_unitMoveIndex + 2].localCoords() : nextHexPos + (nextHexPos - currHexPos);
-
-
-		glm::vec3 newPos = glm::catmullRom(prevHexPos, currHexPos, nextHexPos, nextNextHexPos, m_unitMoveDelta);
-		glm::vec3 newPos2 = glm::catmullRom(prevHexPos, currHexPos, nextHexPos, nextNextHexPos, m_unitMoveDelta + 0.01f);
-
-
-		constexpr bool debugRender = false;
-		if (debugRender)
-		{
-			for (uint32_t k = 0; k < m_unitMovePath.size() - 1; k++)
-			{
-
-				e2::Hex currHex = m_unitMovePath[k];
-				e2::Hex nextHex = m_unitMovePath[k + 1];
-
-				glm::vec3 currHexPos = currHex.localCoords();
-				glm::vec3 nextHexPos = nextHex.localCoords();
-
-
-				glm::vec3 prevHexPos = k > 0 ? m_unitMovePath[k - 1].localCoords() : currHexPos - (nextHexPos - currHexPos);
-
-				glm::vec3 nextNextHexPos = k + 2 < m_unitMovePath.size() ? m_unitMovePath[k + 2].localCoords() : nextHexPos + (nextHexPos - currHexPos);
-
-
-				constexpr uint32_t debugResolution = 8;
-				for (uint32_t i = 0; i < debugResolution; i++)
-				{
-					float ii = glm::clamp(float(i) / float(debugResolution), 0.0f, 1.0f);
-					float ii2 = glm::clamp(float(i + 1) / float(debugResolution), 0.0f, 1.0f);
-					glm::vec3 currPos = glm::catmullRom(prevHexPos, currHexPos, nextHexPos, nextNextHexPos, ii);
-					glm::vec3 nextPos = glm::catmullRom(prevHexPos, currHexPos, nextHexPos, nextNextHexPos, ii2);
-
-					gameSession()->renderer()->debugLine(glm::vec3(1.0f, ii, 1.0f), currPos, nextPos);
-				}
-			}
-		}
-
-
-		float angle = radiansBetween(newPos2, newPos);
-		m_selectedEntity->setMeshTransform(newPos, angle);
-	}
-
-	if (!m_selectedEntity->isLocal() && hexGrid()->isVisible(m_selectedEntity->getTileIndex()))
-	{
-		m_viewOrigin = m_selectedEntity->planarCoords();
-		m_targetViewOrigin = m_viewOrigin;
-	}
-}
-
-void e2::Game::updateTarget()
-{
-	e2::GameSession* session = gameSession();
-	e2::Renderer* renderer = session->renderer();
-	e2::UIContext* ui = session->uiContext();
-	auto& kb = ui->keyboardState();
-	auto& mouse = ui->mouseState();
-	auto& leftMouse = mouse.buttons[uint16_t(e2::MouseButton::Left)];
-
-	if (scriptRunning())
-	{
-		return;
-	}
-
-	if (!m_selectedEntity)
-		return;
-
-	if (m_hexChanged)
-	{
-		m_selectedEntity->onTargetChanged(m_cursorHex);
-	}
-
-	if (leftMouse.clicked)
-	{
-		m_selectedEntity->onTargetClicked();
-	}
-}
-
-
-e2::TurnbasedEntity* e2::Game::spawnTurnbasedEntity(e2::Name entityId, glm::ivec2 const& tileIndex, e2::EmpireId empireId)
-{
-	e2::Entity* newEntity = spawnEntity(entityId, e2::Hex(tileIndex).localCoords());
-	if (!newEntity)
-	{
-		LogError("spawnEntity returned null");
-		return nullptr;
-	}
-
-	e2::TurnbasedEntity* turnbasedEntity = dynamic_cast<e2::TurnbasedEntity*>(newEntity);
-	if (!turnbasedEntity)
-	{
-		LogError("entity isn't turnbased");
-		destroyEntity(newEntity);
-		return nullptr;
-	}
-
-	e2::TurnbasedSpecification* turnbasedSpecification = dynamic_cast<e2::TurnbasedSpecification*>(newEntity->getSpecification());
-	if (!turnbasedSpecification)
-	{
-		LogError("entity specification isn't turnbased");
-		destroyEntity(newEntity);
-		return nullptr;
-	}
-
-	m_turnbasedEntities.insert(turnbasedEntity);
-
-	turnbasedEntity->setupTurnbased(tileIndex, empireId);
-	if (turnbasedSpecification->waveRelevant)
-		m_waveEntities.insert(turnbasedEntity);
-
-
-	m_entityLayers[size_t(turnbasedSpecification->layerIndex)].entityIndex[tileIndex] = turnbasedEntity;
-
-	// insert into entity layer index
-
-
-	// insert into empire and its fiscal stream 
-	m_empires[empireId]->entities.insert(turnbasedEntity);
-	m_empires[empireId]->resources.fiscalStreams.insert(turnbasedEntity);
-
-	if (turnbasedSpecification->layerIndex == EntityLayerIndex::Structure)
-	{
-		removeWood(tileIndex);
-
-		e2::TileData* existingData = m_hexGrid->getExistingTileData(tileIndex);
-		if (existingData)
-		{
-			existingData->empireId = empireId;
-		}
-	}
-
-	turnbasedEntity->onSpawned();
-	return turnbasedEntity;
 }
 
 e2::Entity* e2::Game::spawnEntity(e2::Name entityId, glm::vec3 const& worldPosition, glm::quat const& worldRotation)
@@ -2581,12 +1296,6 @@ e2::Entity* e2::Game::spawnEntity(e2::Name entityId, glm::vec3 const& worldPosit
 
 	// insert into global entity set 
 	m_entities.insert(asEntity);
-
-	e2::TurnbasedSpecification* turnbasedSpecification = dynamic_cast<e2::TurnbasedSpecification*>(spec);
-	if (!turnbasedSpecification)
-	{
-		m_realtimeEntities.insert(asEntity);
-	}
 
 	return asEntity;
 }
@@ -2625,15 +1334,9 @@ e2::Entity* e2::Game::spawnCustomEntity(e2::Name specificationId, e2::Name entit
 
 	// post construct since we created it dynamically
 	asEntity->postConstruct(this, spec, worldPosition, worldRotation);
-
+	asEntity->transient = true;
 	// insert into global entity set 
 	m_entities.insert(asEntity);
-
-	e2::TurnbasedSpecification* turnbasedSpecification = dynamic_cast<e2::TurnbasedSpecification*>(spec);
-	if (!turnbasedSpecification)
-	{
-		m_realtimeEntities.insert(asEntity);
-	}
 
 	return asEntity;
 }
@@ -2774,266 +1477,6 @@ void e2::Game::drawHitLabels()
 		ui->drawSDFText(e2::FontFace::Sans, fontSize, e2::UIColor(255, 255, 255, (uint8_t)alpha), worldToPixels(label.offset), label.text);
 
 	}
-}
-
-void e2::Game::drawStatusUI()
-{
-	e2::GameSession* session = gameSession();
-	e2::Renderer* renderer = session->renderer();
-	e2::UIContext* ui = session->uiContext();
-	auto& kb = ui->keyboardState();
-	auto& mouse = ui->mouseState();
-	auto& leftMouse = mouse.buttons[uint16_t(e2::MouseButton::Left)];
-
-	e2::IWindow* wnd = session->window();
-	glm::vec2 winSize = wnd->size();
-
-	//ui->drawQuadShadow({ -2.0f, -2.0f }, { winSize.x + 4.0f, 30.0f }, 2.0f, 0.9f, 2.0f);
-	ui->drawGamePanel({}, { winSize.x, 32.0f }, false, 0.75f);
-
-	float xCursor = 0.0f;
-	uint8_t fontSize = 14;
-
-	std::string str;
-	float strWidth;
-
-	e2::GameResources& resources = m_empires[m_localEmpireId]->resources;
-
-	float textBaseline = 16.0f;
-
-	// Gold
-	e2::Sprite* goldSprite = getIconSprite("gold");
-	xCursor += 20.0f;
-	ui->drawSprite({ xCursor, 6.0f }, *goldSprite, 0xFFFFFFFF, 20.0f / goldSprite->size.y);
-	xCursor += 24.0f;
-	xCursor += 8.0f;
-
-	str = std::format("{:}", resources.funds.gold);
-	strWidth = ui->calculateTextWidth(e2::FontFace::Sans, fontSize, str);
-	ui->drawRasterText(e2::FontFace::Sans, fontSize, 0xFFFFFFFF, { xCursor, textBaseline }, str);
-	xCursor += strWidth;
-
-	// Wood
-	e2::Sprite* woodSprite = getIconSprite("wood");
-	xCursor += 44.0f;
-	ui->drawSprite({ xCursor, 6.0f }, *woodSprite, 0xFFFFFFFF, 20.0f / goldSprite->size.y);
-	xCursor += 24.0f;
-	xCursor += 8.0f;
-
-	str = std::format("{:} *({:+})*", resources.funds.wood, resources.profits.wood);
-	strWidth = ui->calculateTextWidth(e2::FontFace::Sans, fontSize, str);
-	ui->drawRasterText(e2::FontFace::Sans, fontSize, 0xFFFFFFFF, { xCursor, textBaseline }, str);
-	xCursor += strWidth;
-
-	// Iron
-	e2::Sprite* oreSprite = getIconSprite("ore");
-	xCursor += 44.0f;
-	ui->drawSprite({ xCursor, 6.0f }, *oreSprite, 0xFFFFFFFF, 20.0f / goldSprite->size.y);
-	xCursor += 24.0f;
-	xCursor += 8.0f;
-
-	str = std::format("{:} *({:+})*", resources.funds.iron, resources.profits.iron);
-	strWidth = ui->calculateTextWidth(e2::FontFace::Sans, fontSize, str);
-	ui->drawRasterText(e2::FontFace::Sans, fontSize, 0xFFFFFFFF, { xCursor, textBaseline }, str);
-	xCursor += strWidth;
-
-	// Steel
-	e2::Sprite* steelSprite = getIconSprite("beam");
-	xCursor += 44.0f;
-	ui->drawSprite({ xCursor, 6.0f }, *steelSprite, 0xFFFFFFFF, 20.0f / goldSprite->size.y);
-	xCursor += 24.0f;
-	xCursor += 8.0f;
-
-	str = std::format("{:}", resources.funds.steel);
-	strWidth = ui->calculateTextWidth(e2::FontFace::Sans, fontSize, str);
-	ui->drawRasterText(e2::FontFace::Sans, fontSize, 0xFFFFFFFF, { xCursor, textBaseline }, str);
-	xCursor += strWidth;
-
-
-	str = std::format("Turn {}", m_turn);
-	strWidth = ui->calculateTextWidth(e2::FontFace::Sans, fontSize, str);
-	xCursor = winSize.x - strWidth - 8.0f - 20.0f - 8.0f - 20.0f - 8.0f;
-	ui->drawRasterText(e2::FontFace::Sans, fontSize, 0xFFFFFFFF, { xCursor, textBaseline }, str);
-	
-	e2::Sprite* nextSprite = getUiSprite("endturn");
-	xCursor = winSize.x - 20.0f - 8.0f - 20.0f;
-	glm::vec2 nextOffset{ xCursor, 6.0f };
-	glm::vec2 nextSize{ 20.0f, 20.0f };
-	ui->drawSprite(nextOffset, *nextSprite, 0xFFFFFFFF, 20.0f / nextSprite->size.y);
-
-	if (mouse.relativePosition.x > nextOffset.x && mouse.relativePosition.x < nextOffset.x + nextSize.x &&
-		mouse.relativePosition.y > nextOffset.y && mouse.relativePosition.y < nextOffset.y + nextSize.y)
-	{
-		m_uiHovered = true;
-		if (leftMouse.pressed)
-			endTurn();
-	}
-
-	e2::Sprite* menuSprite = getIconSprite("menu");
-	xCursor = winSize.x - 20.0f - 8.0f;
-	glm::vec2 menuOffset{xCursor, 6.0f};
-	glm::vec2 menuSize{20.0f, 20.0f};
-	ui->drawSprite(menuOffset, *menuSprite, 0xFFFFFFFF, 20.0f / menuSprite->size.y);
-
-	if (mouse.relativePosition.x > menuOffset.x && mouse.relativePosition.x < menuOffset.x + menuSize.x &&
-		mouse.relativePosition.y > menuOffset.y && mouse.relativePosition.y < menuOffset.y + menuSize.y)
-	{
-		m_uiHovered = true;
-		if (leftMouse.pressed)
-			m_globalState = GlobalState::InGameMenu;
-	}
-
-	/*ui->drawRasterText(e2::FontFace::Serif, 11, 0xFFFFFFFF, { 4.0f + (160.0f * 1.0f), 14.0f }, std::format("Wood: {0:10} ({0:+})", m_resources.funds.wood, m_resources.profits.wood));
-	ui->drawRasterText(e2::FontFace::Serif, 11, 0xFFFFFFFF, { 4.0f + (160.0f * 2.0f), 14.0f }, std::format("Stone: {0:10} ({0:+})", m_resources.funds.stone, m_resources.profits.stone));
-	ui->drawRasterText(e2::FontFace::Serif, 11, 0xFFFFFFFF, { 4.0f + (160.0f * 3.0f), 14.0f }, std::format("Metal: {0:10} ({0:+})", m_resources.funds.metal, m_resources.profits.metal));
-	ui->drawRasterText(e2::FontFace::Serif, 11, 0xFFFFFFFF, { 4.0f + (160.0f * 4.0f), 14.0f }, std::format("Oil: {0:10} ({0:+})", m_resources.funds.oil, m_resources.profits.oil));
-	ui->drawRasterText(e2::FontFace::Serif, 11, 0xFFFFFFFF, { 4.0f + (160.0f * 5.0f), 14.0f }, std::format("Uranium: {0:10} ({0:+})", m_resources.funds.uranium, m_resources.profits.uranium));
-	ui->drawRasterText(e2::FontFace::Serif, 11, 0xFFFFFFFF, { 4.0f + (160.0f * 6.0f), 14.0f }, std::format("Meteorite: {0:10} ({0:+})", m_resources.funds.meteorite, m_resources.profits.meteorite));*/
-
-
-
-}
-
-
-void e2::Game::drawUnitUI()
-{
-
-	e2::GameSession* session = gameSession();
-	e2::Renderer* renderer = session->renderer();
-	e2::UIContext* ui = session->uiContext();
-	auto& kb = ui->keyboardState();
-	auto& mouse = ui->mouseState();
-	auto& leftMouse = mouse.buttons[uint16_t(e2::MouseButton::Left)];
-
-	e2::IWindow* wnd = session->window();
-	glm::vec2 winSize = wnd->size();
-
-	float alpha = glm::mix( 1.0f,  0.75f, m_viewZoom);
-	e2::UIColor bgColor = e2::UIColor(glm::vec4{0.0f, 0.0f, 0.0f, alpha});
-	e2::UIColor bgColorNomad = e2::UIColor(166, 28, 0, uint8_t(alpha * 255.f));
-	e2::UIColor bgColorEnemy = e2::UIColor(7, 82, 163, uint8_t(alpha*255.f));
-	for (e2::TurnbasedEntity* entity : m_turnbasedEntitiesInView)
-	{
-		if (!m_hexGrid->isVisible(entity->getTileIndex()))
-		{
-			continue;
-		}
-
-		e2::TurnbasedSpecification* spec = entity->turnbasedSpecification();
-
-		bool isPlayer = entity->getEmpireId() == m_localEmpireId;
-		bool isNomad = entity->getEmpireId() == m_nomadEmpireId;
-		bool isEnemyCiv = !isPlayer && !isNomad;
-
-		e2::UIColor bg = isPlayer ? bgColor : isNomad ? bgColorNomad : bgColorEnemy;
-
-		bool selected = entity == m_selectedEntity;
-
-		if (!selected)
-			bg.a = uint8_t((float)bg.a * 0.8f);
-
-
-		static const e2::Name badgeBgName = "badge";
-		e2::Sprite* badgeBg = getUiSprite(badgeBgName);
-		e2::Sprite* badgeSprite;
-		
-		bool isGlobal = spec->badgeId.string().contains('.');
-		if(isGlobal)
-			badgeSprite = uiManager()->globalSprite(spec->badgeId);
-		else 
-			badgeSprite = getUiSprite(spec->badgeId);
-		
-
-		
-		 
-		if (!selected && badgeBg && badgeSprite)
-		{
-			
-			float uiScale = float(winSize.y) / 1080.0f;
-			uiScale *= 1.0;
-
-			glm::vec2 badgeSize = glm::vec2( 32.0f * (badgeSprite->size.x / badgeSprite->size.y), 32.0f) * uiScale;
-
-			glm::vec2 badgeShieldSize = glm::vec2(64.0f * (badgeBg->size.x / badgeBg->size.y), 64.0f) * uiScale;
-
-			
-
-			glm::vec2 badgePos = worldToPixels( entity->getTransform()->getTranslation(e2::TransformSpace::World) + e2::worldUpf() * 0.75f);
-		
-			ui->drawSprite(badgePos - badgeShieldSize / 2.0f, *badgeBg, bg, (64.0f/ badgeBg->size.y) * uiScale);
-
-			ui->drawSprite(badgePos - badgeSize / 2.0f, *badgeSprite, 0xFFFFFFFF, (32.0f / badgeSprite->size.y) * uiScale);
-		}
-
-	}
-
-	if (!m_selectedEntity || !m_selectedEntity->isLocal())
-		return;
-	
-
-
-	float width = 450.0f;
-	float height = 180.0f;
-
-	glm::vec2 offset = { winSize.x / 2.0 - width / 2.0, winSize.y - height - 16.0f };
-
-	if (mouse.relativePosition.x > offset.x && mouse.relativePosition.x < offset.x + width &&
-		mouse.relativePosition.y > offset.y && mouse.relativePosition.y < offset.y + height)
-		m_uiHovered = true;
-
-	ui->drawQuadShadow(offset, {width, height}, 8.0f, 0.9f, 4.0f);
-	//uint8_t fontSize = 12;
-	//std::string str = m_selectedUnit->displayName;
-	//ui->drawRasterText(e2::FontFace::Serif, 14, 0xFFFFFFFF, offset + glm::vec2(8.f, 14.f), str);
-
-	ui->pushFixedPanel("test", offset + glm::vec2(4.0f, 4.0f), glm::vec2(width - 8.0f, height - 8.0f));
-
-	if (m_selectedEntity && m_turnState == TurnState::Unlocked)
-	{
-		e2::TurnbasedSpecification* spec = m_selectedEntity->turnbasedSpecification();
-
-		ui->beginStackV("unitV", glm::vec2(0.0, 0.0));
-		ui->beginStackH("headerH", 24.0f);
-		ui->gameLabel(std::format("**{}**", spec->displayName));
-
-		
-		if (spec->showMovePoints)
-		{
-			e2::Sprite* moveSprite = uiManager()->globalSprite("gameUi.run");
-
-			ui->sprite(*moveSprite, 0xFFFFFFFF, 0.5f);
-			ui->gameLabel(std::to_string(m_selectedEntity->getMovePointsLeft()));
-		}
-
-		if (spec->showAttackPoints)
-		{
-			e2::Sprite* attackSprite = uiManager()->globalSprite("gameUi.attack");
-
-			ui->sprite(*attackSprite, 0xFFFFFFFF, 0.5f);
-			ui->gameLabel(std::to_string(m_selectedEntity->getAttackPointsLeft()));
-		}
-
-		if (spec->showBuildPoints)
-		{
-			e2::Sprite* buildSprite = uiManager()->globalSprite("gameUi.engineer");
-
-			ui->sprite(*buildSprite, 0xFFFFFFFF, 0.5f);
-			ui->gameLabel(std::to_string(m_selectedEntity->getBuildPointsLeft()));
-		}
-
-		ui->endStackH();
-
-		m_selectedEntity->drawUI(ui);
-
-		ui->endStackV();
-	}
-		
-
-
-
-	ui->popFixedPanel();
-
-
 }
 
 void e2::Game::drawMinimapUI()
@@ -3291,10 +1734,7 @@ void e2::Game::drawFinalUI()
 
 void e2::Game::onNewCursorHex()
 {
-	if (m_selectedEntity && m_selectedEntity->turnbasedSpecification()->moveType != EntityMoveType::Static)
-	{
-		m_unitHoverPath = m_unitAS->find(m_cursorHex);
-	}
+
 }
 
 void e2::Game::spawnHitLabel(glm::vec3 const& worldLocation, std::string const& text)
@@ -3303,354 +1743,6 @@ void e2::Game::spawnHitLabel(glm::vec3 const& worldLocation, std::string const& 
 	if (m_hitLabelIndex >= e2::maxNumHitLabels)
 		m_hitLabelIndex = 0;
 }
-
-e2::EmpireId e2::Game::spawnEmpire()
-{
-	for (e2::EmpireId i = 0; i < m_empires.size(); i++)
-	{
-		if (!m_empires[i])
-		{
-			m_empires[i] = e2::create<e2::GameEmpire>(this, i);
-			//m_undiscoveredEmpires.insert(m_empires[i]);
-			return i;
-		}
-	}
-
-	LogError("failed to spawn empire, we full rn");
-	return 0;
-}
-
-void e2::Game::destroyEmpire(EmpireId empireId)
-{
-	e2::GameEmpire* empire = m_empires[empireId];
-	m_empires[empireId] = nullptr;
-
-	if (!empire)
-		return;
-
-	//m_aiEmpires.erase(empire);
-	//m_discoveredEmpires.erase(empire);
-	//m_undiscoveredEmpires.erase(empire);
-
-	if (empire->ai)
-		e2::destroy(empire->ai);
-
-	e2::destroy(empire);
-}
-
-//void e2::Game::spawnAIEmpire()
-//{
-//	e2::EmpireId newEmpireId = spawnEmpire();
-//	if (newEmpireId == 0)
-//		return;
-//
-//	e2::GameEmpire* newEmpire = m_empires[newEmpireId];
-//	m_aiEmpires.insert(newEmpire);
-//
-//	newEmpire->ai = e2::create<e2::CommanderAI>(this, newEmpireId);
-//
-//	e2::Aabb2D worldBounds = m_hexGrid->worldBounds();
-//	bool foundLocation = false;
-//	glm::ivec2 aiStartLocation;
-//	do
-//	{
-//		glm::vec2 random = e2::randomVec2(worldBounds.min, worldBounds.max);
-//		float distLeft = glm::abs(worldBounds.min.x - random.x);
-//		float distRight = glm::abs(worldBounds.max.x - random.x);
-//		float distUp = glm::abs(worldBounds.min.y - random.y);
-//		float distDown = glm::abs(worldBounds.max.y - random.y);
-//		glm::vec2 offsetDir{};
-//
-//		if (distLeft < distRight && distLeft < distUp && distLeft < distDown)
-//		{
-//			random.x = worldBounds.min.x;
-//			offsetDir = { -1.0f, 0.0f };
-//		}
-//		else if (distRight < distLeft && distRight < distUp && distRight < distDown)
-//		{
-//			random.x = worldBounds.max.x;
-//			offsetDir = { 1.0f, 0.0f };
-//		}
-//		else if (distUp < distRight && distUp < distLeft && distUp < distDown)
-//		{
-//			random.y = worldBounds.min.y;
-//			offsetDir = { 0.0f, -1.0f };
-//		}
-//		else
-//		{
-//			random.y = worldBounds.max.y;
-//			offsetDir = { 0.0f, 1.0f };
-//		}
-//
-//		glm::vec2 offsetPoint = random + offsetDir * 64.0f;
-//
-//		foundLocation = findStartLocation(e2::Hex(offsetPoint).offsetCoords(), { 64, 64 }, aiStartLocation, true);
-//	} while (!foundLocation);
-//
-//	spawnEntity("mob", aiStartLocation, newEmpireId);
-//}
-
-e2::GameEmpire* e2::Game::empireById(EmpireId id)
-{
-	return m_empires[id];
-}
-
-
-void e2::Game::resolveLocalEntity()
-{
-	if (!m_selectedEntity || !m_selectedEntity->isLocal())
-		return;
-
-	resolveSelectedEntity();
-
-	if (!m_selectedEntity)
-	{
-		//nextLocalEntity();
-		return;
-	}
-	
-	m_selectedEntity->updateGrugVariables();
-	//if (!m_selectedEntity->playerRelevant())
-	//{
-	//	nextLocalEntity();
-	//}
-}
-
-void e2::Game::nextLocalEntity()
-{
-	if (m_localTurnEntities.size() == 0)
-		return;
-
-	e2::TurnbasedEntity* entity = *m_localTurnEntities.begin();
-	if (m_selectedEntity == entity)
-	{
-		deselectEntity();
-		m_localTurnEntities.erase(entity);
-	}
-
-	if (m_localTurnEntities.size() == 0)
-		return;
-
-	entity = *m_localTurnEntities.begin();
-	selectEntity(entity);
-	m_targetViewOrigin = entity->planarCoords();
-}
-
-
-e2::Name e2::Game::getCityName()
-{
-	if (m_cityNames.size() == 0)
-		return e2::Name("Nomansland");
-
-	e2::Name returner = m_cityNames.back();
-	m_cityNames.pop_back();
-
-	return returner;
-}
-
-void e2::Game::applyDamage(e2::TurnbasedEntity* entity, e2::TurnbasedEntity* instigator, float damage)
-{
-	game()->spawnHitLabel(entity->getTransform()->getTranslation(e2::TransformSpace::World) + e2::worldUpf() * 0.5f, std::format("{}", int64_t(damage)));
-	entity->onHit(instigator, damage);
-}
-
-void e2::Game::resolveSelectedEntity()
-{
-	if (!m_selectedEntity)
-		return;
-
-	if (m_unitAS)
-		e2::destroy(m_unitAS);
-
-	m_unitAS = nullptr;
-
-	m_unitAS = e2::create<PathFindingAS>(m_selectedEntity);
-
-	if (!m_selectedEntity->isLocal() || m_selectedEntity->turnbasedSpecification()->moveType == EntityMoveType::Static)
-	{
-		m_hexGrid->clearOutline();
-	}
-	else
-	{
-		m_hexGrid->clearOutline();
-		for (auto& [coords, hexAS] : m_unitAS->hexIndex)
-		{
-			m_hexGrid->pushOutline(e2::OutlineLayer::Movement, coords);
-		}
-
-		for (auto& [entity, pair] : m_unitAS->targetsInMoveRange)
-		{
-			m_hexGrid->pushOutline(e2::OutlineLayer::Attack, entity->getTileIndex());
-		}
-	}
-
-	if(!m_selectedEntity->isLocal() && m_selectedEntity->isInView())
-		m_targetViewOrigin = m_selectedEntity->planarCoords();
-
-}
-
-void e2::Game::unresolveSelectedEntity()
-{
-
-	if (m_unitAS)
-		e2::destroy(m_unitAS);
-	m_unitAS = nullptr;
-
-	m_hexGrid->clearOutline();
-}
-
-e2::TurnbasedEntity* e2::Game::getSelectedEntity()
-{
-	return m_selectedEntity;
-}
-
-void e2::Game::selectEntity(e2::TurnbasedEntity* entity)
-{
-	if (!entity || entity == m_selectedEntity)
-		return;
-
-	if (!entityRelevantForPlay(entity))
-		return;
-
-	deselectEntity();
-
-	m_selectedEntity = entity;
-
-	resolveSelectedEntity();
-	m_selectedEntity->turnbasedSpecification()->scriptInterface.invokeOnSelected(m_selectedEntity);
-}
-
-void e2::Game::deselectEntity()
-{
-	if (!m_selectedEntity)
-		return;
-
-	m_selectedEntity->turnbasedSpecification()->scriptInterface.invokeOnDeselected(m_selectedEntity);
-
-	unresolveSelectedEntity();
-
-	m_selectedEntity = nullptr;
-}
-
-void e2::Game::moveSelectedEntityTo(glm::ivec2 const& to)
-{
-	
-
-	if ((m_state != GameState::Turn && m_turnState != TurnState::Unlocked) || !m_selectedEntity)
-		return;
-
-	if (m_selectedEntity->getMovePointsLeft() < 1 || m_selectedEntity->turnbasedSpecification()->moveType == e2::EntityMoveType::Static)
-		return;
-
-	if (to == m_selectedEntity->getTileIndex())
-		return;
-
-	m_unitMovePath = m_unitAS->find(to);
-	if (m_unitMovePath.size() == 0)
-		return;
-	else if (m_unitMovePath.size() - 1 > m_selectedEntity->getMovePointsLeft())
-		return;
-
-
-	m_moveTurnStateFallback = m_turnState;
-
-	m_ffwMove = !m_selectedEntity->isLocal() && !m_hexGrid->isVisible(to) && !m_hexGrid->isVisible(m_selectedEntity->getTileIndex());
-
-	m_hexGrid->clearOutline();
-
-	m_selectedEntity->subtractMovePoints(int32_t(m_unitMovePath.size()) - 1);
-
-	m_selectedEntity->onBeginMove();
-
-	m_turnState = TurnState::UnitAction_Move;
-	m_unitMoveIndex = 0;
-	m_unitMoveDelta = 0.0f;
-	
-}
-
-void e2::Game::beginCustomAction()
-{
-	if (m_turnState == TurnState::Unlocked)
-		m_turnState = TurnState::EntityAction_Generic;
-}
-
-
-void e2::Game::endCustomAction()
-{
-	if (m_turnState == TurnState::EntityAction_Generic)
-	{
-		m_turnState = TurnState::Unlocked;
-	}
-
-}
-
-void e2::Game::updateCustomAction()
-{
-	m_selectedEntity->updateCustomAction(m_timeDelta);
-}
-
-bool e2::Game::attemptBeginWave(e2::TurnbasedEntity* hiveEntity, std::string const& prefabPath)
-{
-	if (m_wave)
-		return false;
-
-	e2::TurnbasedEntity* closestEntity = nullptr;
-	int32_t tileDist = 40;
-	for (e2::TurnbasedEntity* entity : m_localEmpire->entities)
-	{
-		int32_t newDist = e2::Hex::distance(entity->getTileIndex(), hiveEntity->getTileIndex());
-		if (newDist > tileDist)
-			continue;
-
-		if (entity->turnbasedSpecification()->layerIndex != e2::EntityLayerIndex::Structure)
-			continue;
-
-		if (!entity->turnbasedSpecification()->waveRelevant)
-			continue;
-
-		closestEntity = entity;
-	}
-
-	if (!closestEntity)
-		return false;
-	
-	m_wave = e2::create<e2::Wave>(this, hiveEntity, closestEntity);
-	if (m_wave->path.size() == 0)
-	{
-		e2::destroy(m_wave);
-		m_wave = nullptr;
-		return false;
-	}
-
-	deselectEntity();
-
-	m_wave->pushMobs(prefabPath);
-
-	m_waveDeforestIndex = 0;
-	m_waveDeforestTimer = 0.0f;
-
-	m_turnState = TurnState::WavePreparing;
-
-	for (e2::TurnbasedEntity* entity : m_waveEntities)
-	{
-		entity->onWavePreparing();
-	}
-
-	return true;
-}
-
-void e2::Game::beginTargeting()
-{
-	if (m_turnState == TurnState::Unlocked)
-		m_turnState = TurnState::EntityAction_Target;
-}
-
-void e2::Game::endTargeting()
-{
-	if (m_turnState == TurnState::EntityAction_Target)
-		m_turnState = TurnState::Unlocked;
-}
-
 
 
 void e2::Game::updateMainCamera(double seconds)
@@ -3782,10 +1874,7 @@ e2::RenderView e2::Game::calculateRenderView(glm::vec2 const &viewOrigin)
 
 void e2::Game::destroyEntity(e2::Entity* entity)
 {
-	if (!entity->getSpecificationAs<e2::TurnbasedSpecification>())
-	{
-		m_realtimeEntities.erase(entity);
-	}
+
 	m_entities.erase(entity);
 	e2::destroy(entity);
 
@@ -3800,126 +1889,6 @@ void e2::Game::queueDestroyEntity(e2::Entity* entity)
 
 
 
-void e2::Game::queueDestroyTurnbasedEntity(e2::TurnbasedEntity* entity)
-{
-	entity->pendingDestroy = true;
-	m_turnbasedEntitiesPendingDestroy.insert(entity);
-}
-
-void e2::Game::destroyTurnbasedEntity(e2::TurnbasedEntity* entity)
-{
-
-	if (m_selectedEntity && m_selectedEntity == entity)
-	{
-		if (m_turnState == TurnState::UnitAction_Move)
-		{
-			LogError("We are moving while being destroyed. We can't handle this! Fix!!");
-		}
-
-		m_turnState = TurnState::Unlocked;
-
-
-		deselectEntity();
-	}
-
-	m_localTurnEntities.erase(entity);
-
-	e2::TurnbasedSpecification* turnbasedSpecification = entity->getSpecificationAs<e2::TurnbasedSpecification>();
-	m_entityLayers[size_t(turnbasedSpecification->layerIndex)].entityIndex.erase(entity->getTileIndex());
-	m_waveEntities.erase(entity);
-
-
-	e2::EmpireId empireId = entity->getEmpireId();
-	e2::GameEmpire* empire = empireById(empireId);
-	if (empire)
-	{
-		empire->entities.erase(entity);
-		empire->resources.fiscalStreams.erase(entity);
-	}
-
-	m_turnbasedEntities.erase(entity);
-
-	destroyEntity(entity);
-
-	resolveSelectedEntity();
-}
-
-
-e2::TurnbasedEntity* e2::Game::entityAtHex(e2::EntityLayerIndex layerIndex, glm::ivec2 const& hex)
-{
-	auto finder = m_entityLayers[size_t(layerIndex)].entityIndex.find(hex);
-	if (finder == m_entityLayers[size_t(layerIndex)].entityIndex.end())
-		return nullptr;
-
-	return finder->second;
-}
-
-int32_t e2::Game::grugNumAttackMovePoints()
-{
-	if (!m_selectedEntity || !m_unitAS)
-		return 0;
-
-	return m_unitAS->grugTargetMovePoints;
-}
-
-e2::TurnbasedEntity* e2::Game::grugAttackTarget()
-{
-	if (!m_selectedEntity || !m_unitAS)
-		return nullptr;
-
-	return m_unitAS->grugTarget;
-}
-
-glm::ivec2 e2::Game::grugAttackMoveLocation()
-{
-	if (!m_selectedEntity || !m_unitAS)
-		return {};
-
-	return m_unitAS->grugTargetMoveHex.offsetCoords();
-}
-
-glm::ivec2 e2::Game::grugMoveLocation()
-{
-	if (!m_selectedEntity || !m_unitAS)
-		return {};
-
-	if (m_unitAS->hexIndex.size() == 0)
-		return m_selectedEntity->getTileIndex();
-
-	int64_t index = e2::randomInt(0, m_unitAS->hexIndex.size() - 1);
-	auto it =m_unitAS->hexIndex.begin();
-	for (int64_t i = 0; i < index; i++)
-		it++;
-
-	return it->first;
-}
-
-bool e2::Game::entityRelevantForPlay(e2::TurnbasedEntity* entity)
-{
-	bool entityInvalid = (!entity || entity->getHealth() <= 0.0f || m_dyingEntities.contains(entity) || m_turnbasedEntitiesPendingDestroy.contains(entity));
-	return !entityInvalid;
-}
-
-e2::Wave* e2::Game::wave()
-{
-	return m_wave;
-}
-
-void e2::Game::onMobSpawned(e2::Mob* mob)
-{
-	for (e2::TurnbasedEntity* entity : m_waveEntities)
-	{
-		entity->onMobSpawned(mob);
-	}
-}
-
-void e2::Game::onMobDestroyed(e2::Mob* mob)
-{
-	for (e2::TurnbasedEntity* entity : m_waveEntities)
-	{
-		entity->onMobDestroyed(mob);
-	}
-}
 
 e2::Sprite* e2::Game::getUiSprite(e2::Name name)
 {
@@ -4275,23 +2244,6 @@ void e2::Game::unregisterCollisionComponent(e2::CollisionComponent* component, g
 }
 
 
-void e2::Game::harvestWood(glm::ivec2 const& location, EmpireId empire)
-{
-	e2::TileData* tileData = m_hexGrid->getExistingTileData(location);
-	if (!tileData)
-		return;
-
-	bool hasForest = (tileData->flags & e2::TileFlags::FeatureForest) != TileFlags::FeatureNone;
-	float woodProfit = tileData->getWoodAbundanceAsFloat() * 14.0f;
-
-	if (!hasForest)
-		return;
-
-	m_empires[empire]->resources.funds.wood += woodProfit;
-
-	removeWood(location);
-
-}
 
 void e2::Game::removeWood(glm::ivec2 const& location)
 {
@@ -4408,7 +2360,6 @@ void e2::Game::updateAnimation(double seconds)
 
 	e2::Aabb2D viewAabb = m_viewPoints.toAabb();
 
-	m_turnbasedEntitiesInView.clear();
 	m_entitiesInView.clear();
 
 	std::unordered_set<e2::Entity*> ents = m_entities;
@@ -4417,18 +2368,7 @@ void e2::Game::updateAnimation(double seconds)
 		// update inView, first check aabb to give chance for implicit early exit
 		glm::vec2 unitCoords = entity->planarCoords();
 
-
-		e2::TurnbasedEntity* asTurnbased = entity->cast<e2::TurnbasedEntity>();
-		if (asTurnbased)
-		{
-			bool entityRelevant = (m_turnState == e2::TurnState::Wave && asTurnbased->turnbasedSpecification()->waveRelevant) || m_turnState != e2::TurnState::Wave;
-			entity->setInView(viewAabb.isWithin(unitCoords) && m_viewPoints.isWithin(unitCoords, 1.0f) && entityRelevant);
-			m_turnbasedEntitiesInView.insert(asTurnbased);
-		}
-		else
-		{
-			entity->setInView(viewAabb.isWithin(unitCoords) && m_viewPoints.isWithin(unitCoords, 1.0f));
-		}
+		entity->setInView(viewAabb.isWithin(unitCoords) && m_viewPoints.isWithin(unitCoords, 1.0f));
 
 		if (entity->isInView())
 		{
@@ -4439,170 +2379,12 @@ void e2::Game::updateAnimation(double seconds)
 		//for(int32_t i = 0; i < numTicks; i++)
 		//	unit->updateAnimation(targetFrameTime);
 
-		if((asTurnbased && m_turnState != e2::TurnState::Realtime) || (!asTurnbased && m_turnState == e2::TurnState::Realtime))
+		if(m_turnState == e2::TurnState::Realtime)
 			entity->updateAnimation(targetFrameTime * double(numTicks));
 	}
 
 }
 
-e2::PathFindingAS::PathFindingAS(e2::TurnbasedEntity* entity)
-{
-	if (!entity)
-		return;
-
-	e2::Game* game = entity->game();
-	e2::HexGrid* grid = game->hexGrid();
-
-	e2::Hex originHex = e2::Hex(entity->getTileIndex());
-	origin = e2::create<e2::PathFindingHex>(originHex);
-	origin->isBegin = true;
-
-	// find all hexes in attack range from origin hex, add them to targetsInRange and set grugTargets for each hex 
-	e2::TurnbasedEntity* lowestHealthEntity = nullptr;
-	float lowestHealth = std::numeric_limits<float>::max();
-	tmpHex.clear();
-	e2::Hex::circle(originHex, entity->turnbasedSpecification()->attackRange, tmpHex);
-	for (e2::Hex& attackHex : tmpHex)
-	{
-		e2::TurnbasedEntity* potentialTarget = game->entityAtHex(e2::EntityLayerIndex::Unit, attackHex.offsetCoords());
-
-		if (potentialTarget)
-		{
-			if (potentialTarget->getEmpireId() == entity->getEmpireId())
-			{
-				continue;
-			}
-
-			targetsInRange.insert(potentialTarget);
-
-			if (potentialTarget->getHealth() < lowestHealth)
-			{
-				lowestHealthEntity = potentialTarget;
-				lowestHealth = potentialTarget->getHealth();
-			}
-		}
-	}
-
-	if (lowestHealthEntity)
-	{
-		origin->grugTarget = lowestHealthEntity;
-
-		grugTarget = lowestHealthEntity;
-		grugTargetMoveHex = originHex;
-		grugTargetMovePoints = 0;
-	}
-
-
-	hexIndex[entity->getTileIndex()] = origin;
-
-
-	std::queue<e2::PathFindingHex*> queue;
-	std::unordered_set<e2::Hex> processed;
-
-	queue.push(origin);
-
-	while (!queue.empty())
-	{
-		e2::PathFindingHex* currHexEntry  = queue.front();
-		queue.pop();
-
-		for (e2::Hex nextHex : currHexEntry->index.neighbours())
-		{
-			if (int32_t(currHexEntry->stepsFromOrigin + 1) > entity->getMovePointsLeft())
-				continue;
-
-			if (processed.contains(nextHex))
-				continue;
-
-			glm::ivec2 coords = nextHex.offsetCoords();
-
-			if (hexIndex.contains(coords))
-				continue;
-
-			// ignore hexes not directly visible, but only if we are lcoal
-			if (entity->isLocal() && !grid->isVisible(coords))
-				continue;
-
-			// ignore hexes that are occupied by unpassable biome
-			e2::TileData tile = grid->calculateTileData(coords);
-			if (!tile.isPassable(entity->turnbasedSpecification()->passableFlags))
-				continue;
-
-			// ignore hexes that are occupied by units
-			e2::TurnbasedEntity* otherUnit = game->entityAtHex(e2::EntityLayerIndex::Unit, coords);
-			if (otherUnit)
-				continue;
-
-			e2::PathFindingHex* nextHexEntry = e2::create<e2::PathFindingHex>(nextHex);
-			nextHexEntry->towardsOrigin = currHexEntry;
-			nextHexEntry->stepsFromOrigin = currHexEntry->stepsFromOrigin + 1;
-
-
-
-			lowestHealthEntity = nullptr;
-			lowestHealth = std::numeric_limits<float>::max();
-			tmpHex.clear();
-			e2::Hex::circle(nextHex, entity->turnbasedSpecification()->attackRange, tmpHex);
-			for (e2::Hex& attackHex : tmpHex)
-			{
-				if (attackHex == originHex)
-					continue;
-
-				e2::TurnbasedEntity* potentialTarget = game->entityAtHex(e2::EntityLayerIndex::Unit, attackHex.offsetCoords());
-
-				if (potentialTarget)
-				{
-
-					if (potentialTarget->getEmpireId() == game->localEmpireId())
-					{
-						continue;
-					}
-
-					auto finder = targetsInMoveRange.find(potentialTarget);
-					if (finder != targetsInMoveRange.end())
-					{
-						uint32_t currStepsFromOrigin = finder->second.second;
-						if (nextHexEntry->stepsFromOrigin < currStepsFromOrigin)
-						{
-							targetsInMoveRange[potentialTarget] = { nextHex, nextHexEntry->stepsFromOrigin };
-						}
-					}
-					else
-					{
-						targetsInMoveRange[potentialTarget] = { nextHex, nextHexEntry->stepsFromOrigin };
-					}
-
-
-					if (!grugTarget || grugTargetMovePoints > nextHexEntry->stepsFromOrigin)
-					{
-						grugTarget = potentialTarget;
-						grugTargetMovePoints = nextHexEntry->stepsFromOrigin;
-						grugTargetMoveHex = nextHex;
-					}
-
-					if (potentialTarget->getHealth() < lowestHealth)
-					{
-						lowestHealthEntity = potentialTarget;
-						lowestHealth = potentialTarget->getHealth();
-					}
-				}
-			}
-
-			if (lowestHealthEntity)
-			{
-				nextHexEntry->grugTarget = lowestHealthEntity;
-			}
-
-			hexIndex[coords] = nextHexEntry;
-			
-			grugCanMove = true;
-
-			queue.push(nextHexEntry);
-		}
-
-		processed.insert(currHexEntry->index);
-	}
-}
 //
 //e2::PathFindingAS::PathFindingAS(e2::GameEntity* entity, glm::ivec2 const& target)
 //{
@@ -4750,13 +2532,6 @@ e2::PathFindingAS::PathFindingAS(e2::Game* game, e2::Hex const& start, uint64_t 
 			if (!tile.isPassable(passableFlags))
 				continue;
 
-			// ignore hexes that are occupied by units
-			e2::TurnbasedEntity* otherUnit = game->entityAtHex(e2::EntityLayerIndex::Unit, coords);
-			if (!onlyWaveRelevant && otherUnit)
-				continue;
-
-			if (onlyWaveRelevant && otherUnit && otherUnit->turnbasedSpecification()->waveRelevant)
-				continue;
 
 			e2::PathFindingHex* newHex = e2::create<e2::PathFindingHex>(n);
 			newHex->towardsOrigin = curr;

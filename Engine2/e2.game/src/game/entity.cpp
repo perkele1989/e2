@@ -3,7 +3,6 @@
 #include "e2/renderer/meshproxy.hpp"
 #include "game/game.hpp"
 #include "e2/game/gamesession.hpp"
-#include "game/wave.hpp"
 #include "game/entities/player.hpp"
 #include "game/components/staticmeshcomponent.hpp"
 #include "e2/managers/audiomanager.hpp"

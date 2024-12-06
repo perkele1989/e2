@@ -46,6 +46,7 @@ namespace e2
 
 		std::unordered_set<e2::RadionEntity*> m_endNodes;
 		std::unordered_set<e2::RadionEntity*> m_tickedNodes;
+		std::unordered_set<e2::RadionEntity*> m_untickedNodes;
 
 		double m_timeAccumulator{};
 

@@ -6,7 +6,6 @@
 #include "e2/managers/uimanager.hpp"
 #include "e2/managers/audiomanager.hpp"
 #include "e2/transform.hpp"
-#include "game/entities/turnbasedentity.hpp"
 #include "game/game.hpp"
 #include "game/entities/itementity.hpp"
 
@@ -47,9 +46,8 @@ namespace
 	}
 }
 
-void e2::HexGrid::rebuildForestMeshes()
+void e2::HexGrid::buildForestStates()
 {
-
 	constexpr float minDist = 0.15f;
 
 	uint32_t forestNumTrees[3] = { e2::treeNum1, e2::treeNum2, e2::treeNum3 };
@@ -60,8 +58,6 @@ void e2::HexGrid::rebuildForestMeshes()
 		ForestState& forestState = m_forestStates[f];
 
 		forestState.trees.clear();
-		
-		e2::DynamicMesh combinedMesh;
 
 		for (uint32_t i = 0; i < numTrees; i++)
 		{
@@ -84,12 +80,31 @@ void e2::HexGrid::rebuildForestMeshes()
 
 			} while (closestDist < minDist);
 
-
-
-
 			treeState.rotation = glm::radians(e2::randomFloat(0.0f, 359.9999f));
 			treeState.scale = e2::randomFloat(0.9f, 1.1f) * e2::treeScale;
 			forestState.trees.push_back(treeState);
+
+		}
+
+	}
+
+
+}
+
+void e2::HexGrid::buildForestMeshes()
+{
+	uint32_t forestNumTrees[3] = { e2::treeNum1, e2::treeNum2, e2::treeNum3 };
+
+	for (uint32_t f = 0; f < 3; f++)
+	{
+		uint32_t numTrees = forestNumTrees[f];
+		ForestState& forestState = m_forestStates[f];
+
+		e2::DynamicMesh combinedMesh;
+
+		for (uint32_t i = 0; i < numTrees; i++)
+		{
+			e2::TreeState& treeState = forestState.trees[i];
 
 			glm::mat4 treeTranslation = glm::translate(glm::identity<glm::mat4>(), glm::vec3(treeState.planarOffset.x, 0.0f, treeState.planarOffset.y));
 			glm::mat4 treeScale = glm::scale(glm::identity<glm::mat4>(), glm::vec3(treeState.scale));
@@ -103,7 +118,6 @@ void e2::HexGrid::rebuildForestMeshes()
 			glm::vec2 offset{ offset4.x, offset4.z };
 
 			combinedMesh.addMeshWithShaderFunction(&m_dynamicTreeMeshes[treeState.meshIndex], treeTransform, ::treeShader, &offset);
-			//combinedMesh.addMesh(&m_dynamicTreeMeshes[treeState.meshIndex], treeTransform);
 		}
 
 		forestState.mesh = combinedMesh.bake(m_treeMaterial, VertexAttributeFlags::All);
@@ -429,7 +443,10 @@ e2::HexGrid::HexGrid(e2::GameContext* gameCtx)
 
 	initializeFogOfWar();
 
-	rebuildForestMeshes();
+
+	buildForestStates();
+	buildForestMeshes();
+
 }
 
 e2::HexGrid::~HexGrid()
@@ -468,8 +485,9 @@ void e2::HexGrid::saveToBuffer(e2::IStream& toBuffer)
 	for (uint64_t i = 0; i < m_tiles.size(); i++)
 	{
 		toBuffer << int32_t(m_tileVisibility[i]);
-		toBuffer << uint16_t(m_tiles[i].empireId);
 		toBuffer << uint16_t(m_tiles[i].flags);
+		toBuffer << m_tiles[i].forestIndex;
+		toBuffer << m_tiles[i].forestRotation;
 	}
 
 	toBuffer << uint64_t(m_tileIndex.size());
@@ -482,6 +500,19 @@ void e2::HexGrid::saveToBuffer(e2::IStream& toBuffer)
 	toBuffer << m_minimapViewBounds;
 	toBuffer << m_minimapViewOffset;
 	toBuffer << m_minimapViewZoom;
+
+	for (uint32_t i = 0; i < 3; i++)
+	{
+		e2::ForestState& forestState = m_forestStates[i];
+		toBuffer << (uint64_t)forestState.trees.size();
+		for (e2::TreeState& treeState : forestState.trees)
+		{
+			toBuffer << treeState.meshIndex;
+			toBuffer << treeState.planarOffset;
+			toBuffer << treeState.rotation;
+			toBuffer << treeState.scale;
+		}
+	}
 }
 
 void e2::HexGrid::loadFromBuffer(e2::IStream& fromBuffer)
@@ -506,13 +537,14 @@ void e2::HexGrid::loadFromBuffer(e2::IStream& fromBuffer)
 		m_tileVisibility.push_back(newVis);
 
 		TileData newTile;
-		uint16_t empId{};
-		fromBuffer >> empId;
-		newTile.empireId = (EmpireId)empId;
+
 		uint16_t flags{};
 		fromBuffer >> flags;
 		newTile.flags = (e2::TileFlags)flags;
 
+		
+		fromBuffer >> newTile.forestIndex >> newTile.forestRotation;
+	
 		newTile.resourceMesh = getResourceMeshForFlags(newTile.flags);
 
 		m_tiles.push_back(newTile);
@@ -536,6 +568,27 @@ void e2::HexGrid::loadFromBuffer(e2::IStream& fromBuffer)
 	fromBuffer >> m_minimapViewBounds;
 	fromBuffer >> m_minimapViewOffset;
 	fromBuffer >> m_minimapViewZoom;
+
+
+	for (uint32_t i = 0; i < 3; i++)
+	{
+		e2::ForestState& forestState = m_forestStates[i];
+		forestState.trees.clear();
+
+		uint64_t numTrees{};
+		fromBuffer >> numTrees;
+		for (uint64_t j = 0; j < numTrees; j++)
+		{
+			e2::TreeState newTree;
+			fromBuffer >> newTree.meshIndex;
+			fromBuffer >> newTree.planarOffset;
+			fromBuffer >> newTree.rotation;
+			fromBuffer >> newTree.scale;
+			forestState.trees.push_back(newTree);
+		}
+	}
+
+	buildForestMeshes();
 }
 
 e2::Aabb2D e2::HexGrid::getChunkAabb(glm::ivec2 const& chunkIndex)
@@ -1756,11 +1809,6 @@ e2::TileData e2::HexGrid::calculateTileData(glm::ivec2 const& hex)
 	newTileData.forestRotation = glm::radians(hex.x * hex.y * 1.12f);
 	newTileData.resourceMesh = getResourceMeshForFlags(newTileData.flags);
 
-	e2::TurnbasedEntity* existingStructure = game()->entityAtHex(EntityLayerIndex::Structure, hex);
-	if (existingStructure)
-	{
-		newTileData.empireId = existingStructure->getEmpireId();
-	}
 
 	return newTileData;
 }
@@ -2687,29 +2735,6 @@ void e2::HexGrid::renderFogOfWar()
 	buff->bindIndexBuffer(ui->quadIndexBuffer);
 	buff->bindVertexBuffer(0, ui->quadVertexBuffer);
 	buff->bindPipeline(ui->quadPipeline.pipeline);
-
-	e2::GameEmpire* localEmpire = game()->localEmpire();
-	if (localEmpire)
-	{
-		for (e2::TurnbasedEntity* entity: localEmpire->entities)
-		{
-			glm::vec2 planarUnitPosition = entity->planarCoords();
-
-			glm::vec2 unitPosNormalized = (planarUnitPosition - worldOffset) / worldSize;
-			glm::vec2 unitPosPixels = unitPosNormalized * glm::vec2(m_minimapSize);
-
-			if (entity->turnbasedSpecification()->layerIndex == EntityLayerIndex::Structure)
-				unitConstants.quadSize = { 6.0f, 6.0f };
-			else 
-				unitConstants.quadSize = { 3.0f, 3.0f };
-
-			unitConstants.quadPosition = unitPosPixels - (unitConstants.quadSize / 2.0f);
-			buff->pushConstants(ui->quadPipeline.layout, 0, sizeof(e2::UIQuadPushConstants), reinterpret_cast<uint8_t*>(&unitConstants));
-
-			buff->draw(6, 1);
-		}
-
-	}
 
 
 	buff->endRender();

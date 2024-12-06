@@ -19,6 +19,7 @@ void e2::RadionManager::tickWithParents(e2::RadionEntity* node)
 		return;
 
 	m_tickedNodes.insert(node);
+	m_untickedNodes.erase(node);
 
 	for (uint32_t i = 0; i < node->radionSpecification->pins.size(); i++)
 	{
@@ -68,9 +69,15 @@ void e2::RadionManager::update(double seconds)
 	while (m_timeAccumulator >= tickRate)
 	{
 		m_tickedNodes.clear();
+		m_untickedNodes = m_entities;
 		for (e2::RadionEntity* endNode : m_endNodes)
 		{
 			tickWithParents(endNode);
+		}
+
+		while (!m_untickedNodes.empty())
+		{
+			tickWithParents(*m_untickedNodes.begin());
 		}
 
 		m_timeAccumulator -= tickRate;

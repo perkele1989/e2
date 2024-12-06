@@ -32,6 +32,9 @@ namespace e2
 		WieldHandler() = default;
 		virtual ~WieldHandler();
 
+		virtual void onNuke();
+		virtual void onSetup();
+
 		virtual void populate(e2::GameContext* ctx, nlohmann::json& obj, std::unordered_set<e2::Name>& deps) = 0;
 		virtual void finalize(e2::GameContext* ctx) = 0;
 
@@ -53,6 +56,9 @@ namespace e2
 
 		HatchetHandler() = default;
 		virtual ~HatchetHandler();
+
+		virtual void onNuke() override;
+		virtual void onSetup() override;
 
 		virtual void populate(e2::GameContext* ctx, nlohmann::json& obj, std::unordered_set<e2::Name>& deps) override;
 		virtual void finalize(e2::GameContext* ctx) override;
@@ -86,6 +92,10 @@ namespace e2
 
 		IonizerHandler() = default;
 		virtual ~IonizerHandler();
+
+
+		virtual void onNuke() override;
+		virtual void onSetup() override;
 
 		virtual void populate(e2::GameContext* ctx, nlohmann::json& obj, std::unordered_set<e2::Name>& deps) override;
 		virtual void finalize(e2::GameContext* ctx) override;
@@ -124,6 +134,10 @@ namespace e2
 		LinkerHandler() = default;
 		virtual ~LinkerHandler();
 
+
+		virtual void onNuke() override;
+		virtual void onSetup() override;
+
 		virtual void populate(e2::GameContext* ctx, nlohmann::json& obj, std::unordered_set<e2::Name>& deps) override;
 		virtual void finalize(e2::GameContext* ctx) override;
 
@@ -158,6 +172,10 @@ namespace e2
 		SwordHandler() = default;
 		virtual ~SwordHandler();
 
+
+		virtual void onNuke() override;
+		virtual void onSetup() override;
+
 		virtual void populate(e2::GameContext* ctx, nlohmann::json& obj, std::unordered_set<e2::Name>& deps) override;
 		virtual void finalize(e2::GameContext* ctx) override;
 
@@ -187,6 +205,10 @@ namespace e2
 
 		ThrowableHandler() = default;
 		virtual ~ThrowableHandler();
+
+
+		virtual void onNuke() override;
+		virtual void onSetup() override;
 
 		virtual void populate(e2::GameContext* ctx, nlohmann::json& obj, std::unordered_set<e2::Name>& deps) override;
 		virtual void finalize(e2::GameContext* ctx) override;

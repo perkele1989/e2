@@ -10,61 +10,15 @@
 #include "game/gamecontext.hpp"
 #include "game/resources.hpp"
 #include "game/entity.hpp"
-#include "game/mob.hpp"
-#include "game/empire.hpp"
 #include "game/shared.hpp"
 #include "game/playerstate.hpp"
 #include "game/script.hpp"
 #include "game/radionmanager.hpp"
 
-#include <chaiscript/chaiscript.hpp>
 
 namespace e2
 {
 	class CollisionComponent;
-	template<typename T>
-	class ScriptRef 
-	{
-	public:
-
-		ScriptRef() = default;
-
-		ScriptRef(ScriptRef<T> const& other)
-			: value(other.value)
-		{
-			
-		}
-
-		ScriptRef(T* v)
-			: value(v)
-		{
-
-		}
-
-		ScriptRef<T>& operator=(ScriptRef<T> const &other)
-		{
-			value = other.value;
-			return *this;
-		}
-
-
-		static bool equals(ScriptRef<T> const& lhs, ScriptRef<T> const& rhs)
-		{
-			return lhs.value == rhs.value;
-		}
-
-		void clear()
-		{
-			value = nullptr;
-		}
-
-		bool isNull()
-		{
-			return value == nullptr;
-		}
-
-		T* value{};
-	};
 
 
 	/** @tags(arena, arenaSize=16384*128) */
@@ -99,27 +53,13 @@ namespace e2
 	public:
 		PathFindingAS();
 		PathFindingAS(e2::Game* game, e2::Hex const& start, uint64_t range, bool ignoreVisibility = false, e2::PassableFlags passableFlags = PassableFlags::Land, bool onlyWaveRelevant = false, e2::Hex *stopWhenFound = nullptr);
-		PathFindingAS(e2::TurnbasedEntity* unit);
-		// for long range targets
-		//PathFindingAS(e2::GameEntity* unit, glm::ivec2 const& target);
+
 		~PathFindingAS();
 
 		std::vector<e2::Hex> find(e2::Hex const& target);
 
-		// lowest health target directly attackable from origin hex , 
-		bool grugCanMove{};
-		e2::TurnbasedEntity* grugTarget{};
-		e2::Hex grugTargetMoveHex;
-		uint32_t grugTargetMovePoints{};
-
 		e2::PathFindingHex* origin{};
 		std::unordered_map<glm::ivec2, e2::PathFindingHex*> hexIndex;
-
-		/** targets directly attackable from origin hex */
-		std::unordered_set<e2::TurnbasedEntity*> targetsInRange;
-
-		/** Maps attackable entities to the hex that is closest to move to in order to attack it */
-		std::unordered_map<e2::TurnbasedEntity*, std::pair<e2::Hex, uint32_t>> targetsInMoveRange;
 
 		
 		
@@ -128,7 +68,7 @@ namespace e2
 	class Game;
 
 	class Entity;
-	class TurnbasedEntity;
+	//class TurnbasedEntity;
 	class PlayerEntity;
 
 
@@ -160,9 +100,6 @@ namespace e2
 		void exitToMenu();
 
 		void finalizeBoot();
-
-		void initializeScriptEngine();
-		void destroyScriptEngine();
 
 		virtual void initialize() override;
 		virtual void shutdown() override;
@@ -197,15 +134,8 @@ namespace e2
 
 		void updateGameState();
 		void updateTurn();
-		void updateWavePreparing();
-		void updateWave();
-		void updateWaveEnding();
 		//void updateAuto();
 
-	protected:
-		uint32_t m_waveDeforestIndex{};
-		float m_waveDeforestTimer{};
-	public:
 		void updateRealtime();
 		void updateTurnLocal();
 		//void updateTurnAI();
@@ -213,19 +143,9 @@ namespace e2
 		//void updateUnitAttack();
 
 
-		void endTurn();
-		void onTurnPreparingBegin();
-		void onTurnPreparingEnd();
-		void onStartOfTurn();
-		void onEndOfTurn();
-		void onTurnEndingBegin();
-		void onTurnEndingEnd();
-
 		void drawUI();
 		void drawResourceIcons();
 		void drawHitLabels();
-		void drawStatusUI();
-		void drawUnitUI();
 		void drawMinimapUI();
 		void drawDebugUI();
 		void drawFinalUI();
@@ -240,14 +160,6 @@ namespace e2
 		double timeDelta()
 		{
 			return m_timeDelta;
-		}
-
-		//void discoverEmpire(EmpireId empireId);
-
-
-		inline uint64_t turn() const
-		{
-			return m_turn;
 		}
 
 		inline TurnState getTurnState() const
@@ -281,11 +193,6 @@ namespace e2
 		e2::GameSession* m_session{};
 
 		double m_timeDelta{};
-		GameState m_state{ GameState::TurnPreparing };
-		uint64_t m_turn{};
-
-		// which empire has current turn
-		//EmpireId m_empireTurn{};
 
 		e2::ScriptGraph* m_currentGraph{};
 		e2::ScriptExecutionContext* m_scriptExecutionContext{};
@@ -302,7 +209,6 @@ namespace e2
 		e2::Moment m_beginStartTime;
 		e2::Moment m_beginStreamTime;
 
-		CursorMode m_cursorMode{ CursorMode::Select };
 		glm::vec2 m_cursor; // mouse position in pixels, from topleft corner
 		glm::vec2 m_cursorUnit; // mouse position scaled between 0.0 - 1.0
 		glm::vec2 m_cursorNdc; // mouse position scaled between -1.0 and 1.0
@@ -329,61 +235,13 @@ namespace e2
 			return m_cursorHex;
 		}
 
-		EmpireId spawnEmpire();
-		void destroyEmpire(EmpireId empireId);
-
-		//void spawnAIEmpire();
-
-		e2::GameEmpire* localEmpire()
-		{
-			return m_localEmpire;
-		}
-
-		e2::EmpireId localEmpireId()
-		{
-			return m_localEmpireId;
-		}
-
-		e2::GameEmpire* nomadEmpire()
-		{
-			return m_nomadEmpire;
-		}
-
-		e2::EmpireId nomadEmpireId()
-		{
-			return m_nomadEmpireId;
-		}
-
-
-		e2::GameEmpire* empireById(EmpireId id);
-
-		void resolveLocalEntity();
-		void nextLocalEntity();
-
-		e2::Name getCityName();
 
 		inline bool isRealtime() 
 		{
 			return m_turnState == e2::TurnState::Realtime;
 		}
 
-	protected:
-		e2::EmpireId m_localEmpireId{};
-		e2::GameEmpire* m_localEmpire{};
 
-		std::unordered_set<e2::TurnbasedEntity*> m_localTurnEntities;
-
-		e2::EmpireId m_nomadEmpireId{};
-		e2::GameEmpire* m_nomadEmpire{};
-		e2::StackVector<e2::GameEmpire*, e2::maxNumEmpires> m_empires;
-
-		std::vector<e2::Name> m_cityNames;
-
-		std::unordered_map<e2::TurnbasedEntity*, e2::City*> m_entityToCity;
-
-	public:
-
-		void harvestWood(glm::ivec2 const& location, EmpireId empire);
 		void removeWood(glm::ivec2 const& location);
 
 		void removeResource(glm::ivec2 const& location);
@@ -398,87 +256,19 @@ namespace e2
 			return m_viewPoints;
 		}
 
-		void applyDamage(e2::TurnbasedEntity* entity, e2::TurnbasedEntity* instigator, float damage);
-
-		void resolveSelectedEntity();
-		void unresolveSelectedEntity();
-
-		// game units 
-		e2::TurnbasedEntity* getSelectedEntity();
-		void selectEntity(e2::TurnbasedEntity* entity);
-		void deselectEntity();
-
-		void moveSelectedEntityTo(glm::ivec2 const& to);
-		void updateUnitMove();
-
-		void beginCustomAction();
-		void endCustomAction();
-		void updateCustomAction();
-
-		bool attemptBeginWave(e2::TurnbasedEntity* hiveEntity, std::string const& prefabPath);
-
-
-	public:
-
-		void beginTargeting();
-		void endTargeting();
-		void updateTarget();
-
 		e2::Entity* spawnEntity(e2::Name entityId, glm::vec3 const& worldPosition, glm::quat const& worldRotation = glm::identity<glm::quat>());
 		e2::Entity* spawnCustomEntity(e2::Name specificationId, e2::Name entityType, glm::vec3 const& worldPosition, glm::quat const& worldRotation = glm::identity<glm::quat>());
 		void destroyEntity(e2::Entity* entity);
 		void queueDestroyEntity(e2::Entity* entity);
 
-		e2::TurnbasedEntity* spawnTurnbasedEntity(e2::Name entityId, glm::ivec2 const& tileIndex, EmpireId empireId);
-		void queueDestroyTurnbasedEntity(e2::TurnbasedEntity* entity);
-		void destroyTurnbasedEntity(e2::TurnbasedEntity* entity);
-
-		e2::TurnbasedEntity* entityAtHex(e2::EntityLayerIndex layerIndex, glm::ivec2 const& hex);
-
-		inline e2::PathFindingAS* selectedUnitAS()
-		{
-			return m_unitAS;
-		}
-
-		int32_t grugNumAttackMovePoints();
-		e2::TurnbasedEntity* grugAttackTarget();
-		glm::ivec2 grugAttackMoveLocation();
-		glm::ivec2 grugMoveLocation();
-
-		bool entityRelevantForPlay(e2::TurnbasedEntity* entity);
-
-		e2::Wave* wave();
-
-
-		virtual void onMobSpawned(e2::Mob* mob);
-		virtual void onMobDestroyed(e2::Mob* mob);
 
 	protected:
 
-		e2::Wave* m_wave{};
-
-		e2::PathFindingAS* m_unitAS{};
-		std::vector<e2::Hex> m_unitHoverPath;
-		std::vector<e2::Hex> m_unitMovePath;
-		uint32_t m_unitMoveIndex{};
-		float m_unitMoveDelta{};
-		bool m_ffwMove = false;
 
 		std::unordered_set<e2::Entity*> m_entities;//all entities
 		std::unordered_set<e2::Entity*> m_entitiesInView; // all entities in view
-		std::unordered_set<e2::TurnbasedEntity*> m_turnbasedEntitiesInView;
-
-		std::unordered_set<e2::Entity*> m_realtimeEntities;
 		std::unordered_set<e2::Entity*> m_entitiesPendingDestroy; // entities needing destroy-o
 
-		std::unordered_set<e2::TurnbasedEntity*> m_turnbasedEntities; // subset of entities, all the turnbased ones 
-		e2::TurnbasedEntity* m_selectedEntity{}; // selected turnbased entity
-		std::unordered_set<e2::TurnbasedEntity*> m_waveEntities; // wave-relevant turnbased entities
-		std::array<EntityLayer, size_t(EntityLayerIndex::Count)> m_entityLayers; // turnbased entity layers
-		std::unordered_set<e2::TurnbasedEntity*> m_turnbasedEntitiesPendingDestroy; // turnbased entities needing destroy-o
-		std::unordered_set<e2::TurnbasedEntity*> m_dyingEntities; // turnbased entities currently dying
-
-		//e2::PlayerEntity* m_playerEntity{}; // current player entity
 		e2::PlayerState m_playerState;
 
 	public:
@@ -534,15 +324,7 @@ namespace e2
 		e2::StackVector<HitLabel, e2::maxNumHitLabels> m_hitLabels;
 		uint32_t m_hitLabelIndex{};
 
-	public:
-		inline chaiscript::ChaiScript* scriptEngine()
-		{
-			return m_scriptEngine;
-		}
 
-	protected:
-		chaiscript::ChaiScript* m_scriptEngine{};
-		chaiscript::ModulePtr m_scriptModule;
 
 		float m_sunStrength{ 6.0f };
 		float m_iblStrength{ 3.00f };
