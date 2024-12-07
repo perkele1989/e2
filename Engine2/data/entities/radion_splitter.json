@@ -13,12 +13,12 @@
         {
             "name": "OutputA",
             "type": "Output",
-            "offset": [0.1, -0.1, -0.1]
+            "offset": [0.075, -0.1, -0.075]
         },
         {
             "name": "OutputB",
             "type": "Output",
-            "offset": [-0.1, -0.1, -0.1]
+            "offset": [-0.075, -0.1, -0.075]
         }
     ],
 

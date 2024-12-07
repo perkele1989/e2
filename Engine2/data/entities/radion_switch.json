@@ -8,12 +8,12 @@
         {
             "name": "Input",
             "type": "Input",
-            "offset": [0.0, -0.1, 0.1]
+            "offset": [0.0, -0.035, 0.07]
         },
         {
             "name": "Output",
             "type": "Output",
-            "offset": [0.0, -0.1, -0.1]
+            "offset": [0.0, -0.035, -0.07]
         }
     ],
 

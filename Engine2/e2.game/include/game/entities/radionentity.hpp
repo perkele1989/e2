@@ -71,6 +71,12 @@ namespace e2
 
 		virtual void radionTick();
 
+
+
+		virtual void writeForSave(e2::IStream& toBuffer) override;
+		virtual void readForSave(e2::IStream& fromBuffer) override;
+
+
 		virtual void postConstruct(e2::GameContext* ctx, e2::EntitySpecification* spec, glm::vec3 const& worldPosition, glm::quat const& worldRotation) override;
 
 		virtual void update(double seconds) override;
@@ -180,6 +186,10 @@ namespace e2
 
 		virtual void radionTick() override;
 
+
+
+		virtual void writeForSave(e2::IStream& toBuffer) override;
+		virtual void readForSave(e2::IStream& fromBuffer) override;
 
 		virtual bool interactable() { return true; }
 		virtual void onInteract(e2::Entity* interactor);

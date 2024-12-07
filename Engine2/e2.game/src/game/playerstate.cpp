@@ -38,6 +38,35 @@ e2::PlayerState::PlayerState(e2::Game* g)
 {
 }
 
+void e2::PlayerState::writeForSave(e2::IStream& toBuffer)
+{
+	toBuffer << activeSlot;
+	for (e2::InventorySlot& slot : inventory)
+	{
+		toBuffer << (slot.item ? slot.item->id : e2::Name(""));
+		toBuffer << slot.count;
+	}
+}
+
+void e2::PlayerState::readForSave(e2::IStream& fromBuffer)
+{
+	uint32_t newActiveSlot{};
+	fromBuffer >> newActiveSlot;
+
+	for (e2::InventorySlot& slot : inventory)
+	{
+		e2::Name itemName;
+		fromBuffer >> itemName;
+
+		e2::ItemSpecification* itemSpec = game->getItemSpecification(itemName);
+		slot.item = itemSpec;
+
+		fromBuffer >> slot.count;
+	}
+
+	setActiveSlot(newActiveSlot);
+}
+
 bool e2::PlayerState::give(e2::Name itemIdentifier)
 {
 	e2::ItemSpecification* item = game->getItemSpecification(itemIdentifier);
@@ -145,9 +174,9 @@ bool e2::PlayerState::takeById(e2::Name itemName, uint32_t num)
 		uint32_t num;
 	};
 
-	e2::StackVector<_slotFuck, 32> slotsToFuck;
+	e2::StackVector<_slotFuck, e2::inventorySize> slotsToFuck;
 
-	for (uint32_t slotIndex = 0; slotIndex < 32; slotIndex++)
+	for (uint32_t slotIndex = 0; slotIndex < e2::inventorySize; slotIndex++)
 	{
 		if (num == 0)
 		{
@@ -304,6 +333,7 @@ void e2::PlayerState::renderInventory(double seconds)
 
 	e2::IWindow* wnd = session->window();
 	e2::Renderer* renderer = session->renderer();
+	e2::UIMouseState& mouse = ui->mouseState();
 
 	glm::vec2 res = wnd->size();
 	glm::vec2 iconSize{ 48.0f, 48.0f };
@@ -313,6 +343,14 @@ void e2::PlayerState::renderInventory(double seconds)
 	for (uint32_t i = 0; i < 8; i++)
 	{
 		ui->drawGamePanel(cursor, iconSize, i == activeSlot, inventory[i].item ? 1.0f : 0.25f);
+
+
+		bool hovered = (mouse.relativePosition.x > cursor.x && mouse.relativePosition.x < cursor.x + iconSize.x &&
+				mouse.relativePosition.y > cursor.y && mouse.relativePosition.y < cursor.y + iconSize.y);
+		if (hovered)
+		{
+			game->flagUiHovered();
+		}
 
 
 		if (inventory[i].item)
@@ -330,6 +368,11 @@ void e2::PlayerState::renderInventory(double seconds)
 		{
 			float textWidth = ui->calculateTextWidth(e2::FontFace::Sans, 9, "empty");
 			ui->drawRasterText(e2::FontFace::Sans, 9, e2::UIColor(0xFFFFFFFF), cursor + glm::vec2(iconSize.x / 2.0f - textWidth / 2.0f, iconSize.y / 2.0f), "empty");
+		}
+
+		if (hovered && mouse.buttonPressed(e2::MouseButton::Left))
+		{
+			setActiveSlot(i);
 		}
 
 		cursor.x += iconSize.x + iconPadding;
@@ -446,7 +489,7 @@ void e2::HatchetHandler::onUpdate(e2::PlayerEntity* player, double seconds)
 
 	e2::TileData cursorTile = game->hexGrid()->getTileData(game->cursorHex());
 
-	if (player->aiming() && mouse.buttonPressed(e2::MouseButton::Left) && !m_actionBusy && cursorTile.isLand())
+	if (!game->uiHovered() && player->aiming() && mouse.buttonPressed(e2::MouseButton::Left) && !m_actionBusy && cursorTile.isLand())
 	{
 		player->getMesh()->playAction("chop");
 		m_axeSwing->play();
@@ -586,7 +629,7 @@ void e2::SwordHandler::onUpdate(e2::PlayerEntity* player, double seconds)
 
 	e2::TileData cursorTile = game->hexGrid()->getTileData(game->cursorHex());
 
-	if (player->aiming() && mouse.buttonPressed(e2::MouseButton::Left) && !m_actionBusy && cursorTile.isLand())
+	if (!game->uiHovered() && player->aiming() && mouse.buttonPressed(e2::MouseButton::Left) && !m_actionBusy && cursorTile.isLand())
 	{
 		player->getMesh()->playAction("sword");
 		m_swordSwing->play();
@@ -632,7 +675,7 @@ void e2::SwordHandler::onTrigger(e2::PlayerEntity* player, e2::Name actionName, 
 			}
 		}
 
-		player->game()->hexGrid()->grassCutMask().push({ planarPosition + playerToMouse * 0.2f , 0.5f });
+		player->game()->hexGrid()->grassCutMask().push({ planarPosition + playerToMouse * 0.4f , 0.5f });
 		player->game()->hexGrid()->grassCutMask().cut({ planarPosition + playerToMouse * 0.2f , 0.3f });
 
 	}

@@ -92,18 +92,13 @@ void e2::Entity::postConstruct(e2::GameContext* ctx, e2::EntitySpecification* sp
 
 void e2::Entity::writeForSave(e2::IStream& toBuffer)
 {
-	toBuffer << m_transform->getTranslation(e2::TransformSpace::World);
-	toBuffer << m_transform->getRotation(e2::TransformSpace::World);
 	toBuffer << m_transform->getScale(e2::TransformSpace::World);
 }
 
 void e2::Entity::readForSave(e2::IStream& fromBuffer)
 {
-	glm::vec3 pos, scale;
-	glm::quat rot;
-	fromBuffer >> pos >> rot >> scale;
-	m_transform->setTranslation(pos, e2::TransformSpace::World);
-	m_transform->setRotation(rot, e2::TransformSpace::World);
+	glm::vec3 scale;
+	fromBuffer >> scale;
 	m_transform->setScale(scale, e2::TransformSpace::World);
 }
 

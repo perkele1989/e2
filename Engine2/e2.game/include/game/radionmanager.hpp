@@ -27,6 +27,8 @@ namespace e2
 		RadionManager(e2::Game* g);
 		~RadionManager();
 
+		void clearDiscovered();
+
 		void update(double seconds);
 		virtual e2::Game* game() override;
 
@@ -38,6 +40,12 @@ namespace e2
 		e2::Name discoveredEntity(uint32_t index);
 
 		void populatePins(e2::Hex const& coords, e2::RadionPinType type, std::vector<e2::RadionWorldPin> &outPins);
+
+
+
+		void writeForSave(e2::IStream& toBuffer);
+		void readForSave(e2::IStream& fromBuffer);
+
 	protected:
 		
 		void tickWithParents(e2::RadionEntity* node);

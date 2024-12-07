@@ -112,7 +112,7 @@ namespace e2
 		void resumeWorldStreaming();
 		void forceStreamLocation(glm::vec2 const& planarCoords);
 		void beginStartGame();
-		bool findStartLocation(glm::ivec2 const& offset, glm::ivec2 const& rangeSize, glm::ivec2& outLocation, bool forAi);
+		bool findStartLocation(glm::ivec2 const& offset, glm::ivec2 const& rangeSize, glm::ivec2& outLocation);
 		void startGame();
 
 		void addScreenShake(float intensity);
@@ -167,8 +167,19 @@ namespace e2
 			return m_turnState;
 		}
 
+		inline bool uiHovered()
+		{
+			return m_uiHovered;
+		}
+
+		inline void flagUiHovered()
+		{
+			m_uiHovered = true;
+		}
 
 	protected:
+
+		uint64_t m_entityIdGiver{1};
 
 		std::vector<e2::Hex> m_proximityHexes;
 		float m_waterProximity{};
@@ -256,7 +267,7 @@ namespace e2
 			return m_viewPoints;
 		}
 
-		e2::Entity* spawnEntity(e2::Name entityId, glm::vec3 const& worldPosition, glm::quat const& worldRotation = glm::identity<glm::quat>());
+		e2::Entity* spawnEntity(e2::Name entityId, glm::vec3 const& worldPosition, glm::quat const& worldRotation = glm::identity<glm::quat>(), bool forLoadGame = false);
 		e2::Entity* spawnCustomEntity(e2::Name specificationId, e2::Name entityType, glm::vec3 const& worldPosition, glm::quat const& worldRotation = glm::identity<glm::quat>());
 		void destroyEntity(e2::Entity* entity);
 		void queueDestroyEntity(e2::Entity* entity);
@@ -264,7 +275,7 @@ namespace e2
 
 	protected:
 
-
+		std::unordered_map<uint64_t, e2::Entity*> m_entityMap;
 		std::unordered_set<e2::Entity*> m_entities;//all entities
 		std::unordered_set<e2::Entity*> m_entitiesInView; // all entities in view
 		std::unordered_set<e2::Entity*> m_entitiesPendingDestroy; // entities needing destroy-o
@@ -272,6 +283,9 @@ namespace e2
 		e2::PlayerState m_playerState;
 
 	public:
+
+		e2::Entity* entityFromId(uint64_t id);
+
 		inline e2::PlayerState& playerState()
 		{
 			return m_playerState;

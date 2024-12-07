@@ -12,6 +12,11 @@ e2::RadionManager::~RadionManager()
 {
 }
 
+void e2::RadionManager::clearDiscovered()
+{
+	m_discoveredEntities.clear();
+}
+
 
 void e2::RadionManager::tickWithParents(e2::RadionEntity* node)
 {
@@ -154,6 +159,28 @@ void e2::RadionManager::populatePins(e2::Hex const& coords, e2::RadionPinType ty
 
 			i++;
 		}
+	}
+}
+
+void e2::RadionManager::writeForSave(e2::IStream& toBuffer)
+{
+	toBuffer << (uint64_t)m_discoveredEntities.size();
+	for (e2::Name ent : m_discoveredEntities)
+	{
+		toBuffer << ent;
+	}
+}
+
+void e2::RadionManager::readForSave(e2::IStream& fromBuffer)
+{
+	m_discoveredEntities.clear();
+	uint64_t numEnts{};
+	fromBuffer >> numEnts;
+	for (uint64_t i = 0; i < numEnts; i++)
+	{
+		e2::Name newEnt;
+		fromBuffer >> newEnt;
+		discoverEntity(newEnt);
 	}
 }
 

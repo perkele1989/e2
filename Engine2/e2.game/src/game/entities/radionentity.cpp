@@ -116,6 +116,65 @@ void e2::RadionEntity::radionTick()
 {
 }
 
+void e2::RadionEntity::writeForSave(e2::IStream& toBuffer)
+{
+	e2::Entity::writeForSave(toBuffer);
+	
+	for (float rad : outputRadiance)
+	{
+		toBuffer << rad;
+	}
+
+	for (e2::RadionSlot& slot : slots)
+	{
+		toBuffer << (uint64_t)slot.connections.size();
+		for (e2::RadionConnection& conn : slot.connections)
+		{
+			toBuffer << (conn.otherEntity ? conn.otherEntity->uniqueId : (uint64_t)0);
+			toBuffer << conn.otherPin;
+		}
+	}
+}
+
+void e2::RadionEntity::readForSave(e2::IStream& fromBuffer)
+{
+	e2::Entity::readForSave(fromBuffer);
+
+	for (float& rad : outputRadiance)
+	{
+		fromBuffer >> rad;
+	}
+
+	for (e2::RadionSlot& slot : slots)
+	{
+		slot.connections.clear();
+		uint64_t numConnections = 0;
+		fromBuffer >> numConnections;
+		for (uint64_t i = 0; i < numConnections; i++)
+		{
+			uint64_t entityId{};
+			std::string pinName;
+			fromBuffer >> entityId;
+			fromBuffer >> pinName;
+			e2::Entity* otherEntity = game()->entityFromId(entityId);
+			if (!otherEntity)
+			{
+				LogError("no such entity, refusing connection");
+				continue;
+			}
+
+			e2::RadionEntity* otherRadionEntity = otherEntity->cast<e2::RadionEntity>();
+			if (!otherRadionEntity)
+			{
+				LogError("entity wasnt a radion entity wtf, refusing connection");
+				continue;
+			}
+
+			slot.connections.push({ otherRadionEntity, pinName });
+		}
+	}
+}
+
 void e2::RadionEntity::postConstruct(e2::GameContext* ctx, e2::EntitySpecification* spec, glm::vec3 const& worldPosition, glm::quat const& worldRotation)
 {
 	e2::Entity::postConstruct(ctx, spec, worldPosition, worldRotation);
@@ -413,6 +472,21 @@ void e2::RadionSwitch::radionTick()
 {
 	float inputRadiance = getInputRadiance("Input");
 	setOutputRadiance("Output", state ? inputRadiance * e2::radionDecay : e2::radionLowRadiance);
+}
+
+void e2::RadionSwitch::writeForSave(e2::IStream& toBuffer)
+{
+	e2::RadionEntity::writeForSave(toBuffer);
+
+	toBuffer << (uint8_t)state;
+}
+
+void e2::RadionSwitch::readForSave(e2::IStream& fromBuffer)
+{
+	e2::RadionEntity::readForSave(fromBuffer);
+	uint8_t s{};
+	fromBuffer >> s;
+	state = s;
 }
 
 void e2::RadionSwitch::onInteract(e2::Entity* interactor)

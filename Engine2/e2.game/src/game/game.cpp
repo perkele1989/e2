@@ -76,43 +76,58 @@ void e2::Game::saveGame(uint8_t slot)
 	newMeta.timestamp = std::time(nullptr);
 	newMeta.slot = slot;
 
-	e2::FileStream buf(newMeta.fileName(), e2::FileMode(uint8_t(e2::FileMode::ReadWrite) | uint8_t(e2::FileMode::Truncate)));
-
-	buf << int64_t(newMeta.timestamp);
-
-	m_hexGrid->saveToBuffer(buf);
-
-	buf << m_startViewOrigin;
-	buf << m_targetViewOrigin;
-
-	uint64_t numEntities = 0;
-	for (e2::Entity* ent : m_entities)
 	{
-		if (ent->transient)
-			continue;
-		numEntities++;
+		e2::FileStream buf(newMeta.fileName(), e2::FileMode(uint8_t(e2::FileMode::ReadWrite) | uint8_t(e2::FileMode::Truncate)));
+
+		buf << int64_t(newMeta.timestamp);
+
+		m_hexGrid->saveToBuffer(buf);
+
+		buf << m_startViewOrigin;
+		buf << m_targetViewOrigin;
+
+		uint64_t numEntities = 0;
+		for (e2::Entity* ent : m_entities)
+		{
+			if (ent->transient)
+				continue;
+			numEntities++;
+		}
+
+		std::vector<e2::Entity*> savedEntities;
+		savedEntities.reserve(numEntities);
+		buf << numEntities;
+		for (e2::Entity* entity : m_entities)
+		{
+			if (entity->transient)
+				continue;
+
+			e2::EntitySpecification* spec = entity->getSpecification();
+
+			// structure id
+			buf << entity->uniqueId;
+			buf << spec->id;
+
+			buf << entity->getTransform()->getTranslation(e2::TransformSpace::World);
+			buf << entity->getTransform()->getRotation(e2::TransformSpace::World);
+
+			savedEntities.push_back(entity);
+
+		}
+		for (e2::Entity* entity : savedEntities)
+		{
+			if (entity->transient)
+				continue;
+
+			entity->writeForSave(buf);
+		}
+
+		m_playerState.writeForSave(buf);
+		m_radionManager.writeForSave(buf);
+
+		saveSlots[slot] = newMeta;
 	}
-
-	buf << numEntities;
-	for (e2::Entity* entity : m_entities)
-	{
-		if (entity->transient)
-			continue;
-
-		e2::EntitySpecification* spec = entity->getSpecification();
-
-		// structure id
-		buf << entity->uniqueId;
-		buf << spec->id;
-
-		buf << entity->getTransform()->getTranslation(e2::TransformSpace::World);
-
-
-		entity->writeForSave(buf);
-	}
-
-	saveSlots[slot] = newMeta;
-
+	readAllSaveMetas();
 }
 
 e2::SaveMeta e2::Game::readSaveMeta(uint8_t slot)
@@ -181,8 +196,11 @@ void e2::Game::loadGame(uint8_t slot)
 	buf >> m_targetViewOrigin;
 	m_viewOrigin = m_targetViewOrigin;
 
+	std::vector<e2::Entity*> loadedEntities;
 	uint64_t numEntities{};
 	buf >> numEntities;
+
+	loadedEntities.reserve(numEntities);
 	for (uint64_t i = 0; i < numEntities; i++)
 	{
 		uint64_t uniqueId{};
@@ -200,41 +218,38 @@ void e2::Game::loadGame(uint8_t slot)
 		e2::EntitySpecification* spec = finder->second;
 		glm::vec3 worldPosition;
 		buf >> worldPosition;
-		e2::Entity* newEntity = spawnEntity(entityId, worldPosition);
+
+		glm::quat worldRotation;
+		buf >> worldRotation;
+
+		e2::Entity* newEntity = spawnEntity(entityId, worldPosition, worldRotation, true);
 		newEntity->uniqueId = uniqueId;
-		newEntity->readForSave(buf);
+		m_entityMap[newEntity->uniqueId] = newEntity;
 
 		if (e2::PlayerEntity* player = newEntity->cast<e2::PlayerEntity>())
 		{
 			m_playerState.entity = player;
 		}
 
+		loadedEntities.push_back(newEntity);
+
 	}
 
-	//uint64_t numDiscoveredEmpires{};
-	//buf >> numDiscoveredEmpires;
-	//for (uint64_t i = 0; i < numDiscoveredEmpires;i++)
-	//{
-	//	int64_t empId;
-	//	buf >> empId;
+	for (e2::Entity* entity : loadedEntities)
+	{
+		entity->readForSave(buf);
+	}
 
-	//	if (empId > (std::numeric_limits<EmpireId>::max)())
-	//	{
-	//		LogError("unsupported datatype in savefile, try updating your game before loading this save!");
-	//		continue;
-	//	}
-
-
-	//	discoverEmpire((EmpireId)empId);
-	//}
-
-	
+	m_playerState.readForSave(buf);
+	m_radionManager.readForSave(buf);
 
 	startGame();
 }
 
 void e2::Game::setupGame()
 {
+	readAllSaveMetas();
+
 	m_hexGrid = e2::create<e2::HexGrid>(this);
 
 
@@ -299,7 +314,7 @@ void e2::Game::nukeGame()
 		m_hexGrid = nullptr;
 	}
 
-
+	m_radionManager.clearDiscovered();
 
 	m_globalState = GlobalState::Menu;
 	m_inGameMenuState = InGameMenuState::Main;
@@ -1053,12 +1068,12 @@ void e2::Game::beginStartGame()
 {
 	m_haveBegunStart = true;
 	m_beginStartTime = e2::timeNow();
-	do {} while (!findStartLocation(e2::randomIvec2(glm::ivec2(-1024), glm::ivec2(1024)), { 1024, 1024 }, m_startLocation, false));
+	do {} while (!findStartLocation(e2::randomIvec2(glm::ivec2(-1024), glm::ivec2(1024)), { 1024, 1024 }, m_startLocation));
 	pauseWorldStreaming();
 	forceStreamLocation(e2::Hex(m_startLocation).planarCoords());
 }
 
-bool e2::Game::findStartLocation(glm::ivec2 const& offset, glm::ivec2 const& rangeSize, glm::ivec2 &outLocation, bool forAi)
+bool e2::Game::findStartLocation(glm::ivec2 const& offset, glm::ivec2 const& rangeSize, glm::ivec2 &outLocation)
 {
 	glm::ivec2 returner;
 	int32_t numTries = 0;
@@ -1085,15 +1100,32 @@ bool e2::Game::findStartLocation(glm::ivec2 const& offset, glm::ivec2 const& ran
 		constexpr bool ignoreVisibility = true;
 		auto as = e2::create<e2::PathFindingAS>(this, e2::Hex(startLocation), 64, ignoreVisibility, e2::PassableFlags::Land, false, nullptr);
 		uint64_t numWalkableHexes = as->hexIndex.size();
+		e2::TileFlags testFlags = e2::TileFlags::None;
+		uint64_t numGreen = 0;
+		bool foundNonForested = false;
+		for (auto& [index, tile] : as->hexIndex)
+		{
+			m_hexGrid->calculateBiome(tile->index.planarCoords(), testFlags);
+			if ((testFlags & e2::TileFlags::BiomeMask) == e2::TileFlags::BiomeGrassland)
+			{
+				numGreen++;
+			}
+
+			if (!foundNonForested)
+			{
+				float baseHeight = m_hexGrid->calculateBaseHeight(tile->index.planarCoords());
+				m_hexGrid->calculateFeaturesAndWater(tile->index.planarCoords(), baseHeight, testFlags);
+				if ((testFlags & e2::TileFlags::FeatureMask) != e2::TileFlags::FeatureForest)
+				{
+					startLocation = tile->index.offsetCoords();
+					foundNonForested = true;
+				}
+			}
+		}
 		e2::destroy(as);
 
-		if (numWalkableHexes < 64)
+		if (numWalkableHexes < 64 || numGreen < 18 || !foundNonForested)
 			continue;
-
-		if (forAi)
-		{
-
-		}
 
 		returner = startLocation;
 		foundStartLocation = true;
@@ -1265,7 +1297,7 @@ void e2::Game::updateTurnLocal()
 
 }
 
-e2::Entity* e2::Game::spawnEntity(e2::Name entityId, glm::vec3 const& worldPosition, glm::quat const& worldRotation)
+e2::Entity* e2::Game::spawnEntity(e2::Name entityId, glm::vec3 const& worldPosition, glm::quat const& worldRotation, bool forLoadGame)
 {
 	auto finder = m_entitySpecifications.find(entityId);
 	if (finder == m_entitySpecifications.end())
@@ -1290,6 +1322,13 @@ e2::Entity* e2::Game::spawnEntity(e2::Name entityId, glm::vec3 const& worldPosit
 		LogError("entity specification couldnt spawn entity instance, make sure entity type inherits e2::Entity and isnt pure virtual/abstract");
 		return nullptr;
 	}
+	
+	if (!forLoadGame)
+	{
+		asEntity->uniqueId = m_entityIdGiver++;
+		m_entityMap[asEntity->uniqueId] = asEntity;
+	}
+	
 
 	// post construct since we created it dynamically
 	asEntity->postConstruct(this, spec, worldPosition, worldRotation);
@@ -1332,9 +1371,11 @@ e2::Entity* e2::Game::spawnCustomEntity(e2::Name specificationId, e2::Name entit
 		return nullptr;
 	}
 
+	asEntity->uniqueId = m_entityIdGiver++;
+	asEntity->transient = true;
+
 	// post construct since we created it dynamically
 	asEntity->postConstruct(this, spec, worldPosition, worldRotation);
-	asEntity->transient = true;
 	// insert into global entity set 
 	m_entities.insert(asEntity);
 
@@ -1874,17 +1915,27 @@ e2::RenderView e2::Game::calculateRenderView(glm::vec2 const &viewOrigin)
 
 void e2::Game::destroyEntity(e2::Entity* entity)
 {
-
+	m_entityMap.erase(entity->uniqueId);
 	m_entities.erase(entity);
 	e2::destroy(entity);
-
-
 }
 
 void e2::Game::queueDestroyEntity(e2::Entity* entity)
 {
 	entity->pendingDestroy = true;
 	m_entitiesPendingDestroy.insert(entity);
+}
+
+e2::Entity* e2::Game::entityFromId(uint64_t id)
+{
+	auto finder = m_entityMap.find(id);
+	if (finder != m_entityMap.end())
+	{
+		return finder->second;
+	}
+
+	LogWarning("no such entity");
+	return nullptr;
 }
 
 
@@ -2278,7 +2329,7 @@ void e2::Game::removeResource(glm::ivec2 const& location)
 
 void e2::Game::updateAltCamera(double seconds)
 {
-	constexpr float moveSpeed = 10.0f;
+	constexpr float moveSpeed = 2.5f;
 	constexpr float viewSpeed = .3f;
 
 	e2::GameSession* session = gameSession();
@@ -2333,7 +2384,7 @@ void e2::Game::updateAltCamera(double seconds)
 
 		e2::RenderView newView{};
 		newView.fov = 65.0;
-		newView.clipPlane = { 1.0, 2000.0 };
+		newView.clipPlane = { 0.1, 1000.0 };
 		newView.origin = m_altViewOrigin;
 		newView.orientation = altRotation;
 		renderer->setView(newView);
@@ -2368,7 +2419,7 @@ void e2::Game::updateAnimation(double seconds)
 		// update inView, first check aabb to give chance for implicit early exit
 		glm::vec2 unitCoords = entity->planarCoords();
 
-		entity->setInView(viewAabb.isWithin(unitCoords) && m_viewPoints.isWithin(unitCoords, 1.0f));
+		entity->setInView(/*viewAabb.isWithin(unitCoords) &&*/ m_viewPoints.isWithin(unitCoords, 1.0f));
 
 		if (entity->isInView())
 		{

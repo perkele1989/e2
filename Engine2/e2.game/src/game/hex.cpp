@@ -155,6 +155,7 @@ e2::HexGrid::HexGrid(e2::GameContext* gameCtx)
 	: m_game(gameCtx->game())
 	, m_cutMask(gameCtx, 1280, 10.0f)
 {
+	LogNotice("HexGrid constructor at {}", (uint64_t)this);
 	constexpr size_t prewarmSize = 16'384;
 	m_tiles.reserve(prewarmSize);
 	m_tileIndex.reserve(prewarmSize);
@@ -451,6 +452,7 @@ e2::HexGrid::HexGrid(e2::GameContext* gameCtx)
 
 e2::HexGrid::~HexGrid()
 {
+	LogNotice("HexGrid destructor at {}", (uint64_t)this);
 	clearAllChunks();
 	destroyFogOfWar();
 
@@ -3665,6 +3667,7 @@ e2::GrassCutMask::GrassCutMask(e2::GameContext* ctx, uint32_t resolution, float 
 	, m_resolution(resolution)
 	, m_areaSize(areaSize)
 {
+	LogNotice("GrassCutMask constructor at {}", (uint64_t)this);
 	e2::TextureCreateInfo cutMaskInfo{};
 	cutMaskInfo.format = e2::TextureFormat::RGBA16;
 	cutMaskInfo.resolution.x = resolution;
@@ -3839,6 +3842,7 @@ e2::GrassCutMask::GrassCutMask(e2::GameContext* ctx, uint32_t resolution, float 
 
 e2::GrassCutMask::~GrassCutMask()
 {
+	LogNotice("GrassCutMask destructor at {}", (uint64_t)this);
 	e2::discard(m_pushPipeline);
 	e2::discard(m_pushPipelineLayout);
 	e2::discard(m_pushFragmentShader);

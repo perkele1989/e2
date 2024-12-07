@@ -279,10 +279,15 @@ namespace e2
 		uint32_t count;
 	};
 
+	constexpr uint64_t inventorySize = 32;
 	struct PlayerState
 	{
 
 		PlayerState(e2::Game* g);
+
+
+		void writeForSave(e2::IStream& toBuffer);
+		void readForSave(e2::IStream& fromBuffer);
 
 		bool give(e2::Name itemIdentifier);
 		void drop(uint32_t slotIndex, uint32_t num);
@@ -299,7 +304,7 @@ namespace e2
 		e2::PlayerEntity* entity{};
 
 		uint32_t activeSlot{}; // 0-7
-		std::array<InventorySlot, 32> inventory; // 8x4, first row is ready to use 
+		std::array<InventorySlot, e2::inventorySize> inventory; // 8x4, first row is ready to use 
 
 	};
 }
