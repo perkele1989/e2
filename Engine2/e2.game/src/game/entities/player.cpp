@@ -290,7 +290,7 @@ void e2::PlayerEntity::update(double seconds)
 			e2::ItemSpecification* itemSpec = otherEntity->getSpecificationAs<e2::ItemSpecification>();
 			if (item && itemSpec)
 			{
-				if (item->getLifetime() > 4.0 && glm::distance(planarCoords(), item->planarCoords()) < 0.3f && game()->playerState().give(itemSpec->id))
+				if (item->getCooldown() <= 0.0 && glm::distance(planarCoords(), item->planarCoords()) < 0.3f && game()->playerState().give(itemSpec->id))
 					game()->queueDestroyEntity(item);
 			}
 			else
@@ -519,11 +519,11 @@ void e2::PlayerEntity::onTrigger(e2::Name action, e2::Name trigger)
 		e2::TileData tile = game()->hexGrid()->getTileData(hex().offsetCoords());
 		e2::TileFlags biome = tile.getBiome();
 		if(biome == e2::TileFlags::BiomeGrassland)
-			m_footstepGrass->play(0.15f);
+			m_footstepGrass->play(0.05f);
 		else if (biome == e2::TileFlags::BiomeDesert)
-			m_footstepDesert->play(0.15f);
+			m_footstepDesert->play(0.05f);
 		else if (biome == e2::TileFlags::BiomeTundra)
-			m_footstepSnow->play(0.15f);
+			m_footstepSnow->play(0.05f);
 	}
 
 	e2::PlayerState& playerState = game()->playerState();

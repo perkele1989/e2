@@ -482,6 +482,7 @@ namespace e2
 
 		/// Chunks Begin (and World Streaming)
 
+		e2::ChunkState* getChunk(glm::ivec2 const& chunkIndex);
 		e2::ChunkState* getOrCreateChunk(glm::ivec2 const& index);
 		void nukeChunk(e2::ChunkState* chunk);
 

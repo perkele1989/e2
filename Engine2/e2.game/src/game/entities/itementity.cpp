@@ -223,7 +223,6 @@ void e2::ItemEntity::updateAnimation(double seconds)
 	constexpr double periodsPerSecond = 0.24;
 	constexpr double maxHeight = 0.10;
 
-	m_time += seconds;
 	double sineWave = glm::sin(glm::radians(m_time * 360.0f * periodsPerSecond));
 	double sineWaveUnit = sineWave * 0.5 + 0.5;
 	double height = sineWaveUnit * -maxHeight;
@@ -239,6 +238,14 @@ void e2::ItemEntity::updateAnimation(double seconds)
 void e2::ItemEntity::update(double seconds)
 {
 	e2::Entity::update(seconds);
+
+
+	m_time += seconds;
+
+	if (m_coolDown >= 0.0f)
+	{
+		m_coolDown -= seconds;
+	}
 
 	m_collisionCache.clear();
 	game()->populateCollisions(hex().offsetCoords(), e2::CollisionType::Component | e2::CollisionType::Tree | e2::CollisionType::Mountain, m_collisionCache);

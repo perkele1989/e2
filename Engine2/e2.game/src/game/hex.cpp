@@ -1231,6 +1231,17 @@ void e2::HexGrid::clearQueue()
 	}
 }
 
+e2::ChunkState* e2::HexGrid::getChunk(glm::ivec2 const& chunkIndex)
+{
+	auto finder = m_chunkIndex.find(chunkIndex);
+	if (finder == m_chunkIndex.end())
+	{
+		return nullptr;
+	}
+
+	return finder->second;
+}
+
 e2::ChunkState* e2::HexGrid::getOrCreateChunk(glm::ivec2 const& index)
 {
 	auto finder = m_chunkIndex.find(index);
@@ -1630,7 +1641,6 @@ void e2::HexGrid::updateUnpackedForests()
 								if (t.killTime < nextTimeRef)
 								{
 									e2::ItemEntity* newLumber = game()->spawnEntity("lumber", glm::vec3(t.worldOffset.x, 0.0f, t.worldOffset.y) + fallRot * (t.spawnedLumber * 0.2f))->cast<e2::ItemEntity>();
-									newLumber->setLifetime(4.0);
 									newLumber->playSound("S_Wood_Spawn.e2a", 1.0f, 1.0f);
 									t.spawnedLumber++;
 								}
@@ -1872,6 +1882,7 @@ size_t e2::HexGrid::discover(glm::ivec2 const& hex)
 		e2::Aabb2D chunkAabb = getChunkAabb(chunkIndex);
 		for (glm::vec2 p : chunkAabb.points())
 			m_discoveredChunksAABB.push(p);
+
 	}
 	
 	
@@ -1913,6 +1924,7 @@ e2::TileData* e2::HexGrid::getExistingTileData(glm::ivec2 const& hex)
 
 	return &m_tiles[finder->second];
 }
+
 
 e2::TileData& e2::HexGrid::getTileFromIndex(size_t index)
 {

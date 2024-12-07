@@ -134,7 +134,10 @@ void e2::PlayerState::drop(uint32_t slotIndex, uint32_t num)
 	if (entity && num > 0)
 	{
 		for (uint32_t i = 0; i < num; i++)
-			game->spawnEntity(slot.item->id, entity->getTransform()->getTranslation(e2::TransformSpace::World));
+		{
+			e2::ItemEntity* dropItem = game->spawnEntity(slot.item->id, entity->getTransform()->getTranslation(e2::TransformSpace::World))->cast<e2::ItemEntity>();
+			dropItem->setCooldown(3.0f);
+		}
 
 		entity->playSound("S_Item_Drop.e2a", 1.0, 1.0);
 	}
@@ -492,7 +495,7 @@ void e2::HatchetHandler::onUpdate(e2::PlayerEntity* player, double seconds)
 	if (!game->uiHovered() && player->aiming() && mouse.buttonPressed(e2::MouseButton::Left) && !m_actionBusy && cursorTile.isLand())
 	{
 		player->getMesh()->playAction("chop");
-		m_axeSwing->play();
+		m_axeSwing->play(0.4f);
 		m_actionBusy = true;
 	}
 
@@ -632,7 +635,7 @@ void e2::SwordHandler::onUpdate(e2::PlayerEntity* player, double seconds)
 	if (!game->uiHovered() && player->aiming() && mouse.buttonPressed(e2::MouseButton::Left) && !m_actionBusy && cursorTile.isLand())
 	{
 		player->getMesh()->playAction("sword");
-		m_swordSwing->play();
+		m_swordSwing->play(0.5f);
 		m_actionBusy = true;
 	}
 
@@ -958,7 +961,6 @@ void e2::IonizerHandler::onUpdate(e2::PlayerEntity* player, double seconds)
 		{
 			e2::Entity *cube = game->spawnEntity("radion_cube", hoveredEntity->getTransform()->getTranslation(e2::TransformSpace::World));
 			e2::ItemEntity* cubeAsItem = cube->cast<e2::ItemEntity>();
-			cubeAsItem->setLifetime(4.0);
 		}
 		game->destroyEntity(hoveredEntity);
 	}

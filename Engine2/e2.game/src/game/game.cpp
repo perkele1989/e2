@@ -490,7 +490,18 @@ void e2::Game::update(double seconds)
 
 	auto view = renderer->view();
 
-	audioManager()->setListenerTransform(glm::inverse(view.calculateViewMatrix()));
+	
+	glm::mat4 cameraMatrix = glm::inverse(view.calculateViewMatrix());
+	if (m_turnState == e2::TurnState::Realtime && m_playerState.entity)
+	{
+		glm::quat viewRotation = view.orientation;
+
+		glm::mat4 translateMatrix = glm::translate(glm::identity<glm::mat4>(), m_playerState.entity->getTransform()->getTranslation(e2::TransformSpace::World));
+		glm::mat4 rotateMatrix = glm::mat4_cast(viewRotation);
+
+		cameraMatrix = translateMatrix * rotateMatrix;
+	}
+	audioManager()->setListenerTransform(cameraMatrix);
 
 	std::unordered_set<e2::Entity*> ecpy = m_entitiesPendingDestroy;
 	for (e2::Entity* entity : ecpy)
@@ -617,7 +628,11 @@ void e2::Game::updateGame(double seconds)
 
 	m_session->renderer()->setEnvironment(m_irradianceMap->handle(), m_radianceMap->handle());
 
-
+	if (m_turnState == e2::TurnState::Realtime && m_entitySpawnTimer.seconds() > 1.0)
+	{
+		updateEntitySpawns();
+		m_entitySpawnTimer.reset();
+	}
 
 	// update input state
 	glm::vec2 resolution = renderer->resolution();
@@ -1922,6 +1937,9 @@ void e2::Game::destroyEntity(e2::Entity* entity)
 
 void e2::Game::queueDestroyEntity(e2::Entity* entity)
 {
+	if (entity->pendingDestroy)
+		return;
+
 	entity->pendingDestroy = true;
 	m_entitiesPendingDestroy.insert(entity);
 }
@@ -1934,8 +1952,125 @@ e2::Entity* e2::Game::entityFromId(uint64_t id)
 		return finder->second;
 	}
 
-	LogWarning("no such entity");
+	/*LogWarning("no such entity");*/
 	return nullptr;
+}
+
+void e2::Game::updateEntitySpawns()
+{
+	if (!m_playerState.entity)
+		return;
+
+	//e2::Transform* playerTransform = m_playerState.entity->getTransform();
+	glm::vec2 playerCoords = m_playerState.entity->planarCoords();
+	glm::ivec2 centerIndex = m_hexGrid->chunkIndexFromPlanarCoords(playerCoords);
+
+	int32_t range = 3;
+	glm::ivec2 topLeftIndex = centerIndex - glm::ivec2(range, range);
+	glm::ivec2 bottomRightIndex = centerIndex + glm::ivec2(range, range);
+
+	glm::vec2 startCoords = e2::Hex(m_startLocation).planarCoords();
+
+	for (uint32_t y = topLeftIndex.y; y <= bottomRightIndex.y; y++)
+	{
+		for (uint32_t x = topLeftIndex.x; x <= bottomRightIndex.x; x++)
+		{
+			glm::ivec2 currentIndex(x, y);
+			glm::ivec2 chunkTileOffset = currentIndex * glm::ivec2(e2::hexChunkResolution);
+
+			e2::EntitySpawnList* currSpawnList = nullptr;
+
+			auto currSpawnListIt = m_entitySpawnLists.find(currentIndex);
+			if (currSpawnListIt == m_entitySpawnLists.end())
+			{
+				// build spawn list 
+				e2::EntitySpawnList newList;
+				
+				for (int32_t ty = 0; ty < e2::hexChunkResolution; ty++)
+				{
+					for (int32_t tx = 0; tx < e2::hexChunkResolution; tx++)
+					{
+
+
+						glm::ivec2 worldIndex = chunkTileOffset + glm::ivec2(tx, ty);
+						e2::TileData tile = m_hexGrid->calculateTileData(worldIndex);
+
+						e2::Hex currentHex(worldIndex);
+						glm::vec2 planarCoords = currentHex.planarCoords();
+						float distanceToStart = glm::distance(planarCoords, startCoords);
+						bool shouldSpawn = e2::HexGrid::sampleSimplex(planarCoords*1.1f) > 0.75f;
+						shouldSpawn =  shouldSpawn && distanceToStart > 3.0f;
+						shouldSpawn = shouldSpawn && tile.isLand() && !tile.isForested() && !tile.isMountain();
+						
+						e2::Name toSpawn;
+						
+						if (tile.getBiome() == e2::TileFlags::BiomeGrassland)
+						{
+							toSpawn = "teardrop";
+						}
+						else if (tile.getBiome() == e2::TileFlags::BiomeDesert)
+						{
+							toSpawn = "amberling";
+						}
+						else
+						{
+							shouldSpawn = false;
+						}
+
+						if (shouldSpawn)
+						{
+							e2::EntitySpawn newSpawn;
+							newSpawn.entityId = toSpawn;
+							newSpawn.worldPlanarCoords = planarCoords;
+							newSpawn.spawnTimer.reset();
+							newList.spawns.push(newSpawn);
+						}
+
+						if (newList.spawns.full())
+							break;
+					}
+
+					if (newList.spawns.full())
+						break;
+				}
+
+
+				m_entitySpawnLists[currentIndex] = newList;
+
+				currSpawnList = &m_entitySpawnLists.at(currentIndex);
+			}
+			else
+			{
+				currSpawnList = &currSpawnListIt->second;
+			}
+
+			// dont spawn enemies in view
+			e2::ChunkState* chunk = m_hexGrid->getChunk(currentIndex);
+			if (chunk && chunk->inView)
+			{
+				continue;
+			}
+
+			for (e2::EntitySpawn& spawn : currSpawnList->spawns)
+			{
+				
+				if (spawn.spawnTimer.seconds() < 5.0)
+				{
+					continue;
+				}
+
+				e2::Entity* spawnedEntity = entityFromId(spawn.spawnedEntityId);
+				if (spawnedEntity)
+				{
+					continue;
+				}
+
+				spawnedEntity = spawnEntity(spawn.entityId, { spawn.worldPlanarCoords.x, 0.0f, spawn.worldPlanarCoords.y });
+				spawn.spawnedEntityId = spawnedEntity->uniqueId;
+				spawn.spawnTimer.reset();
+			}
+		}
+	}
 }
 
 

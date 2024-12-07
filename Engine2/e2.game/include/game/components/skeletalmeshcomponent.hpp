@@ -61,6 +61,9 @@ namespace e2
 		e2::Name meshAssetName;
 		e2::MeshPtr meshAsset;
 
+		e2::StackVector<e2::Name, e2::maxNumSubmeshes> materialAssetNames;
+		e2::StackVector<e2::MaterialPtr, e2::maxNumSubmeshes>  materialAssets;
+
 		/** Skeleton asset to use */
 		e2::Name skeletonAssetName;
 		e2::SkeletonPtr skeletonAsset;

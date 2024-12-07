@@ -152,7 +152,7 @@ void e2::AudioManager::playOneShot(e2::Ptr<e2::Sound> sound, float volume,  floa
 	vel.y = 0.0f;
 	vel.z = 0.0f;
 	channel->set3DAttributes(&pos, &vel);
-	channel->set3DMinMaxDistance(0.25f, 15.0f);
+	channel->set3DMinMaxDistance(0.25f, 5.0f);
 	channel->set3DLevel(spatiality);
 	channel->setPitch(pitch);
 	channel->setPaused(false);

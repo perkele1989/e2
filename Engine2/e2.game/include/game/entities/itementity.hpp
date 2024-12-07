@@ -84,13 +84,13 @@ namespace e2
 
 		virtual void updateVisibility() override;
 
-		inline double getLifetime() {
-			return m_time;
+		inline double getCooldown() {
+			return m_coolDown;
 		}
 
-		inline void setLifetime(double newTime)
+		inline void setCooldown(double newTime)
 		{
-			m_time = newTime;
+			m_coolDown = newTime;
 		}
 
 	protected:
@@ -98,7 +98,7 @@ namespace e2
 		e2::StaticMeshComponent* m_mesh{};
 		e2::CollisionComponent* m_collision{};
 		e2::MovementComponent* m_movement{};
-
+		float m_coolDown{};
 		double m_time{};
 		float m_rotation{};
 

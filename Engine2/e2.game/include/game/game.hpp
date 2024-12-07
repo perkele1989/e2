@@ -72,6 +72,20 @@ namespace e2
 	class PlayerEntity;
 
 
+	constexpr uint64_t maxEntitySpawns = 4;
+
+	struct EntitySpawn
+	{
+		e2::Name entityId;
+		glm::vec2 worldPlanarCoords;
+		uint64_t spawnedEntityId{};
+		e2::Timer spawnTimer;
+	};
+
+	struct EntitySpawnList
+	{
+		e2::StackVector<e2::EntitySpawn, e2::maxEntitySpawns> spawns;
+	};
 
 	class Game : public e2::Application, public e2::GameContext
 	{
@@ -179,7 +193,6 @@ namespace e2
 
 	protected:
 
-		uint64_t m_entityIdGiver{1};
 
 		std::vector<e2::Hex> m_proximityHexes;
 		float m_waterProximity{};
@@ -232,6 +245,7 @@ namespace e2
 		bool m_uiHovered{};
 		bool m_viewDragging{};
 
+
 		// empirees 
 
 	public:
@@ -275,14 +289,25 @@ namespace e2
 
 	protected:
 
+
+		uint64_t m_entityIdGiver{ 1 };
+
+
 		std::unordered_map<uint64_t, e2::Entity*> m_entityMap;
 		std::unordered_set<e2::Entity*> m_entities;//all entities
 		std::unordered_set<e2::Entity*> m_entitiesInView; // all entities in view
 		std::unordered_set<e2::Entity*> m_entitiesPendingDestroy; // entities needing destroy-o
 
+		std::unordered_map<glm::ivec2, e2::EntitySpawnList> m_entitySpawnLists;
+
+		void updateEntitySpawns();
+
+		e2::Timer m_entitySpawnTimer;
+
 		e2::PlayerState m_playerState;
 
 	public:
+
 
 		e2::Entity* entityFromId(uint64_t id);
 

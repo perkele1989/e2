@@ -13,12 +13,12 @@ namespace e2
 {
 
 	/** @tags(dynamic) */
-	class TeardropSpecification : public e2::EntitySpecification
+	class AmberlingSpecification : public e2::EntitySpecification
 	{
 		ObjectDeclaration();
 	public:
-		TeardropSpecification();
-		virtual ~TeardropSpecification();
+		AmberlingSpecification();
+		virtual ~AmberlingSpecification();
 		virtual void populate(e2::GameContext* ctx, nlohmann::json& obj) override;
 		virtual void finalize() override;
 
@@ -33,12 +33,12 @@ namespace e2
 	 * A game character, i.e. a freely movable character (not strictly tied to the hexgrid, but navigates through it freely with collisions)
 	 * @tags(dynamic, arena, arenaSize=1024)
 	 */
-	class TeardropEntity : public e2::Entity, public e2::ITriggerListener
+	class AmberlingEntity : public e2::Entity, public e2::ITriggerListener
 	{
 		ObjectDeclaration();
 	public:
-		TeardropEntity();
-		virtual ~TeardropEntity();
+		AmberlingEntity();
+		virtual ~AmberlingEntity();
 
 		virtual void postConstruct(e2::GameContext* ctx, e2::EntitySpecification* spec, glm::vec3 const& worldPosition, glm::quat const& worldRotation) override;
 
@@ -65,7 +65,7 @@ namespace e2
 
 	protected:
 
-		e2::TeardropSpecification* m_teardropSpecification{};
+		e2::AmberlingSpecification* m_amberlingSpecification{};
 		float m_spawnCooldown{ 5.0f };
 		float m_health{ 30.0f };
 		bool m_interacting{ false };
@@ -91,4 +91,4 @@ namespace e2
 
 }
 
-#include "teardrop.generated.hpp"
+#include "amberling.generated.hpp"

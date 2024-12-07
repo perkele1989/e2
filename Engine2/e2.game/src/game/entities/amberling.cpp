@@ -1,8 +1,9 @@
 
 
-#include "game/entities/teardrop.hpp"
+#include "game/entities/amberling.hpp"
 
 #include "game/entities/player.hpp"
+#include "game/entities/itementity.hpp"
 #include "game/game.hpp"
 
 #include <e2/game/gamesession.hpp>
@@ -11,17 +12,17 @@
 #include <e2/utils.hpp>
 
 
-e2::TeardropSpecification::TeardropSpecification()
+e2::AmberlingSpecification::AmberlingSpecification()
 	: e2::EntitySpecification()
 {
-	entityType = e2::Type::fromName("e2::TeardropEntity");
+	entityType = e2::Type::fromName("e2::AmberlingEntity");
 }
 
-e2::TeardropSpecification::~TeardropSpecification()
+e2::AmberlingSpecification::~AmberlingSpecification()
 {
 }
 
-void e2::TeardropSpecification::populate(e2::GameContext* ctx, nlohmann::json& obj)
+void e2::AmberlingSpecification::populate(e2::GameContext* ctx, nlohmann::json& obj)
 {
 	e2::EntitySpecification::populate(ctx, obj);
 
@@ -40,20 +41,20 @@ void e2::TeardropSpecification::populate(e2::GameContext* ctx, nlohmann::json& o
 		movement.populate(obj.at("movement"), assets);
 }
 
-void e2::TeardropSpecification::finalize()
+void e2::AmberlingSpecification::finalize()
 {
 	mesh.finalize(game);
 	collision.finalize(game);
 
 }
 
-e2::TeardropEntity::TeardropEntity()
+e2::AmberlingEntity::AmberlingEntity()
 	: e2::Entity()
 {
 	m_targetRotation = glm::angleAxis(0.0f, e2::worldUpf());
 }
 
-e2::TeardropEntity::~TeardropEntity()
+e2::AmberlingEntity::~AmberlingEntity()
 {
 	if (m_mesh)
 		e2::destroy(m_mesh);
@@ -66,30 +67,30 @@ e2::TeardropEntity::~TeardropEntity()
 
 }
 
-void e2::TeardropEntity::postConstruct(e2::GameContext* ctx, e2::EntitySpecification* spec, glm::vec3 const& worldPosition, glm::quat const& worldRotation)
+void e2::AmberlingEntity::postConstruct(e2::GameContext* ctx, e2::EntitySpecification* spec, glm::vec3 const& worldPosition, glm::quat const& worldRotation)
 {
 	e2::Entity::postConstruct(ctx, spec, worldPosition, worldRotation);
-	m_teardropSpecification = m_specification->cast<e2::TeardropSpecification>();
+	m_amberlingSpecification = m_specification->cast<e2::AmberlingSpecification>();
 
-	m_mesh = e2::create<e2::SkeletalMeshComponent>(&m_teardropSpecification->mesh, this);
+	m_mesh = e2::create<e2::SkeletalMeshComponent>(&m_amberlingSpecification->mesh, this);
 	m_mesh->setTriggerListener(this);
 
 
-	m_collision = e2::create<e2::CollisionComponent>(&m_teardropSpecification->collision, this);
-	m_movement = e2::create<e2::MovementComponent>(&m_teardropSpecification->movement, this);
+	m_collision = e2::create<e2::CollisionComponent>(&m_amberlingSpecification->collision, this);
+	m_movement = e2::create<e2::MovementComponent>(&m_amberlingSpecification->movement, this);
 
 	m_timeSinceJump = e2::randomFloat(0.0f, 2.25f);
 }
 
-void e2::TeardropEntity::writeForSave(e2::IStream& toBuffer)
+void e2::AmberlingEntity::writeForSave(e2::IStream& toBuffer)
 {
 }
 
-void e2::TeardropEntity::readForSave(e2::IStream& fromBuffer)
+void e2::AmberlingEntity::readForSave(e2::IStream& fromBuffer)
 {
 }
 
-void e2::TeardropEntity::updateAnimation(double seconds)
+void e2::AmberlingEntity::updateAnimation(double seconds)
 {
 	glm::quat currentRotation = m_transform->getRotation(e2::TransformSpace::World);
 	currentRotation = glm::slerp(currentRotation, m_targetRotation, glm::clamp(float(seconds) * 10.0f, 0.01f, 1.0f));
@@ -98,7 +99,7 @@ void e2::TeardropEntity::updateAnimation(double seconds)
 	m_mesh->updateAnimation(seconds);
 }
 
-void e2::TeardropEntity::update(double seconds)
+void e2::AmberlingEntity::update(double seconds)
 {
 	if(m_spawnCooldown >= 0.0f)
 		m_spawnCooldown -= seconds;
@@ -204,7 +205,7 @@ void e2::TeardropEntity::update(double seconds)
 
 }
 
-void e2::TeardropEntity::onTrigger(e2::Name action, e2::Name trigger)
+void e2::AmberlingEntity::onTrigger(e2::Name action, e2::Name trigger)
 {
 	static const e2::Name triggerJump{ "jump" };
 	if (trigger == triggerJump)
@@ -220,12 +221,12 @@ void e2::TeardropEntity::onTrigger(e2::Name action, e2::Name trigger)
 	}
 }
 
-void e2::TeardropEntity::updateVisibility()
+void e2::AmberlingEntity::updateVisibility()
 {
 	m_mesh->updateVisibility();
 }
 
-void e2::TeardropEntity::onMeleeDamage(e2::Entity* instigator, float dmg)
+void e2::AmberlingEntity::onMeleeDamage(e2::Entity* instigator, float dmg)
 {
 	if (m_health <= 0.0f)
 		return;
@@ -251,6 +252,14 @@ void e2::TeardropEntity::onMeleeDamage(e2::Entity* instigator, float dmg)
 		playSound("S_Teardrop_Die.e2a", 1.0, 0.5);
 		m_mesh->playAction("die");
 		game()->queueDestroyEntity(this);
+
+		int64_t dropRate = e2::randomInt(0, 2);
+		for (int64_t i = 0; i < dropRate; i++)
+		{
+			e2::ItemEntity *cube = game()->spawnEntity("radion_cube", getTransform()->getTranslation(e2::TransformSpace::World))->cast<e2::ItemEntity>();
+			cube->setCooldown(0.5f);
+		}
+		
 	}
 	else
 	{
@@ -259,12 +268,12 @@ void e2::TeardropEntity::onMeleeDamage(e2::Entity* instigator, float dmg)
 	}
 }
 
-bool e2::TeardropEntity::canBeDestroyed()
+bool e2::AmberlingEntity::canBeDestroyed()
 {
 	return !m_mesh->isActionPlaying("die");
 }
 
-void e2::TeardropEntity::onInteract(e2::Entity* interactor)
+void e2::AmberlingEntity::onInteract(e2::Entity* interactor)
 {
 	if (m_jumping)
 	{

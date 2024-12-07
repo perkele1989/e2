@@ -62,6 +62,12 @@ e2::SkeletalMeshComponent::SkeletalMeshComponent(e2::SkeletalMeshSpecification* 
 		e2::MeshProxyConfiguration proxyConf{};
 		e2::MeshLodConfiguration lod;
 
+		for (e2::MaterialPtr material : m_specification->materialAssets)
+		{
+			lod.materials.push(session->getOrCreateDefaultMaterialProxy(material));
+		}
+		
+
 		lod.mesh = m_specification->meshAsset;
 		proxyConf.lods.push(lod);
 
@@ -457,6 +463,16 @@ void e2::SkeletalMeshSpecification::populate(nlohmann::json& obj, std::unordered
 		deps.insert(meshAssetName);
 	}
 
+	if (obj.contains("materials"))
+	{
+		for (nlohmann::json& material : obj.at("materials"))
+		{
+			e2::Name materialName = material.template get<std::string>();
+			materialAssetNames.push(materialName);
+			deps.insert(materialName);
+		}
+	}
+
 	if (obj.contains("skeleton"))
 	{
 		skeletonAssetName = obj.at("skeleton").template get<std::string>();
@@ -573,6 +589,15 @@ void e2::SkeletalMeshSpecification::finalize(e2::GameContext* ctx)
 
 	meshAsset = am->get(meshAssetName).cast<e2::Mesh>();
 
+	if (materialAssetNames.size() > 0)
+	{
+		for (e2::Name materialName : materialAssetNames)
+		{
+			e2::MaterialPtr material = am->get(materialName).cast<e2::Material>();
+			materialAssets.push(material);
+		}		
+	}
+	
 	if (skeletonAssetName.index() != 0)
 		skeletonAsset = am->get(skeletonAssetName).cast<e2::Skeleton>();
 
