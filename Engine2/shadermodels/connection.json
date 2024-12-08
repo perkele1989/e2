@@ -1,0 +1,15 @@
+{
+    "name": "connection",
+    "renderLayer": 1032,
+    "vertexShader": "shaders/connection/connection.vertex.glsl",
+    "fragmentShader": "shaders/connection/connection.fragment.glsl",
+    "doubleSided": false,
+    "supportsShadows": false,
+    "alphaBlending": true,
+    "parameters": [
+        {
+            "name": "color",
+            "defaultValue": [1.0, 1.0, 1.0, 1.0]
+        }
+    ]
+}

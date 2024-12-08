@@ -18,6 +18,7 @@
 
 namespace e2
 {
+	class LightweightProxy;
 	class CollisionComponent;
 
 
@@ -269,8 +270,6 @@ namespace e2
 
 		void removeWood(glm::ivec2 const& location);
 
-		void removeResource(glm::ivec2 const& location);
-
 		e2::RenderView const& view()
 		{
 			return m_view;
@@ -321,6 +320,8 @@ namespace e2
 			return m_playerState.entity;
 		}
 	protected:
+
+		e2::LightweightProxy* m_testProxy{};
 
 		// anim stuff 
 		double m_accumulatedAnimationTime{};

@@ -16,6 +16,8 @@
 #include "e2/transform.hpp"
 #include "e2/buffer.hpp"
 
+#include "e2/renderer/shadermodels/lightweight.hpp"
+
 #include "game/components/physicscomponent.hpp"
 
 #include <glm/gtx/intersect.hpp>
@@ -333,6 +335,7 @@ void e2::Game::finalizeBoot()
 {
 	finalizeSpecifications();
 
+	m_radionManager.finalize();
 
 	auto am = assetManager();
 
@@ -352,7 +355,9 @@ void e2::Game::finalizeBoot()
 	// After this line, we may no longer safely fetch and store loaded assets
 	am->returnALJ(m_bootTicket);
 
-	
+	e2::MaterialPtr testMat = am->get("M_Dummy.e2a").cast<e2::Material>();
+	m_testProxy = gameSession()->getOrCreateDefaultMaterialProxy(testMat)->cast<e2::LightweightProxy>();
+	 
 	audioManager()->playMusic(am->get("M_Ambient_Ocean.e2a").cast<e2::Sound>(), 0.0f, true, &m_waterChannel);
 
 	setupGame();
@@ -398,6 +403,8 @@ void e2::Game::initialize()
 
 	am->prescribeALJ(alj, "M_Menu.e2a");
 	am->prescribeALJ(alj, "M_Ambient_Ocean.e2a");
+
+	m_radionManager.populate(alj);
 
 	initializeScriptGraphs();
 
@@ -960,9 +967,9 @@ void e2::Game::updateMenu(double seconds)
 	double blockAlphaLoadGame = glm::smoothstep(15.25, 15.5, timer);
 	e2::UIColor textColorLoadGame(14, 14, 15, uint8_t(blockAlphaLoadGame * 170.0 * globalMenuFade));
 	double loadGameWidth = ui->calculateSDFTextWidth(FontFace::Serif, 24.0f, "Load Game");
-	bool loadGameHovered = !m_haveBegunStart && timer > 15.5 && mouse.relativePosition.x > xOffset && mouse.relativePosition.x < xOffset + loadGameWidth
+	bool loadGameHovered = !m_haveBegunStart && timer > 15.5 && mouse.relativePosition.x > middleX - loadGameWidth / 2.0 && mouse.relativePosition.x < middleX + loadGameWidth / 2.0
 		&& mouse.relativePosition.y > cursorY + 60.0 && mouse.relativePosition.y < cursorY + 100.0;
-	ui->drawSDFText(FontFace::Serif, 24.0f, loadGameHovered ? 0x000000FF : textColorLoadGame, glm::vec2(xOffset, cursorY + 40.0 * 2), "Load Game");
+	ui->drawSDFText(FontFace::Serif, 24.0f, loadGameHovered ? 0x000000FF : textColorLoadGame, glm::vec2(middleX - loadGameWidth / 2.0, cursorY + 40.0*2.0), "Load Game");
 	if (!m_haveBegunStart && loadGameHovered && leftMouse.clicked)
 	{
 		m_mainMenuState = MainMenuState::Load;
@@ -973,9 +980,9 @@ void e2::Game::updateMenu(double seconds)
 	double blockAlphaOptions = glm::smoothstep(15.5, 15.75, timer);
 	e2::UIColor textColorOptions(14, 14, 15, uint8_t(blockAlphaOptions * 170.0 * globalMenuFade));
 	double optionsWidth = ui->calculateSDFTextWidth(FontFace::Serif, 24.0f, "Options");
-	bool optionsHovered = !m_haveBegunStart && timer > 15.75 && mouse.relativePosition.x > xOffset && mouse.relativePosition.x < xOffset + optionsWidth
+	bool optionsHovered = !m_haveBegunStart && timer > 15.75 && mouse.relativePosition.x > middleX - optionsWidth / 2.0 && mouse.relativePosition.x < middleX + optionsWidth / 2.0
 		&& mouse.relativePosition.y > cursorY + 100.0 && mouse.relativePosition.y < cursorY + 140.0;
-	ui->drawSDFText(FontFace::Serif, 24.0f, optionsHovered ? 0x000000FF : textColorOptions, glm::vec2(xOffset, cursorY + 40.0 * 3), "Options");
+	ui->drawSDFText(FontFace::Serif, 24.0f, optionsHovered ? 0x000000FF : textColorOptions, glm::vec2(middleX - optionsWidth / 2.0, cursorY + 40.0 * 3.0), "Options");
 	if (!m_haveBegunStart && optionsHovered && leftMouse.clicked)
 	{
 		m_mainMenuState = MainMenuState::Options;
@@ -985,9 +992,9 @@ void e2::Game::updateMenu(double seconds)
 	double blockAlphaQuit = glm::smoothstep(15.75, 16.0, timer);
 	e2::UIColor textColorQuit(14, 14, 15, uint8_t(blockAlphaQuit * 170.0 * globalMenuFade));
 	double quitWidth = ui->calculateSDFTextWidth(FontFace::Serif, 24.0f, "Quit");
-	bool quitHovered = !m_haveBegunStart && timer > 16.0 && mouse.relativePosition.x > xOffset && mouse.relativePosition.x < xOffset + optionsWidth
+	bool quitHovered = !m_haveBegunStart && timer > 16.0 && mouse.relativePosition.x > middleX - quitWidth / 2.0 && mouse.relativePosition.x < middleX + quitWidth / 2.0
 		&& mouse.relativePosition.y > cursorY + 140.0 && mouse.relativePosition.y < cursorY + 180.0;
-	ui->drawSDFText(FontFace::Serif, 24.0f, quitHovered ? 0x000000FF : textColorQuit, glm::vec2(xOffset, cursorY + 40.0 * 4), "Quit");
+	ui->drawSDFText(FontFace::Serif, 24.0f, quitHovered ? 0x000000FF : textColorQuit, glm::vec2(middleX - quitWidth / 2.0, cursorY + 40.0 * 4.0), "Quit");
 	if (quitHovered && leftMouse.clicked)
 	{
 
@@ -1009,6 +1016,16 @@ void e2::Game::updateMenu(double seconds)
 		m_playerState.give("ironhatchet");
 		m_playerState.give("ironsword");
 		m_playerState.give("radion_ionizer");
+		for (uint32_t i = 0; i < 10; i++)
+		{
+			m_playerState.give("bomb");
+		}
+
+		for (uint32_t i = 0; i < 5; i++)
+		{
+			m_playerState.give("redbomb");
+		}
+
 		m_playerState.give("radion_linker");
 		m_radionManager.discoverEntity("radion_powersource");
 		m_radionManager.discoverEntity("radion_wirepost");
@@ -1024,7 +1041,7 @@ void e2::Game::updateMenu(double seconds)
 		m_radionManager.discoverEntity("radion_gateXNOR");
 		m_radionManager.discoverEntity("radion_gateXOR");
 
-		for (uint32_t i = 0; i < 400; i++)
+		for (uint32_t i = 0; i < 50; i++)
 		{
 			m_playerState.give("radion_cube");
 		}
@@ -1447,13 +1464,31 @@ void e2::Game::drawUI()
 			ui->pushFixedPanel("envParams", offset, size);
 			ui->beginStackV("envParamStack");
 
-			ui->sliderFloat("sunAngleA", m_sunAngleA, -180.0f, 180.0f);
-			ui->sliderFloat("sunAngleB", m_sunAngleB, 0.0f, 90.0f);
-			ui->sliderFloat("sunStr", m_sunStrength, 0.0f, 10.0f);
-			ui->sliderFloat("iblStr", m_iblStrength, 0.0f, 10.0f); 
+			e2::LightweightData uniformData = m_testProxy->uniformData.data();
+			bool doUpdate = false;
+			if (ui->sliderFloat("Albedo R", uniformData.albedo.r, 0.0, 1.0))
+				doUpdate = true;
+			if (ui->sliderFloat("Albedo G", uniformData.albedo.g, 0.0, 1.0))
+				doUpdate = true;
+			if (ui->sliderFloat("Albedo B", uniformData.albedo.b, 0.0, 1.0))
+				doUpdate = true;
+			if (ui->sliderFloat("Roughness", uniformData.rmxx.r, 0.0, 1.0))
+				doUpdate = true;
+			if (ui->sliderFloat("Metalness", uniformData.rmxx.g, 0.0, 1.0))
+				doUpdate = true;
 
-			ui->sliderFloat("exposure", m_exposure, 0.0f, 20.0f);
-			ui->sliderFloat("whitepoint", m_whitepoint, 0.0f, 20.0f);
+			if (doUpdate)
+			{
+				m_testProxy->uniformData.set(uniformData);
+			}
+
+			//ui->sliderFloat("sunAngleA", m_sunAngleA, -180.0f, 180.0f);
+			//ui->sliderFloat("sunAngleB", m_sunAngleB, 0.0f, 90.0f);
+			//ui->sliderFloat("sunStr", m_sunStrength, 0.0f, 10.0f);
+			//ui->sliderFloat("iblStr", m_iblStrength, 0.0f, 10.0f); 
+
+			//ui->sliderFloat("exposure", m_exposure, 0.0f, 20.0f);
+			//ui->sliderFloat("whitepoint", m_whitepoint, 0.0f, 20.0f);
 
 			//ui->sliderFloat("mtnFreqScale", e2::mtnFreqScale, 0.001f, 0.1f, "%.6f");
 			//ui->sliderFloat("mtnScale", e2::mtnScale, 0.25f, 10.0f, "%.6f");
@@ -2436,24 +2471,6 @@ void e2::Game::removeWood(glm::ivec2 const& location)
 	hexGrid()->removeWood(location);
 }
 
-void e2::Game::removeResource(glm::ivec2 const& location)
-{
-	e2::TileData* tileData = m_hexGrid->getExistingTileData(location);
-	if (!tileData)
-		return;
-
-	bool hasResource = (tileData->flags & e2::TileFlags::ResourceMask) != TileFlags::ResourceNone;
-	if (!hasResource)
-		return;
-
-	tileData->flags = e2::TileFlags(uint16_t(tileData->flags) & (~uint16_t(e2::TileFlags::ResourceMask)));
-
-	if (tileData->resourceProxy)
-		e2::destroy(tileData->resourceProxy);
-
-	tileData->resourceProxy = nullptr;
-	tileData->resourceMesh = nullptr;
-}
 //
 //void e2::Game::discoverEmpire(EmpireId empireId)
 //{

@@ -3,6 +3,8 @@
 #include "game/game.hpp"
 #include <e2/game/gamesession.hpp>
 
+#include <glm/gtx/spline.hpp>
+
 e2::RadionEntitySpecification::RadionEntitySpecification()
 	: e2::EntitySpecification()
 {
@@ -104,6 +106,8 @@ e2::RadionEntity::~RadionEntity()
 
 	}
 
+	destroyConnectionMeshes();
+
 	radionManager()->unregisterEntity(this);
 	if (m_mesh)
 		e2::destroy(m_mesh);
@@ -173,6 +177,8 @@ void e2::RadionEntity::readForSave(e2::IStream& fromBuffer)
 			slot.connections.push({ otherRadionEntity, pinName });
 		}
 	}
+
+	updateConnectionMeshes();
 }
 
 void e2::RadionEntity::postConstruct(e2::GameContext* ctx, e2::EntitySpecification* spec, glm::vec3 const& worldPosition, glm::quat const& worldRotation)
@@ -204,34 +210,19 @@ void e2::RadionEntity::update(double seconds)
 	e2::GameSession* gameSession = game()->gameSession();
 	e2::Renderer* renderer = gameSession->renderer();
 
-	int32_t i = -1;
-	for (e2::RadionPin& pin : radionSpecification->pins)
+	for (e2::ConnectionMesh& mesh : connectionMeshes)
 	{
-		i++;
-		if (pin.type != e2::RadionPinType::Output)
-			continue;
+		float radiance = outputRadiance[mesh.pinIndex];
+		bool powerOn = radiance >= e2::radionPowerTreshold;
+		bool signalHigh = radiance >= e2::radionSignalTreshold;
 
-		e2::RadionSlot& slot = slots[i];
+		e2::MaterialProxy *glowProxy = game()->radionManager()->glowProxy();
+		e2::MaterialProxy *unglowProxy = game()->radionManager()->unglowProxy();
+		e2::MaterialProxy* signalProxy = game()->radionManager()->signalProxy();
 
-		for (e2::RadionConnection conn : slot.connections)
-		{
-			e2::RadionEntity* otherEntity = conn.otherEntity;
-			if (!otherEntity)
-				continue;
-			glm::vec3 aWorld = getTransform()->getTransformMatrix(e2::TransformSpace::World) * glm::vec4(pin.offset, 1.0f);
-
-			e2::RadionEntitySpecification* otherSpec = otherEntity->radionSpecification;
-			int32_t otherIndex = otherSpec->pinIndexFromName(conn.otherPin);
-
-			glm::vec3 bWorld = otherEntity->getTransform()->getTransformMatrix(e2::TransformSpace::World) * glm::vec4(otherSpec->pins[otherIndex].offset, 1.0f);
-
-			glm::vec3 color = glm::mix(glm::vec3(1.0, 0.0, 0.0), glm::vec3(0.0, 1.0, 0.0), outputRadiance[i] / e2::radionHighRadiance);
-			renderer->debugLine(color, aWorld, bWorld);
-		}
-
-
-
+		mesh.meshProxy->setMaterial(0, 0, powerOn ? glowProxy : ( signalHigh ? signalProxy :  unglowProxy));
 	}
+
 }
 
 void e2::RadionEntity::updateAnimation(double seconds)
@@ -242,6 +233,20 @@ void e2::RadionEntity::updateAnimation(double seconds)
 void e2::RadionEntity::updateVisibility()
 {
 	m_mesh->updateVisibility();
+
+
+	for (e2::ConnectionMesh& mesh : connectionMeshes)
+	{
+		bool proxyEnabled = mesh.meshProxy->enabled();
+		if (m_inView && !proxyEnabled)
+		{
+			mesh.meshProxy->enable();
+		}
+		else if (!m_inView && proxyEnabled)
+		{
+			mesh.meshProxy->disable();		
+		}
+	}
 }
 
 void e2::RadionEntity::connectOutputPin(e2::Name outputPinName, e2::RadionEntity* inputEntity, e2::Name inputPinName)
@@ -282,7 +287,7 @@ void e2::RadionEntity::connectOutputPin(e2::Name outputPinName, e2::RadionEntity
 	inputSlot.connections.push({this, outputPinName});
 	outputSlot.connections.push({ inputEntity, inputPinName });
 
-
+	updateConnectionMeshes();
 }
 
 void e2::RadionEntity::disconnectInputPin(e2::Name pinName)
@@ -331,6 +336,8 @@ void e2::RadionEntity::disconnectInputPin(e2::Name pinName)
 
 			e2::RadionSlot &outputSlot = outputEntity->slots[outputPinIndex];
 			outputSlot.connections.removeFirstByValueFast({this, pinName});
+
+			outputEntity->updateConnectionMeshes();
 		}
 	}
 
@@ -368,6 +375,8 @@ void e2::RadionEntity::disconnectOutputPin(e2::Name pinName)
 			continue;
 		conn.otherEntity->disconnectInputPin(conn.otherPin);
 	}
+
+	updateConnectionMeshes();
 }
 
 float e2::RadionEntity::getInputRadiance(e2::Name pinName)
@@ -441,6 +450,203 @@ bool e2::RadionEntity::anyOutputConnected()
 	}
 	
 	return false;
+}
+
+e2::MeshPtr generateConnectionMesh(glm::vec3 a, glm::vec3 aO, glm::vec3 b, glm::vec3 bO, e2::Game* game)
+{
+
+	constexpr float halfWidth = 0.01f;
+	glm::vec3 const normal = e2::worldUpf();
+
+	float aHeight = a.y;
+	float bHeight = b.y;
+
+	a.y = 0.0f;
+	b.y = 0.0f;
+	aO.y = 0.0f;
+	bO.y = 0.0f;
+
+	glm::vec3 offsetA = glm::distance(aO, a) < 0.001f ? glm::normalize(b -a) : glm::normalize(aO - a);
+	glm::vec3 offsetB = glm::distance(bO, b) < 0.001f ? glm::normalize(a - b) : glm::normalize(bO - b);
+
+	glm::vec3 aO2 = a + offsetA * 0.5f;
+	glm::vec3 bO2 = b + offsetB * 0.5f;
+	constexpr int32_t numDivisions = 8;
+
+
+	e2::DynamicMesh dynMesh;
+	dynMesh.reserve(4 * (numDivisions), 2 * (numDivisions));
+	float distance = 0.0f;
+	for (int32_t currDivision = 0; currDivision < numDivisions; currDivision++)
+	{
+		int32_t nextDivision = currDivision + 1;
+
+		float pastAlpha = (float)glm::max(currDivision - 1, 0) / numDivisions;
+		float currAlpha = (float)currDivision / numDivisions;
+		float nextAlpha = (float)nextDivision / numDivisions;
+		float futureAlpha = (float)glm::min(nextDivision + 1, numDivisions+1) / numDivisions;
+
+		float currHeight = glm::mix(aHeight, bHeight, currAlpha);
+		float nextHeight = glm::mix(aHeight, bHeight, nextAlpha);
+
+		glm::vec3 pastBegin = glm::catmullRom(aO2, a, b, bO2, pastAlpha);
+		glm::vec3 begin = glm::catmullRom(aO2, a, b, bO2, currAlpha);
+		glm::vec3 end = glm::catmullRom(aO2, a, b, bO2, nextAlpha);
+		glm::vec3 futureEnd = glm::catmullRom(aO2, a, b, bO2, futureAlpha);
+
+		float prevDistance = distance;
+		distance += glm::distance(begin, end);
+
+		glm::vec3 beginToEnd = end - begin;
+		beginToEnd.y = 0.0f;
+
+		glm::vec3 endToFuture = futureEnd - end;
+		endToFuture.y = 0.0f;
+
+		glm::vec3 beginToEndNorm = glm::normalize(beginToEnd);
+		glm::vec3 tangentBegin{ -beginToEndNorm.z, 0.0f, beginToEndNorm.x };
+
+
+		glm::vec3 endToFutureNorm = glm::normalize(endToFuture);
+		glm::vec3 tangentEnd{ -endToFutureNorm.z, 0.0f, endToFutureNorm.x };
+
+
+		glm::vec3 startRight = begin + tangentBegin * halfWidth;
+		glm::vec3 startCenter = begin;
+		glm::vec3 startLeft = begin - tangentBegin * halfWidth;
+
+		glm::vec3 endRight = end + tangentEnd * halfWidth;
+		glm::vec3 endCenter = end;
+		glm::vec3 endLeft = end - tangentEnd * halfWidth;
+
+		e2::Vertex tl, tc, tr, bl, bc, br;
+		tl.position = startLeft + glm::vec3{0.0f, currHeight, 0.0f};
+		tl.normal = normal;
+		tl.tangent = tangentBegin;
+		tl.uv01 = {-1.0, currAlpha, prevDistance, 0.0};
+
+		tc.position = startCenter + glm::vec3{ 0.0f, currHeight, 0.0f };
+		tc.normal = normal;
+		tc.tangent = tangentBegin;
+		tc.uv01 = { 0.0, currAlpha, prevDistance, 0.0 };
+
+		tr.position = startRight + glm::vec3{0.0f, currHeight, 0.0f};
+		tr.normal = normal;
+		tr.tangent = tangentBegin;
+		tr.uv01 = { 1.0, currAlpha, prevDistance, 0.0 };
+
+		bl.position = endLeft + glm::vec3{0.0f, nextHeight, 0.0f};
+		bl.normal = normal;
+		bl.tangent = tangentEnd;
+		bl.uv01 = { -1.0, nextAlpha, distance, 0.0 };
+
+		bc.position = endCenter + glm::vec3{ 0.0f, nextHeight, 0.0f };
+		bc.normal = normal;
+		bc.tangent = tangentBegin;
+		bc.uv01 = { 0.0, nextAlpha, distance, 0.0 };
+
+		br.position = endRight + glm::vec3{0.0f, nextHeight, 0.0f};
+		br.normal = normal;
+		br.tangent = tangentEnd;
+		br.uv01 = { 1.0, nextAlpha, distance, 0.0 };
+
+		dynMesh.addVertex(tl);
+		dynMesh.addVertex(tc);
+		dynMesh.addVertex(tr);
+		dynMesh.addVertex(bl);
+		dynMesh.addVertex(bc);
+		dynMesh.addVertex(br);
+
+		e2::Triangle triA, triB, triC, triD;
+		triA.a = 0 + (currDivision * 6);
+		triA.b = 1 + (currDivision * 6);
+		triA.c = 3 + (currDivision * 6);
+
+		triB.a = 1 + (currDivision * 6);
+		triB.b = 4 + (currDivision * 6);
+		triB.c = 3 + (currDivision * 6);
+
+
+		triC.a = 1 + (currDivision * 6);
+		triC.b = 2 + (currDivision * 6);
+		triC.c = 4 + (currDivision * 6);
+
+
+		triD.a = 2 + (currDivision * 6);
+		triD.b = 5 + (currDivision * 6);
+		triD.c = 4 + (currDivision * 6);
+
+		dynMesh.addTriangle(triA);
+		dynMesh.addTriangle(triB);
+		dynMesh.addTriangle(triC);
+		dynMesh.addTriangle(triD);
+	}
+
+
+
+
+	e2::MaterialPtr mat = game->assetManager()->get("M_Connection_Off.e2a").cast<e2::Material>();
+
+	return dynMesh.bake(mat, e2::VertexAttributeFlags::Normal |  e2::VertexAttributeFlags::TexCoords01);
+}
+
+void e2::RadionEntity::destroyConnectionMeshes()
+{
+	for (e2::ConnectionMesh& mesh : connectionMeshes)
+	{
+		if (mesh.meshProxy)
+			e2::destroy(mesh.meshProxy);
+
+		mesh.generatedMesh = nullptr;
+	}
+
+	connectionMeshes.clear();
+}
+
+void e2::RadionEntity::updateConnectionMeshes()
+{
+
+	destroyConnectionMeshes();
+	int32_t i = -1;
+	for (e2::RadionPin& pin : radionSpecification->pins)
+	{
+		i++;
+
+		if (pin.type != e2::RadionPinType::Output)
+			continue;
+
+		for (e2::RadionConnection& conn : slots[i].connections)
+		{
+
+
+
+			e2::RadionEntity* otherEntity = conn.otherEntity;
+			if (!otherEntity)
+				continue;
+
+			glm::vec3 aO = getTransform()->getTranslation(e2::TransformSpace::World);
+			glm::vec3 aWorld = getTransform()->getTransformMatrix(e2::TransformSpace::World) * glm::vec4(pin.offset, 1.0f);
+
+			e2::RadionEntitySpecification* otherSpec = otherEntity->radionSpecification;
+			int32_t otherIndex = otherSpec->pinIndexFromName(conn.otherPin);
+
+			glm::vec3 bO = otherEntity->getTransform()->getTranslation(e2::TransformSpace::World);
+			glm::vec3 bWorld = otherEntity->getTransform()->getTransformMatrix(e2::TransformSpace::World) * glm::vec4(otherSpec->pins[otherIndex].offset, 1.0f);
+
+			e2::ConnectionMesh newMesh;
+			newMesh.generatedMesh = generateConnectionMesh(aWorld, aO, bWorld, bO, game());
+
+			e2::MeshProxyConfiguration cfg;
+			e2::MeshLodConfiguration lod;
+			lod.mesh = newMesh.generatedMesh;
+			cfg.lods.push(lod);
+			newMesh.meshProxy = e2::create<e2::MeshProxy>(gameSession(), cfg);
+
+			newMesh.pinIndex = i;
+
+			connectionMeshes.push(newMesh);
+		}
+	}
 }
 
 

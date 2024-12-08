@@ -142,6 +142,11 @@ namespace e2
 		void enable();
 		void disable();
 
+		void setMaterial(uint8_t submesh, uint8_t lodIndex, e2::Name materialName);
+
+		void setMaterial(uint8_t submesh, uint8_t lodIndex, e2::MaterialProxy* materialProxy);
+
+
 		void invalidatePipeline();
 
 		virtual Engine* engine() override;

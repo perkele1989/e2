@@ -61,6 +61,13 @@ namespace e2
 		uint32_t radionCost{ 4 };
 	};
 
+	struct ConnectionMesh
+	{
+		uint32_t pinIndex;
+		e2::MeshPtr generatedMesh;
+		e2::MeshProxy* meshProxy{};
+	};
+
 	/** @tags(dynamic) */
 	class RadionEntity : public e2::Entity
 	{
@@ -71,11 +78,8 @@ namespace e2
 
 		virtual void radionTick();
 
-
-
 		virtual void writeForSave(e2::IStream& toBuffer) override;
 		virtual void readForSave(e2::IStream& fromBuffer) override;
-
 
 		virtual void postConstruct(e2::GameContext* ctx, e2::EntitySpecification* spec, glm::vec3 const& worldPosition, glm::quat const& worldRotation) override;
 
@@ -94,8 +98,13 @@ namespace e2
 
 		bool anyOutputConnected();
 
+		void destroyConnectionMeshes();
+		void updateConnectionMeshes();
+
 		e2::StackVector<RadionSlot, e2::maxNumRadionPins> slots;
 		e2::StackVector<float, e2::maxNumRadionPins> outputRadiance;
+		e2::StackVector<ConnectionMesh, e2::maxNumRadionPins * e2::maxNumRadionConnections> connectionMeshes;
+
 		e2::RadionEntitySpecification* radionSpecification{};
 
 	protected:

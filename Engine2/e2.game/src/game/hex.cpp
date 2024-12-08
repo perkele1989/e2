@@ -547,8 +547,6 @@ void e2::HexGrid::loadFromBuffer(e2::IStream& fromBuffer)
 		
 		fromBuffer >> newTile.forestIndex >> newTile.forestRotation;
 	
-		newTile.resourceMesh = getResourceMeshForFlags(newTile.flags);
-
 		m_tiles.push_back(newTile);
 
 	}
@@ -1354,51 +1352,6 @@ float e2::HexGrid::calculateBaseHeight(glm::vec2 const& planarCoords)
 	return h1 * h2 * h3;*/
 }
 
-void e2::HexGrid::calculateResources(glm::vec2 const& planarCoords, e2::TileFlags& outFlags)
-{
-	
-	if ((outFlags & e2::TileFlags::FeatureMask) != e2::TileFlags::FeatureNone)
-		return;
-
-	float abundanceCoeff = sampleSimplex((planarCoords + glm::vec2(41.44f, 73.28f)) * 2.0f);
-	if (abundanceCoeff > 0.97)
-		outFlags |= TileFlags::Abundance4;
-	else if (abundanceCoeff > 0.86)
-		outFlags |= TileFlags::Abundance3;
-	else if (abundanceCoeff > 0.75)
-		outFlags |= TileFlags::Abundance2;
-	else
-		outFlags |= TileFlags::Abundance1;
-
-	float resourceBase = sampleSimplex((planarCoords + glm::vec2(11.44f, 53.28f)) * 8.0f);
-
-	if ((outFlags & e2::TileFlags::WaterMask) == e2::TileFlags::WaterDeep)
-	{
-		if (resourceBase > 0.865)
-			outFlags |= TileFlags::ResourceStone;
-		return;
-	}
-	if ((outFlags & e2::TileFlags::WaterMask) == e2::TileFlags::WaterShallow)
-	{
-		if (resourceBase > 0.92)
-			outFlags |= TileFlags::ResourceStone;
-		return;
-	}
-
-	if (abundanceCoeff > 0.5f)
-	{
-		/*if (resourceBase > 0.97)
-			outFlags |= TileFlags::ResourceUranium;
-		else if (resourceBase > 0.85)
-			outFlags |= TileFlags::ResourceGold;
-		else if (resourceBase > 0.7)
-			outFlags |= TileFlags::ResourceOre;*/
-		// else if
-		if (resourceBase > 0.85)
-			outFlags |= TileFlags::ResourceStone;
-	}
-}
-
 void e2::HexGrid::calculateFeaturesAndWater(glm::vec2 const& planarCoords, float baseHeight, e2::TileFlags& outFlags)
 {
 	if (baseHeight > 0.75f)
@@ -1437,24 +1390,6 @@ void e2::HexGrid::calculateFeaturesAndWater(glm::vec2 const& planarCoords, float
 	else
 	{
 		outFlags |= TileFlags::WaterDeep;
-	}
-}
-
-e2::MeshPtr e2::HexGrid::getResourceMeshForFlags(e2::TileFlags flags)
-{
-	//return nullptr;
-	switch (flags & e2::TileFlags::ResourceMask)
-	{
-		case e2::TileFlags::ResourceStone:
-			return m_resourceMeshStone;
-		case e2::TileFlags::ResourceGold:
-			return m_resourceMeshStone; // @todo
-		case e2::TileFlags::ResourceOre:
-			return m_resourceMeshStone; // @todo
-		case e2::TileFlags::ResourceUranium:
-			return m_resourceMeshStone; // @todo
-		default:
-			return nullptr;
 	}
 }
 
@@ -1762,52 +1697,6 @@ e2::MeshProxy* e2::HexGrid::createGrassProxy(e2::TileData* tileData, glm::ivec2 
 	return newMeshProxy;
 }
 
-e2::MeshProxy* e2::HexGrid::createResourceProxyForTile(e2::TileData* tileData, glm::ivec2 const& hex)
-{
-	if (!tileData)
-		return nullptr; 
-
-	if (!tileData->resourceMesh)
-		return nullptr;
-
-	e2::MeshProxyConfiguration meshConf;
-	e2::MeshLodConfiguration lodConf;
-	lodConf.mesh = tileData->resourceMesh;
-	meshConf.lods.push(lodConf);
-
-	e2::MeshProxy* newMeshProxy = e2::create<e2::MeshProxy>(gameSession(), meshConf);
-
-	if ((tileData->flags & e2::TileFlags::WaterMask) != e2::TileFlags::WaterNone)
-	{
-
-
-		glm::vec3 meshOffset = e2::Hex(hex).localCoords() + e2::worldUpf() * -1.0f;
-
-		glm::mat4 transform = glm::mat4(1.0f);
-		transform = glm::translate(transform, meshOffset);
-		transform = glm::rotate(transform, glm::radians(e2::randomFloat(0.0f, 359.f)), glm::vec3(e2::worldUp()));
-		transform = glm::scale(transform, glm::vec3(e2::randomFloat(1.4f, 2.2f)));
-		newMeshProxy->modelMatrix = transform;
-		newMeshProxy->modelMatrixDirty = { true };
-
-		return newMeshProxy;
-	}
-
-
-
-	
-	glm::vec3 meshOffset = e2::Hex(hex).localCoords();
-
-	glm::mat4 transform = glm::mat4(1.0f);
-	transform = glm::translate(transform, meshOffset);
-	transform = glm::rotate(transform, glm::radians(hex.x * 20.0f), glm::vec3(e2::worldUp()));
-	transform = glm::scale(transform, glm::vec3(0.675f));
-	newMeshProxy->modelMatrix = transform;
-	newMeshProxy->modelMatrixDirty = { true };
-
-	return newMeshProxy;
-}
-
 e2::TileData e2::HexGrid::calculateTileData(glm::ivec2 const& hex)
 {
 	TileData newTileData;
@@ -1816,11 +1705,8 @@ e2::TileData e2::HexGrid::calculateTileData(glm::ivec2 const& hex)
 	float baseHeight = calculateBaseHeight(planarCoords);
 	calculateBiome(planarCoords, newTileData.flags);
 	calculateFeaturesAndWater(planarCoords, baseHeight, newTileData.flags);
-	calculateResources(planarCoords, newTileData.flags);
 	newTileData.forestIndex = getForestIndexForFlags(newTileData.flags);
 	newTileData.forestRotation = glm::radians(hex.x * hex.y * 1.12f);
-	newTileData.resourceMesh = getResourceMeshForFlags(newTileData.flags);
-
 
 	return newTileData;
 }
@@ -3401,11 +3287,6 @@ void e2::HexGrid::popOutChunk(e2::ChunkState* state)
 					e2::destroy(realTileData->forestProxy);
 
 				realTileData->forestProxy = nullptr;
-
-				if (realTileData->resourceProxy)
-					e2::destroy(realTileData->resourceProxy);
-
-				realTileData->resourceProxy = nullptr;
 			}
 		}
 	}
@@ -3438,11 +3319,6 @@ void e2::HexGrid::refreshChunkMeshes(e2::ChunkState* state)
 
 				realTileData->forestProxy = createForestProxyForTile(realTileData, tileHex);
 
-				if (realTileData->resourceProxy)
-					e2::destroy(realTileData->resourceProxy);
-
-				realTileData->resourceProxy = createResourceProxyForTile(realTileData, tileHex);
-
 				if(realTileData->getBiome() == e2::TileFlags::BiomeGrassland && realTileData->isLand() && !realTileData->isMountain())
 					state->extraMeshes.push(createGrassProxy(realTileData, tileHex));
 			}
@@ -3453,10 +3329,6 @@ void e2::HexGrid::refreshChunkMeshes(e2::ChunkState* state)
 				e2::MeshProxy* newForestProxy = createForestProxyForTile(&tileData, tileHex);
 				if (newForestProxy)
 					state->extraMeshes.push(newForestProxy);
-
-				e2::MeshProxy* newResourceProxy = createResourceProxyForTile(&tileData, tileHex);
-				if (newResourceProxy)
-					state->extraMeshes.push(newResourceProxy);
 
 				if (tileData.getBiome() == e2::TileFlags::BiomeGrassland && tileData.isLand() && !tileData.isMountain())
 					state->extraMeshes.push(createGrassProxy(&tileData, tileHex));
@@ -3572,31 +3444,6 @@ bool e2::TileData::isMountain()
 	return uint16_t(flags & e2::TileFlags::FeatureMountains);
 }
 
-bool e2::TileData::hasGold()
-{
-	return getResource() == TileFlags::ResourceGold;
-}
-
-bool e2::TileData::hasOil()
-{
-	return getResource() == TileFlags::ResourceOil;
-}
-
-bool e2::TileData::hasOre()
-{
-	return getResource() == TileFlags::ResourceOre;
-}
-
-bool e2::TileData::hasStone()
-{
-	return getResource() == TileFlags::ResourceStone;
-}
-
-bool e2::TileData::hasUranium()
-{
-	return getResource() == TileFlags::ResourceUranium;
-}
-
 e2::TileFlags e2::TileData::getWater()
 {
 	return (flags & e2::TileFlags::WaterMask);
@@ -3612,16 +3459,6 @@ e2::TileFlags e2::TileData::getBiome()
 	return (flags & e2::TileFlags::BiomeMask);
 }
 
-e2::TileFlags e2::TileData::getResource()
-{
-	return (flags & e2::TileFlags::ResourceMask);
-}
-
-e2::TileFlags e2::TileData::getAbundance()
-{
-	return (flags & e2::TileFlags::AbundanceMask);
-}
-
 e2::TileFlags e2::TileData::getWoodAbundance()
 {
 	return (flags & e2::TileFlags::WoodAbundanceMask);
@@ -3630,28 +3467,6 @@ e2::TileFlags e2::TileData::getWoodAbundance()
 bool e2::TileData::isForested()
 {
 	return (flags & TileFlags::FeatureForest) != TileFlags::FeatureNone;
-}
-
-bool e2::TileData::hasResource()
-{
-	return (flags & TileFlags::ResourceMask) != TileFlags::ResourceNone;
-}
-
-float e2::TileData::getAbundanceAsFloat()
-{
-	switch (getAbundance()) 
-	{
-	case TileFlags::Abundance1:
-		return 1.0f;
-	case TileFlags::Abundance2:
-		return 2.0f;
-	case TileFlags::Abundance3:
-		return 3.0f;
-	case TileFlags::Abundance4:
-		return 4.0f;
-	}
-
-	return 0.0f;
 }
 
 float e2::TileData::getWoodAbundanceAsFloat()

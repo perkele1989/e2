@@ -132,6 +132,8 @@ namespace e2
 
 		uint64_t m_renderLayer{(uint64_t)e2::RenderLayer::Default};
 
+
+		bool m_alphaBlending{};
 		bool m_doubleSided{};
 		bool m_supportsShadows{true};
 

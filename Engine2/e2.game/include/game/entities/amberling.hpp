@@ -67,7 +67,7 @@ namespace e2
 
 		e2::AmberlingSpecification* m_amberlingSpecification{};
 		float m_spawnCooldown{ 5.0f };
-		float m_health{ 30.0f };
+		float m_health{ 100.0f };
 		bool m_interacting{ false };
 
 		e2::CollisionComponent* m_collision{};

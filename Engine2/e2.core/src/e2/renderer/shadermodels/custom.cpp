@@ -98,6 +98,11 @@ void e2::CustomModel::postConstruct(e2::Context* ctx)
 			m_supportsShadows = false;
 		}
 
+		if (data.contains("alphaBlending") && data.at("alphaBlending").template get<bool>())
+		{
+			m_alphaBlending = true;
+		}
+
 		if (data.contains("renderLayer"))
 		{
 			m_renderLayer = data.at("renderLayer").template get<uint64_t>();
@@ -419,7 +424,7 @@ e2::IPipeline* e2::CustomModel::getOrCreatePipeline(e2::MeshProxy* proxy, uint8_
 			pipelineInfo.layout = m_pipelineLayout;
 
 		pipelineInfo.shaders = { newEntry.vertexShader, newEntry.fragmentShader };
-
+		pipelineInfo.alphaBlending = m_alphaBlending;
 		if (shadows)
 			pipelineInfo.colorFormats = { };
 		else

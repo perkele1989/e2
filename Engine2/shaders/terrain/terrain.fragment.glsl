@@ -121,6 +121,7 @@ void main()
 	
 
 	vec3 albedo;
+	//albedo = heightlerp(albedoSand, 1.0, grassTundraMix, bigSimplex + smallSimplex, smoothstep(0.25, 0.75, clamp(greenCoeff + tundraCoeff, 0.0, 1.0)));
 	albedo = heightlerp(albedoSand, 1.0, grassTundraMix, bigSimplex + smallSimplex, clamp(greenCoeff + tundraCoeff, 0.0, 1.0));
 	
 	albedo = heightlerp(albedo, 1.0, albedoMountains, bigSimplex, mountainCoeff);

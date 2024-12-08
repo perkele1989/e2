@@ -50,7 +50,8 @@ e2::MeshProxy::MeshProxy(e2::Session* inSession, e2::MeshProxyConfiguration cons
 		lods.push(newLod);
 	}
 
-	modelMatrix = glm::mat4(1.0f);
+	modelMatrix = glm::identity<glm::mat4>();
+	modelMatrixDirty = true;
 	
 	invalidatePipeline();
 	enable();
@@ -73,6 +74,7 @@ void e2::MeshProxy::enable()
 		return;
 
 	id = session->registerMeshProxy(this);
+	modelMatrixDirty = true;
 }
 
 void e2::MeshProxy::disable()
@@ -82,6 +84,29 @@ void e2::MeshProxy::disable()
 
 	session->unregisterMeshProxy(this);
 	id = UINT32_MAX;
+}
+
+
+void e2::MeshProxy::setMaterial(uint8_t submesh, uint8_t lodIndex, e2::Name materialName)
+{
+
+
+	e2::MaterialPtr material = assetManager()->get(materialName).cast<e2::Material>();
+	e2::MaterialProxy* materialProxy = session->getOrCreateDefaultMaterialProxy(material);
+	setMaterial(submesh, lodIndex, materialProxy);
+
+}
+
+void e2::MeshProxy::setMaterial(uint8_t submesh, uint8_t lodIndex, e2::MaterialProxy* materialProxy)
+{
+	bool wasEnabled = enabled();
+	disable();
+	lods[lodIndex].materialProxies[submesh] = materialProxy;
+
+	invalidatePipeline();
+
+	if (wasEnabled)
+		enable();
 }
 
 // this is never called for disabled proxies

@@ -94,52 +94,28 @@ namespace e2
 
 
 
-	enum class TileFlags : uint16_t
+	enum class TileFlags : uint8_t
 	{
-		None					= 0b0000'0000'0000'0000,
-
-		BiomeMask				= 0b0000'0000'0000'0011,
-		BiomeGrassland			= 0b0000'0000'0000'0000,
-		BiomeDesert				= 0b0000'0000'0000'0001,
-		BiomeTundra				= 0b0000'0000'0000'0010,
-		BiomeReserved0			= 0b0000'0000'0000'0011,
-
-		FeatureMask				= 0b0000'0000'0000'1100,
-		FeatureNone				= 0b0000'0000'0000'0000,
-		FeatureMountains		= 0b0000'0000'0000'0100,
-		FeatureForest			= 0b0000'0000'0000'1000,
-
-		WaterMask				= 0b0000'0000'0011'0000,
-		WaterNone				= 0b0000'0000'0000'0000,
-		WaterShallow			= 0b0000'0000'0001'0000,
-		WaterDeep				= 0b0000'0000'0010'0000,
-		WaterReserved0			= 0b0000'0000'0011'0000,
-
-		ResourceMask			= 0b0000'0001'1100'0000,
-		ResourceNone			= 0b0000'0000'0000'0000,
-		ResourceStone			= 0b0000'0000'0100'0000,
-		ResourceOre				= 0b0000'0000'1000'0000,
-		ResourceGold			= 0b0000'0000'1100'0000,
-		ResourceOil				= 0b0000'0001'0000'0000,
-		ResourceUranium			= 0b0000'0001'0100'0000,
-		ResourceReserved0		= 0b0000'0001'1000'0000,
-		ResourceReserved1		= 0b0000'0001'1100'0000,
-
-		// Abundance of the given resources on this tile
-		AbundanceMask			= 0b0000'0110'0000'0000,
-		Abundance1				= 0b0000'0000'0000'0000,
-		Abundance2				= 0b0000'0010'0000'0000,
-		Abundance3				= 0b0000'0100'0000'0000,
-		Abundance4				= 0b0000'0110'0000'0000,
-
-		// Abundance of forest/wood on this tile
-		WoodAbundanceMask		= 0b0001'1000'0000'0000,
-		WoodAbundance1			= 0b0000'0000'0000'0000,
-		WoodAbundance2			= 0b0000'1000'0000'0000,
-		WoodAbundance3			= 0b0001'0000'0000'0000,
-		WoodAbundance4			= 0b0001'1000'0000'0000,
-
-		Reserved0				= 0b1110'0000'0000'0000
+		None					= 0b0000'0000,
+		BiomeMask				= 0b0000'0011,
+		BiomeGrassland			= 0b0000'0000,
+		BiomeDesert				= 0b0000'0001,
+		BiomeTundra				= 0b0000'0010,
+		BiomeLava				= 0b0000'0011,
+		FeatureMask				= 0b0000'1100,
+		FeatureNone				= 0b0000'0000,
+		FeatureMountains		= 0b0000'0100,
+		FeatureForest			= 0b0000'1000,
+		WaterMask				= 0b0011'0000,
+		WaterNone				= 0b0000'0000,
+		WaterShallow			= 0b0001'0000,
+		WaterDeep				= 0b0010'0000,
+		WaterReserved0			= 0b0011'0000,
+		WoodAbundanceMask		= 0b1100'0000,
+		WoodAbundance1			= 0b0000'0000,
+		WoodAbundance2			= 0b0100'0000,
+		WoodAbundance3			= 0b1000'0000,
+		WoodAbundance4			= 0b1100'0000
 	};
 
 	EnumFlagsDeclaration(TileFlags);
@@ -156,42 +132,25 @@ namespace e2
 		bool isLand();
 		bool isMountain();
 
-		bool hasGold();
-		bool hasOil();
-		bool hasOre();
-		bool hasStone();
-		bool hasUranium();
-
 		TileFlags getWater();
 
 		TileFlags getFeature();
 
 		TileFlags getBiome();
 
-		TileFlags getResource();
-
-		TileFlags getAbundance();
-
 		TileFlags getWoodAbundance();
 
 		bool isForested();
-		bool hasResource();
 
-		float getAbundanceAsFloat();
 		float getWoodAbundanceAsFloat();
 
 		// flags control biome, resources, abundance
-		TileFlags flags{ TileFlags::None }; // 16 bits
+		TileFlags flags{ TileFlags::None }; //8 bits
 
 		// optional forest proxy, if this tile is discovered it shows: forest abundance if unbuilt on forest, partly forest if built on forest, nothing if not on forest or if undiscovered (undiscovered tile meshes lives on chunk array)
 		int32_t forestIndex{-1};
 		e2::MeshProxy* forestProxy{};
 		float forestRotation{};
-
-
-		e2::MeshProxy* resourceProxy{};
-		e2::MeshPtr resourceMesh;
-
 	};
 
 	constexpr uint32_t hexChunkResolution = 6;
@@ -616,10 +575,7 @@ namespace e2
 
 		float calculateBaseHeight(glm::vec2 const& planarCoords);
 		void calculateBiome(glm::vec2 const& planarCoords, e2::TileFlags& outFlags);
-		void calculateResources(glm::vec2 const& planarCoords, e2::TileFlags& outFlags);
 		void calculateFeaturesAndWater(glm::vec2 const& planarCoords, float baseHeight, e2::TileFlags& outFlags);
-
-		e2::MeshPtr getResourceMeshForFlags(e2::TileFlags flags);
 
 		int32_t getForestIndexForFlags(e2::TileFlags flags);
 		ForestState* getForestState(int32_t index);
@@ -630,7 +586,6 @@ namespace e2
 		e2::UnpackedForestState* unpackForestState(glm::ivec2 const& hex);
 
 		e2::MeshProxy* createGrassProxy(e2::TileData* tileData, glm::ivec2 const& hex);
-		e2::MeshProxy* createResourceProxyForTile(e2::TileData* tileData, glm::ivec2 const& hex);
 		e2::MeshProxy* createForestProxyForTile(e2::TileData* tileData, glm::ivec2 const& hex);
 		static float sampleSimplex(glm::vec2 const& position);
 

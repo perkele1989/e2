@@ -2,6 +2,8 @@
 #include "game/radionmanager.hpp"
 #include "game/entities/radionentity.hpp"
 #include "game/game.hpp"
+#include <e2/game/gamesession.hpp>
+
 
 e2::RadionManager::RadionManager(e2::Game* g)
 	: m_game(g)
@@ -15,6 +17,24 @@ e2::RadionManager::~RadionManager()
 void e2::RadionManager::clearDiscovered()
 {
 	m_discoveredEntities.clear();
+}
+
+void e2::RadionManager::populate(e2::ALJDescription& alj)
+{
+	game()->assetManager()->prescribeALJ(alj, "M_Connection_On.e2a");
+	game()->assetManager()->prescribeALJ(alj, "M_Connection_Signal.e2a");
+	game()->assetManager()->prescribeALJ(alj, "M_Connection_Off.e2a");
+}
+
+void e2::RadionManager::finalize()
+{
+	m_glowMaterial = game()->assetManager()->get("M_Connection_On.e2a").cast<e2::Material>();
+	m_signalMaterial = game()->assetManager()->get("M_Connection_Signal.e2a").cast<e2::Material>();
+	m_unglowMaterial = game()->assetManager()->get("M_Connection_Off.e2a").cast<e2::Material>();
+
+	m_glowProxy = game()->gameSession()->getOrCreateDefaultMaterialProxy(m_glowMaterial);
+	m_signalProxy = game()->gameSession()->getOrCreateDefaultMaterialProxy(m_signalMaterial);
+	m_unglowProxy = game()->gameSession()->getOrCreateDefaultMaterialProxy(m_unglowMaterial);
 }
 
 
@@ -160,6 +180,21 @@ void e2::RadionManager::populatePins(e2::Hex const& coords, e2::RadionPinType ty
 			i++;
 		}
 	}
+}
+
+e2::MaterialProxy* e2::RadionManager::glowProxy()
+{
+	return m_glowProxy;
+}
+
+e2::MaterialProxy* e2::RadionManager::signalProxy()
+{
+	return m_signalProxy;
+}
+
+e2::MaterialProxy* e2::RadionManager::unglowProxy()
+{
+	return m_unglowProxy;
 }
 
 void e2::RadionManager::writeForSave(e2::IStream& toBuffer)

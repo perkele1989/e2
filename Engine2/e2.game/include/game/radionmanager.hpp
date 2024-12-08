@@ -29,6 +29,9 @@ namespace e2
 
 		void clearDiscovered();
 
+		void populate(e2::ALJDescription &alj);
+		void finalize();
+
 		void update(double seconds);
 		virtual e2::Game* game() override;
 
@@ -41,7 +44,9 @@ namespace e2
 
 		void populatePins(e2::Hex const& coords, e2::RadionPinType type, std::vector<e2::RadionWorldPin> &outPins);
 
-
+		e2::MaterialProxy* glowProxy();
+		e2::MaterialProxy* signalProxy();
+		e2::MaterialProxy* unglowProxy();
 
 		void writeForSave(e2::IStream& toBuffer);
 		void readForSave(e2::IStream& fromBuffer);
@@ -51,6 +56,13 @@ namespace e2
 		void tickWithParents(e2::RadionEntity* node);
 
 		e2::Game* m_game{};
+
+		e2::MaterialPtr m_glowMaterial;
+		e2::MaterialPtr m_signalMaterial;
+		e2::MaterialPtr m_unglowMaterial;
+		e2::MaterialProxy* m_glowProxy{};
+		e2::MaterialProxy* m_signalProxy{};
+		e2::MaterialProxy* m_unglowProxy{};
 
 		std::unordered_set<e2::RadionEntity*> m_endNodes;
 		std::unordered_set<e2::RadionEntity*> m_tickedNodes;
