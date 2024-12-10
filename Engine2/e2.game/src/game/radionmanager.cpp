@@ -129,6 +129,8 @@ void e2::RadionManager::discoverEntity(e2::Name name)
 	if (std::find(m_discoveredEntities.begin(), m_discoveredEntities.end(), name) != m_discoveredEntities.end())
 		return;
 
+	game()->pushMessage(std::format("Discovered {}.", name));
+
 	m_discoveredEntities.push_back(name);
 }
 

@@ -164,7 +164,7 @@ void main()
 
 	float metalness = 0.0;//(1.0 - waterLineCoeff) * 0.1;
 
-	float clouds = getCloudShadows(fragmentPosition.xyz) * 0.75 + 0.25;
+	float clouds = getCloudShadows(fragmentPosition.xyz);
 	//clouds = mix(clouds, 1.0, 1.0 - waterLineCoeff);
 	//clouds *= clouds;
 

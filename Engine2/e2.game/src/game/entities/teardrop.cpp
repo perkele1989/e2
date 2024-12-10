@@ -276,5 +276,10 @@ void e2::TeardropEntity::onInteract(e2::Entity* interactor)
 	game()->runScriptGraph("test");
 }
 
+std::string e2::TeardropEntity::interactText()
+{
+	return "Talk";
+}
+
 
 

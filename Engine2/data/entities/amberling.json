@@ -1,6 +1,7 @@
 
 {
     "id": "amberling",
+    "displayName": "Amberling",
     "specification": "e2::AmberlingSpecification",
     "entityType": "e2::AmberlingEntity",
     "movement": {

@@ -927,6 +927,7 @@ void e2::UIContext::drawRasterText(e2::FontFace fontFace, uint8_t fontSize, e2::
 	};
 
 	glm::vec2 cursor = position + glm::vec2(0.f, midOffset);
+	glm::vec2 initialCursor = cursor;
 
 	uint32_t nextCodepoint = 0;
 	uint32_t prevCodepoint = 0;
@@ -946,7 +947,12 @@ void e2::UIContext::drawRasterText(e2::FontFace fontFace, uint8_t fontSize, e2::
 		// special characters
 		if (codepoint <= 32)
 		{
-			// we ignore 10 (\n)
+			if (codepoint == 10)
+			{
+				cursor.x = initialCursor.x;
+				cursor.y += fontSize * 1.25f;
+			}
+
 			// space, just OK?
 			// literally dont know how long a space is supposed to be.
 			// should probably be scaled to the fontsize or smth @todo
@@ -1322,7 +1328,7 @@ void e2::UIContext::drawSDFTextCarousel(e2::FontFace fontFace, float fontSize, e
 
 void e2::UIContext::drawRasterTextShadow(e2::FontFace fontFace, uint8_t fontSize, glm::vec2 position, std::string const& markdownUtf8)
 {
-	drawRasterText(fontFace, fontSize, 0x000000FF, position + glm::vec2(1.0f, 1.0f), markdownUtf8, false, true);
+	drawRasterText(fontFace, fontSize, 0x000000FF, position + glm::vec2(1.0f, 1.0f), markdownUtf8, false);
 }
 
 float e2::UIContext::calculateSDFTextWidth(e2::FontFace fontFace, float fontSize, std::string const& markdownUtf8)

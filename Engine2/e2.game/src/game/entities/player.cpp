@@ -127,6 +127,34 @@ void e2::PlayerEntity::updateAnimation(double seconds)
 	m_fog.refresh();
 }
 
+void e2::PlayerEntity::beCaptain()
+{
+	m_captain = true;
+	m_boatMesh->meshProxy()->enable();
+	m_collision->setRadius(0.3f);
+	m_boatVelocity = 0.0f;
+	m_fog.setRange(8, 1);
+}
+
+void e2::PlayerEntity::beLandcrab()
+{
+	m_captain = false;
+	m_collision->setRadius(0.05f);
+	m_fog.setRange(6, 1);
+	m_boatMesh->meshProxy()->disable();
+}
+
+void e2::PlayerEntity::renderUi()
+{
+	auto ui = gameSession()->uiContext();
+	if (m_hintText.size() > 0)
+	{
+		ui->drawRasterTextShadow(e2::FontFace::Sans, 12, m_hintTextPos, m_hintText);
+		ui->drawRasterText(e2::FontFace::Sans, 12, e2::UIColor::white(), m_hintTextPos, m_hintText);
+	}
+		
+}
+
 glm::vec2 rhash(glm::vec2 uv) {
 	glm::mat2 myt = glm::mat2(.12121212f, .13131313f, -.13131313f, .12121212f);
 	glm::vec2 mys = glm::vec2(1e4, 1e6);
@@ -152,7 +180,7 @@ float voronoi2d(glm::vec2 const& point)
 
 static float sampleHeight(glm::vec2 position)
 {
-	return glm::pow(voronoi2d(position * 0.8f), 2.0f);
+	return glm::pow(voronoi2d(position * (0.8f/0.75f)), 2.0f);
 }
 
 static float generateWaveHeight(
@@ -166,6 +194,7 @@ static float generateWaveHeight(
 	float speed,
 	glm::vec2 dir)
 {
+	time *= 0.75f;
 	float varianceOffset = 1.0 - variance;
 	float waveCoeff = (sin(time * varianceSpeed) * 0.5f + 0.5f) * variance + varianceOffset;
 
@@ -220,7 +249,7 @@ void e2::PlayerEntity::update(double seconds)
 	e2::UIContext* ui = gameSession()->uiContext();
 	e2::UIMouseState& mouse = ui->mouseState();
 	m_collisionCache.clear();
-	game()->populateCollisions(hex().offsetCoords(), m_captain ? e2::CollisionType::Land |  e2::CollisionType::Component : e2::CollisionType::Mountain | e2::CollisionType::Tree | e2::CollisionType::Water | e2::CollisionType::Component, m_collisionCache);
+	game()->populateCollisions(hex().offsetCoords(), m_captain ? e2::CollisionType::Land |  e2::CollisionType::Component | e2::CollisionType::Mountain | e2::CollisionType::Tree : e2::CollisionType::Mountain | e2::CollisionType::Tree | e2::CollisionType::Water | e2::CollisionType::Component, m_collisionCache);
 
 
 
@@ -281,6 +310,13 @@ void e2::PlayerEntity::update(double seconds)
 	glm::vec3 playerPosition = playerTransform->getTranslation(e2::TransformSpace::World);
 	glm::vec2 playerCoords{ playerPosition.x, playerPosition.z };
 	glm::vec2 playerFwdPlanar = glm::normalize(glm::vec2{ playerFwd.x, playerFwd.z });
+
+	bool overWater = false;
+	glm::vec2 waterPlanar{};
+
+	bool blocksLand = false;
+	bool foundLand = false;
+	glm::vec2 landPlanar = playerCoords + playerFwdPlanar * 0.5f;
 	for (e2::Collision& collision : m_collisionCache)
 	{
 		if (collision.type == e2::CollisionType::Component && collision.component)
@@ -309,12 +345,75 @@ void e2::PlayerEntity::update(double seconds)
 				}
 			}
 		}
+
+		if (collision.type == e2::CollisionType::Water)
+		{
+			glm::vec2 potentiallyWaterA = playerCoords + playerFwdPlanar * 0.2f;
+			glm::vec2 potentiallyWaterB = playerCoords + playerFwdPlanar * 0.7f;
+			bool overlapsA = e2::circleOverlapTest(potentiallyWaterA, 0.02, collision.position, collision.radius).overlaps;
+			bool overlapsB = e2::circleOverlapTest(potentiallyWaterB, 0.02, collision.position, collision.radius).overlaps;
+			if (overlapsA && overlapsB)
+			{
+				overWater = true;
+				waterPlanar = potentiallyWaterB;
+			}
+		}
+
+		bool overlapsThis = e2::circleOverlapTest(landPlanar, 0.02, collision.position, collision.radius).overlaps;
+		if (collision.type == e2::CollisionType::Land && overlapsThis)
+		{
+			foundLand = true;
+		}
+
+
+		if (overlapsThis && collision.type != e2::CollisionType::Land)
+		{
+			blocksLand = true;
+		}
 	}
 	m_interactable = interactables.empty() ? nullptr : *interactables.begin();
 
-	if (!game()->scriptRunning() && m_interactable && ui->keyboardState().pressed(e2::Key::E))
+	auto renderer = gameSession()->renderer();
+	glm::vec3 translation = getTransform()->getTranslation(e2::TransformSpace::World);
+	glm::vec2 uiPos = renderer->view().unprojectWorld(renderer->resolution(), translation + e2::worldUpf() * 0.25f);
+
+	if (!game()->scriptRunning() && m_interactable)
 	{
-		m_interactable->onInteract(this);
+		m_hintText = std::format("*{}*\n**{}** (E)", m_interactable->getSpecification()->displayName, m_interactable->interactText());
+		m_hintTextPos = renderer->view().unprojectWorld(renderer->resolution(), m_interactable->getTransform()->getTranslation(e2::TransformSpace::World) + e2::worldUpf() * 0.2f);
+
+		if (ui->keyboardState().pressed(e2::Key::E))
+		{
+			m_interactable->onInteract(this);
+		}
+	}
+	else if (!m_interactable && !m_captain && overWater)
+	{
+		m_hintText = "*Boat*\n**Embark** (E)";
+		m_hintTextPos = uiPos;// renderer->view().unprojectWorld(renderer->resolution(), glm::vec3{ waterPlanar.x, 0.0f, waterPlanar.y } + e2::worldUpf() * 0.1f);
+
+		if (ui->keyboardState().pressed(e2::Key::E))
+		{
+			beCaptain();
+
+			getTransform()->setTranslation({ waterPlanar.x, translation.y, waterPlanar.y }, e2::TransformSpace::World);
+		}
+	}
+	else if (!m_interactable && m_captain && !blocksLand && foundLand)
+	{
+		m_hintText = "*Boat*\n**Disembark** (E)";
+		m_hintTextPos = uiPos;
+
+		if (ui->keyboardState().pressed(e2::Key::E))
+		{
+			beLandcrab();
+
+			getTransform()->setTranslation({ landPlanar.x, translation.y, landPlanar.y }, e2::TransformSpace::World);
+		}
+	}
+	else
+	{
+		m_hintText.clear();
 	}
 }
 
@@ -373,26 +472,6 @@ void e2::PlayerEntity::updateLand(double seconds)
 	{
 		float angle = e2::radiansBetween(glm::vec3(cursor.x, 0.0f, cursor.y), glm::vec3(planarPosition.x, 0.0f, planarPosition.y));
 		m_targetRotation = glm::angleAxis(angle, glm::vec3(e2::worldUp()));
-
-		if (!m_mesh->isAnyActionPlaying() && mouse.buttonPressed(e2::MouseButton::Left))
-		{
-			e2::TileData cursorTile = game()->hexGrid()->getTileData(game()->cursorHex());
-			if (cursorTile.isDeepWater() || cursorTile.isShallowWater())
-			{
-				glm::vec2 cursorPlane = game()->cursorPlane();
-				if (glm::distance(cursorPlane, planarPosition) < 2.0f)
-				{
-					m_captain = true;
-					m_boatMesh->meshProxy()->enable();
-					m_collision->setRadius(0.3f);
-					m_boatVelocity = 0.0f;
-					m_fog.setRange(8, 1);
-					glm::vec3 translation = getTransform()->getTranslation(e2::TransformSpace::World);
-					getTransform()->setTranslation({ cursorPlane.x, translation.y, cursorPlane.y }, e2::TransformSpace::World);
-				}
-
-			}
-		}
 	}
 
 }
@@ -470,27 +549,24 @@ void e2::PlayerEntity::updateWater(double seconds)
 		}
 	}
 
-	if (m_aiming)
-	{
-		if (mouse.buttonPressed(e2::MouseButton::Left))
-		{
-			e2::TileData cursorTile = game()->hexGrid()->getTileData(game()->cursorHex());
-			if (cursorTile.isLand() && !cursorTile.isMountain())
-			{
-				glm::vec2 cursorPlane = game()->cursorPlane();
-				if (glm::distance(cursorPlane, planarPosition) < 2.0f)
-				{
-					m_captain = false;
-					m_collision->setRadius(0.05f);
-					m_fog.setRange(6, 1);
-					m_boatMesh->meshProxy()->disable();
-					glm::vec3 translation = getTransform()->getTranslation(e2::TransformSpace::World);
-					getTransform()->setTranslation({ cursorPlane.x, translation.y, cursorPlane.y }, e2::TransformSpace::World);
-				}
+	//if (m_aiming)
+	//{
+	//	if (mouse.buttonPressed(e2::MouseButton::Left))
+	//	{
+	//		e2::TileData cursorTile = game()->hexGrid()->getTileData(game()->cursorHex());
+	//		if (cursorTile.isLand() && !cursorTile.isMountain())
+	//		{
+	//			glm::vec2 cursorPlane = game()->cursorPlane();
+	//			if (glm::distance(cursorPlane, planarPosition) < 2.0f)
+	//			{
+	//				beLandcrab();
+	//				glm::vec3 translation = getTransform()->getTranslation(e2::TransformSpace::World);
+	//				getTransform()->setTranslation({ cursorPlane.x, translation.y, cursorPlane.y }, e2::TransformSpace::World);
+	//			}
 
-			}
-		}
-	}
+	//		}
+	//	}
+	//}
 
 }
 

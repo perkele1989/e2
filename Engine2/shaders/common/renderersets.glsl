@@ -216,18 +216,18 @@ vec3 getRimColor(vec3 fragNormal, vec3 viewVector, vec3 rimLight)
 
 float getCloudShadows(vec3 fragPosition)
 {
-	float shadowSimplex = (simplex((fragPosition.xz * 0.051) - vec2(0.4, 0.6) * renderer.time.x * 0.05 ) * 0.5 + 0.5);
+	float shadowSimplex = (simplex((fragPosition.xz * 0.11) - vec2(0.4, 0.6) * renderer.time.x * 0.05 ) * 0.5 + 0.5);
 	float shadowCoeff = pow(shadowSimplex, 0.72);
-	shadowCoeff = smoothstep(0.4, 0.7, shadowCoeff) * 0.5 + 0.5;
-	return shadowCoeff;
-    //return 0.25 + shadowCoeff*0.75;
+	shadowCoeff = smoothstep(0.2, 0.7, shadowCoeff);
+	//return shadowCoeff;
+   	return 0.4 + shadowCoeff*0.6;
 }
 
 float getGrassCloudShadows(vec3 fragPosition)
 {
 	float shadowSimplex = (simplex((fragPosition.xz) - vec2(0.4, 0.6) * renderer.time.x * 0.241 ) * 0.5 + 0.5);
 	shadowSimplex = smoothstep(0.1,0.8, shadowSimplex);
-	return 0.5 + (1.0 - shadowSimplex)*0.75;
+	return 0.75 + (1.0 - shadowSimplex)*0.5;
 	//float shadowCoeff = pow(shadowSimplex, 0.72);
 	//shadowCoeff = smoothstep(0.4, 0.7, shadowCoeff) * 0.5 + 0.5;
 	//return shadowCoeff;

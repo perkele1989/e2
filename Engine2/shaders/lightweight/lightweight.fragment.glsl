@@ -100,9 +100,11 @@ void main()
 
 	vec3 viewVector= getViewVector(fragmentPosition.xyz);
 
+	float shadows = getCloudShadows(fragmentPosition.xyz);
+
 	outColor.rgb = vec3(0.0, 0.0, 0.0);
-	outColor.rgb += getIblColor(fragmentPosition.xyz, albedo, worldNormal, roughness, metalness, viewVector);
-	outColor.rgb += getSunColor(fragmentPosition.xyz, worldNormal, albedo, roughness, metalness, viewVector) * getCloudShadows(fragmentPosition.xyz);
+	outColor.rgb += getIblColor(fragmentPosition.xyz, albedo, worldNormal, roughness, metalness, viewVector) * shadows;
+	outColor.rgb += getSunColor(fragmentPosition.xyz, worldNormal, albedo, roughness, metalness, viewVector) * shadows;
 
 
 	outColor.rgb += emissive;

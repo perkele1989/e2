@@ -86,6 +86,8 @@ bool e2::PlayerState::give(e2::Name itemIdentifier)
 					slot.item->wieldHandler->setActive(entity);
 				}
 
+				game->pushMessage(std::format("Got 1 {}.", slot.item->displayName));
+
 				slot.count++;
 
 				entity->playSound("S_Item_Pickup.e2a", 1.0, 1.0);
@@ -106,6 +108,8 @@ bool e2::PlayerState::give(e2::Name itemIdentifier)
 			{
 				slot.item->wieldHandler->setActive(entity);
 			}
+
+			game->pushMessage(std::format("Got 1 {}.", slot.item->displayName));
 
 			entity->playSound("S_Item_Pickup.e2a", 1.0, 1.0);
 
@@ -142,10 +146,14 @@ void e2::PlayerState::drop(uint32_t slotIndex, uint32_t num)
 		entity->playSound("S_Item_Drop.e2a", 1.0, 1.0);
 	}
 
+	game->pushMessage(std::format("Dropped {} {}.", num, slot.item->displayName));
+
 	if (slot.count == 0)
 	{
 		slot.item = nullptr;
 	}
+
+	
 }
 
 void e2::PlayerState::take(uint32_t slotIndex, uint32_t num)
@@ -162,6 +170,8 @@ void e2::PlayerState::take(uint32_t slotIndex, uint32_t num)
 		if (slot.item->wieldable && slot.item->wieldHandler)
 			slot.item->wieldHandler->setInactive(entity);
 	}
+
+	game->pushMessage(std::format("Lost {} {}.", num, slot.item->displayName));
 
 	if (slot.count == 0)
 	{
@@ -492,7 +502,7 @@ void e2::HatchetHandler::onUpdate(e2::PlayerEntity* player, double seconds)
 
 	e2::TileData cursorTile = game->hexGrid()->getTileData(game->cursorHex());
 
-	if (!game->uiHovered() && player->aiming() && mouse.buttonPressed(e2::MouseButton::Left) && !m_actionBusy && cursorTile.isLand())
+	if (!game->uiHovered() && player->aiming() && mouse.buttonPressed(e2::MouseButton::Left) && !m_actionBusy)
 	{
 		player->getMesh()->playAction("chop");
 		m_axeSwing->play(0.4f);
@@ -632,7 +642,7 @@ void e2::SwordHandler::onUpdate(e2::PlayerEntity* player, double seconds)
 
 	e2::TileData cursorTile = game->hexGrid()->getTileData(game->cursorHex());
 
-	if (!game->uiHovered() && player->aiming() && mouse.buttonPressed(e2::MouseButton::Left) && !m_actionBusy && cursorTile.isLand())
+	if (!game->uiHovered() && player->aiming() && mouse.buttonPressed(e2::MouseButton::Left) && !m_actionBusy)
 	{
 		player->getMesh()->playAction("sword");
 		m_swordSwing->play(0.5f);

@@ -45,6 +45,11 @@ namespace e2
 	//uint32_t maxAutoMoveRange = 128; // 128*128 = 16384 pathfindinghex
 
 
+	struct Message
+	{
+		std::string text;
+		float life{ 5.0f };
+	};
 
 
 	/** @tags(arena, arenaSize=4096) */
@@ -422,6 +427,11 @@ namespace e2
 		e2::RadionManager* radionManager();
 
 
+
+	protected:
+		std::vector<Message> m_messages;
+	public:
+		void pushMessage(std::string const& text);
 	};
 	
 

@@ -202,6 +202,7 @@ namespace e2
 
 		virtual bool interactable() { return true; }
 		virtual void onInteract(e2::Entity* interactor);
+		virtual std::string interactText()override { return "Press"; };
 
 		bool state{ false };
 	};

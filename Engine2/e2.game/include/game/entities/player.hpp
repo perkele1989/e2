@@ -54,6 +54,10 @@ namespace e2
 
 		virtual void updateAnimation(double seconds) override;
 
+		void beCaptain();
+		void beLandcrab();
+
+		void renderUi();
 		
 
 		virtual void update(double seconds) override;
@@ -97,6 +101,8 @@ namespace e2
 
 	protected:
 
+		std::string m_hintText;
+		glm::vec2 m_hintTextPos;
 
 		e2::PlayerSpecification* m_playerSpecification{};
 

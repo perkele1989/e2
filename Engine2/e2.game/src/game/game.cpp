@@ -1424,12 +1424,27 @@ void e2::Game::drawUI()
 	e2::UIContext* ui = gameSession()->uiContext();
 	auto& mouse = ui->mouseState();
 
+	glm::vec2 uiSize = ui->size();
+
 	if (!m_altView)
 	{
 		//drawResourceIcons();
 
 		drawHitLabels();
 
+		{
+			glm::vec2 cursor{ 48.0f, uiSize.y - 128.0f };
+			for (e2::Message& msg : m_messages)
+			{
+				msg.life -= m_timeDelta;
+
+
+				ui->drawRasterText(e2::FontFace::Sans, 20.0f, e2::UIColor::white(), cursor, msg.text);
+
+				cursor.y -= 28.0f;
+			}
+			m_messages.erase(std::remove_if(m_messages.begin(), m_messages.end(), [](Message const& msg)->bool { return msg.life <= 0.0f; }), m_messages.end());
+		}
 
 		//drawStatusUI();
 
@@ -1440,6 +1455,11 @@ void e2::Game::drawUI()
 		if (m_playerState.entity)
 		{
 			m_playerState.renderInventory(game()->timeDelta());
+		}
+
+		if (m_playerState.entity)
+		{
+			m_playerState.entity->renderUi();
 		}
 
 		//drawFinalUI();
@@ -1557,7 +1577,7 @@ void e2::Game::drawHitLabels()
 			continue;
 		}
 
-		label.velocity.y += 20.0f * (float)game()->timeDelta();
+		label.velocity.y += 12.0f * (float)game()->timeDelta();
 
 		label.offset += label.velocity * (float)game()->timeDelta();
 
@@ -2110,6 +2130,13 @@ void e2::Game::updateEntitySpawns()
 
 
 
+
+void e2::Game::pushMessage(std::string const& text)
+{
+	m_messages.insert(m_messages.begin(), { text });
+	if (m_messages.size() > 10)
+		m_messages.resize(10);
+}
 
 e2::Sprite* e2::Game::getUiSprite(e2::Name name)
 {
@@ -2846,5 +2873,5 @@ e2::HitLabel::HitLabel(glm::vec3 const& worldOffset, std::string const& inText) 
 {
 	active = true;
 	timeCreated = e2::timeNow();
-	velocity = glm::vec3{ 50.0f, -200.0f, 50.0f } * 0.02f;
+	velocity = glm::vec3{ 50.0f, -200.0f, 50.0f } * 0.01f;
 }

@@ -74,7 +74,9 @@ namespace e2
 
 		virtual void onInteract(e2::Entity* interactor) {}
 
-		virtual void onHitEntity(e2::Entity* otherEntity) {};
+		virtual void onHitEntity(e2::Entity* otherEntity) {}
+
+		virtual std::string interactText() { return "Interact"; }
 
 		virtual void onMeleeDamage(e2::Entity* instigator, float dmg) {};
 

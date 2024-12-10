@@ -63,6 +63,8 @@ namespace e2
 		virtual void onInteract(e2::Entity* interactor) override;
 
 
+		virtual std::string interactText() override;
+
 	protected:
 
 		e2::AmberlingSpecification* m_amberlingSpecification{};

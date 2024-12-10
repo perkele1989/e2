@@ -285,5 +285,10 @@ void e2::AmberlingEntity::onInteract(e2::Entity* interactor)
 	game()->runScriptGraph("test");
 }
 
+std::string e2::AmberlingEntity::interactText()
+{
+	return "Calm";
+}
+
 
 

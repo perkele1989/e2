@@ -17,7 +17,7 @@ layout(set = MaterialSetIndex, binding = 2) uniform texture2D visibilityMask;
 
 float sampleHeight(vec2 position)
 {
-    return pow(voronoi2d(position*0.8), 2.0);
+    return pow(voronoi2d(position*(0.8/0.75)), 2.0);
 }
 
 
@@ -32,6 +32,7 @@ float generateWaveHeight(
     float speed,
     vec2 dir)
 {
+    time *= 0.75;
     float varianceOffset = 1.0 - variance;
     float waveCoeff = (sin(time * varianceSpeed) * 0.5 + 0.5) * variance + varianceOffset;
 

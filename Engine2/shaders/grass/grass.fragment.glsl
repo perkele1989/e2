@@ -91,11 +91,12 @@ void main()
 	vec3 viewVector= getViewVector(fragmentPosition.xyz);
 
 	float cloudShadows =  getGrassCloudShadows(fragmentPosition.xyz);
+	cloudShadows *= getCloudShadows(fragmentPosition.xyz);
 
 	outColor.rgb = vec3(0.0, 0.0, 0.0);
 
-	outColor.rgb += getIblColor(fragmentPosition.xyz, albedo, worldNormal, roughness, metalness, viewVector) * 0.5;
-	outColor.rgb += getIblColor(fragmentPosition.xyz, albedo, -worldNormal, roughness, metalness, viewVector) * 0.5;
+	outColor.rgb += getIblColor(fragmentPosition.xyz, albedo, worldNormal, roughness, metalness, viewVector) * cloudShadows * 0.5;
+	outColor.rgb += getIblColor(fragmentPosition.xyz, albedo, -worldNormal, roughness, metalness, viewVector) * cloudShadows *  0.5;
 	outColor.rgb += getSunColor(fragmentPosition.xyz, worldNormal, albedo, roughness, metalness, viewVector) * cloudShadows * 0.5;
 	outColor.rgb += getSunColor(fragmentPosition.xyz, -worldNormal, albedo, roughness, metalness, viewVector) * cloudShadows * 0.5;
 

@@ -1,6 +1,7 @@
 
 {
     "id": "radion_switch",
+    "displayName": "Button",
     "specification": "e2::RadionEntitySpecification",
     "entityType": "e2::RadionSwitch",
     "radionCost": 3,

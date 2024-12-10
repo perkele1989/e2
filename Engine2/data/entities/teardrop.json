@@ -1,6 +1,7 @@
 
 {
     "id": "teardrop",
+    "displayName": "Teardrop",
     "specification": "e2::TeardropSpecification",
     "entityType": "e2::TeardropEntity",
     "movement": {
