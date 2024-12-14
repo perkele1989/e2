@@ -415,3 +415,381 @@ std::string const& e2::DialogueNode::outputPin(uint64_t index)
 {
     return m_answers[index].text;
 }
+
+bool e2::CountItemNode::isDone()
+{
+    return true;
+}
+
+uint64_t e2::CountItemNode::resultPin()
+{
+    e2::Game* game = m_graph->game();
+    bool hasEnough = game->playerState().countById(m_item) >= m_requiredCount;
+    return hasEnough ? 0 : 1;
+}
+
+uint64_t e2::CountItemNode::numOutputPins()
+{
+    return 2;
+}
+
+std::string const& e2::CountItemNode::outputPin(uint64_t index)
+{
+    return index == 0 ? "true" : "false";
+}
+
+e2::CountItemNode::~CountItemNode()
+{
+}
+
+void e2::CountItemNode::serialize(nlohmann::json& obj)
+{
+
+}
+
+void e2::CountItemNode::deserialize(nlohmann::json& obj)
+{
+    if (obj.contains("item"))
+    {
+        m_item = obj.at("item").template get<std::string>();
+    }
+
+    if (obj.contains("requiredCount"))
+    {
+        m_requiredCount = obj.at("requiredCount").template get<uint64_t>();
+    }
+}
+
+void e2::CountItemNode::onActivate()
+{
+}
+
+void e2::CountItemNode::onUpdate(double seconds)
+{
+
+}
+
+void e2::CountItemNode::onDeactivate()
+{
+}
+
+e2::ReadValueNode::~ReadValueNode()
+{
+}
+
+void e2::ReadValueNode::serialize(nlohmann::json& obj)
+{
+}
+
+void e2::ReadValueNode::deserialize(nlohmann::json& obj)
+{
+    if (obj.contains("variableName"))
+    {
+        m_variableName = obj.at("variableName").template get<std::string>();
+    }
+
+    if (obj.contains("compareValue"))
+    {
+        m_compareValue = obj.at("compareValue").template get<int32_t>();
+    }
+}
+
+void e2::ReadValueNode::onActivate()
+{
+}
+
+void e2::ReadValueNode::onUpdate(double seconds)
+{
+}
+
+void e2::ReadValueNode::onDeactivate()
+{
+}
+
+bool e2::ReadValueNode::isDone()
+{
+    return true;
+}
+
+uint64_t e2::ReadValueNode::resultPin()
+{
+    e2::Game* game = m_graph->game();
+    bool greaterOrEqual = game->readScriptValue(m_variableName) >= m_compareValue;
+    return greaterOrEqual ? 0 : 1;
+}
+
+uint64_t e2::ReadValueNode::numOutputPins()
+{
+    return 2;
+}
+
+std::string const& e2::ReadValueNode::outputPin(uint64_t index)
+{
+    return index == 0 ? "true" : "false";
+}
+
+e2::WriteValueNode::~WriteValueNode()
+{
+}
+
+void e2::WriteValueNode::serialize(nlohmann::json& obj)
+{
+}
+
+void e2::WriteValueNode::deserialize(nlohmann::json& obj)
+{
+    if (obj.contains("variableName"))
+    {
+        m_variableName = obj.at("variableName").template get<std::string>();
+    }
+
+    if (obj.contains("writeValue"))
+    {
+        m_writeValue = obj.at("writeValue").template get<int32_t>();
+    }
+}
+
+void e2::WriteValueNode::onActivate()
+{
+    m_graph->game()->writeScriptValue(m_variableName, m_writeValue);
+}
+
+void e2::WriteValueNode::onUpdate(double seconds)
+{
+}
+
+void e2::WriteValueNode::onDeactivate()
+{
+}
+
+bool e2::WriteValueNode::isDone()
+{
+    return true;
+}
+
+uint64_t e2::WriteValueNode::resultPin()
+{
+    return 0;
+}
+
+uint64_t e2::WriteValueNode::numOutputPins()
+{
+    return 1;
+}
+
+std::string const& e2::WriteValueNode::outputPin(uint64_t index)
+{
+    return "then";
+}
+
+e2::DelayNode::~DelayNode()
+{
+}
+
+void e2::DelayNode::serialize(nlohmann::json& obj)
+{
+}
+
+void e2::DelayNode::deserialize(nlohmann::json& obj)
+{
+    if (obj.contains("seconds"))
+    {
+        m_seconds = obj.at("seconds").template get<float>();
+    }
+}
+
+void e2::DelayNode::onActivate()
+{
+    m_begin = e2::timeNow();
+}
+
+void e2::DelayNode::onUpdate(double seconds)
+{
+}
+
+void e2::DelayNode::onDeactivate()
+{
+}
+
+bool e2::DelayNode::isDone()
+{
+    return m_begin.durationSince().seconds() >= m_seconds;
+}
+
+uint64_t e2::DelayNode::resultPin()
+{
+    return 0;
+}
+
+uint64_t e2::DelayNode::numOutputPins()
+{
+    return 1;
+}
+
+std::string const& e2::DelayNode::outputPin(uint64_t index)
+{
+    return "then";
+}
+
+e2::GiveItemNode::~GiveItemNode()
+{
+}
+
+void e2::GiveItemNode::serialize(nlohmann::json& obj)
+{
+}
+
+void e2::GiveItemNode::deserialize(nlohmann::json& obj)
+{
+    if (obj.contains("item"))
+    {
+        m_item = obj.at("item").template get<std::string>();
+    }
+
+    if (obj.contains("count"))
+    {
+        m_count = obj.at("count").template get<uint64_t>();
+    }
+}
+
+void e2::GiveItemNode::onActivate()
+{
+    for (uint32_t i = 0; i < m_count; i++)
+        m_graph->game()->playerState().give(m_item);
+}
+
+void e2::GiveItemNode::onUpdate(double seconds)
+{
+}
+
+void e2::GiveItemNode::onDeactivate()
+{
+}
+
+bool e2::GiveItemNode::isDone()
+{
+    return true;
+}
+
+uint64_t e2::GiveItemNode::resultPin()
+{
+    return 0;
+}
+
+uint64_t e2::GiveItemNode::numOutputPins()
+{
+    return 1;
+}
+
+std::string const& e2::GiveItemNode::outputPin(uint64_t index)
+{
+    return "then";
+}
+
+
+
+
+
+
+
+e2::TakeItemNode::~TakeItemNode()
+{
+}
+
+void e2::TakeItemNode::serialize(nlohmann::json& obj)
+{
+}
+
+void e2::TakeItemNode::deserialize(nlohmann::json& obj)
+{
+    if (obj.contains("item"))
+    {
+        m_item = obj.at("item").template get<std::string>();
+    }
+
+    if (obj.contains("count"))
+    {
+        m_count = obj.at("count").template get<uint64_t>();
+    }
+}
+
+void e2::TakeItemNode::onActivate()
+{
+    m_graph->game()->playerState().takeById(m_item, m_count);
+}
+
+void e2::TakeItemNode::onUpdate(double seconds)
+{
+}
+
+void e2::TakeItemNode::onDeactivate()
+{
+}
+
+bool e2::TakeItemNode::isDone()
+{
+    return true;
+}
+
+uint64_t e2::TakeItemNode::resultPin()
+{
+    return 0;
+}
+
+uint64_t e2::TakeItemNode::numOutputPins()
+{
+    return 1;
+}
+
+std::string const& e2::TakeItemNode::outputPin(uint64_t index)
+{
+    return "then";
+}
+
+e2::RandomNode::~RandomNode()
+{
+}
+
+void e2::RandomNode::serialize(nlohmann::json& obj)
+{
+}
+
+void e2::RandomNode::deserialize(nlohmann::json& obj)
+{
+    if (obj.contains("count"))
+    {
+        m_count = obj.at("count").template get<uint64_t>();
+    }
+}
+
+void e2::RandomNode::onActivate()
+{
+}
+
+void e2::RandomNode::onUpdate(double seconds)
+{
+}
+
+void e2::RandomNode::onDeactivate()
+{
+}
+
+bool e2::RandomNode::isDone()
+{
+    return true;
+}
+
+uint64_t e2::RandomNode::resultPin()
+{
+    return e2::randomInt(0, m_count - 1);
+}
+
+uint64_t e2::RandomNode::numOutputPins()
+{
+    return m_count;
+}
+
+std::string const& e2::RandomNode::outputPin(uint64_t index)
+{
+    return std::format("output{}", index);
+}

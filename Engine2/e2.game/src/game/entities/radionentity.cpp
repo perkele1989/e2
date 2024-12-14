@@ -455,7 +455,7 @@ bool e2::RadionEntity::anyOutputConnected()
 e2::MeshPtr generateConnectionMesh(glm::vec3 a, glm::vec3 aO, glm::vec3 b, glm::vec3 bO, e2::Game* game)
 {
 
-	constexpr float halfWidth = 0.01f;
+	constexpr float halfWidth = 0.0125f;
 	glm::vec3 const normal = e2::worldUpf();
 
 	float aHeight = a.y;

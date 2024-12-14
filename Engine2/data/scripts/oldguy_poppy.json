@@ -1,0 +1,309 @@
+{
+    "id": "oldguy_poppy",
+    "entryNode": 0,
+    "nodes": [
+        {
+            "id": 0,
+            "typeName": "e2::ReadValueNode",
+            "variableName": "oldguy_poppy_done"
+        },
+
+        {
+            "id": 1,
+            "typeName": "e2::RandomNode",
+            "count": 7
+        },
+        {
+            "id": 2,
+            "typeName": "e2::DialogueNode",
+            "lines": [
+                "Oh hey there."
+            ]
+        },
+        {
+            "id": 3,
+            "typeName": "e2::DialogueNode",
+            "lines": [
+                "Hello!"
+            ]
+        },
+        {
+            "id": 4,
+            "typeName": "e2::DialogueNode",
+            "lines": [
+                "My bed has never felt softer!"
+            ]
+        },
+        {
+            "id": 5,
+            "typeName": "e2::DialogueNode",
+            "lines": [
+                "Those flowers really worked!"
+            ]
+        },
+        {
+            "id": 6,
+            "typeName": "e2::DialogueNode",
+            "lines": [
+                "Life is good."
+            ]
+        },
+        {
+            "id": 7,
+            "typeName": "e2::DialogueNode",
+            "lines": [
+                "It's a beautiful day!"
+            ]
+        },
+        {
+            "id": 8,
+            "typeName": "e2::DialogueNode",
+            "lines": [
+                "I feel well rested."
+            ]
+        },
+        {
+            "id": 9,
+            "typeName": "e2::ReadValueNode",
+            "variableName": "oldguy_poppy_accepted",
+            "compareValue": 1
+        },
+        {
+            "id": 10,
+            "typeName": "e2::CountItemNode",
+            "item": "poppy",
+            "requiredCount": 10
+        },
+        {
+            "id": 11,
+            "typeName": "e2::TakeItemNode",
+            "item": "poppy",
+            "count": 10
+        },
+        {
+            "id": 12,
+            "typeName": "e2::DialogueNode",
+            "lines": [
+                "You got it! Thank you.",
+                "You've made my day. Have this!"
+            ]
+        },
+        {
+            "id": 13,
+            "typeName": "e2::GiveItemNode",
+            "item": "ironhatchet",
+            "count": 1
+        },
+        {
+            "id": 14,
+            "typeName": "e2::WriteValueNode",
+            "variableName": "oldguy_poppy_done",
+            "writeValue": 1
+        },
+        {
+            "id": 15,
+            "typeName": "e2::DialogueNode",
+            "lines": [
+                "She is so mad..",
+                "Let me know when you've found them!",
+                "Remember, 10 field poppys."
+            ]
+        },
+        {
+            "id": 16,
+            "typeName": "e2::DialogueNode",
+            "lines": [
+                "Hi kid,",
+                "Can you help me?"
+            ]
+        },
+        {
+            "id": 17,
+            "typeName": "e2::DialogueNode",
+            "lines": [
+                "My wife,",
+                "She is mighty mad at me.."
+            ]
+        },
+        {
+            "id": 18,
+            "typeName": "e2::DialogueNode",
+            "lines": [
+                "Apparently agreeing with her",
+                "sister was not a good move."
+            ]
+        },
+        {
+            "id": 19,
+            "typeName": "e2::DialogueNode",
+            "lines": [
+                "But I know she likes those flowers!",
+                "Those red ones.."
+            ]
+        },
+        {
+            "id": 20,
+            "typeName": "e2::DialogueNode",
+            "lines": [
+                "What are they called again?",
+                "..."
+            ]
+        },
+        {
+            "id": 21,
+            "typeName": "e2::DialogueNode",
+            "lines": [
+                "Poppys! Yes, field poppys!",
+                "Can you help me find 10 of them?"
+            ],
+            "answers": [
+                "Certainly!",
+                "I'm not the one she's mad at.."
+            ]
+        },
+        {
+            "id": 22,
+            "typeName": "e2::DialogueNode",
+            "lines": [
+                "Thank you, you will be of great help!"
+            ]
+        },
+        {
+            "id": 23,
+            "typeName": "e2::WriteValueNode",
+            "variableName": "oldguy_poppy_accepted",
+            "writeValue": 1
+        },
+        {
+            "id": 24,
+            "typeName": "e2::DialogueNode",
+            "lines":[
+                "Well, what good are you?",
+                "Scram!"
+            ]
+        }
+    ],
+    "connections": [
+        {
+            "startNode": 0,
+            "startNodePin": 0,
+            "endNode": 1
+        },
+
+        {
+            "startNode": 1,
+            "startNodePin": 0,
+            "endNode": 2
+        },
+        {
+            "startNode": 1,
+            "startNodePin": 1,
+            "endNode": 3
+        },
+        {
+            "startNode": 1,
+            "startNodePin": 2,
+            "endNode": 4
+        },
+        {
+            "startNode": 1,
+            "startNodePin": 3,
+            "endNode": 5
+        },        
+        {
+            "startNode": 1,
+            "startNodePin": 4,
+            "endNode": 6
+        },
+        {
+            "startNode": 1,
+            "startNodePin": 5,
+            "endNode": 7
+        },
+        {
+            "startNode": 1,
+            "startNodePin": 6,
+            "endNode": 8 
+        },
+        {
+            "startNode": 0,
+            "startNodePin": 1,
+            "endNode": 9
+        },
+        {
+            "startNode": 9,
+            "startNodePin": 0,
+            "endNode": 10
+        },
+        {
+            "startNode": 10,
+            "startNodePin": 0,
+            "endNode": 11
+        },
+        {
+            "startNode": 11,
+            "startNodePin": 0,
+            "endNode": 12
+        },
+        {
+            "startNode": 12,
+            "startNodePin": 0,
+            "endNode": 13
+        },
+        {
+            "startNode": 13,
+            "startNodePin": 0,
+            "endNode": 14 
+        }, 
+        {
+            "startNode": 10,
+            "startNodePin": 1,
+            "endNode": 15
+        },
+        {
+            "startNode": 9,
+            "startNodePin": 1,
+            "endNode": 16
+        },
+        {
+            "startNode": 16,
+            "startNodePin": 0,
+            "endNode": 17
+        },
+        {
+            "startNode": 17,
+            "startNodePin": 0,
+            "endNode": 18
+        },
+        {
+            "startNode": 18,
+            "startNodePin": 0,
+            "endNode": 19
+        },
+        {
+            "startNode": 19,
+            "startNodePin": 0,
+            "endNode": 20
+        },
+        {
+            "startNode": 20,
+            "startNodePin": 0,
+            "endNode": 21
+        },
+        {
+            "startNode": 21,
+            "startNodePin": 0,
+            "endNode": 22
+        },
+        {
+            "startNode": 22,
+            "startNodePin": 0,
+            "endNode": 23
+        },
+        {
+            "startNode": 21,
+            "startNodePin": 1,
+            "endNode": 24
+        }
+    ]
+}

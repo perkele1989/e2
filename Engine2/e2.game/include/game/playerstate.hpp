@@ -285,13 +285,15 @@ namespace e2
 
 		PlayerState(e2::Game* g);
 
-
+		void nukeInventory();
 		void writeForSave(e2::IStream& toBuffer);
 		void readForSave(e2::IStream& fromBuffer);
 
 		bool give(e2::Name itemIdentifier);
 		void drop(uint32_t slotIndex, uint32_t num);
 		void take(uint32_t slotIndex, uint32_t num); // opposite of give, just makes items disappear
+
+		uint64_t countById(e2::Name itemName);
 
 		bool takeById(e2::Name itemName, uint32_t num);
 		void setActiveSlot(uint8_t newSlot);

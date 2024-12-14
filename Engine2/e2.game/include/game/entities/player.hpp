@@ -137,6 +137,73 @@ namespace e2
 		std::vector<e2::Collision> m_collisionCache;
 	};
 
+
+
+
+
+
+
+
+
+
+
+
+
+	/** @tags(dynamic) */
+	class OldGuySpecification : public e2::EntitySpecification
+	{
+		ObjectDeclaration();
+	public:
+		OldGuySpecification();
+		virtual ~OldGuySpecification();
+
+		virtual void populate(e2::GameContext* ctx, nlohmann::json& obj) override;
+		virtual void finalize() override;
+
+		e2::StaticMeshSpecification mesh;
+		e2::CollisionSpecification collision;
+	};
+
+	/**
+	 * Old guy, gives you intro quest
+	 * @tags(dynamic)
+	 */
+	class OldGuyEntity : public e2::Entity
+	{
+		ObjectDeclaration();
+	public:
+		OldGuyEntity();
+		virtual ~OldGuyEntity();
+
+		virtual void postConstruct(e2::GameContext* ctx, e2::EntitySpecification* spec, glm::vec3 const& worldPosition, glm::quat const& worldRotation) override;
+
+		virtual void writeForSave(e2::IStream& toBuffer) override;
+		virtual void readForSave(e2::IStream& fromBuffer) override;
+
+		virtual void updateAnimation(double seconds) override;
+
+		virtual void update(double seconds) override;
+
+		virtual void updateVisibility() override;
+
+
+
+		virtual bool interactable() override { return true; }
+
+		virtual void onInteract(e2::Entity* interactor) override;
+
+		virtual std::string interactText() override { return "Talk"; }
+
+	protected:
+
+
+		e2::OldGuySpecification* m_oldGuySpecification{};
+
+		e2::StaticMeshComponent* m_mesh{};
+		e2::CollisionComponent* m_collision{};
+	};
+
+
 }
 
 

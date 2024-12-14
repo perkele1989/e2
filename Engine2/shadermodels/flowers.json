@@ -1,0 +1,22 @@
+{
+    "name": "flowers",
+    "renderLayer": 1024,
+    "vertexShader": "shaders/flowers/flowers.vertex.glsl",
+    "fragmentShader": "shaders/flowers/flowers.fragment.glsl",
+    "doubleSided": true,
+    "supportsShadows": false,
+    "parameters": [
+        {
+            "name": "albedo",
+            "defaultValue": [1.0, 1.0, 1.0, 1.0]
+        },
+        {
+            "name": "emissive",
+            "defaultValue": [0.0, 0.0, 0.0, 0.0]
+        },
+        {
+            "name": "rmxx",
+            "defaultValue": [1.0, 0.0, 0.0, 0.0]
+        }
+    ]
+}

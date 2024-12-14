@@ -55,8 +55,8 @@ void main()
 	vec3 albedo = material.albedo.rgb;
 #endif 
 
-#if defined(Vertex_Color)
-	//albedo.rgb *= pow(fragmentColor.rgb, vec3(2.2));
+#if defined(Vertex_Color) && !defined(Material_AlbedoTexture)
+	albedo.rgb *= pow(fragmentColor.rgb, vec3(2.2));
 #endif
 
 

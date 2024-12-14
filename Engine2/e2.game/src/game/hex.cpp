@@ -1247,6 +1247,93 @@ e2::ChunkState* e2::HexGrid::getOrCreateChunk(glm::ivec2 const& index)
 	{
 		e2::ChunkState* newState = e2::create<e2::ChunkState>();
 		newState->chunkIndex = index;
+		/*newState->prepareChunkEntities();*/
+
+
+
+		// prepare chunk entities 
+		glm::ivec2 chunkTileOffset = index * glm::ivec2(e2::hexChunkResolution);
+
+		for (int32_t ty = 0; ty < e2::hexChunkResolution; ty++)
+		{
+			for (int32_t tx = 0; tx < e2::hexChunkResolution; tx++)
+			{
+				glm::ivec2 worldIndex = chunkTileOffset + glm::ivec2(tx, ty);
+				e2::TileData tile = calculateTileData(worldIndex);
+				if (!tile.isLand() || tile.isMountain())
+					continue;
+
+				e2::Hex currentHex(worldIndex);
+				glm::vec2 planarCoords = currentHex.planarCoords();
+
+				float simpl = sampleSimplex(planarCoords * 1.2f);
+
+				uint32_t numPoppys = 0;
+				if (tile.getBiome() == e2::TileFlags::BiomeGrassland)
+				{
+					numPoppys = glm::clamp(int32_t(simpl * 3.0f), 0, 2);
+					for (uint32_t i = 0; i < numPoppys; i++)
+					{
+						float semiRandomLength = sampleSimplex(planarCoords * 1.2f + (float)(i + ty + tx));
+						float semiRandomRotation = simpl * (3612.f * (1.2512f * (i + ty + tx)));
+						glm::vec3 semiRandFwd = glm::rotate(glm::identity<glm::quat>(), glm::radians(semiRandomRotation), e2::worldUpf()) * e2::worldForwardf();
+						glm::vec2 semiRandomOffset{ semiRandFwd.x, semiRandFwd.z };
+						semiRandomOffset *= semiRandomLength;
+
+						e2::ChunkEntity newEntity;
+						newEntity.entityName = "poppy_entity";
+						newEntity.worldPlanar = planarCoords + semiRandomOffset;
+
+						float grassCoeff = sampleSimplex((newEntity.worldPlanar + glm::vec2(32.16f, 64.32f)) * 0.135f);
+						grassCoeff = pow(glm::smoothstep(0.35f, 0.40f, grassCoeff), 4.2f);
+
+						if (grassCoeff < 0.01f)
+						{
+							continue;
+						}
+
+						newEntity.rotation = semiRandomRotation;
+						newState->entities.push(newEntity);
+					}
+				}
+
+				if (tile.getBiome() != e2::TileFlags::BiomeTundra)
+				{
+					uint32_t numStones = 3 - numPoppys;
+					for (uint32_t i = numPoppys; i < 3; i++)
+					{
+
+						float semiRandomLength = sampleSimplex(planarCoords * 1.2f + (float)(i + ty + tx));
+						float semiRandomRotation = simpl * (3612.f * (1.2512f * (i + ty + tx)));
+						glm::vec3 semiRandFwd = glm::rotate(glm::identity<glm::quat>(), glm::radians(semiRandomRotation), e2::worldUpf()) * e2::worldForwardf();
+						glm::vec2 semiRandomOffset{ semiRandFwd.x, semiRandFwd.z };
+						semiRandomOffset *= semiRandomLength;
+
+
+						e2::ChunkEntity newEntity;
+						newEntity.entityName = "stone_entity";
+						newEntity.worldPlanar = planarCoords + semiRandomOffset;
+
+						float baseHeight = calculateBaseHeight(newEntity.worldPlanar);
+						if (baseHeight > 0.8) // not beach
+						{
+							continue;
+						}
+
+						//float grassCoeff = sampleSimplex((newEntity.worldPlanar + glm::vec2(32.16f, 64.32f)) * 0.135f);
+						//grassCoeff = pow(glm::smoothstep(0.35f, 0.40f, grassCoeff), 4.2f);
+
+						//if (grassCoeff < 0.01f)
+						//	continue;
+
+						newEntity.rotation = semiRandomRotation;
+						newState->entities.push(newEntity);
+					}
+				}
+			}
+		}
+
+
 
 		m_chunkIndex[index] = newState;
 		m_hiddenChunks.insert(newState);
@@ -1356,32 +1443,27 @@ void e2::HexGrid::calculateFeaturesAndWater(glm::vec2 const& planarCoords, float
 {
 	if (baseHeight > 0.75f)
 	{
+		float forestCoeff = sampleSimplex((planarCoords + glm::vec2(32.16f, 64.32f)) * 0.135f);
+		forestCoeff = glm::smoothstep(0.5f, 1.0f, forestCoeff);
+		//forestCoeff = 1.0 - forestCoeff;
 
-		if (baseHeight > 0.6f)
-		{
+		//float forestCoeff = sampleSimplex((planarCoords + glm::vec2(32.16f, 64.32f)) * 0.135f);
+		//forestCoeff = glm::pow(glm::smoothstep(0.0f, 0.5f, forestCoeff), 1.2f);
 
-			float forestCoeff = sampleSimplex((planarCoords + glm::vec2(32.16f, 64.32f)) * 0.135f);
-			forestCoeff = glm::pow(glm::smoothstep(0.5f, 1.0f, forestCoeff), 1.0);
-			//forestCoeff = 1.0 - forestCoeff;
+		if (forestCoeff > 0.05f && (baseHeight <= 0.90f) && ((outFlags & TileFlags::BiomeMask) != TileFlags::BiomeDesert))
+			outFlags |= TileFlags::FeatureForest;
 
-			//float forestCoeff = sampleSimplex((planarCoords + glm::vec2(32.16f, 64.32f)) * 0.135f);
-			//forestCoeff = glm::pow(glm::smoothstep(0.0f, 0.5f, forestCoeff), 1.2f);
+		if (forestCoeff > 0.95f)
+			outFlags |= TileFlags::WoodAbundance4;
+		else if (forestCoeff > 0.750f)
+			outFlags |= TileFlags::WoodAbundance3;
+		else if (forestCoeff > 0.5f)
+			outFlags |= TileFlags::WoodAbundance2;
+		else
+			outFlags |= TileFlags::WoodAbundance1;
 
-			if (forestCoeff > 0.05f && (baseHeight <= 0.90f) && ((outFlags & TileFlags::BiomeMask) != TileFlags::BiomeDesert))
-				outFlags |= TileFlags::FeatureForest;
-
-			if (forestCoeff > 0.95f)
-				outFlags |= TileFlags::WoodAbundance4;
-			else if (forestCoeff > 0.750f)
-				outFlags |= TileFlags::WoodAbundance3;
-			else if (forestCoeff > 0.5f)
-				outFlags |= TileFlags::WoodAbundance2;
-			else
-				outFlags |= TileFlags::WoodAbundance1;
-
-			if (baseHeight > 0.90f)
-				outFlags |= TileFlags::FeatureMountains;
-		}
+		if (baseHeight > 0.90f)
+			outFlags |= TileFlags::FeatureMountains;
 	}
 	else if (baseHeight > 0.57f)
 	{
@@ -3241,6 +3323,17 @@ void e2::HexGrid::popInChunk(e2::ChunkState* state)
 	}
 
 
+	for (e2::ChunkEntity& ent : state->entities)
+	{
+		e2::Entity* existing = game()->entityFromId(ent.spawnedEntityId);
+		if (existing && !existing->pendingDestroy)
+			continue;
+
+		e2::Entity* newEnt = game()->spawnEntity(ent.entityName, glm::vec3{ ent.worldPlanar.x, 0.0f, ent.worldPlanar.y}, glm::rotate(glm::identity<glm::quat>(), glm::radians(ent.rotation), e2::worldUpf()));
+		newEnt->transient = true;
+		ent.spawnedEntityId = newEnt->uniqueId;
+	}
+
 }
 
 void e2::HexGrid::popOutChunk(e2::ChunkState* state)
@@ -3289,6 +3382,13 @@ void e2::HexGrid::popOutChunk(e2::ChunkState* state)
 				realTileData->forestProxy = nullptr;
 			}
 		}
+	}
+
+	for (e2::ChunkEntity& ent : state->entities)
+	{
+		e2::Entity* entity = game()->entityFromId(ent.spawnedEntityId);
+		if (entity && !entity->pendingDestroy)
+			game()->destroyEntity(entity);
 	}
 }
 

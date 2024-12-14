@@ -1011,44 +1011,44 @@ void e2::Game::updateMenu(double seconds)
 		glm::vec2 startCoords = e2::Hex(m_startLocation).planarCoords();
 		m_hexGrid->initializeWorldBounds(startCoords);
 
+		m_playerState.nukeInventory();
 		e2::Entity *player = spawnEntity("player", e2::Hex(m_startLocation).localCoords());
 		m_playerState.entity = player->cast<e2::PlayerEntity>();
-		m_playerState.give("ironhatchet");
-		m_playerState.give("ironsword");
-		m_playerState.give("radion_ionizer");
-		for (uint32_t i = 0; i < 10; i++)
-		{
-			m_playerState.give("bomb");
-		}
 
-		for (uint32_t i = 0; i < 5; i++)
-		{
-			m_playerState.give("redbomb");
-		}
+		spawnEntity("oldguy", e2::Hex(m_oldGuyLocation).localCoords());
+		//m_playerState.give("ironhatchet");
+		//m_playerState.give("ironsword");
+		//m_playerState.give("radion_ionizer");
+		//for (uint32_t i = 0; i < 10; i++)
+		//{
+		//	m_playerState.give("bomb");
+		//}
 
-		m_playerState.give("radion_linker");
-		m_radionManager.discoverEntity("radion_powersource");
-		m_radionManager.discoverEntity("radion_wirepost");
-		m_radionManager.discoverEntity("radion_splitter");
-		m_radionManager.discoverEntity("radion_capacitor");
-		m_radionManager.discoverEntity("radion_switch");
-		m_radionManager.discoverEntity("radion_crystal");
-		m_radionManager.discoverEntity("radion_gateAND");
-		m_radionManager.discoverEntity("radion_gateNAND");
-		m_radionManager.discoverEntity("radion_gateNOR");
-		m_radionManager.discoverEntity("radion_gateNOT");
-		m_radionManager.discoverEntity("radion_gateOR");
-		m_radionManager.discoverEntity("radion_gateXNOR");
-		m_radionManager.discoverEntity("radion_gateXOR");
+		//for (uint32_t i = 0; i < 5; i++)
+		//{
+		//	m_playerState.give("redbomb");
+		//}
 
-		for (uint32_t i = 0; i < 50; i++)
-		{
-			m_playerState.give("radion_cube");
-		}
+		//m_playerState.give("radion_linker");
+		//m_radionManager.discoverEntity("radion_powersource");
+		//m_radionManager.discoverEntity("radion_wirepost");
+		//m_radionManager.discoverEntity("radion_splitter");
+		//m_radionManager.discoverEntity("radion_capacitor");
+		//m_radionManager.discoverEntity("radion_switch");
+		//m_radionManager.discoverEntity("radion_crystal");
+		//m_radionManager.discoverEntity("radion_gateAND");
+		//m_radionManager.discoverEntity("radion_gateNAND");
+		//m_radionManager.discoverEntity("radion_gateNOR");
+		//m_radionManager.discoverEntity("radion_gateNOT");
+		//m_radionManager.discoverEntity("radion_gateOR");
+		//m_radionManager.discoverEntity("radion_gateXNOR");
+		//m_radionManager.discoverEntity("radion_gateXOR");
 
-		//spawnCity(m_localEmpireId, m_startLocation);
+		//for (uint32_t i = 0; i < 50; i++)
+		//{
+		//	m_playerState.give("radion_cube");
+		//}
 
-		//spawnEntity("mobile_mob", m_startLocation, m_localEmpireId);
 
 	}
 	if (m_haveStreamedStart)
@@ -1100,20 +1100,17 @@ void e2::Game::beginStartGame()
 {
 	m_haveBegunStart = true;
 	m_beginStartTime = e2::timeNow();
-	do {} while (!findStartLocation(e2::randomIvec2(glm::ivec2(-1024), glm::ivec2(1024)), { 1024, 1024 }, m_startLocation));
+	findStartLocation(e2::randomIvec2(glm::ivec2(-1024), glm::ivec2(1024)), { 1024, 1024 });
 	pauseWorldStreaming();
 	forceStreamLocation(e2::Hex(m_startLocation).planarCoords());
 }
 
-bool e2::Game::findStartLocation(glm::ivec2 const& offset, glm::ivec2 const& rangeSize, glm::ivec2 &outLocation)
+void e2::Game::findStartLocation(glm::ivec2 const& offset, glm::ivec2 const& rangeSize)
 {
-	glm::ivec2 returner;
-	int32_t numTries = 0;
-
 	// plop us down somehwere nice 
 	std::unordered_set<glm::ivec2> attemptedStartLocations;
-	bool foundStartLocation{};
-	while (!foundStartLocation)
+	bool foundEverything{};
+	while (!foundEverything)
 	{
 		glm::ivec2 rangeStart = offset - (rangeSize / 2);
 		glm::ivec2 rangeEnd = offset + (rangeSize / 2);
@@ -1133,43 +1130,36 @@ bool e2::Game::findStartLocation(glm::ivec2 const& offset, glm::ivec2 const& ran
 		auto as = e2::create<e2::PathFindingAS>(this, e2::Hex(startLocation), 64, ignoreVisibility, e2::PassableFlags::Land, false, nullptr);
 		uint64_t numWalkableHexes = as->hexIndex.size();
 		e2::TileFlags testFlags = e2::TileFlags::None;
-		uint64_t numGreen = 0;
-		bool foundNonForested = false;
+		std::vector<glm::ivec2> greenTiles;
 		for (auto& [index, tile] : as->hexIndex)
 		{
+			float baseHeight = m_hexGrid->calculateBaseHeight(tile->index.planarCoords());
 			m_hexGrid->calculateBiome(tile->index.planarCoords(), testFlags);
-			if ((testFlags & e2::TileFlags::BiomeMask) == e2::TileFlags::BiomeGrassland)
-			{
-				numGreen++;
-			}
+			m_hexGrid->calculateFeaturesAndWater(tile->index.planarCoords(), baseHeight, testFlags);
 
-			if (!foundNonForested)
+			if ((testFlags & e2::TileFlags::BiomeMask) == e2::TileFlags::BiomeGrassland && (testFlags & e2::TileFlags::FeatureMask) != e2::TileFlags::FeatureForest)
 			{
-				float baseHeight = m_hexGrid->calculateBaseHeight(tile->index.planarCoords());
-				m_hexGrid->calculateFeaturesAndWater(tile->index.planarCoords(), baseHeight, testFlags);
-				if ((testFlags & e2::TileFlags::FeatureMask) != e2::TileFlags::FeatureForest)
-				{
-					startLocation = tile->index.offsetCoords();
-					foundNonForested = true;
-				}
+				greenTiles.push_back(index);
 			}
 		}
 		e2::destroy(as);
 
-		if (numWalkableHexes < 64 || numGreen < 18 || !foundNonForested)
+		if (numWalkableHexes < 64 || greenTiles.size() < 16)
 			continue;
 
-		returner = startLocation;
-		foundStartLocation = true;
 
-		if (numTries++ >= 20)
-			break;
+
+		m_startLocation = greenTiles[e2::randomInt(0, greenTiles.size()-1)];
+		glm::ivec2 oldGuyLocation;
+		do
+		{
+			oldGuyLocation = greenTiles[e2::randomInt(0, greenTiles.size() - 1)];
+		} while (oldGuyLocation == m_startLocation || glm::distance(glm::vec2(oldGuyLocation), glm::vec2(m_startLocation)) > 4.0f);
+
+		m_oldGuyLocation = oldGuyLocation;
+
+		foundEverything = true;
 	}
-
-	if(foundStartLocation)
-		outLocation = returner;
-
-	return foundStartLocation;
 }
 
 void e2::Game::startGame()
@@ -2026,9 +2016,9 @@ void e2::Game::updateEntitySpawns()
 
 	glm::vec2 startCoords = e2::Hex(m_startLocation).planarCoords();
 
-	for (uint32_t y = topLeftIndex.y; y <= bottomRightIndex.y; y++)
+	for (int32_t y = topLeftIndex.y; y <= bottomRightIndex.y; y++)
 	{
-		for (uint32_t x = topLeftIndex.x; x <= bottomRightIndex.x; x++)
+		for (int32_t x = topLeftIndex.x; x <= bottomRightIndex.x; x++)
 		{
 			glm::ivec2 currentIndex(x, y);
 			glm::ivec2 chunkTileOffset = currentIndex * glm::ivec2(e2::hexChunkResolution);
@@ -2136,6 +2126,19 @@ void e2::Game::pushMessage(std::string const& text)
 	m_messages.insert(m_messages.begin(), { text });
 	if (m_messages.size() > 10)
 		m_messages.resize(10);
+}
+
+int32_t e2::Game::readScriptValue(e2::Name name)
+{
+	auto finder = m_scriptVariables.find(name);
+	if (finder != m_scriptVariables.end())
+		return finder->second;
+	return 0;
+}
+
+void e2::Game::writeScriptValue(e2::Name variableName, int32_t value)
+{
+	m_scriptVariables[variableName] = value;
 }
 
 e2::Sprite* e2::Game::getUiSprite(e2::Name name)

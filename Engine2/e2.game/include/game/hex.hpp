@@ -160,6 +160,7 @@ namespace e2
 
 	constexpr uint32_t maxNumChunkLoadTasks = 4096;
 	constexpr uint32_t maxNumMeshesPerChunk = (hexChunkResolution * hexChunkResolution)*3;
+	constexpr uint32_t maxNumEntitiesPerChunk = (hexChunkResolution * hexChunkResolution) * 3;
 
 	class HexGrid;
 
@@ -213,7 +214,14 @@ namespace e2
 		Ready
 	};
 
+	struct ChunkEntity
+	{
+		e2::Name entityName;
+		glm::vec2 worldPlanar;
+		float rotation;
 
+		uint64_t spawnedEntityId{};
+	};
 
 	/** @tags(arena, arenaSize=e2::maxNumChunkStates)  */
 	class ChunkState : public e2::ManagedObject
@@ -249,6 +257,8 @@ namespace e2
 
 
 		e2::StackVector<e2::MeshProxy*, e2::maxNumMeshesPerChunk> extraMeshes;
+		e2::StackVector<e2::ChunkEntity, e2::maxNumEntitiesPerChunk> entities;
+
 
 	};
 

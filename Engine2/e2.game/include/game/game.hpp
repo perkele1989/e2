@@ -78,7 +78,7 @@ namespace e2
 	class PlayerEntity;
 
 
-	constexpr uint64_t maxEntitySpawns = 4;
+	constexpr uint64_t maxEntitySpawns = 16;
 
 	struct EntitySpawn
 	{
@@ -132,7 +132,7 @@ namespace e2
 		void resumeWorldStreaming();
 		void forceStreamLocation(glm::vec2 const& planarCoords);
 		void beginStartGame();
-		bool findStartLocation(glm::ivec2 const& offset, glm::ivec2 const& rangeSize, glm::ivec2& outLocation);
+		void findStartLocation(glm::ivec2 const& offset, glm::ivec2 const& rangeSize);
 		void startGame();
 
 		void addScreenShake(float intensity);
@@ -234,6 +234,7 @@ namespace e2
 		e2::HexGrid* m_hexGrid{};
 
 		glm::ivec2 m_startLocation;
+		glm::ivec2 m_oldGuyLocation;
 		bool m_haveBegunStart{};
 		bool m_haveStreamedStart{};
 		e2::Moment m_beginStartTime;
@@ -432,6 +433,14 @@ namespace e2
 		std::vector<Message> m_messages;
 	public:
 		void pushMessage(std::string const& text);
+
+
+	protected:
+		std::map<e2::Name, int32_t> m_scriptVariables;
+
+	public:
+		int32_t readScriptValue(e2::Name variableName);
+		void writeScriptValue(e2::Name variableName, int32_t value);
 	};
 	
 

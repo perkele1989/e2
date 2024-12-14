@@ -5,6 +5,7 @@
 
 #include "game/gamecontext.hpp"
 
+#include <e2/timer.hpp>
 #include <nlohmann/json.hpp>
 
 namespace e2
@@ -184,6 +185,212 @@ namespace e2
         uint64_t m_selectedAnswer{};
         bool m_done{};
         double m_secondsSinceCharacterOffset{};
+    };
+
+
+    /** @tags(dynamic) */
+    class GiveItemNode : public e2::ScriptNode
+    {
+        ObjectDeclaration();
+    public:
+        GiveItemNode() = default;
+        virtual ~GiveItemNode();
+
+
+        virtual void serialize(nlohmann::json& obj) override;
+        virtual void deserialize(nlohmann::json& obj) override;
+
+        virtual void onActivate() override;
+        virtual void onUpdate(double seconds) override;
+        virtual void onDeactivate() override;
+
+        virtual bool isDone() override;
+        virtual uint64_t resultPin() override;
+
+
+        virtual uint64_t numOutputPins() override;
+
+        virtual std::string const& outputPin(uint64_t index);
+
+    protected:
+        e2::Name m_item;
+        uint64_t m_count{ 1 };
+    };
+
+    /** @tags(dynamic) */
+    class TakeItemNode : public e2::ScriptNode
+    {
+        ObjectDeclaration();
+    public:
+        TakeItemNode() = default;
+        virtual ~TakeItemNode();
+
+
+        virtual void serialize(nlohmann::json& obj) override;
+        virtual void deserialize(nlohmann::json& obj) override;
+
+        virtual void onActivate() override;
+        virtual void onUpdate(double seconds) override;
+        virtual void onDeactivate() override;
+
+        virtual bool isDone() override;
+        virtual uint64_t resultPin() override;
+
+
+        virtual uint64_t numOutputPins() override;
+
+        virtual std::string const& outputPin(uint64_t index);
+
+    protected:
+        e2::Name m_item;
+        uint64_t m_count{ 1 };
+    };
+
+    /** @tags(dynamic) */
+    class CountItemNode : public e2::ScriptNode
+    {
+        ObjectDeclaration();
+    public:
+        CountItemNode() = default;
+        virtual ~CountItemNode();
+
+
+        virtual void serialize(nlohmann::json& obj) override;
+        virtual void deserialize(nlohmann::json& obj) override;
+
+        virtual void onActivate() override;
+        virtual void onUpdate(double seconds) override;
+        virtual void onDeactivate() override;
+
+        virtual bool isDone() override;
+        virtual uint64_t resultPin() override;
+
+
+        virtual uint64_t numOutputPins() override;
+
+        virtual std::string const& outputPin(uint64_t index);
+
+    protected:
+        e2::Name m_item;
+        uint64_t m_requiredCount{ 1 };
+    };
+
+    /** @tags(dynamic) */
+    class ReadValueNode : public e2::ScriptNode
+    {
+        ObjectDeclaration();
+    public:
+        ReadValueNode() = default;
+        virtual ~ReadValueNode();
+
+
+        virtual void serialize(nlohmann::json& obj) override;
+        virtual void deserialize(nlohmann::json& obj) override;
+
+        virtual void onActivate() override;
+        virtual void onUpdate(double seconds) override;
+        virtual void onDeactivate() override;
+
+        virtual bool isDone() override;
+        virtual uint64_t resultPin() override;
+
+
+        virtual uint64_t numOutputPins() override;
+
+        virtual std::string const& outputPin(uint64_t index);
+
+    protected:
+        e2::Name m_variableName;
+        int32_t m_compareValue{ 1 };
+    };
+
+
+    /** @tags(dynamic) */
+    class WriteValueNode : public e2::ScriptNode
+    {
+        ObjectDeclaration();
+    public:
+        WriteValueNode() = default;
+        virtual ~WriteValueNode();
+
+
+        virtual void serialize(nlohmann::json& obj) override;
+        virtual void deserialize(nlohmann::json& obj) override;
+
+        virtual void onActivate() override;
+        virtual void onUpdate(double seconds) override;
+        virtual void onDeactivate() override;
+
+        virtual bool isDone() override;
+        virtual uint64_t resultPin() override;
+
+
+        virtual uint64_t numOutputPins() override;
+
+        virtual std::string const& outputPin(uint64_t index);
+
+    protected:
+        e2::Name m_variableName;
+        int32_t m_writeValue{ 0 };
+    };
+
+
+    /** @tags(dynamic) */
+    class DelayNode : public e2::ScriptNode
+    {
+        ObjectDeclaration();
+    public:
+        DelayNode() = default;
+        virtual ~DelayNode();
+
+
+        virtual void serialize(nlohmann::json& obj) override;
+        virtual void deserialize(nlohmann::json& obj) override;
+
+        virtual void onActivate() override;
+        virtual void onUpdate(double seconds) override;
+        virtual void onDeactivate() override;
+
+        virtual bool isDone() override;
+        virtual uint64_t resultPin() override;
+
+
+        virtual uint64_t numOutputPins() override;
+
+        virtual std::string const& outputPin(uint64_t index);
+
+    protected:
+        float m_seconds;
+        e2::Moment m_begin;
+    };
+
+
+    /** @tags(dynamic) */
+    class RandomNode : public e2::ScriptNode
+    {
+        ObjectDeclaration();
+    public:
+        RandomNode() = default;
+        virtual ~RandomNode();
+
+
+        virtual void serialize(nlohmann::json& obj) override;
+        virtual void deserialize(nlohmann::json& obj) override;
+
+        virtual void onActivate() override;
+        virtual void onUpdate(double seconds) override;
+        virtual void onDeactivate() override;
+
+        virtual bool isDone() override;
+        virtual uint64_t resultPin() override;
+
+
+        virtual uint64_t numOutputPins() override;
+
+        virtual std::string const& outputPin(uint64_t index);
+
+    protected:
+        uint64_t m_count;
     };
 
 }

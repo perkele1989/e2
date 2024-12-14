@@ -38,6 +38,15 @@ e2::PlayerState::PlayerState(e2::Game* g)
 {
 }
 
+void e2::PlayerState::nukeInventory()
+{
+	for (e2::InventorySlot& slot : inventory)
+	{
+		slot.count = 0;
+		slot.item = nullptr;
+	}
+}
+
 void e2::PlayerState::writeForSave(e2::IStream& toBuffer)
 {
 	toBuffer << activeSlot;
@@ -177,6 +186,19 @@ void e2::PlayerState::take(uint32_t slotIndex, uint32_t num)
 	{
 		slot.item = nullptr;
 	}
+}
+
+uint64_t e2::PlayerState::countById(e2::Name itemName)
+{
+	uint64_t c = 0;
+	for (uint32_t slotIndex = 0; slotIndex < e2::inventorySize; slotIndex++)
+	{
+		if (inventory[slotIndex].item && inventory[slotIndex].item->id == itemName)
+		{
+			c += inventory[slotIndex].count;
+		}
+	}
+	return c;
 }
 
 bool e2::PlayerState::takeById(e2::Name itemName, uint32_t num)

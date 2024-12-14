@@ -1,0 +1,12 @@
+{
+    "id": "stone",
+    "displayName": "Stone",
+    "dropMesh": {
+        "meshScale": [0.6, 0.6, 0.6],
+        "mesh": "SM_Stone.e2a"
+    },
+    "wieldable": false,
+    "stackable": true,
+    "stackSize": 50,
+    "iconSprite": "ItemIconStone"
+}

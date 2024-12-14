@@ -1,0 +1,16 @@
+{
+    "id": "stone_entity",
+    "displayName": "Stone",
+    "specification": "e2::PickupSpecification",
+    "entityType": "e2::PickupEntity",
+    "collision": {
+        "block": false,
+        "radius": 0.1
+    },
+    "pickupItem": "stone",
+    "pickupMesh": {
+
+        "meshScale": [0.6, 0.6, 0.6],
+        "mesh": "SM_Stone.e2a"
+    }
+}

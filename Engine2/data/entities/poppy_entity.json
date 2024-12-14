@@ -1,0 +1,16 @@
+{
+    "id": "poppy_entity",
+    "displayName": "Field Poppy",
+    "specification": "e2::PickupSpecification",
+    "entityType": "e2::PickupEntity",
+    "collision": {
+        "block": false,
+        "radius": 0.1
+    },
+    "pickupItem": "poppy",
+    "pickupMesh": {
+
+        "meshScale": [0.6, 0.6, 0.6],
+        "mesh": "SM_Poppy.e2a"
+    }
+}

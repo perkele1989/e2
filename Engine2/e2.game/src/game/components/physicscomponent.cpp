@@ -14,7 +14,7 @@ e2::CollisionComponent::CollisionComponent(e2::CollisionSpecification* specifica
 	m_currentIndex = entity->hex().offsetCoords();
 	m_radius = m_specification->radius;
 	m_entity->game()->registerCollisionComponent(this, m_currentIndex);
-
+	block = specification->block;
 }
 
 e2::CollisionComponent::~CollisionComponent()
@@ -33,7 +33,8 @@ void e2::CollisionComponent::invalidate()
 		m_entity->game()->registerCollisionComponent(this, m_currentIndex);
 	}
 
-	m_entity->game()->hexGrid()->grassCutMask().push({ m_entity->planarCoords(), m_radius*4.0f });
+	if(block)
+		m_entity->game()->hexGrid()->grassCutMask().push({ m_entity->planarCoords(), m_radius*4.0f });
 }
 
 void e2::CollisionComponent::setRadius(float newRadius)
@@ -48,6 +49,11 @@ void e2::CollisionSpecification::populate(nlohmann::json& obj, std::unordered_se
 	if (obj.contains("radius"))
 	{
 		radius = obj.at("radius").template get<float>();
+	}
+
+	if (obj.contains("block"))
+	{
+		block = obj.at("block").template get<bool>();
 	}
 
 }
@@ -106,7 +112,7 @@ float e2::MovementComponent::move(float radius, glm::vec2 const& dir, float ener
 			if ((c.type & mask) != c.type && c.type != e2::CollisionType::Component)
 				continue;
 
-			if (c.type == e2::CollisionType::Component && c.component && shouldIgnore(c.component->entity()))
+			if (c.type == e2::CollisionType::Component && c.component && ( !c.component->block ||  shouldIgnore(c.component->entity()) ))
 				continue;
 
 			e2::SweepResult result = e2::circleSweepTest(startPosition, targetPosition, radius, c.position, c.radius);
@@ -157,7 +163,7 @@ float e2::MovementComponent::move(float radius, glm::vec2 const& dir, float ener
 		if ((c.type & mask) != c.type)
 			continue;
 
-		if (c.type == e2::CollisionType::Component && c.component && shouldIgnore(c.component->entity()))
+		if (c.type == e2::CollisionType::Component && c.component && (!c.component->block || shouldIgnore(c.component->entity())))
 			continue;
 
 		glm::vec2 cToThis = planarPosition - c.position;
@@ -188,7 +194,7 @@ void e2::MovementComponent::resolve(float radius, e2::CollisionType mask, std::v
 		if ((c.type & mask) != c.type)
 			continue;
 
-		if (c.type == e2::CollisionType::Component && c.component && shouldIgnore(c.component->entity()))
+		if (c.type == e2::CollisionType::Component && c.component && (!c.component->block || shouldIgnore(c.component->entity())))
 			continue;
 
 		if (planarPosition == c.position)

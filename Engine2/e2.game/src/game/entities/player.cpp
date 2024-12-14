@@ -643,3 +643,101 @@ bool e2::RadialCompare::operator()(e2::Entity* a, e2::Entity* b) const
 	float radiansB = e2::radiansBetween(dirB, playerFwdPlanar);
 	return radiansA < radiansB;
 }
+
+
+
+
+
+
+
+
+
+e2::OldGuySpecification::OldGuySpecification()
+	: e2::EntitySpecification()
+{
+	entityType = e2::Type::fromName("e2::OldGuyEntity");
+}
+
+e2::OldGuySpecification::~OldGuySpecification()
+{
+}
+
+void e2::OldGuySpecification::populate(e2::GameContext* ctx, nlohmann::json& obj)
+{
+	e2::EntitySpecification::populate(ctx, obj);
+
+	if (obj.contains("mesh"))
+		mesh.populate(obj.at("mesh"), assets);
+	if (obj.contains("collision"))
+		collision.populate(obj.at("collision"), assets);
+}
+
+void e2::OldGuySpecification::finalize()
+{
+	mesh.finalize(game);
+	collision.finalize(game);
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+e2::OldGuyEntity::OldGuyEntity()
+{
+}
+
+e2::OldGuyEntity::~OldGuyEntity()
+{
+	if (m_mesh)
+		e2::destroy(m_mesh);
+
+	if (m_collision)
+		e2::destroy(m_collision);
+
+}
+
+void e2::OldGuyEntity::postConstruct(e2::GameContext* ctx, e2::EntitySpecification* spec, glm::vec3 const& worldPosition, glm::quat const& worldRotation)
+{
+	e2::Entity::postConstruct(ctx, spec, worldPosition, worldRotation);
+	m_oldGuySpecification = m_specification->cast<e2::OldGuySpecification>();
+
+	m_mesh = e2::create<e2::StaticMeshComponent>(&m_oldGuySpecification->mesh, this);
+	
+	m_collision = e2::create<e2::CollisionComponent>(&m_oldGuySpecification->collision, this);
+}
+
+void e2::OldGuyEntity::writeForSave(e2::IStream& toBuffer)
+{
+}
+
+void e2::OldGuyEntity::readForSave(e2::IStream& fromBuffer)
+{
+}
+
+void e2::OldGuyEntity::updateAnimation(double seconds)
+{
+
+}
+
+void e2::OldGuyEntity::update(double seconds)
+{
+	m_mesh->applyTransform();
+}
+
+void e2::OldGuyEntity::updateVisibility()
+{
+	m_mesh->updateVisibility();
+}
+
+void e2::OldGuyEntity::onInteract(e2::Entity* interactor)
+{
+	game()->runScriptGraph("oldguy_poppy");
+}

@@ -17,6 +17,7 @@ namespace e2
 		void finalize(e2::GameContext* ctx);
 
 		float radius{20.0f};
+		bool block{true};
 
 	};
 
@@ -40,6 +41,8 @@ namespace e2
 			return m_radius;
 		}
 		void setRadius(float newRadius);
+
+		bool block{true};
 
 	protected:
 

@@ -1,0 +1,16 @@
+
+{
+    "id": "oldguy",
+    "displayName": "Old Man",
+    "specification": "e2::OldGuySpecification",
+    "entityType": "e2::OldGuyEntity",
+    "collision": {
+        "radius": 0.1
+    },
+    "mesh": {
+
+        "meshScale": [0.3, 0.3, 0.3],
+        "mesh": "SM_Dummy.e2a"
+    }
+
+}
