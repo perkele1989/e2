@@ -2,7 +2,7 @@
     "id": "redbomb",
     "displayName": "Red Bomb",
     "dropMesh": {
-        "meshScale": [1.0, 1.0, 1.0],
+        "meshScale": [0.5, 0.5, 0.5],
         "mesh": "SM_RedBomb.e2a"
     },
     "wieldable": true,

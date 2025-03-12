@@ -77,3 +77,8 @@ e2::UIManager* e2::Context::uiManager()
 	return engine()->m_uiManager;
 }
 
+e2::NetworkManager* e2::Context::networkManager()
+{
+	return engine()->m_networkManager;
+}
+

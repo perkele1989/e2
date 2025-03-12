@@ -3329,6 +3329,17 @@ void e2::HexGrid::popInChunk(e2::ChunkState* state)
 		if (existing && !existing->pendingDestroy)
 			continue;
 
+		if (ent.destroyState)
+		{
+			if (ent.lastDestroyed.durationSince().seconds() > 20.0f)
+			{
+				ent.destroyState = false;
+			}
+		}
+
+		if (ent.destroyState)
+			continue;
+
 		e2::Entity* newEnt = game()->spawnEntity(ent.entityName, glm::vec3{ ent.worldPlanar.x, 0.0f, ent.worldPlanar.y}, glm::rotate(glm::identity<glm::quat>(), glm::radians(ent.rotation), e2::worldUpf()));
 		newEnt->transient = true;
 		ent.spawnedEntityId = newEnt->uniqueId;
@@ -3388,7 +3399,18 @@ void e2::HexGrid::popOutChunk(e2::ChunkState* state)
 	{
 		e2::Entity* entity = game()->entityFromId(ent.spawnedEntityId);
 		if (entity && !entity->pendingDestroy)
+		{
 			game()->destroyEntity(entity);
+			ent.destroyState = false;
+		}
+		else
+		{
+			if (!ent.destroyState)
+			{
+				ent.lastDestroyed = e2::timeNow();
+				ent.destroyState = true;
+			}
+		}
 	}
 }
 

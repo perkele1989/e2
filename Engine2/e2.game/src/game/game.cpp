@@ -371,6 +371,8 @@ void e2::Game::initialize()
 {
 	m_session = e2::create<e2::GameSession>(this);
 
+	m_session->window()->maximize();
+
 	m_menuMusic = audioManager()->createChannel();
 	m_waterChannel = audioManager()->createChannel();
 
@@ -503,7 +505,7 @@ void e2::Game::update(double seconds)
 	{
 		glm::quat viewRotation = view.orientation;
 
-		glm::mat4 translateMatrix = glm::translate(glm::identity<glm::mat4>(), m_playerState.entity->getTransform()->getTranslation(e2::TransformSpace::World));
+		glm::mat4 translateMatrix = glm::translate(glm::identity<glm::mat4>(), m_playerState.entity->getTransform()->getTranslation(e2::TransformSpace::World) + e2::worldUpf() * 1.0f);
 		glm::mat4 rotateMatrix = glm::mat4_cast(viewRotation);
 
 		cameraMatrix = translateMatrix * rotateMatrix;
@@ -1016,38 +1018,39 @@ void e2::Game::updateMenu(double seconds)
 		m_playerState.entity = player->cast<e2::PlayerEntity>();
 
 		spawnEntity("oldguy", e2::Hex(m_oldGuyLocation).localCoords());
-		//m_playerState.give("ironhatchet");
-		//m_playerState.give("ironsword");
-		//m_playerState.give("radion_ionizer");
-		//for (uint32_t i = 0; i < 10; i++)
-		//{
-		//	m_playerState.give("bomb");
-		//}
+		spawnEntity("redbomb_entity", e2::Hex(m_blacksmithLocation).localCoords());
+		m_playerState.give("ironhatchet");
+		m_playerState.give("ironsword");
+		m_playerState.give("radion_ionizer");
+		m_playerState.give("radion_linker");
+		m_radionManager.discoverEntity("radion_powersource");
+		m_radionManager.discoverEntity("radion_wirepost");
+		m_radionManager.discoverEntity("radion_splitter");
+		m_radionManager.discoverEntity("radion_capacitor");
+		m_radionManager.discoverEntity("radion_switch");
+		m_radionManager.discoverEntity("radion_crystal");
+		m_radionManager.discoverEntity("radion_gateAND");
+		m_radionManager.discoverEntity("radion_gateNAND");
+		m_radionManager.discoverEntity("radion_gateNOR");
+		m_radionManager.discoverEntity("radion_gateNOT");
+		m_radionManager.discoverEntity("radion_gateOR");
+		m_radionManager.discoverEntity("radion_gateXNOR");
+		m_radionManager.discoverEntity("radion_gateXOR");
 
-		//for (uint32_t i = 0; i < 5; i++)
-		//{
-		//	m_playerState.give("redbomb");
-		//}
+		for (uint32_t i = 0; i < 10; i++)
+		{
+			m_playerState.give("bomb");
+		}
 
-		//m_playerState.give("radion_linker");
-		//m_radionManager.discoverEntity("radion_powersource");
-		//m_radionManager.discoverEntity("radion_wirepost");
-		//m_radionManager.discoverEntity("radion_splitter");
-		//m_radionManager.discoverEntity("radion_capacitor");
-		//m_radionManager.discoverEntity("radion_switch");
-		//m_radionManager.discoverEntity("radion_crystal");
-		//m_radionManager.discoverEntity("radion_gateAND");
-		//m_radionManager.discoverEntity("radion_gateNAND");
-		//m_radionManager.discoverEntity("radion_gateNOR");
-		//m_radionManager.discoverEntity("radion_gateNOT");
-		//m_radionManager.discoverEntity("radion_gateOR");
-		//m_radionManager.discoverEntity("radion_gateXNOR");
-		//m_radionManager.discoverEntity("radion_gateXOR");
+		for (uint32_t i = 0; i < 5; i++)
+		{
+			m_playerState.give("redbomb");
+		}
 
-		//for (uint32_t i = 0; i < 50; i++)
-		//{
-		//	m_playerState.give("radion_cube");
-		//}
+		for (uint32_t i = 0; i < 50; i++)
+		{
+			m_playerState.give("radion_cube");
+		}
 
 
 	}
@@ -1100,18 +1103,20 @@ void e2::Game::beginStartGame()
 {
 	m_haveBegunStart = true;
 	m_beginStartTime = e2::timeNow();
-	findStartLocation(e2::randomIvec2(glm::ivec2(-1024), glm::ivec2(1024)), { 1024, 1024 });
+	findStartLocation();
 	pauseWorldStreaming();
 	forceStreamLocation(e2::Hex(m_startLocation).planarCoords());
 }
 
-void e2::Game::findStartLocation(glm::ivec2 const& offset, glm::ivec2 const& rangeSize)
+void e2::Game::findStartLocation()
 {
 	// plop us down somehwere nice 
 	std::unordered_set<glm::ivec2> attemptedStartLocations;
 	bool foundEverything{};
 	while (!foundEverything)
 	{
+		glm::ivec2 offset = e2::randomIvec2(glm::ivec2(-1024), glm::ivec2(1024));
+		glm::ivec2 rangeSize{2048, 2048};
 		glm::ivec2 rangeStart = offset - (rangeSize / 2);
 		glm::ivec2 rangeEnd = offset + (rangeSize / 2);
 		glm::ivec2 startLocation = e2::randomIvec2(rangeStart, rangeEnd);
@@ -1127,36 +1132,55 @@ void e2::Game::findStartLocation(glm::ivec2 const& offset, glm::ivec2 const& ran
 			continue;
 
 		constexpr bool ignoreVisibility = true;
-		auto as = e2::create<e2::PathFindingAS>(this, e2::Hex(startLocation), 64, ignoreVisibility, e2::PassableFlags::Land, false, nullptr);
+		auto as = e2::create<e2::PathFindingAS>(this, e2::Hex(startLocation), 256, ignoreVisibility, e2::PassableFlags::Land, false, nullptr);
 		uint64_t numWalkableHexes = as->hexIndex.size();
-		e2::TileFlags testFlags = e2::TileFlags::None;
+
 		std::vector<glm::ivec2> greenTiles;
+		std::vector<glm::ivec2> snowTiles;
 		for (auto& [index, tile] : as->hexIndex)
 		{
-			float baseHeight = m_hexGrid->calculateBaseHeight(tile->index.planarCoords());
-			m_hexGrid->calculateBiome(tile->index.planarCoords(), testFlags);
-			m_hexGrid->calculateFeaturesAndWater(tile->index.planarCoords(), baseHeight, testFlags);
+			e2::Hex currentHex = tile->index;
+			glm::ivec2 offsetCoords = currentHex.offsetCoords();
+			glm::vec2 planarCoords = currentHex.planarCoords();
 
-			if ((testFlags & e2::TileFlags::BiomeMask) == e2::TileFlags::BiomeGrassland && (testFlags & e2::TileFlags::FeatureMask) != e2::TileFlags::FeatureForest)
+			e2::TileData currentTile = m_hexGrid->calculateTileData(offsetCoords);
+
+			if (currentTile.getBiome() == e2::TileFlags::BiomeGrassland && !currentTile.isForested())
 			{
-				greenTiles.push_back(index);
+				greenTiles.push_back(offsetCoords);
+			}
+
+			if (currentTile.getBiome() == e2::TileFlags::BiomeTundra && !currentTile.isForested())
+			{
+				snowTiles.push_back(offsetCoords);
 			}
 		}
 		e2::destroy(as);
 
-		if (numWalkableHexes < 64 || greenTiles.size() < 16)
+		if (numWalkableHexes < 32 || greenTiles.size() < 8 || snowTiles.size() < 8)
 			continue;
 
 
 
 		m_startLocation = greenTiles[e2::randomInt(0, greenTiles.size()-1)];
-		glm::ivec2 oldGuyLocation;
-		do
+		bool foundOldGuy = false;
+		for (glm::ivec2 const& v : greenTiles)
 		{
-			oldGuyLocation = greenTiles[e2::randomInt(0, greenTiles.size() - 1)];
-		} while (oldGuyLocation == m_startLocation || glm::distance(glm::vec2(oldGuyLocation), glm::vec2(m_startLocation)) > 4.0f);
+			if (m_startLocation == v)
+				continue;
 
-		m_oldGuyLocation = oldGuyLocation;
+			if (glm::distance(glm::vec2(v), glm::vec2(m_startLocation)) > 8.0f)
+				continue;
+
+			m_oldGuyLocation = v;
+			foundOldGuy = true;
+			break;
+		}
+		
+		if (!foundOldGuy)
+			continue;
+
+		m_blacksmithLocation = snowTiles[e2::randomInt(0, snowTiles.size() - 1)];
 
 		foundEverything = true;
 	}
@@ -1423,15 +1447,16 @@ void e2::Game::drawUI()
 		drawHitLabels();
 
 		{
-			glm::vec2 cursor{ 48.0f, uiSize.y - 128.0f };
+			glm::vec2 cursor{ 64.0f, uiSize.y - 200.0f };
 			for (e2::Message& msg : m_messages)
 			{
 				msg.life -= m_timeDelta;
 
 
-				ui->drawRasterText(e2::FontFace::Sans, 20.0f, e2::UIColor::white(), cursor, msg.text);
+				ui->drawRasterTextShadow(e2::FontFace::Sans, 14.0f, cursor, msg.text);
+				ui->drawRasterText(e2::FontFace::Sans, 14.0f, e2::UIColor::white(), cursor, msg.text);
 
-				cursor.y -= 28.0f;
+				cursor.y -= 20.0f;
 			}
 			m_messages.erase(std::remove_if(m_messages.begin(), m_messages.end(), [](Message const& msg)->bool { return msg.life <= 0.0f; }), m_messages.end());
 		}
@@ -1471,53 +1496,53 @@ void e2::Game::drawUI()
 
 
 
-			ui->pushFixedPanel("envParams", offset, size);
-			ui->beginStackV("envParamStack");
+			//ui->pushFixedPanel("envParams", offset, size);
+			//ui->beginStackV("envParamStack");
 
-			e2::LightweightData uniformData = m_testProxy->uniformData.data();
-			bool doUpdate = false;
-			if (ui->sliderFloat("Albedo R", uniformData.albedo.r, 0.0, 1.0))
-				doUpdate = true;
-			if (ui->sliderFloat("Albedo G", uniformData.albedo.g, 0.0, 1.0))
-				doUpdate = true;
-			if (ui->sliderFloat("Albedo B", uniformData.albedo.b, 0.0, 1.0))
-				doUpdate = true;
-			if (ui->sliderFloat("Roughness", uniformData.rmxx.r, 0.0, 1.0))
-				doUpdate = true;
-			if (ui->sliderFloat("Metalness", uniformData.rmxx.g, 0.0, 1.0))
-				doUpdate = true;
+			//e2::LightweightData uniformData = m_testProxy->uniformData.data();
+			//bool doUpdate = false;
+			//if (ui->sliderFloat("Albedo R", uniformData.albedo.r, 0.0, 1.0))
+			//	doUpdate = true;
+			//if (ui->sliderFloat("Albedo G", uniformData.albedo.g, 0.0, 1.0))
+			//	doUpdate = true;
+			//if (ui->sliderFloat("Albedo B", uniformData.albedo.b, 0.0, 1.0))
+			//	doUpdate = true;
+			//if (ui->sliderFloat("Roughness", uniformData.rmxx.r, 0.0, 1.0))
+			//	doUpdate = true;
+			//if (ui->sliderFloat("Metalness", uniformData.rmxx.g, 0.0, 1.0))
+			//	doUpdate = true;
 
-			if (doUpdate)
-			{
-				m_testProxy->uniformData.set(uniformData);
-			}
+			//if (doUpdate)
+			//{
+			//	m_testProxy->uniformData.set(uniformData);
+			//}
 
-			//ui->sliderFloat("sunAngleA", m_sunAngleA, -180.0f, 180.0f);
-			//ui->sliderFloat("sunAngleB", m_sunAngleB, 0.0f, 90.0f);
-			//ui->sliderFloat("sunStr", m_sunStrength, 0.0f, 10.0f);
-			//ui->sliderFloat("iblStr", m_iblStrength, 0.0f, 10.0f); 
+			////ui->sliderFloat("sunAngleA", m_sunAngleA, -180.0f, 180.0f);
+			////ui->sliderFloat("sunAngleB", m_sunAngleB, 0.0f, 90.0f);
+			////ui->sliderFloat("sunStr", m_sunStrength, 0.0f, 10.0f);
+			////ui->sliderFloat("iblStr", m_iblStrength, 0.0f, 10.0f); 
 
-			//ui->sliderFloat("exposure", m_exposure, 0.0f, 20.0f);
-			//ui->sliderFloat("whitepoint", m_whitepoint, 0.0f, 20.0f);
+			////ui->sliderFloat("exposure", m_exposure, 0.0f, 20.0f);
+			////ui->sliderFloat("whitepoint", m_whitepoint, 0.0f, 20.0f);
 
-			//ui->sliderFloat("mtnFreqScale", e2::mtnFreqScale, 0.001f, 0.1f, "%.6f");
-			//ui->sliderFloat("mtnScale", e2::mtnScale, 0.25f, 10.0f, "%.6f");
+			////ui->sliderFloat("mtnFreqScale", e2::mtnFreqScale, 0.001f, 0.1f, "%.6f");
+			////ui->sliderFloat("mtnScale", e2::mtnScale, 0.25f, 10.0f, "%.6f");
 
-			//ui->sliderFloat("treeScale", e2::treeScale, 0.1f, 2.0f);
-			//ui->sliderFloat("treeSpread", e2::treeSpread, 0.1f, 2.0f);
-			//ui->sliderInt("treeNum1", e2::treeNum1, 1, 50);
-			//ui->sliderInt("treeNum2", e2::treeNum2, 1, 50);
-			//ui->sliderInt("treeNum3", e2::treeNum3, 1, 50);
+			////ui->sliderFloat("treeScale", e2::treeScale, 0.1f, 2.0f);
+			////ui->sliderFloat("treeSpread", e2::treeSpread, 0.1f, 2.0f);
+			////ui->sliderInt("treeNum1", e2::treeNum1, 1, 50);
+			////ui->sliderInt("treeNum2", e2::treeNum2, 1, 50);
+			////ui->sliderInt("treeNum3", e2::treeNum3, 1, 50);
 
-			if (ui->sliderFloat("fog", m_fog, 0.0f, 2.0f))
-			{
-				m_hexGrid->setFog(m_fog);
-			}
+			//if (ui->sliderFloat("fog", m_fog, 0.0f, 2.0f))
+			//{
+			//	m_hexGrid->setFog(m_fog);
+			//}
 
 
 
-			ui->endStackV();
-			ui->popFixedPanel();
+			//ui->endStackV();
+			//ui->popFixedPanel();
 		}
 
 
@@ -1680,8 +1705,8 @@ void e2::Game::drawDebugUI()
 	auto& kb = ui->keyboardState();
 	auto& mouse = ui->mouseState();
 	auto& leftMouse = mouse.buttons[uint16_t(e2::MouseButton::Left)];
-	ui->drawRasterText(e2::FontFace::Monospace, 14, 0xFFFFFFFF, { 12, 12 + (18.0f * 14.0f) }, std::format("^3View Origin: {}", m_viewOrigin));
-	ui->drawRasterText(e2::FontFace::Monospace, 14, 0xFFFFFFFF, { 12, 12 + (18.0f * 15.0f) }, std::format("^3Zoom: {}", m_targetViewZoom));
+	//ui->drawRasterText(e2::FontFace::Monospace, 14, 0xFFFFFFFF, { 12, 12 + (18.0f * 14.0f) }, std::format("^3View Origin: {}", m_viewOrigin));
+	//ui->drawRasterText(e2::FontFace::Monospace, 14, 0xFFFFFFFF, { 12, 12 + (18.0f * 15.0f) }, std::format("^3Zoom: {}", m_targetViewZoom));
 
 	
 	if (m_showPhysics)

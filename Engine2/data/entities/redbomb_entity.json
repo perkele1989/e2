@@ -1,6 +1,7 @@
 
 {
     "id": "redbomb_entity",
+    "displayName": "Red Bomb",
     "specification": "e2::BombSpecification",
     "isRedBomb": true,
     "entityType": "e2::BombEntity",

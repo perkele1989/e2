@@ -1,6 +1,7 @@
 
 {
     "id": "bomb_entity",
+    "displayName": "Bomb",
     "specification": "e2::BombSpecification",
     "entityType": "e2::BombEntity",
     "movement": {

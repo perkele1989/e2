@@ -19,6 +19,7 @@ namespace e2
 	class UIManager;
 	class Application;
 	class AudioManager;
+	class NetworkManager;
 
 #if defined(E2_PROFILER)
 	class Profiler;
@@ -49,6 +50,7 @@ namespace e2
 		GameManager* gameManager();
 		TypeManager* typeManager();
 		UIManager* uiManager();
+		NetworkManager* networkManager();
 	};
 
 }

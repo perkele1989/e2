@@ -55,7 +55,9 @@ namespace e2
 		virtual void update(double seconds) override;
 
 		virtual void updateVisibility() override;
-
+		virtual void onInteract(e2::Entity* instigator);
+		virtual std::string interactText() override;
+		virtual bool interactable() override;
 
 		virtual void onMeleeDamage(e2::Entity* instigator, float dmg) override;
 

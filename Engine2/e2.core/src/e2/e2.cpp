@@ -10,6 +10,7 @@
 #include "e2/managers/gamemanager.hpp"
 #include "e2/managers/typemanager.hpp"
 #include "e2/managers/uimanager.hpp"
+#include "e2/managers/networkmanager.hpp"
 
 #include "e2/managers/audiomanager.hpp"
 
@@ -25,6 +26,7 @@ e2::Engine::Engine()
 	m_config = e2::create<Config>();
 	m_typeManager = e2::create<e2::TypeManager>(this);
 	m_asyncManager = e2::create<e2::AsyncManager>(this);
+	m_networkManager = e2::create<e2::NetworkManager>(this);
 	m_assetManager = e2::create<e2::AssetManager>(this);
 	m_audioManager = e2::create<e2::AudioManager>(this);
 	m_renderManager = e2::create<e2::RenderManager>(this);
@@ -42,6 +44,7 @@ e2::Engine::~Engine()
 	e2::destroy(m_renderManager);
 	e2::destroy(m_audioManager);
 	e2::destroy(m_assetManager);
+	e2::destroy(m_networkManager);
 	e2::destroy(m_asyncManager);
 	e2::destroy(m_typeManager);
 	
@@ -66,6 +69,7 @@ void e2::Engine::run(e2::Application* app)
 
 	m_typeManager->initialize();
 	m_asyncManager->initialize();
+	m_networkManager->initialize();
 	m_assetManager->initialize();
 	m_audioManager->initialize();
 	m_renderManager->initialize();
@@ -97,7 +101,7 @@ void e2::Engine::run(e2::Application* app)
 #endif
 
 			E2_BEGIN_SCOPE(Default);
-
+			m_networkManager->update(deltaTime);
 			m_asyncManager->update(deltaTime);
 			m_assetManager->update(deltaTime);
 			m_audioManager->update(deltaTime);
@@ -175,6 +179,8 @@ void e2::Engine::run(e2::Application* app)
 	e2::ManagedObject::keepAroundPrune();
 
 	m_gameManager->shutdown();
+
+	m_networkManager->shutdown();
 
 	m_audioManager->shutdown();
 

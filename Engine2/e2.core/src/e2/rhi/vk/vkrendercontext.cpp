@@ -496,12 +496,22 @@ void e2::IRenderContext_Vk::createInstance(e2::Name appName)
 	char const** glfwRequiredExtensions = glfwGetRequiredInstanceExtensions(&glfwRequiredExtensionsCount);
 
 
+#if defined(E2_DEVELOPMENT)
 	char const** enabledExtensions = new char const* [glfwRequiredExtensionsCount + 1];
 	enabledExtensions[0] = VK_EXT_DEBUG_UTILS_EXTENSION_NAME;
 	for (uint32_t i = 1; i < glfwRequiredExtensionsCount + 1; i++)
 	{
 		enabledExtensions[i] = glfwRequiredExtensions[i - 1];
 	}
+#else 
+	char const** enabledExtensions = new char const* [glfwRequiredExtensionsCount];
+	for (uint32_t i = 0; i < glfwRequiredExtensionsCount; i++)
+	{
+		enabledExtensions[i] = glfwRequiredExtensions[i];
+	}
+#endif
+
+
 
 
 #if defined(E2_DEVELOPMENT)
@@ -517,7 +527,11 @@ void e2::IRenderContext_Vk::createInstance(e2::Name appName)
 
 	VkInstanceCreateInfo instanceCreateInfo{ VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO };
 	instanceCreateInfo.pApplicationInfo = &vkAppInfo;
+#if defined(E2_DEVELOPMENT)
 	instanceCreateInfo.enabledExtensionCount = glfwRequiredExtensionsCount + 1;
+#else 
+	instanceCreateInfo.enabledExtensionCount = glfwRequiredExtensionsCount;
+#endif
 	instanceCreateInfo.ppEnabledExtensionNames = enabledExtensions;
 #if defined(E2_DEVELOPMENT)
 	instanceCreateInfo.enabledLayerCount = 1;
@@ -671,7 +685,7 @@ void e2::IRenderContext_Vk::createDevice()
 
 	char const* deviceExtensions[] = {
 		VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-		VK_KHR_MULTIVIEW_EXTENSION_NAME,
+		//VK_KHR_MULTIVIEW_EXTENSION_NAME,
 		VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME,
 		VK_EXT_VERTEX_INPUT_DYNAMIC_STATE_EXTENSION_NAME
 	};
@@ -689,7 +703,7 @@ void e2::IRenderContext_Vk::createDevice()
 	deviceCreateInfo.pQueueCreateInfos = &queueCreateInfo;
 	deviceCreateInfo.queueCreateInfoCount = 1;
 	deviceCreateInfo.enabledLayerCount = 0;
-	deviceCreateInfo.enabledExtensionCount = 4;
+	deviceCreateInfo.enabledExtensionCount = 3;
 	deviceCreateInfo.ppEnabledExtensionNames = deviceExtensions;
 	deviceCreateInfo.pEnabledFeatures = &physicalFeatures;
 

@@ -54,8 +54,6 @@ void e2::PickupSpecification::populate(e2::GameContext* ctx, nlohmann::json& obj
 		pickupItem = obj.at("pickupItem").template get<std::string>();
 	}
 
-	collision.radius = 0.1;
-
 }
 
 void e2::PickupSpecification::finalize()

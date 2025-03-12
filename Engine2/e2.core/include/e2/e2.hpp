@@ -44,6 +44,7 @@ namespace e2
 	class TypeManager;
 	class UIManager;
 	class AudioManager;
+	class NetworkManager;
 
 	/** Minimal and global engine performance metrics */
 	constexpr uint32_t engineMetricsWindow = 120;
@@ -248,6 +249,7 @@ namespace e2
 #if defined(E2_PROFILER)
 		e2::Profiler* m_profiler{};
 #endif
+		e2::NetworkManager* m_networkManager{};
 		e2::AudioManager* m_audioManager{};
 		e2::RenderManager* m_renderManager{};
 		e2::GameManager* m_gameManager{};

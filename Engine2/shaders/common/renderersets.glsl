@@ -94,6 +94,7 @@ vec3 getFrontColor(vec2 uv)
 
 vec3 getFrontPosition(vec2 uv)
 {
+
 	vec4 frontPosition = textureLod(sampler2D(frontBufferPosition, clampSampler), uv, 0);
 	return frontPosition.xyz;
 	//return frontPosition.xyz / frontPosition.w;

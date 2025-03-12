@@ -581,7 +581,7 @@ void e2::HatchetHandler::onTrigger(e2::PlayerEntity* player, e2::Name actionName
 
 		if (didHitTree)
 		{
-			player->hexGrid()->damageTree(closestHex, closestTree, e2::randomFloat(0.15f, 0.27f));
+			player->hexGrid()->damageTree(closestHex, closestTree, e2::randomFloat(0.05f, 0.15f));
 			m_woodChop->play();
 		}
 	}

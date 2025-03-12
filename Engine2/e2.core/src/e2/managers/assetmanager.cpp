@@ -392,7 +392,7 @@ e2::AssetDatabase::AssetDatabase(e2::Context* ctx)
 	repopulate();
 	dumpAssets();
 
-	populateEditorEntries();
+	//populateEditorEntries();
 }
 
 e2::AssetDatabase::~AssetDatabase()
@@ -488,7 +488,7 @@ e2::Name e2::AssetDatabase::invalidateAsset(std::string const& path)
 	m_pathIndex[newEntry->path] = newEntry;
 	m_nameIndex[newEntry->name] = newEntry;
 
-	populateEditorEntries();
+	//populateEditorEntries();
 
 	return newEntry->name;
 }

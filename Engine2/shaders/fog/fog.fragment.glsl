@@ -37,6 +37,8 @@ void main()
 
 	outColor.rgb = fogOfWar(outColor.rgb,fragPos.xyz, visibility, renderer.time.x, depth, fogHeight);
 
+	// outColor.a = 0.0;
+
 	//outColor.rgb = vec3(pow(fogHeight,3.0));
 
 	//outColor.rgb = vec3(renderer.time.x);

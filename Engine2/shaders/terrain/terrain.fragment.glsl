@@ -61,6 +61,12 @@ void main()
 
 
 	float tundraCoeff =fragmentColor.b;
+
+	// float sss = sampleSimplex((fragmentPosition.xz + vec2(81.44, 93.58)) * 0.01);
+	// sss = step(0.8, sss);
+	//  outColor.rgb = vec3(sss, 0.0, 0.0);
+	//  return;
+
 	tundraCoeff = mix(tundraCoeff, 0.0, waterKill);
 
 

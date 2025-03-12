@@ -4,8 +4,8 @@
     "specification": "e2::PickupSpecification",
     "entityType": "e2::PickupEntity",
     "collision": {
-        "block": false,
-        "radius": 0.1
+        "block": true,
+        "radius": 0.025
     },
     "pickupItem": "stone",
     "pickupMesh": {

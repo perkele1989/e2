@@ -219,6 +219,11 @@ namespace e2
 		virtual uint8_t const* read(uint64_t numBytes) override;
 		virtual bool write(uint8_t const* data, uint64_t size) override;
 
+		inline uint8_t* data() const
+		{
+			return m_data;
+		}
+
 	protected:
 	
 		mutable uint8_t* m_data;

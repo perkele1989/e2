@@ -132,7 +132,7 @@ namespace e2
 		void resumeWorldStreaming();
 		void forceStreamLocation(glm::vec2 const& planarCoords);
 		void beginStartGame();
-		void findStartLocation(glm::ivec2 const& offset, glm::ivec2 const& rangeSize);
+		void findStartLocation();
 		void startGame();
 
 		void addScreenShake(float intensity);
@@ -235,6 +235,7 @@ namespace e2
 
 		glm::ivec2 m_startLocation;
 		glm::ivec2 m_oldGuyLocation;
+		glm::ivec2 m_blacksmithLocation;
 		bool m_haveBegunStart{};
 		bool m_haveStreamedStart{};
 		e2::Moment m_beginStartTime;

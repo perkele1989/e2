@@ -160,7 +160,7 @@ namespace e2
 
 	constexpr uint32_t maxNumChunkLoadTasks = 4096;
 	constexpr uint32_t maxNumMeshesPerChunk = (hexChunkResolution * hexChunkResolution)*3;
-	constexpr uint32_t maxNumEntitiesPerChunk = (hexChunkResolution * hexChunkResolution) * 3;
+	constexpr uint32_t maxNumEntitiesPerChunk = (hexChunkResolution * hexChunkResolution) * 8;
 
 	class HexGrid;
 
@@ -219,6 +219,8 @@ namespace e2
 		e2::Name entityName;
 		glm::vec2 worldPlanar;
 		float rotation;
+		e2::Moment lastDestroyed;
+		bool destroyState{ false };
 
 		uint64_t spawnedEntityId{};
 	};

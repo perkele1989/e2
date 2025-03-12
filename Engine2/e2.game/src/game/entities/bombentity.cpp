@@ -210,6 +210,31 @@ void e2::BombEntity::updateVisibility()
 	m_mesh->updateVisibility();
 }
 
+void e2::BombEntity::onInteract(e2::Entity* instigator)
+{
+	if (!m_bombSpecification->isRedBomb)
+		return;
+
+	if (game()->playerState().give("redbomb"))
+	{
+		game()->queueDestroyEntity(this);
+	}
+	else
+	{
+		game()->pushMessage("Inventory full.");
+	}
+}
+
+std::string e2::BombEntity::interactText()
+{
+	return "Pick up";
+}
+
+bool e2::BombEntity::interactable()
+{
+	return m_bombSpecification->isRedBomb;
+}
+
 void e2::BombEntity::onMeleeDamage(e2::Entity* instigator, float dmg)
 {
 

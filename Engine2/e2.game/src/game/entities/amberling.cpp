@@ -121,10 +121,10 @@ void e2::AmberlingEntity::update(double seconds)
 	
 	glm::vec2 thisCoords = planarCoords();
 
-	constexpr float jumpInterval = 3.0f;
-	constexpr float jumpTime = 0.5f;
-	constexpr float rotateTime = 2.3f;
-	constexpr float jumpHeight = 0.3f;
+	constexpr float jumpInterval = 2.0f;
+	constexpr float jumpTime = 0.9f;
+	constexpr float rotateTime = 1.3f;
+	constexpr float jumpHeight = 0.4f;
 
 	if (m_interacting)
 	{
